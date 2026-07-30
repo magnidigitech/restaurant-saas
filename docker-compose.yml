@@ -39,13 +39,12 @@ services:
       retries: 5
 
   pgbouncer:
-    image: ghcr.io/cloudnative-pg/pgbouncer:1.25.2
+    build:
+      context: .
+      dockerfile: ./infra/pgbouncer/Dockerfile
     command:
       - /usr/bin/pgbouncer
       - /etc/pgbouncer/pgbouncer.ini
-    volumes:
-      - ./infra/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
-      - ./infra/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
     # Bind to loopback interface for local development access
     ports:
       - "127.0.0.1:6432:6432"
