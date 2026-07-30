@@ -447,7 +447,8 @@ export default function PlatformAdminDashboard() {
                                       </span>
                                       <button
                                         onClick={() => {
-                                          const url = `${window.location.origin.replace("admin.", "").replace("//", `//${restaurant.subdomain}.")}/activate`;
+                                          const base = window.location.origin.replace("//admin.", "//" + restaurant.subdomain + ".");
+                                          const url = base + "/activate";
                                           navigator.clipboard.writeText(url);
                                         }}
                                         className="px-3 py-1 bg-slate-800 text-xs font-bold rounded border border-slate-700 hover:bg-slate-700 cursor-pointer shrink-0"
