@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: restaurant_saas
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    # Bind only to loopback interface to prevent public exposure
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - saas-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d restaurant_saas"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgbouncer:
+    image: edoburu/pgbouncer:1.22.0
+    volumes:
+      - ./infra/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./infra/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    ports:
+      - "127.0.0.1:6432:6432"
+    networks:
+      - saas-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
+
+networks:
+  saas-network:
+    driver: bridge

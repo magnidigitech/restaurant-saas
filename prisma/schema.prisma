@@ -1,0 +1,376 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ----------------------------------------------------
+// 1. Platform & Tenant Entities
+// ----------------------------------------------------
+
+model PlatformUser {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_users")
+}
+
+model Restaurant {
+  id        String       @id @default(uuid())
+  name      String
+  subdomain String       @unique // e.g. "cafedelights" -> cafedelights.platform.com
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  branding      RestaurantBranding?
+  domains       RestaurantDomain[]
+  outlets       RestaurantOutlet[]
+  memberships   RestaurantMembership[]
+  modules       RestaurantModule[]
+  subscriptions RestaurantSubscription[]
+  auditLogs     AuditLog[]
+  invitations   StaffInvitation[]
+  accessGrants  AccessGrant[]
+  roles         Role[]
+
+  @@map("restaurants")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+model RestaurantBranding {
+  id              String  @id @default(uuid())
+  restaurantId    String  @unique @map("restaurant_id")
+  applicationName String  @map("application_name")
+  logoUrl         String? @map("logo_url")
+  faviconUrl      String? @map("favicon_url")
+  primaryColor    String  @default("#0f172a") @map("primary_color")
+  secondaryColor  String  @default("#3b82f6") @map("secondary_color")
+  loginBackground String? @map("login_background")
+  supportEmail    String? @map("support_email")
+  supportPhone    String? @map("support_phone")
+  customDomain    String? @unique @map("custom_domain")
+
+  // Relations
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("restaurant_branding")
+}
+
+model RestaurantDomain {
+  id           String       @id @default(uuid())
+  restaurantId String       @map("restaurant_id")
+  domain       String       @unique // e.g. "coyotegrill.com"
+  status       DomainStatus @default(PENDING)
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@map("restaurant_domains")
+}
+
+enum DomainStatus {
+  PENDING
+  ACTIVE
+  FAILED
+}
+
+model RestaurantOutlet {
+  id           String   @id @default(uuid())
+  restaurantId String   @map("restaurant_id")
+  name         String
+  address      String?
+  timezone     String   @default("UTC")
+  currency     String   @default("USD")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant   Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  accessGrants AccessGrant[]
+  invitations  StaffInvitation[]
+
+  @@index([restaurantId])
+  @@map("restaurant_outlets")
+}
+
+// ----------------------------------------------------
+// 2. User & Membership Entities
+// ----------------------------------------------------
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  tokenVersion Int      @default(0) @map("token_version")
+
+  // Relations
+  memberships RestaurantMembership[]
+
+  @@map("users")
+}
+
+model RestaurantMembership {
+  id           String       @id @default(uuid())
+  restaurantId String       @map("restaurant_id")
+  userId       String       @map("user_id")
+  employeeId   String?      @map("employee_id") // Reference to HR employee profiles
+  status       MemberStatus @default(ACTIVE)
+  joinedAt     DateTime     @default(now()) @map("joined_at")
+
+  // Relations
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessGrants AccessGrant[]
+
+  @@unique([restaurantId, userId])
+  @@index([userId])
+  @@map("restaurant_memberships")
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  PENDING_INVITE
+}
+
+// ----------------------------------------------------
+// 3. Module & Entitlement Entities
+// ----------------------------------------------------
+
+model Module {
+  id           String   @id // e.g. "inventory", "shifts", "payroll", "hr_onboarding"
+  name         String
+  description  String?
+  status       String   @default("ACTIVE") // e.g. ACTIVE, MAINTENANCE
+  sortOrder    Int      @default(0) @map("sort_order")
+  dependencies String? // JSON array of module keys this depends on
+  availability String   @default("GENERAL") // GENERAL, BETA, DEPRECATED
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  restaurants  RestaurantModule[]
+  permissions  Permission[]
+  accessGrants AccessGrant[]
+
+  @@map("modules")
+}
+
+model RestaurantModule {
+  id           String       @id @default(uuid())
+  restaurantId String       @map("restaurant_id")
+  moduleId     String       @map("module_id")
+  status       ModuleStatus @default(ACTIVE)
+  enabledAt    DateTime     @default(now()) @map("enabled_at")
+  expiresAt    DateTime?    @map("expires_at")
+  enabledBy    String?      @map("enabled_by") // PlatformUser id
+
+  // Relations
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  module     Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, moduleId])
+  @@index([moduleId])
+  @@map("restaurant_modules")
+}
+
+enum ModuleStatus {
+  ACTIVE
+  INACTIVE
+  EXPIRED
+}
+
+// ----------------------------------------------------
+// 4. Role & Access Control Entities
+// ----------------------------------------------------
+
+model Role {
+  id           String   @id @default(uuid())
+  restaurantId String   @map("restaurant_id")
+  name         String // e.g. "Store Manager", "Accountant"
+  description  String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  restaurant   Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  permissions  RolePermission[]
+  accessGrants AccessGrant[]
+  invitations  StaffInvitation[]
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId])
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id // e.g. "inventory:create_item", "payroll:approve_run"
+  moduleId    String  @map("module_id")
+  name        String
+  description String?
+
+  // Relations
+  module Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  roles  RolePermission[]
+
+  @@index([moduleId])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  // Relations
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model AccessGrant {
+  id           String      @id @default(uuid())
+  restaurantId String      @map("restaurant_id")
+  membershipId String      @map("membership_id")
+  moduleId     String      @map("module_id")
+  roleId       String      @map("role_id")
+  outletId     String?     @map("outlet_id") // Nullable if grant spans entire tenant
+  status       GrantStatus @default(ACTIVE)
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  restaurant Restaurant           @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  membership RestaurantMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  module     Module               @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  role       Role                 @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  outlet     RestaurantOutlet?    @relation(fields: [outletId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId])
+  @@index([membershipId])
+  @@index([roleId])
+  @@index([outletId])
+  @@map("access_grants")
+}
+
+enum GrantStatus {
+  ACTIVE
+  REVOKED
+}
+
+// ----------------------------------------------------
+// 5. Subscription & Logs & Invites
+// ----------------------------------------------------
+
+model SubscriptionPlan {
+  id             String  @id @default(uuid())
+  name           String // e.g. "Growth", "Enterprise"
+  maxOutlets     Int     @map("max_outlets")
+  maxEmployees   Int     @map("max_employees")
+  maxAdminUsers  Int     @map("max_admin_users")
+  storageQuotaGb Int     @map("storage_quota_gb")
+  priceMonthly   Decimal @map("price_monthly")
+
+  // Relations
+  subscriptions RestaurantSubscription[]
+
+  @@map("subscription_plans")
+}
+
+model RestaurantSubscription {
+  id            String        @id @default(uuid())
+  restaurantId  String        @map("restaurant_id")
+  planId        String        @map("plan_id")
+  status        SubStatus     @default(ACTIVE)
+  billingPeriod BillingPeriod @default(MONTHLY)
+  startDate     DateTime      @default(now()) @map("start_date")
+  endDate       DateTime?     @map("end_date")
+
+  // Relations
+  restaurant Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  plan       SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@map("restaurant_subscriptions")
+}
+
+enum SubStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+}
+
+enum BillingPeriod {
+  MONTHLY
+  ANNUALLY
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  restaurantId   String?  @map("restaurant_id") // Can be null if Platform-level event
+  userId         String   @map("user_id")
+  userEmail      String   @map("user_email")
+  action         String // e.g. "RESTAURANT_CREATED"
+  entityType     String   @map("entity_type") // e.g. "Restaurant", "User"
+  entityId       String   @map("entity_id")
+  previousValues String?  @map("previous_values") // JSON text of previous state
+  newValues      String?  @map("new_values") // JSON text of new state
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Relations
+  restaurant Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model StaffInvitation {
+  id           String           @id @default(uuid())
+  restaurantId String           @map("restaurant_id")
+  email        String
+  roleId       String           @map("role_id")
+  outletId     String?          @map("outlet_id")
+  tokenHash    String           @unique @map("token_hash")
+  status       InvitationStatus @default(SENT)
+  expiresAt    DateTime         @map("expires_at")
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  // Relations
+  restaurant Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  role       Role              @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  outlet     RestaurantOutlet? @relation(fields: [outletId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, email])
+  @@index([restaurantId])
+  @@index([tokenHash])
+  @@map("staff_invitations")
+}
+
+enum InvitationStatus {
+  SENT
+  ACCEPTED
+  EXPIRED
+}
