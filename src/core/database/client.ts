@@ -3,15 +3,18 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
+const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+
 if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is missing.");
+  if (!isBuildPhase) {
+    throw new Error("DATABASE_URL environment variable is missing.");
+  }
 }
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient | undefined };
-
 let prismaInstance: PrismaClient;
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString = process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/restaurant_saas?schema=public";
 
 if (!globalForPrisma.prisma) {
   const pool = new Pool({

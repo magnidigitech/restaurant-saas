@@ -1,10 +1,16 @@
 import * as jose from "jose";
 
+const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+
 if (!process.env.JWT_SECRET) {
-  throw new Error("JWT_SECRET environment variable is missing.");
+  if (!isBuildPhase) {
+    throw new Error("JWT_SECRET environment variable is missing.");
+  }
 }
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || "dummy_jwt_secret_testing_only_must_change_in_production_123456"
+);
 
 export interface SessionPayload {
   userId: string;
