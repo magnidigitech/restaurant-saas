@@ -1,11 +1,30 @@
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    expose:
+      - "3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@pgbouncer:6432/restaurant_saas?schema=public
+      - DIRECT_DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/restaurant_saas?schema=public
+      - JWT_SECRET=${JWT_SECRET:-local_testing_secret_key_1234567890}
+      - NODE_ENV=production
+      - PORT=3000
+    networks:
+      - saas-network
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    restart: unless-stopped
+
   postgres:
     image: postgres:17-alpine
     environment:
       POSTGRES_DB: restaurant_saas
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    # Bind only to loopback interface to prevent public exposure
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    # Bind to loopback interface for local development access
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -27,6 +46,7 @@ services:
     volumes:
       - ./infra/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
       - ./infra/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    # Bind to loopback interface for local development access
     ports:
       - "127.0.0.1:6432:6432"
     networks:
