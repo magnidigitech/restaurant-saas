@@ -14,8 +14,7 @@ services:
     networks:
       - saas-network
     depends_on:
-      pgbouncer:
-        condition: service_healthy
+      - pgbouncer
     restart: unless-stopped
 
   postgres:
@@ -54,11 +53,6 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "pidof", "pgbouncer"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
 volumes:
   postgres-data:
