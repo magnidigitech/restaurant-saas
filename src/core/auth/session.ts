@@ -9,7 +9,7 @@ export async function setPlatformSession(payload: SessionPayload) {
   const cookieStore = await cookies();
   cookieStore.set(PLATFORM_SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: false,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24, // 24 hours
@@ -38,7 +38,7 @@ export async function setTenantSession(payload: SessionPayload) {
   const cookieStore = await cookies();
   cookieStore.set(TENANT_SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: false,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24, // 24 hours
