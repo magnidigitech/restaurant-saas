@@ -42,19 +42,29 @@ export async function PATCH(
       },
     });
 
+    const serializedModule = {
+      ...updated,
+      priceMonthly: Number(updated.priceMonthly),
+    };
+
+    const serializedExisting = {
+      ...existing,
+      priceMonthly: Number(existing.priceMonthly),
+    };
+
     await logAudit({
       userId: session.userId,
       userEmail: session.email,
       action: "MODULE_PRICING_UPDATED",
       entityType: "Module",
       entityId: id,
-      previousValues: existing,
-      newValues: updated,
+      previousValues: serializedExisting,
+      newValues: serializedModule,
     });
 
-    return NextResponse.json({ success: true, module: updated });
+    return NextResponse.json({ success: true, module: serializedModule });
   } catch (error: any) {
     console.error("Update Module Pricing Error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
   }
 }

@@ -14,9 +14,14 @@ export async function GET(req: NextRequest) {
       orderBy: { sortOrder: "asc" },
     });
 
-    return NextResponse.json({ modules });
+    const serialized = modules.map((m) => ({
+      ...m,
+      priceMonthly: Number(m.priceMonthly),
+    }));
+
+    return NextResponse.json({ modules: serialized });
   } catch (error: any) {
     console.error("List Platform Modules Error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
   }
 }
