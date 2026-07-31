@@ -63,7 +63,7 @@ interface SystemModule {
 
 export default function PlatformAdminDashboard() {
   const router = useRouter();
-  
+
   // Navigation Tabs
   const [activeTab, setActiveTab] = useState<"tenants" | "onboard" | "modules" | "logs">("tenants");
 
@@ -359,33 +359,29 @@ export default function PlatformAdminDashboard() {
         <aside className="w-full md:w-64 border-r border-slate-900 p-4 space-y-2 flex flex-col justify-start">
           <button
             onClick={() => setActiveTab("tenants")}
-            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-              activeTab === "tenants" ? "bg-blue-600 text-white font-bold" : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-100"
-            }`}
+            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeTab === "tenants" ? "bg-blue-600 text-white font-bold" : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-100"
+              }`}
           >
             Manage Tenants
           </button>
           <button
             onClick={() => setActiveTab("onboard")}
-            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-              activeTab === "onboard" ? "bg-blue-600 text-white font-bold" : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-100"
-            }`}
+            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeTab === "onboard" ? "bg-blue-600 text-white font-bold" : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-100"
+              }`}
           >
             Onboard Tenant
           </button>
           <button
             onClick={() => setActiveTab("modules")}
-            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-              activeTab === "modules" ? "bg-blue-600 text-white font-bold" : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-100"
-            }`}
+            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeTab === "modules" ? "bg-blue-600 text-white font-bold" : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-100"
+              }`}
           >
             Module Add-on Pricing
           </button>
           <button
             onClick={() => setActiveTab("logs")}
-            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-              activeTab === "logs" ? "bg-blue-600 text-white font-bold" : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-100"
-            }`}
+            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeTab === "logs" ? "bg-blue-600 text-white font-bold" : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-100"
+              }`}
           >
             Audit Logs
           </button>
@@ -401,187 +397,184 @@ export default function PlatformAdminDashboard() {
             <>
               {/* Tab 1: Tenants List */}
               {activeTab === "tenants" && (
-                  <div className="space-y-4">
-                    <h3 className="text-2xl font-bold tracking-tight text-white">Active Tenants</h3>
-                    {restaurants.length === 0 ? (
-                      <div className="text-slate-500 py-12 text-center border border-dashed border-slate-800 rounded-xl">
-                        No restaurant tenants found. Onboard a restaurant to begin.
-                      </div>
-                    ) : (
-                      <div className="grid gap-4">
-                        {restaurants.map((restaurant) => {
-                          const sub = restaurant.subscriptions[0];
-                          const isExpanded = expandedTenant === restaurant.id;
-                          const statusColor = restaurant.status === "ACTIVE"
-                            ? "bg-green-950 text-green-200 border-green-800"
-                            : restaurant.status === "SUSPENDED"
+                <div className="space-y-4">
+                  <h3 className="text-2xl font-bold tracking-tight text-white">Active Tenants</h3>
+                  {restaurants.length === 0 ? (
+                    <div className="text-slate-500 py-12 text-center border border-dashed border-slate-800 rounded-xl">
+                      No restaurant tenants found. Onboard a restaurant to begin.
+                    </div>
+                  ) : (
+                    <div className="grid gap-4">
+                      {restaurants.map((restaurant) => {
+                        const sub = restaurant.subscriptions[0];
+                        const isExpanded = expandedTenant === restaurant.id;
+                        const statusColor = restaurant.status === "ACTIVE"
+                          ? "bg-green-950 text-green-200 border-green-800"
+                          : restaurant.status === "SUSPENDED"
                             ? "bg-yellow-950 text-yellow-200 border-yellow-800"
                             : "bg-red-950 text-red-200 border-red-800";
-                          return (
+                        return (
+                          <div
+                            key={restaurant.id}
+                            className="bg-slate-900/30 border border-slate-900 rounded-2xl overflow-hidden hover:border-slate-800 transition-all"
+                          >
+                            {/* Tenant Card Header - always visible */}
                             <div
-                              key={restaurant.id}
-                              className="bg-slate-900/30 border border-slate-900 rounded-2xl overflow-hidden hover:border-slate-800 transition-all"
+                              className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 cursor-pointer"
+                              onClick={() => setExpandedTenant(isExpanded ? null : restaurant.id)}
                             >
-                              {/* Tenant Card Header - always visible */}
-                              <div
-                                className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 cursor-pointer"
-                                onClick={() => setExpandedTenant(isExpanded ? null : restaurant.id)}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className="w-9 h-9 rounded-lg bg-blue-900/60 border border-blue-800 flex items-center justify-center font-bold text-blue-300 uppercase">
-                                    {restaurant.name.charAt(0)}
-                                  </div>
-                                  <div>
-                                    <h4 className="text-base font-bold text-white leading-tight">{restaurant.name}</h4>
-                                    <p className="text-xs text-slate-500 font-mono">{restaurant.subdomain}.yourplatform.com</p>
-                                  </div>
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-lg bg-blue-900/60 border border-blue-800 flex items-center justify-center font-bold text-blue-300 uppercase">
+                                  {restaurant.name.charAt(0)}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <span className={`text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider border ${statusColor}`}>
-                                    {restaurant.status}
-                                  </span>
-                                  <span className="text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider bg-blue-950 text-blue-200 border border-blue-800">
-                                    {sub?.plan.name || "No Plan"}
-                                  </span>
-                                  <svg
-                                    className={`w-4 h-4 text-slate-500 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-                                  >
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                                  </svg>
+                                <div>
+                                  <h4 className="text-base font-bold text-white leading-tight">{restaurant.name}</h4>
+                                  <p className="text-xs text-slate-500 font-mono">{restaurant.subdomain}.yourplatform.com</p>
                                 </div>
                               </div>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider border ${statusColor}`}>
+                                  {restaurant.status}
+                                </span>
+                                <span className="text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wider bg-blue-950 text-blue-200 border border-blue-800">
+                                  {sub?.plan.name || "No Plan"}
+                                </span>
+                                <svg
+                                  className={`w-4 h-4 text-slate-500 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                                  fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </div>
+                            </div>
 
-                              {/* Expanded Details Panel */}
-                              {isExpanded && (
-                                <div className="border-t border-slate-900 p-5 space-y-5 bg-slate-950/40">
-                                  {/* Plan Limits */}
-                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                                    {[
-                                      { label: "Outlets", value: sub?.plan.maxOutlets ?? 0 },
-                                      { label: "Employees", value: sub?.plan.maxEmployees ?? 0 },
-                                      { label: "Admins", value: sub?.plan.maxAdminUsers ?? 0 },
-                                      { label: "Storage", value: `${sub?.plan.storageQuotaGb ?? 0} GB` },
-                                    ].map((item) => (
-                                      <div key={item.label} className="bg-slate-900/50 rounded-lg p-3 border border-slate-900">
-                                        <span className="text-slate-500 text-xs block mb-1">{item.label} Limit</span>
-                                        <span className="font-bold text-slate-200">{item.value}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-
-                                  {/* Module Toggles */}
-                                  <div>
-                                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block mb-3">
-                                      Active Modules (click to toggle)
-                                    </span>
-                                    <div className="flex flex-wrap gap-2">
-                                      {availableModules.map((mod) => {
-                                        const isEnabled = restaurant.modules.some((rm) => rm.moduleId === mod.key);
-                                        return (
-                                          <button
-                                            key={mod.key}
-                                            onClick={() => handleToggleModule(restaurant.id, mod.key, isEnabled)}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                                              isEnabled
-                                                ? "bg-blue-950 text-blue-200 border-blue-800 hover:bg-red-950 hover:text-red-200 hover:border-red-800"
-                                                : "bg-slate-950 text-slate-500 border-slate-900 hover:border-green-800 hover:text-green-200 hover:bg-green-950"
-                                            }`}
-                                            title={isEnabled ? `Disable ${mod.label}` : `Enable ${mod.label}`}
-                                          >
-                                            {mod.label} {isEnabled ? "✓" : "+"}
-                                          </button>
-                                        );
-                                      })}
+                            {/* Expanded Details Panel */}
+                            {isExpanded && (
+                              <div className="border-t border-slate-900 p-5 space-y-5 bg-slate-950/40">
+                                {/* Plan Limits */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                  {[
+                                    { label: "Outlets", value: sub?.plan.maxOutlets ?? 0 },
+                                    { label: "Employees", value: sub?.plan.maxEmployees ?? 0 },
+                                    { label: "Admins", value: sub?.plan.maxAdminUsers ?? 0 },
+                                    { label: "Storage", value: `${sub?.plan.storageQuotaGb ?? 0} GB` },
+                                  ].map((item) => (
+                                    <div key={item.label} className="bg-slate-900/50 rounded-lg p-3 border border-slate-900">
+                                      <span className="text-slate-500 text-xs block mb-1">{item.label} Limit</span>
+                                      <span className="font-bold text-slate-200">{item.value}</span>
                                     </div>
-                                  </div>
+                                  ))}
+                                </div>
 
-                                  {/* Status Management */}
-                                  <div>
-                                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block mb-3">
-                                      Tenant Status
-                                    </span>
-                                    <div className="flex gap-2 flex-wrap">
-                                      {(["ACTIVE", "SUSPENDED", "DEACTIVATED"] as const).map((s) => (
+                                {/* Module Toggles */}
+                                <div>
+                                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block mb-3">
+                                    Active Modules (click to toggle)
+                                  </span>
+                                  <div className="flex flex-wrap gap-2">
+                                    {availableModules.map((mod) => {
+                                      const isEnabled = restaurant.modules.some((rm) => rm.moduleId === mod.key);
+                                      return (
                                         <button
-                                          key={s}
-                                          disabled={restaurant.status === s || statusLoading === restaurant.id}
-                                          onClick={() => handleStatusChange(restaurant.id, s)}
-                                          className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                                            s === "ACTIVE" ? "border-green-800 text-green-200 hover:bg-green-950" :
-                                            s === "SUSPENDED" ? "border-yellow-800 text-yellow-200 hover:bg-yellow-950" :
-                                            "border-red-800 text-red-200 hover:bg-red-950"
-                                          } ${ restaurant.status === s ? "bg-slate-900" : "bg-transparent" }`}
-                                        >
-                                          {statusLoading === restaurant.id ? "Saving..." : s}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  {/* Invite Link */}
-                                  <div>
-                                    <div className="flex items-center justify-between mb-2">
-                                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
-                                        Admin Activation URL
-                                      </span>
-                                      {restaurant.invitations.length > 0 && (
-                                        <span className="text-xs text-slate-500">
-                                          Pending invite for: <span className="text-slate-300">{restaurant.invitations[0].email}</span>
-                                        </span>
-                                      )}
-                                    </div>
-
-                                    {inviteUrls[restaurant.id] ? (
-                                      <div className="space-y-2">
-                                        <div className="flex items-center gap-2 bg-slate-900 p-3 rounded-lg border border-blue-900">
-                                          <input
-                                            readOnly
-                                            value={inviteUrls[restaurant.id]}
-                                            className="w-full bg-transparent text-xs text-blue-300 font-mono focus:outline-none selection:bg-blue-900"
-                                          />
-                                        </div>
-                                        <div className="flex gap-2">
-                                          <button
-                                            onClick={() => handleCopyUrl(restaurant.id)}
-                                            className={`flex-1 px-3 py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
-                                              copiedId === restaurant.id
-                                                ? "bg-green-950 border-green-800 text-green-200"
-                                                : "bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
+                                          key={mod.key}
+                                          onClick={() => handleToggleModule(restaurant.id, mod.key, isEnabled)}
+                                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${isEnabled
+                                              ? "bg-blue-950 text-blue-200 border-blue-800 hover:bg-red-950 hover:text-red-200 hover:border-red-800"
+                                              : "bg-slate-950 text-slate-500 border-slate-900 hover:border-green-800 hover:text-green-200 hover:bg-green-950"
                                             }`}
-                                          >
-                                            {copiedId === restaurant.id ? "✓ Copied!" : "Copy URL"}
-                                          </button>
-                                          <button
-                                            onClick={() => handleGenerateInvite(restaurant.id, restaurant.subdomain)}
-                                            disabled={inviteLoadingId === restaurant.id}
-                                            className="px-3 py-2 text-xs font-bold rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-all cursor-pointer disabled:opacity-40"
-                                          >
-                                            {inviteLoadingId === restaurant.id ? "Generating..." : "↻ Regenerate"}
-                                          </button>
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <button
-                                        onClick={() => handleGenerateInvite(restaurant.id, restaurant.subdomain)}
-                                        disabled={inviteLoadingId === restaurant.id || restaurant.invitations.length === 0}
-                                        className="w-full py-2.5 text-sm font-semibold rounded-lg border border-blue-800 text-blue-300 hover:bg-blue-950 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                                      >
-                                        {inviteLoadingId === restaurant.id
-                                          ? "Generating link..."
-                                          : restaurant.invitations.length === 0
-                                          ? "No pending invitation"
-                                          : "Generate Activation Link"}
-                                      </button>
-                                    )}
+                                          title={isEnabled ? `Disable ${mod.label}` : `Enable ${mod.label}`}
+                                        >
+                                          {mod.label} {isEnabled ? "✓" : "+"}
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+
+                                {/* Status Management */}
+                                <div>
+                                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block mb-3">
+                                    Tenant Status
+                                  </span>
+                                  <div className="flex gap-2 flex-wrap">
+                                    {(["ACTIVE", "SUSPENDED", "DEACTIVATED"] as const).map((s) => (
+                                      <button
+                                        key={s}
+                                        disabled={restaurant.status === s || statusLoading === restaurant.id}
+                                        onClick={() => handleStatusChange(restaurant.id, s)}
+                                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${s === "ACTIVE" ? "border-green-800 text-green-200 hover:bg-green-950" :
+                                            s === "SUSPENDED" ? "border-yellow-800 text-yellow-200 hover:bg-yellow-950" :
+                                              "border-red-800 text-red-200 hover:bg-red-950"
+                                          } ${restaurant.status === s ? "bg-slate-900" : "bg-transparent"}`}
+                                      >
+                                        {statusLoading === restaurant.id ? "Saving..." : s}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Invite Link */}
+                                <div>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
+                                      Admin Activation URL
+                                    </span>
+                                    {restaurant.invitations.length > 0 && (
+                                      <span className="text-xs text-slate-500">
+                                        Pending invite for: <span className="text-slate-300">{restaurant.invitations[0].email}</span>
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {inviteUrls[restaurant.id] ? (
+                                    <div className="space-y-2">
+                                      <div className="flex items-center gap-2 bg-slate-900 p-3 rounded-lg border border-blue-900">
+                                        <input
+                                          readOnly
+                                          value={inviteUrls[restaurant.id]}
+                                          className="w-full bg-transparent text-xs text-blue-300 font-mono focus:outline-none selection:bg-blue-900"
+                                        />
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <button
+                                          onClick={() => handleCopyUrl(restaurant.id)}
+                                          className={`flex-1 px-3 py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${copiedId === restaurant.id
+                                              ? "bg-green-950 border-green-800 text-green-200"
+                                              : "bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
+                                            }`}
+                                        >
+                                          {copiedId === restaurant.id ? "✓ Copied!" : "Copy URL"}
+                                        </button>
+                                        <button
+                                          onClick={() => handleGenerateInvite(restaurant.id, restaurant.subdomain)}
+                                          disabled={inviteLoadingId === restaurant.id}
+                                          className="px-3 py-2 text-xs font-bold rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-all cursor-pointer disabled:opacity-40"
+                                        >
+                                          {inviteLoadingId === restaurant.id ? "Generating..." : "↻ Regenerate"}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleGenerateInvite(restaurant.id, restaurant.subdomain)}
+                                      disabled={inviteLoadingId === restaurant.id || restaurant.invitations.length === 0}
+                                      className="w-full py-2.5 text-sm font-semibold rounded-lg border border-blue-800 text-blue-300 hover:bg-blue-950 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                      {inviteLoadingId === restaurant.id
+                                        ? "Generating link..."
+                                        : restaurant.invitations.length === 0
+                                          ? "No pending invitation"
+                                          : "Generate Activation Link"}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -746,11 +739,10 @@ export default function PlatformAdminDashboard() {
                           return (
                             <label
                               key={mod.key}
-                              className={`flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer select-none ${
-                                isChecked
+                              className={`flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer select-none ${isChecked
                                   ? "bg-blue-950/30 border-blue-800/80 text-blue-200"
                                   : "bg-slate-950/50 border-slate-900 text-slate-400 hover:border-slate-800 hover:text-slate-300"
-                              }`}
+                                }`}
                             >
                               <div className="flex items-center space-x-3">
                                 <input
@@ -765,9 +757,8 @@ export default function PlatformAdminDashboard() {
                                 />
                                 <span className="text-sm font-semibold">{mod.label}</span>
                               </div>
-                              <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
-                                price > 0 ? "bg-blue-950 text-blue-300 border border-blue-800" : "bg-slate-900 text-slate-500"
-                              }`}>
+                              <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${price > 0 ? "bg-blue-950 text-blue-300 border border-blue-800" : "bg-slate-900 text-slate-500"
+                                }`}>
                                 {price > 0 ? `+$${price}/mo` : "$0/mo"}
                               </span>
                             </label>

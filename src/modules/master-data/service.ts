@@ -9,12 +9,13 @@ export class MasterDataService {
     });
   }
 
-  static async createDepartment(restaurantId: string, data: { name: string; code: string }) {
+  static async createDepartment(restaurantId: string, data: { name: string; code: string; description?: string }) {
     return prisma.department.create({
       data: {
         restaurantId,
         name: data.name,
         code: data.code.toUpperCase(),
+        description: data.description || null,
         status: "ACTIVE",
       },
     });
@@ -23,13 +24,14 @@ export class MasterDataService {
   static async updateDepartment(
     restaurantId: string,
     id: string,
-    data: { name?: string; code?: string; status?: string }
+    data: { name?: string; code?: string; description?: string; status?: string }
   ) {
     return prisma.department.updateMany({
       where: { id, restaurantId },
       data: {
         ...(data.name && { name: data.name }),
         ...(data.code && { code: data.code.toUpperCase() }),
+        ...(data.description !== undefined && { description: data.description }),
         ...(data.status && { status: data.status }),
       },
     });
@@ -50,12 +52,13 @@ export class MasterDataService {
     });
   }
 
-  static async createDesignation(restaurantId: string, data: { name: string; code: string }) {
+  static async createDesignation(restaurantId: string, data: { name: string; code: string; description?: string }) {
     return prisma.designation.create({
       data: {
         restaurantId,
         name: data.name,
         code: data.code.toUpperCase(),
+        description: data.description || null,
         status: "ACTIVE",
       },
     });
@@ -64,13 +67,14 @@ export class MasterDataService {
   static async updateDesignation(
     restaurantId: string,
     id: string,
-    data: { name?: string; code?: string; status?: string }
+    data: { name?: string; code?: string; description?: string; status?: string }
   ) {
     return prisma.designation.updateMany({
       where: { id, restaurantId },
       data: {
         ...(data.name && { name: data.name }),
         ...(data.code && { code: data.code.toUpperCase() }),
+        ...(data.description !== undefined && { description: data.description }),
         ...(data.status && { status: data.status }),
       },
     });
@@ -97,7 +101,7 @@ export class MasterDataService {
         restaurantId,
         name: data.name,
         code: data.code.toUpperCase(),
-        description: data.description,
+        description: data.description || null,
         status: "ACTIVE",
       },
     });
@@ -119,6 +123,13 @@ export class MasterDataService {
     });
   }
 
+  static async archiveJobGrade(restaurantId: string, id: string) {
+    return prisma.jobGrade.updateMany({
+      where: { id, restaurantId },
+      data: { archivedAt: new Date(), status: "INACTIVE" },
+    });
+  }
+
   // --- Cost Centers ---
   static async getCostCenters(restaurantId: string) {
     return prisma.costCenter.findMany({
@@ -133,7 +144,7 @@ export class MasterDataService {
         restaurantId,
         name: data.name,
         code: data.code.toUpperCase(),
-        description: data.description,
+        description: data.description || null,
         status: "ACTIVE",
       },
     });
@@ -152,6 +163,13 @@ export class MasterDataService {
         ...(data.description !== undefined && { description: data.description }),
         ...(data.status && { status: data.status }),
       },
+    });
+  }
+
+  static async archiveCostCenter(restaurantId: string, id: string) {
+    return prisma.costCenter.updateMany({
+      where: { id, restaurantId },
+      data: { archivedAt: new Date(), status: "INACTIVE" },
     });
   }
 }
