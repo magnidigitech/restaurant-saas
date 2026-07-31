@@ -54,15 +54,23 @@ interface AuditLog {
   createdAt: string;
 }
 
+interface SystemModule {
+  id: string;
+  name: string;
+  description: string | null;
+  priceMonthly: number;
+}
+
 export default function PlatformAdminDashboard() {
   const router = useRouter();
   
   // Navigation Tabs
-  const [activeTab, setActiveTab] = useState<"tenants" | "onboard" | "logs">("tenants");
+  const [activeTab, setActiveTab] = useState<"tenants" | "onboard" | "modules" | "logs">("tenants");
 
   // State
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [systemModules, setSystemModules] = useState<SystemModule[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -78,10 +86,8 @@ export default function PlatformAdminDashboard() {
     primaryAdminName: "",
     primaryAdminEmail: "",
   });
-  const [selectedModules, setSelectedModules] = useState<string[]>([
-    "hr_onboarding",
-    "inventory",
-  ]);
+  // No modules selected by default
+  const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [createdInvite, setCreatedInvite] = useState<{ url: string; subdomain: string } | null>(null);
@@ -90,32 +96,35 @@ export default function PlatformAdminDashboard() {
   const [inviteUrls, setInviteUrls] = useState<Record<string, string>>({});
   const [inviteLoadingId, setInviteLoadingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [savingModuleId, setSavingModuleId] = useState<string | null>(null);
 
-  // Module List
-  const availableModules = [
-    { key: "hr_onboarding", label: "HR Onboarding" },
-    { key: "shift_management", label: "Shift Management" },
-    { key: "attendance", label: "Attendance" },
-    { key: "leave_management", label: "Leave Management" },
-    { key: "payroll", label: "Payroll" },
-    { key: "inventory", label: "Inventory" },
-    { key: "vendor_management", label: "Vendor Management" },
-    { key: "purchase_management", label: "Purchase Management" },
+  // Fallback Module List if systemModules is loading
+  const availableModules = systemModules.length > 0 ? systemModules.map(m => ({ key: m.id, label: m.name, priceMonthly: Number(m.priceMonthly || 0) })) : [
+    { key: "hr_onboarding", label: "HR Onboarding", priceMonthly: 0 },
+    { key: "shift_management", label: "Shift Management", priceMonthly: 0 },
+    { key: "attendance", label: "Attendance", priceMonthly: 0 },
+    { key: "leave_management", label: "Leave Management", priceMonthly: 0 },
+    { key: "payroll", label: "Payroll", priceMonthly: 0 },
+    { key: "inventory", label: "Inventory", priceMonthly: 0 },
+    { key: "vendor_management", label: "Vendor Management", priceMonthly: 0 },
+    { key: "purchase_management", label: "Purchase Management", priceMonthly: 0 },
   ];
 
   // Fetch Data
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [resTenants, resPlans, resLogs] = await Promise.all([
+      const [resTenants, resPlans, resLogs, resModules] = await Promise.all([
         fetch("/api/platform-admin/restaurants"),
         fetch("/api/platform-admin/subscription-plans"),
         fetch("/api/platform-admin/audit-logs"),
+        fetch("/api/platform-admin/modules"),
       ]);
 
       const dataTenants = await resTenants.json();
       const dataPlans = await resPlans.json();
       const dataLogs = await resLogs.json();
+      const dataModules = await resModules.json();
 
       if (resTenants.ok) setRestaurants(dataTenants.restaurants || []);
       if (resPlans.ok) {
@@ -125,6 +134,7 @@ export default function PlatformAdminDashboard() {
         }
       }
       if (resLogs.ok) setLogs(dataLogs.auditLogs || []);
+      if (resModules.ok) setSystemModules(dataModules.modules || []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -291,6 +301,29 @@ export default function PlatformAdminDashboard() {
     }
   };
 
+  // Update module add-on price
+  const handleUpdateModulePrice = async (moduleId: string, newPrice: number) => {
+    setSavingModuleId(moduleId);
+    try {
+      const res = await fetch(`/api/platform-admin/modules/${moduleId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceMonthly: newPrice }),
+      });
+      if (res.ok) {
+        setSystemModules((prev) =>
+          prev.map((m) => (m.id === moduleId ? { ...m, priceMonthly: newPrice } : m))
+        );
+      } else {
+        alert("Failed to update module price");
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingModuleId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       {/* Header Banner */}
@@ -330,6 +363,14 @@ export default function PlatformAdminDashboard() {
             }`}
           >
             Onboard Tenant
+          </button>
+          <button
+            onClick={() => setActiveTab("modules")}
+            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === "modules" ? "bg-blue-600 text-white font-bold" : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-100"
+            }`}
+          >
+            Module Add-on Pricing
           </button>
           <button
             onClick={() => setActiveTab("logs")}
@@ -683,37 +724,75 @@ export default function PlatformAdminDashboard() {
 
                     {/* Module entitlements checkboxes */}
                     <div>
-                      <label className="text-xs font-semibold text-slate-400 uppercase block mb-3">Enable Modules</label>
+                      <div className="flex justify-between items-center mb-3">
+                        <label className="text-xs font-semibold text-slate-400 uppercase block">Enable Modules (Add-ons)</label>
+                        <span className="text-xs text-slate-500 font-semibold">
+                          Selected: {selectedModules.length} module(s)
+                        </span>
+                      </div>
                       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
                         {availableModules.map((mod) => {
                           const isChecked = selectedModules.includes(mod.key);
+                          const price = mod.priceMonthly || 0;
                           return (
                             <label
                               key={mod.key}
-                              className={`flex items-center space-x-3 p-3 rounded-lg border transition-all cursor-pointer select-none ${
+                              className={`flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer select-none ${
                                 isChecked
-                                  ? "bg-blue-950/20 border-blue-800/80 text-blue-200"
+                                  ? "bg-blue-950/30 border-blue-800/80 text-blue-200"
                                   : "bg-slate-950/50 border-slate-900 text-slate-400 hover:border-slate-800 hover:text-slate-300"
                               }`}
                             >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => {
-                                  setSelectedModules((prev) =>
-                                    isChecked ? prev.filter((k) => k !== mod.key) : [...prev, mod.key]
-                                  );
-                                }}
-                                className="w-4 h-4 accent-blue-500 cursor-pointer"
-                              />
-                              <span className="text-sm font-semibold">{mod.label}</span>
+                              <div className="flex items-center space-x-3">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    setSelectedModules((prev) =>
+                                      isChecked ? prev.filter((k) => k !== mod.key) : [...prev, mod.key]
+                                    );
+                                  }}
+                                  className="w-4 h-4 accent-blue-500 cursor-pointer"
+                                />
+                                <span className="text-sm font-semibold">{mod.label}</span>
+                              </div>
+                              <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
+                                price > 0 ? "bg-blue-950 text-blue-300 border border-blue-800" : "bg-slate-900 text-slate-500"
+                              }`}>
+                                {price > 0 ? `+$${price}/mo` : "$0/mo"}
+                              </span>
                             </label>
                           );
                         })}
                       </div>
                     </div>
 
-                    <div className="pt-4">
+                    {/* Pricing Summary */}
+                    {(() => {
+                      const selectedPlan = plans.find((p) => p.id === formData.subscriptionPlanId);
+                      const basePrice = Number(selectedPlan?.priceMonthly || 0);
+                      const addOnPrice = selectedModules.reduce((acc, key) => {
+                        const m = availableModules.find((mod) => mod.key === key);
+                        return acc + Number(m?.priceMonthly || 0);
+                      }, 0);
+                      const totalPrice = basePrice + addOnPrice;
+
+                      return (
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center text-sm">
+                          <div>
+                            <span className="text-slate-400 font-semibold block">Total Subscription & Add-on Price:</span>
+                            <span className="text-xs text-slate-500">
+                              Base ({selectedPlan?.name || "Plan"}): ${basePrice}/mo &bull; Add-ons ({selectedModules.length}): +${addOnPrice}/mo
+                            </span>
+                          </div>
+                          <span className="text-xl font-extrabold text-blue-400 font-mono">
+                            ${totalPrice}/mo
+                          </span>
+                        </div>
+                      );
+                    })()}
+
+                    <div className="pt-2">
                       <button
                         type="submit"
                         disabled={formLoading}
@@ -726,7 +805,69 @@ export default function PlatformAdminDashboard() {
                 </div>
               )}
 
-              {/* Tab 3: System Audit Logs */}
+              {/* Tab 3: Module Add-on Pricing Settings */}
+              {activeTab === "modules" && (
+                <div className="space-y-6 max-w-4xl">
+                  <div>
+                    <h3 className="text-2xl font-bold tracking-tight text-white">Module Add-on Pricing</h3>
+                    <p className="text-sm text-slate-400 mt-1">Configure monthly add-on fees for each operational module.</p>
+                  </div>
+
+                  {systemModules.length === 0 ? (
+                    <div className="text-slate-500 py-12 text-center border border-dashed border-slate-800 rounded-xl">
+                      No system modules found. Run seeding to populate initial modules.
+                    </div>
+                  ) : (
+                    <div className="grid gap-4">
+                      {systemModules.map((mod) => (
+                        <div
+                          key={mod.id}
+                          className="bg-slate-900/30 border border-slate-900 p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:border-slate-800 transition-all"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-3">
+                              <h4 className="text-lg font-bold text-white">{mod.name}</h4>
+                              <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-950 text-blue-400 border border-slate-800">
+                                {mod.id}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400">{mod.description || "No description."}</p>
+                          </div>
+
+                          <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-1 bg-slate-950 px-3 py-2 rounded-lg border border-slate-800">
+                              <span className="text-xs text-slate-500 font-bold">$</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={mod.priceMonthly}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  setSystemModules((prev) =>
+                                    prev.map((m) => (m.id === mod.id ? { ...m, priceMonthly: val } : m))
+                                  );
+                                }}
+                                className="w-20 bg-transparent text-sm font-bold font-mono text-white focus:outline-none"
+                              />
+                              <span className="text-xs text-slate-500 font-semibold">/mo</span>
+                            </div>
+                            <button
+                              onClick={() => handleUpdateModulePrice(mod.id, Number(mod.priceMonthly))}
+                              disabled={savingModuleId === mod.id}
+                              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                            >
+                              {savingModuleId === mod.id ? "Saving..." : "Save Price"}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 4: System Audit Logs */}
               {activeTab === "logs" && (
                 <div className="space-y-6">
                   <h3 className="text-2xl font-bold tracking-tight text-white">System Audit Log</h3>

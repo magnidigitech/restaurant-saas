@@ -175,6 +175,7 @@ model Module {
   sortOrder    Int      @default(0) @map("sort_order")
   dependencies String? // JSON array of module keys this depends on
   availability String   @default("GENERAL") // GENERAL, BETA, DEPRECATED
+  priceMonthly Decimal  @default(0) @map("price_monthly")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
