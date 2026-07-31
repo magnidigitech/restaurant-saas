@@ -20,26 +20,40 @@ src/
 │   │       ├── login/
 │   │       ├── activate/
 │   │       ├── dashboard/
+│   │       ├── settings/          # profile, outlets, master-data, roles-permissions, access-grants
+│   │       ├── workforce/         # employees, employees/[id], users
 │   │       └── modules/[moduleKey]/
 │   └── api/                       # API Handlers
 │       ├── platform-admin/
 │       │   ├── auth/              # login, logout
-│       │   ├── restaurants/       # create, update, list, modules mapping
+│       │   ├── restaurants/       # create, update, list, modules, status, resend-invite
 │       │   └── audit-logs/        # audit records list
 │       └── restaurant/
 │           ├── auth/              # member login, logout
 │           ├── activate/          # invitation activation handler
+│           ├── profile/           # profile & branding
+│           ├── outlets/           # physical branches management
+│           ├── departments/       # department master data
+│           ├── designations/      # designation master data
+│           ├── job-grades/        # job grade master data
+│           ├── cost-centers/      # cost center master data
+│           ├── employees/         # employee onboarding, detail, history, assignments, docs
+│           ├── users/             # internal login creation & invites
+│           ├── roles/             # custom roles builder
+│           ├── permissions/       # system permissions list
+│           ├── access-grants/     # module access grants matrix
 │           └── modules/           # list entitled modules and verify actions
 ├── core/                          # Shared codebase infrastructure
-│   ├── auth/                      # JWT validation and session cookes
+│   ├── auth/                      # JWT validation and session cookies
 │   ├── database/                  # Prisma client singleton instance
-│   ├── permissions/               # check access rights check engine
+│   ├── permissions/               # check access rights engine
 │   ├── audit/                     # AuditLogger database writer
-│   └── tests/                     # Security verification tests
+│   └── tests/                     # Security verification test suites
 ├── infra/                         # Production docker infrastructure config
 │   └── pgbouncer/                 # PgBouncer configurations (ini, userlist)
 ├── proxy.ts                       # Next.js 16 subdomain rewriter & proxy routing
-└── modules/                       # Independent business modules (placeholders for now)
+└── modules/                       # Business modules
+    ├── master-data/               # Centralized master data service
     ├── inventory/
     ├── shifts/
     ├── attendance/

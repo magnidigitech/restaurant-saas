@@ -6,26 +6,31 @@ This document captures the current status of the project, including completed wo
 
 ## 1. Project Phase Summary
 
-* **Current Phase**: Phase 1.1 (Production Hardening and PgBouncer Integration)
+* **Current Phase**: Phase 2 (Restaurant Administration & Workforce Foundation)
 * **Status**: Completed
 
 ### Work Completed:
-1. **Workspace Bootstrap**: Next.js App Router workspace set up with Tailwind CSS, Zod, TypeScript, and ESLint.
-2. **Next.js 16 Proxy Migration**: Migrated deprecated middleware.ts to `src/proxy.ts` using Next.js 16 proxy routing convention, isolating database accesses from edge request routes.
-3. **Database Engine**: Configured Prisma 7 schema mapped with all 17 tables, proper indexes for `restaurant_id` / `outlet_id`, and transaction/migration connection options.
-4. **Session Versioning**: Implemented User `tokenVersion` DB tracking. The authorization engine validates user sessions against this version on every request, allowing instantaneous global logout/revocation.
-5. **Cryptographic Invitation Hashing**: Staff invitation UUIDs are hashed with `SHA-256` before storing, keeping plaintext credentials out of the database tables.
-6. **Authentication Protections**: Configured CSRF origin/referer validation and built-in in-memory rate limiting to block brute force dictionary logins.
-7. **PgBouncer Orchestration**: Designed PgBouncer transaction pooling container config (`pgbouncer.ini`, `userlist.txt`) and added it to private `saas-network` services in `docker-compose.yml`.
-8. **Prisma Connection Pooling**: Pinned client runtime database connections to explicit pool limits matching PgBouncer limits in `src/core/database/client.ts`.
-9. **Health Check APIs**: Built lightweight liveness check (`GET /api/health/live`) and ready check (`GET /api/health/ready` performing `SELECT 1` DB ping).
-10. **CLI Scripts**: Added NPM script commands for migrations, client generation, database seed execution, and security tests execution.
-11. **Verification Suite**: Expanded `src/core/tests/security.test.ts` to assert all 14 tenant-isolation, cross-subdomain, invitation-lifecycle, session-revocation, and outlet-scope constraints.
+1. **Workspace Bootstrap & Production Hardening**: Next.js App Router workspace set up with Tailwind CSS, Zod, TypeScript, ESLint, PgBouncer transaction pooling, tokenVersion session invalidation, and hashed invitation tokens.
+2. **Phase 2 Database Entities**: Expanded Prisma schema with 9 new entities (`Department`, `Designation`, `JobGrade`, `CostCenter`, `Employee`, `EmploymentRecord`, `EmployeeOutletAssignment`, `EmployeeEmergencyContact`, `EmployeeDocument`) and enums (`EmploymentStatus`, `WorkerType`, `AssignmentType`, `DocumentType`). Applied migration `20260731072219_phase2_init`.
+3. **Master Data Module**: Created `src/modules/master-data/service.ts` owning tenant-isolated CRUD for departments, designations, job grades, and cost centers.
+4. **Restaurant Administration APIs**: Built complete REST API suite under `src/app/api/restaurant/` for profile/branding, outlets (with transactional `maxOutlets` limit enforcement), departments, designations, job grades, cost centers, employees (with auto-generated `EMP-00001` codes per restaurant and transactional `maxEmployees` limit check), employment records, outlet assignments, emergency contacts, document metadata, internal user logins (with `maxAdminUsers` limit check), custom roles, system permissions, and module access grants.
+5. **Restaurant Admin Mobile-First UI Pages**:
+   - `settings/profile` (Profile & Branding, color pickers, limit overview)
+   - `settings/outlets` (Physical branches, timezones, currencies, creation modal)
+   - `settings/master-data` (Tabbed departments, designations, job grades, cost centers)
+   - `workforce/employees` (Directory, search, filters, mobile card view, desktop table view, `EMP-00001` auto-coding)
+   - `workforce/employees/[id]` (Detail view with Profile, History, Outlets, Contacts, Documents tabs)
+   - `workforce/users` (Internal login generation for existing employees, invite link creation)
+   - `settings/roles-permissions` (Custom role builder & permissions matrix)
+   - `settings/access-grants` (Module & outlet access grant matrix)
+6. **Security & Verification Suite**: Built `src/core/tests/phase2-security.test.ts` verifying all 14 Phase 2 security requirements (tenant isolation, limit enforcement, employee/user separation, disabled module grant rejection, access revocation, tokenVersion invalidation). Both `security.test.ts` and `phase2-security.test.ts` pass 100% (28/28 assertions total).
+7. **Production Build & Verification**: Passed `npx tsc --noEmit`, ESLint, and `npm run build` compilation with 0 errors.
 
 ### Database Status:
-* Relational database tables pushed and synced to PostgreSQL database `restaurant_saas` at `localhost:5432` using `postgres:postgres` credentials.
-* Database client singleton fully configured with PG driver adapter wrapper and custom pool capacity constraints.
-* Seeding executed successfully.
+* Relational database schema fully synced to PostgreSQL database `restaurant_saas` at `localhost:5432`.
+* Migrations applied using `DIRECT_DATABASE_URL`.
+* Runtime queries running through PgBouncer `DATABASE_URL`.
+* Seeding executed for default modules, permissions, and subscription plans.
 
 
 ---
