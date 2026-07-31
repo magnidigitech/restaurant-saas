@@ -96,8 +96,9 @@ export default function RestaurantProfilePage() {
   const activeSub = restaurantData?.subscriptions?.[0];
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-8 max-w-5xl mx-auto space-y-8 font-sans">
-      <div className="flex items-center justify-between">
+    <div className="w-full min-h-screen bg-slate-950 text-slate-100">
+      <main className="max-w-7xl mx-auto p-6 md:p-8 space-y-8 font-sans">
+        <div className="flex items-center justify-between">
         <div>
           <button onClick={() => router.back()} className="text-xs text-blue-400 hover:text-blue-300 mb-2 cursor-pointer">
             &larr; Back to Dashboard
@@ -258,6 +259,7 @@ export default function RestaurantProfilePage() {
           </button>
         </div>
       </form>
-    </main>
+      </main>
+    </div>
   );
 }

@@ -97,8 +97,9 @@ export default function AccessGrantsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-8 max-w-6xl mx-auto space-y-8 font-sans">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="w-full min-h-screen bg-slate-950 text-slate-100">
+      <main className="max-w-7xl mx-auto p-6 md:p-8 space-y-8 font-sans">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <button onClick={() => router.back()} className="text-xs text-blue-400 hover:text-blue-300 mb-2 cursor-pointer">
             &larr; Back to Dashboard
@@ -263,5 +264,6 @@ export default function AccessGrantsPage() {
         </div>
       )}
     </main>
-  );
+  </div>
+);
 }
