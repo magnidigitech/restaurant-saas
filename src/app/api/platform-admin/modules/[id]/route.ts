@@ -3,6 +3,7 @@ import { prisma } from "@/core/database/client";
 import { getPlatformSession } from "@/core/auth/session";
 import { logAudit } from "@/core/audit/logger";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 
 const updateModuleSchema = z.object({
   priceMonthly: z.coerce.number().min(0),
@@ -37,7 +38,7 @@ export async function PATCH(
     const updated = await prisma.module.update({
       where: { id },
       data: {
-        priceMonthly: result.data.priceMonthly,
+        priceMonthly: new Prisma.Decimal(result.data.priceMonthly),
         ...(result.data.status && { status: result.data.status }),
       },
     });
