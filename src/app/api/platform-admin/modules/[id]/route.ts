@@ -5,7 +5,7 @@ import { logAudit } from "@/core/audit/logger";
 import { z } from "zod";
 
 const updateModuleSchema = z.object({
-  priceMonthly: z.number().min(0),
+  priceMonthly: z.coerce.number().min(0),
   status: z.string().optional(),
 });
 
@@ -48,8 +48,8 @@ export async function PATCH(
       action: "MODULE_PRICING_UPDATED",
       entityType: "Module",
       entityId: id,
-      previousValues: JSON.stringify(existing),
-      newValues: JSON.stringify(updated),
+      previousValues: existing,
+      newValues: updated,
     });
 
     return NextResponse.json({ success: true, module: updated });

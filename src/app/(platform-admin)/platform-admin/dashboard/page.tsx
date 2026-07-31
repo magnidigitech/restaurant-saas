@@ -134,7 +134,14 @@ export default function PlatformAdminDashboard() {
         }
       }
       if (resLogs.ok) setLogs(dataLogs.auditLogs || []);
-      if (resModules.ok) setSystemModules(dataModules.modules || []);
+      if (resModules.ok) {
+        setSystemModules(
+          (dataModules.modules || []).map((m: any) => ({
+            ...m,
+            priceMonthly: Number(m.priceMonthly ?? 0),
+          }))
+        );
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -310,15 +317,17 @@ export default function PlatformAdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ priceMonthly: newPrice }),
       });
+      const data = await res.json();
       if (res.ok) {
         setSystemModules((prev) =>
-          prev.map((m) => (m.id === moduleId ? { ...m, priceMonthly: newPrice } : m))
+          prev.map((m) => (m.id === moduleId ? { ...m, priceMonthly: Number(data.module?.priceMonthly ?? newPrice) } : m))
         );
       } else {
-        alert("Failed to update module price");
+        alert(data.error || "Failed to update module price");
       }
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error("Update module price error:", e);
+      alert("Error updating module price: " + e.message);
     } finally {
       setSavingModuleId(null);
     }
@@ -841,11 +850,12 @@ export default function PlatformAdminDashboard() {
                                 type="number"
                                 min="0"
                                 step="1"
-                                value={mod.priceMonthly}
+                                value={mod.priceMonthly ?? 0}
                                 onChange={(e) => {
-                                  const val = parseFloat(e.target.value) || 0;
+                                  const raw = e.target.value;
+                                  const val = raw === "" ? 0 : parseFloat(raw);
                                   setSystemModules((prev) =>
-                                    prev.map((m) => (m.id === mod.id ? { ...m, priceMonthly: val } : m))
+                                    prev.map((m) => (m.id === mod.id ? { ...m, priceMonthly: isNaN(val) ? 0 : val } : m))
                                   );
                                 }}
                                 className="w-20 bg-transparent text-sm font-bold font-mono text-white focus:outline-none"
