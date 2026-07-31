@@ -40,6 +40,13 @@ model Restaurant {
   invitations   StaffInvitation[]
   accessGrants  AccessGrant[]
   roles         Role[]
+  departments       Department[]
+  designations      Designation[]
+  jobGrades         JobGrade[]
+  costCenters       CostCenter[]
+  employees         Employee[]
+  employmentRecords EmploymentRecord[]
+  outletAssignments EmployeeOutletAssignment[]
 
   @@map("restaurants")
 }
@@ -104,6 +111,8 @@ model RestaurantOutlet {
   restaurant   Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   accessGrants AccessGrant[]
   invitations  StaffInvitation[]
+  employmentRecords EmploymentRecord[]
+  outletAssignments  EmployeeOutletAssignment[]
 
   @@index([restaurantId])
   @@map("restaurant_outlets")
@@ -139,10 +148,12 @@ model RestaurantMembership {
   // Relations
   restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employee     Employee?     @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   accessGrants AccessGrant[]
 
   @@unique([restaurantId, userId])
   @@index([userId])
+  @@index([employeeId])
   @@map("restaurant_memberships")
 }
 
@@ -374,3 +385,247 @@ enum InvitationStatus {
   ACCEPTED
   EXPIRED
 }
+
+// ----------------------------------------------------
+// 6. Phase 2: Restaurant Master Data & Workforce Entities
+// ----------------------------------------------------
+
+model Department {
+  id           String    @id @default(uuid())
+  restaurantId String    @map("restaurant_id")
+  name         String
+  code         String
+  status       String    @default("ACTIVE")
+  archivedAt   DateTime? @map("archived_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant        Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  employmentRecords EmploymentRecord[]
+
+  @@unique([restaurantId, code])
+  @@unique([restaurantId, name])
+  @@index([restaurantId])
+  @@map("departments")
+}
+
+model Designation {
+  id           String    @id @default(uuid())
+  restaurantId String    @map("restaurant_id")
+  name         String
+  code         String
+  status       String    @default("ACTIVE")
+  archivedAt   DateTime? @map("archived_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant        Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  employmentRecords EmploymentRecord[]
+
+  @@unique([restaurantId, code])
+  @@unique([restaurantId, name])
+  @@index([restaurantId])
+  @@map("designations")
+}
+
+model JobGrade {
+  id           String    @id @default(uuid())
+  restaurantId String    @map("restaurant_id")
+  name         String
+  code         String
+  description  String?
+  status       String    @default("ACTIVE")
+  archivedAt   DateTime? @map("archived_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, code])
+  @@index([restaurantId])
+  @@map("job_grades")
+}
+
+model CostCenter {
+  id           String    @id @default(uuid())
+  restaurantId String    @map("restaurant_id")
+  name         String
+  code         String
+  description  String?
+  status       String    @default("ACTIVE")
+  archivedAt   DateTime? @map("archived_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, code])
+  @@index([restaurantId])
+  @@map("cost_centers")
+}
+
+model Employee {
+  id              String       @id @default(uuid())
+  restaurantId    String       @map("restaurant_id")
+  employeeCode    String       @map("employee_code")
+  firstName       String       @map("first_name")
+  lastName        String       @map("last_name")
+  personalEmail   String?      @map("personal_email")
+  phone           String?
+  alternatePhone  String?      @map("alternate_phone")
+  gender          String?
+  dateOfBirth     DateTime?    @map("date_of_birth")
+  joiningDate     DateTime     @map("joining_date")
+  profilePhotoUrl String?      @map("profile_photo_url")
+  workerType      WorkerType   @default(FULL_TIME) @map("worker_type")
+  archivedAt      DateTime?    @map("archived_at")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant        Restaurant                 @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  employmentRecords EmploymentRecord[]         @relation("EmployeeHistory")
+  managedRecords    EmploymentRecord[]         @relation("ReportingManager")
+  outletAssignments EmployeeOutletAssignment[]
+  emergencyContacts EmployeeEmergencyContact[]
+  documents         EmployeeDocument[]
+  memberships       RestaurantMembership[]
+
+  @@unique([restaurantId, employeeCode])
+  @@index([restaurantId])
+  @@map("employees")
+}
+
+model EmploymentRecord {
+  id                         String           @id @default(uuid())
+  restaurantId               String           @map("restaurant_id")
+  employeeId                 String           @map("employee_id")
+  departmentId               String?          @map("department_id")
+  designationId              String?          @map("designation_id")
+  primaryOutletId            String?          @map("primary_outlet_id")
+  employmentType             WorkerType?      @map("employment_type")
+  effectiveFrom              DateTime         @map("effective_from")
+  effectiveTo                DateTime?        @map("effective_to")
+  probationEndDate           DateTime?        @map("probation_end_date")
+  confirmationDate           DateTime?        @map("confirmation_date")
+  noticePeriod               Int?             @map("notice_period")
+  reportingManagerEmployeeId String?          @map("reporting_manager_employee_id")
+  salaryStructureId          String?          @map("salary_structure_id")
+  status                     EmploymentStatus @default(ACTIVE)
+  notes                      String?
+  createdAt                  DateTime         @default(now()) @map("created_at")
+  updatedAt                  DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant       Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  employee         Employee          @relation("EmployeeHistory", fields: [employeeId], references: [id], onDelete: Cascade)
+  department       Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  designation      Designation?      @relation(fields: [designationId], references: [id], onDelete: SetNull)
+  primaryOutlet    RestaurantOutlet? @relation(fields: [primaryOutletId], references: [id], onDelete: SetNull)
+  reportingManager Employee?         @relation("ReportingManager", fields: [reportingManagerEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId])
+  @@index([employeeId])
+  @@map("employment_records")
+}
+
+model EmployeeOutletAssignment {
+  id             String         @id @default(uuid())
+  restaurantId   String         @map("restaurant_id")
+  employeeId     String         @map("employee_id")
+  outletId       String         @map("outlet_id")
+  isPrimary      Boolean        @default(false) @map("is_primary")
+  assignmentType AssignmentType @default(PRIMARY) @map("assignment_type")
+  effectiveFrom  DateTime       @default(now()) @map("effective_from")
+  effectiveTo    DateTime?      @map("effective_to")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  employee   Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  outlet     RestaurantOutlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, outletId])
+  @@index([restaurantId])
+  @@index([employeeId])
+  @@map("employee_outlet_assignments")
+}
+
+model EmployeeEmergencyContact {
+  id           String   @id @default(uuid())
+  employeeId   String   @map("employee_id")
+  relationship String
+  name         String
+  phone        String
+  address      String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@map("employee_emergency_contacts")
+}
+
+model EmployeeDocument {
+  id             String       @id @default(uuid())
+  employeeId     String       @map("employee_id")
+  type           DocumentType
+  fileUrl        String?      @map("file_url")
+  documentNumber String?      @map("document_number")
+  issueDate      DateTime?    @map("issue_date")
+  expiryDate     DateTime?    @map("expiry_date")
+  verifiedBy     String?      @map("verified_by")
+  verifiedAt     DateTime?    @map("verified_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@map("employee_documents")
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  PROBATION
+  ON_LEAVE
+  NOTICE
+  SUSPENDED
+  TERMINATED
+  RESIGNED
+}
+
+enum WorkerType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERN
+  CONSULTANT
+  TEMPORARY
+}
+
+enum AssignmentType {
+  PRIMARY
+  TEMPORARY
+  TRAINING
+}
+
+enum DocumentType {
+  AADHAAR
+  PASSPORT
+  VISA
+  CONTRACT
+  RESUME
+  CERTIFICATE
+  MEDICAL
+  FOOD_LICENSE
+}
+

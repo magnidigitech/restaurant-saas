@@ -148,6 +148,36 @@ export default function TenantDashboard() {
             </div>
           )}
         </div>
+
+        {/* Administration & Workforce Section */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-bold tracking-tight uppercase text-slate-400">Administration & Workforce</h3>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { label: "Restaurant Profile", desc: "Branding, application name, colors", path: "/settings/profile" },
+              { label: "Outlets Management", desc: "Manage physical branches and timezones", path: "/settings/outlets" },
+              { label: "Master Data", desc: "Departments, designations, job grades, cost centers", path: "/settings/master-data" },
+              { label: "Employee Directory", desc: "Workforce directory and profiles", path: "/workforce/employees" },
+              { label: "Users & Invitations", desc: "App login access and staff invites", path: "/workforce/users" },
+              { label: "Roles & Permissions", desc: "Custom roles and access matrices", path: "/settings/roles-permissions" },
+              { label: "Access Grants", desc: "Module and outlet access controls", path: "/settings/access-grants" },
+            ].map((item) => (
+              <div
+                key={item.path}
+                onClick={() => router.push(item.path)}
+                className="bg-slate-900/20 border border-slate-900 p-5 rounded-2xl hover:border-slate-800 hover:bg-slate-900/40 transition-all cursor-pointer space-y-2 flex flex-col justify-between"
+              >
+                <div>
+                  <h4 className="text-base font-bold text-white">{item.label}</h4>
+                  <p className="text-xs text-slate-400 mt-1">{item.desc}</p>
+                </div>
+                <span className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1 pt-2">
+                  Manage &rarr;
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       </main>
     </div>
   );

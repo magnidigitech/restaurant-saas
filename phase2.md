@@ -1,10 +1,25 @@
-Implement Phase 2: Restaurant Administration and Employee Foundation.
+# Phase 2 — Restaurant Administration & Workforce Foundation
 
-The Phase 1 and Phase 1.1 foundation is complete.
+## Context
 
-Do not implement payroll calculations, attendance processing, complete shift scheduling or inventory workflows during this phase.
+Phase 1 (Platform Foundation) and Phase 1.1 (Production Hardening & PgBouncer Integration) are complete.
 
-At task start, read only:
+The platform is running on:
+
+* Next.js 16 App Router
+* PostgreSQL
+* Prisma 7
+* PgBouncer
+* Multi-tenant architecture
+* Platform Super Admin
+* Restaurant Admin
+* JWT Authentication
+* Proxy-based tenant routing
+* Module entitlement
+* Access Grants
+* Security verification suite
+
+Read ONLY these files before implementation:
 
 * docs/ai/PROJECT_CONTEXT.md
 * docs/ai/PROJECT_MAP.md
@@ -13,53 +28,111 @@ At task start, read only:
 * docs/ai/MODULE_REGISTRY.md
 * docs/ai/DECISIONS.md
 
-Do not recursively inspect the repository.
+Do NOT recursively inspect the repository.
 
-Search for exact Prisma models, routes, components and authorization functions before opening files.
+Search only for the exact Prisma models, routes, components and authorization utilities required before opening files.
 
-## Objective
+---
 
-Allow a Restaurant Administrator to manage:
+# Objective
 
-* Restaurant profile
-* Restaurant branding
-* Outlets
-* Employees
-* Employment records
-* Internal user accounts
-* Invitations
-* Custom roles
-* Permissions
-* Module access grants
-* Outlet-specific access
+Build the complete Restaurant Administration and Workforce Foundation.
 
-Only modules enabled by Platform Super Admin may be assigned to restaurant staff.
+Do NOT implement:
 
-## Core Modelling Rule
+* Payroll calculations
+* Attendance processing
+* Shift scheduling engine
+* Inventory workflows
+* Purchasing
+* Kitchen production
 
-Employee identity and application login identity must remain separate.
+This phase builds the organization layer that every future module depends on.
 
-An Employee may exist without a User account.
+---
 
-A User may receive access to an Employee record through a RestaurantMembership.
+# Architecture Rules
 
-Recommended relationship:
+## Employee and Login must remain separate
+
+Never merge employee identity with authentication.
+
+Relationship:
 
 ```text
 Employee
-    ↓ optional relationship
-RestaurantMembership
-    ↓
-User
+        │
+        ├── Employment Records
+        ├── Emergency Contacts
+        ├── Documents
+        ├── Outlet Assignments
+        └── Restaurant Membership (optional)
+                        │
+                        ▼
+                      User Login
 ```
 
-Do not require every employee to have an email address or application login.
+An Employee may exist forever without a login.
 
-## Employee Entities
+Creating an Employee must NEVER automatically create a User.
 
-Create or extend models for:
+---
 
-### Employee
+## Organization Structure
+
+Support:
+
+```text
+Restaurant
+        │
+        ├── Region (optional)
+        │
+        ├── Outlets
+        │
+        ├── Departments
+        │
+        ├── Designations
+        │
+        ├── Job Grades
+        │
+        ├── Cost Centers
+        │
+        └── Employees
+```
+
+Region is optional but the architecture must support it.
+
+Departments and Designations belong to the Restaurant, not an Outlet.
+
+---
+
+# Master Data Module
+
+Create a dedicated module:
+
+```
+src/modules/master-data/
+```
+
+It owns:
+
+* Departments
+* Designations
+* Job Grades
+* Cost Centers
+* Employment Types
+* Worker Types
+* Future Leave Types
+
+HR, Payroll and Shift Management must reuse this master data instead of maintaining duplicate configuration.
+
+---
+
+# Database Models
+
+## Employee
+
+Identity only.
 
 Required fields:
 
@@ -73,53 +146,64 @@ Required fields:
 * personalEmail
 * phone
 * alternatePhone
+* gender
 * dateOfBirth
 * joiningDate
 * profilePhotoUrl
 * employmentStatus
 * workerType
-* primaryOutletId
-* reportingManagerEmployeeId
 * createdAt
 * updatedAt
 * archivedAt
 
-Sensitive or optional employee information should be stored only when needed.
+Unique constraint:
 
-Create a unique constraint for:
-
-```text
 restaurantId + employeeCode
+
+Employee codes are restaurant scoped.
+
+Employee code generator:
+
+```
+EMP-00001
+EMP-00002
+EMP-00003
 ```
 
-Do not make employee codes globally unique.
+per restaurant.
 
-### EmploymentRecord
+---
 
-Support employment history rather than placing all mutable job information directly on Employee.
+## EmploymentRecord
 
-Fields should include:
+Contains mutable employment history.
+
+Fields:
 
 * id
 * restaurantId
 * employeeId
-* outletId
 * departmentId
 * designationId
+* primaryOutletId
 * employmentType
 * effectiveFrom
 * effectiveTo
-* status
 * probationEndDate
+* confirmationDate
+* noticePeriod
+* reportingManagerEmployeeId
+* salaryStructureId (nullable for future)
+* status
 * notes
 * createdAt
 * updatedAt
 
-Only one current primary employment record should be active for an employee unless multi-assignment is explicitly enabled.
+Only one active EmploymentRecord may exist unless multi-assignment is enabled.
 
-### EmployeeOutletAssignment
+---
 
-Support employees working in more than one outlet.
+## EmployeeOutletAssignment
 
 Fields:
 
@@ -127,289 +211,737 @@ Fields:
 * restaurantId
 * employeeId
 * outletId
+* isPrimary
 * assignmentType
 * effectiveFrom
 * effectiveTo
 * status
 
-### Department
+Supports:
 
-Restaurant-scoped fields:
+Primary outlet
+
+Temporary outlet
+
+Training outlet
+
+Multiple outlet assignments.
+
+---
+
+## Department
+
+Restaurant scoped.
+
+Fields:
 
 * id
 * restaurantId
 * name
 * code
 * status
+* archivedAt
 
-### Designation
+---
 
-Restaurant-scoped fields:
+## Designation
+
+Restaurant scoped.
+
+Fields:
 
 * id
 * restaurantId
 * name
 * code
 * status
+* archivedAt
 
-Do not hard-code department or designation lists globally.
+---
 
-## Restaurant Administration
+## JobGrade
 
-Create Restaurant Admin screens and APIs for:
+Restaurant scoped.
 
-* Viewing and editing restaurant profile
-* Uploading or changing branding details
-* Viewing enabled modules
-* Viewing subscription and account limits
-* Managing outlets
-* Activating or deactivating outlets
-* Managing departments
-* Managing designations
-* Managing employees
-* Archiving employees
+---
 
-Restaurant Administrators must not be able to:
+## CostCenter
 
-* Enable an unpurchased module
-* Change the platform subscription plan
-* Increase platform-defined limits
-* Access another restaurant
-* Access Platform Super Admin functionality
+Restaurant scoped.
 
-## Outlet Management
+---
 
-Restaurant Admin must be able to configure:
+## EmployeeEmergencyContact
 
-* Outlet name
-* Outlet code
-* Address
-* Timezone
-* Currency
-* Contact information
-* Status
-* Opening date
+Separate relational table.
 
-Enforce Platform Super Admin outlet limits during outlet creation.
+Fields:
 
-Do not rely only on frontend limit checks.
+* employeeId
+* relationship
+* name
+* phone
+* address
 
-## Employee Workflow
+Do NOT store emergency contacts as JSON.
 
-Implement:
+---
 
-```text
-Create Employee
-    ↓
-Assign Primary Outlet
-    ↓
-Assign Department and Designation
-    ↓
-Create Employment Record
-    ↓
-Optionally Create Login Invitation
-    ↓
-Assign Roles and Module Access
-```
+## EmployeeDocument
 
-Creating an Employee must not automatically create a User account.
+Fields:
 
-## Internal Login Creation
+* employeeId
+* type
+* fileUrl
+* documentNumber
+* issueDate
+* expiryDate
+* verifiedBy
+* verifiedAt
 
-Restaurant Admin may optionally grant an employee application access.
+Document types include:
 
-Workflow:
+* Aadhaar
+* Passport
+* Visa
+* Contract
+* Resume
+* Certificate
+* Medical
+* Food License
 
-1. Select an existing employee.
-2. Enter or confirm the login email.
-3. Create a RestaurantMembership.
-4. Generate a secure StaffInvitation.
-5. Assign one or more AccessGrants.
-6. Send or display the activation link through the existing invitation mechanism.
-7. Record all actions in the audit log.
+Do NOT upload actual files during this phase.
 
-Prevent duplicate active memberships for the same User and Restaurant.
+Only implement metadata.
 
-Invitation tokens must continue using the Phase 1.1 hashed-token design.
+---
 
-## Roles and Permissions
+# Enumerations
+
+Employment Status:
+
+* ACTIVE
+* PROBATION
+* ON_LEAVE
+* NOTICE
+* SUSPENDED
+* TERMINATED
+* RESIGNED
+
+Worker Type:
+
+* FULL_TIME
+* PART_TIME
+* CONTRACT
+* INTERN
+* CONSULTANT
+* TEMPORARY
+
+Login Provider:
+
+* LOCAL
+* GOOGLE
+* MICROSOFT
+* APPLE
+
+Only LOCAL is implemented now.
+
+---
+
+# Restaurant Administration
+
+Create Restaurant Admin screens for:
+
+Restaurant Profile
+
+Restaurant Branding
+
+Subscription View
+
+Enabled Modules
+
+Outlets
+
+Departments
+
+Designations
+
+Employees
+
+Users
+
+Roles
+
+Permissions
+
+Invitations
+
+Access Grants
+
+Restaurant Admin must NOT:
+
+* enable modules
+* upgrade plans
+* change limits
+* access Platform Super Admin
+* access another restaurant
+
+---
+
+# Outlet Management
 
 Support:
 
-* Platform-defined default roles
-* Restaurant-defined custom roles
-* Module-specific roles
-* Outlet-specific access
-* Restaurant-wide access when outletId is null
+* name
+* code
+* address
+* timezone
+* currency
+* contact details
+* opening date
+* active status
 
-Default restaurant roles may include:
+Validate outlet limits transactionally.
 
-* Restaurant Owner
-* Restaurant Administrator
-* HR Manager
-* Shift Manager
-* Payroll Manager
-* Inventory Manager
-* Outlet Manager
-* Viewer
+---
 
-Restaurant-defined roles must be scoped by restaurantId.
+# Employee Workflow
 
-Restaurant users must never modify platform-level permissions.
+Workflow:
 
-## Access Grants
+```
+Create Employee
 
-Use the existing AccessGrant design.
+↓
 
-Each access grant must connect:
+Assign Department
 
-* restaurant membership
-* enabled module
-* role
-* optional outlet
+↓
 
-Validation requirements:
+Assign Designation
 
-1. The restaurant owns the membership.
-2. The module is enabled for the restaurant.
-3. The role belongs to the restaurant or is an approved platform default.
-4. The outlet belongs to the restaurant.
-5. The user creating the grant has permission to assign access.
-6. Account user limits have not been exceeded.
+↓
 
-When Platform Super Admin disables a module, all related grants must become unusable immediately without requiring their deletion.
+Assign Outlet
 
-## Account Limits
+↓
 
-Enforce limits for:
+Create Employment Record
 
-* Outlets
-* Employees
-* Internal users
-* Active invitations where relevant
+↓
 
-Limits must be checked transactionally during creation.
+Save Employee
 
-Return clear errors without revealing internal plan implementation details.
+↓
 
-## UI Requirements
+(Optional)
 
-Create mobile-first Restaurant Admin pages for:
+Create Login
 
-* Restaurant settings
-* Outlets
-* Employees
-* Employee details
-* Departments
-* Designations
-* Users and invitations
-* Roles
-* Access grants
+↓
 
-Use responsive tables on desktop and card/list views on mobile.
+Generate Invitation
 
-Show disabled modules as unavailable only where useful for administrators. Do not show disabled module navigation to ordinary users.
+↓
 
-## Security Requirements
+Assign Roles
 
-Every query and mutation must be scoped by the authenticated restaurant context.
+↓
 
-Never trust these client-provided values as authorization:
+Assign Module Access
 
-* restaurantId
-* membershipId
-* employeeId ownership
-* outlet ownership
-* module entitlement
-* role ownership
+↓
 
-Identifiers may be received as resource references, but ownership must be resolved and verified in the database.
+Send Activation Link
+```
+
+---
+
+# Internal User Workflow
+
+Restaurant Admin chooses an existing Employee.
+
+System creates:
+
+RestaurantMembership
+
+↓
+
+User
+
+↓
+
+Invitation
+
+↓
+
+Activation
+
+↓
+
+Access Grants
+
+Invitation continues using the hashed token architecture implemented in Phase 1.1.
+
+---
+
+# Roles
+
+Support:
+
+Platform Roles
+
+Restaurant Roles
+
+Module Roles
+
+Outlet Roles
+
+Restaurant-wide Roles
+
+Default roles:
+
+Restaurant Owner
+
+Restaurant Administrator
+
+HR Manager
+
+Shift Manager
+
+Payroll Manager
+
+Inventory Manager
+
+Outlet Manager
+
+Viewer
+
+Restaurant roles belong to restaurantId.
+
+---
+
+# Permissions
+
+Permissions remain action based.
+
+Examples:
+
+Inventory
+
+View
+
+Create
+
+Update
+
+Delete
+
+Approve
+
+HR
+
+Employee View
+
+Employee Create
+
+Employee Update
+
+Employee Archive
+
+Payroll
+
+Generate
+
+Approve
+
+Export
+
+Restaurant Admin may create custom roles from permissions.
+
+---
+
+# Access Grants
+
+Each grant connects:
+
+Restaurant Membership
+
+↓
+
+Module
+
+↓
+
+Role
+
+↓
+
+Optional Outlet
+
+Validate:
+
+Restaurant owns membership
+
+Module enabled
+
+Role belongs to restaurant
+
+Outlet belongs to restaurant
+
+Creator has permission
+
+User limits not exceeded
+
+Disabled modules immediately invalidate grants.
+
+---
+
+# Account Limits
+
+Enforce:
+
+Outlets
+
+Employees
+
+Internal Users
+
+Invitations
+
+Validation must occur server-side inside database transactions.
+
+---
+
+# API Structure
+
+Organize APIs by feature.
+
+```
+restaurant/
+
+profile
+
+branding
+
+outlets
+
+employees
+
+employment-records
+
+departments
+
+designations
+
+job-grades
+
+cost-centers
+
+users
+
+roles
+
+permissions
+
+access-grants
+
+invitations
+```
+
+Avoid giant route handlers.
+
+---
+
+# UI Requirements
+
+Mobile-first responsive design.
+
+Desktop:
+
+Responsive tables.
+
+Mobile:
+
+Cards
+
+Bottom actions
+
+Drawers
+
+Dialogs
+
+No desktop-only layouts.
+
+---
+
+# Security
+
+Never trust:
+
+restaurantId
+
+employeeId ownership
+
+membershipId
+
+module entitlement
+
+role ownership
+
+outlet ownership
+
+Resolve ownership server-side.
+
+Continue using:
+
+verifyAccess()
+
+database authorization
+
+tokenVersion
+
+module entitlement
+
+restaurant validation
+
+PgBouncer runtime
+
+---
+
+# Audit Logging
+
+Log:
+
+Restaurant updated
+
+Branding updated
+
+Outlet created
+
+Outlet updated
+
+Outlet archived
+
+Department created
+
+Department updated
+
+Designation created
+
+Designation updated
+
+Employee created
+
+Employee updated
+
+Employee archived
+
+Employment record updated
+
+Invitation created
+
+Invitation revoked
+
+Membership activated
+
+Membership suspended
+
+Role created
+
+Permission modified
+
+Access Grant created
+
+Access Grant removed
+
+Include:
+
+actor
+
+ip
+
+device
+
+browser
+
+oldValue
+
+newValue
+
+reason
+
+timestamp
+
+Never log:
+
+passwords
+
+JWTs
+
+invitation tokens
+
+document contents
+
+---
+
+# Security Tests
 
 Add tests proving:
 
-* Restaurant A cannot view or update Restaurant B employees.
-* Restaurant A cannot assign Restaurant B outlets.
-* Restaurant Admin cannot exceed employee limits.
-* Restaurant Admin cannot exceed internal user limits.
-* Employee creation does not automatically create login access.
-* A disabled module cannot be assigned.
-* A role from another restaurant cannot be assigned.
-* An outlet from another restaurant cannot be assigned.
-* An archived employee cannot receive a new login without reactivation.
-* Duplicate active membership creation is rejected.
-* Invitation tokens remain single-use and restaurant-bound.
-* Removing an AccessGrant revokes access immediately.
-* Disabling a user invalidates existing sessions.
-* Outlet-scoped access cannot retrieve another outlet's employee data.
+Restaurant A cannot view Restaurant B employees
 
-## Audit Events
+Restaurant A cannot edit Restaurant B employees
 
-Record:
+Restaurant A cannot assign Restaurant B outlets
 
-* Restaurant profile updated
-* Branding updated
-* Outlet created
-* Outlet updated
-* Outlet deactivated
-* Department created or updated
-* Designation created or updated
-* Employee created
-* Employee updated
-* Employee archived
-* Employment record changed
-* Login invitation created
-* Invitation revoked
-* Membership activated or suspended
-* Role created
-* Permission assignment changed
-* Access grant created
-* Access grant removed
+Restaurant Admin cannot exceed employee limits
 
-Do not log passwords, session tokens, invitation tokens or sensitive document contents.
+Restaurant Admin cannot exceed user limits
 
-## Database and Migration Requirements
+Employee creation does not create login
+
+Disabled modules cannot be assigned
+
+Cross-restaurant roles rejected
+
+Cross-restaurant outlets rejected
+
+Archived employee cannot receive login
+
+Duplicate memberships rejected
+
+Invitation reuse rejected
+
+Invitation is restaurant-bound
+
+AccessGrant removal immediately revokes access
+
+User deactivation invalidates sessions
+
+Outlet scoped users cannot access another outlet
+
+All existing Phase 1.1 security tests must continue passing.
+
+---
+
+# Database
 
 Create versioned Prisma migrations.
 
-Do not use force-reset outside disposable local development.
+Never use force-reset outside disposable local development.
 
-Verify migrations using DIRECT_DATABASE_URL.
+Runtime:
 
-Runtime queries must continue using DATABASE_URL through PgBouncer.
+DATABASE_URL
 
-Update seed data only for platform defaults. Do not seed fake production restaurants or employees.
+through PgBouncer.
 
-## Completion Requirements
+Migration:
+
+DIRECT_DATABASE_URL
+
+Seed only:
+
+Platform Roles
+
+Platform Permissions
+
+Master Data defaults where appropriate.
+
+Do NOT seed fake restaurants.
+
+---
+
+# Verification
 
 Run:
 
-* Prisma validation
-* Prisma generation
-* Migration on a disposable test database
-* Type checking
-* ESLint
-* Production build
-* Existing 14 Phase 1.1 security tests
-* New Phase 2 security tests
-* PgBouncer runtime query test
+Prisma Validate
+
+Prisma Generate
+
+Migration Test
+
+Type Check
+
+ESLint
+
+Production Build
+
+Security Test Suite
+
+PgBouncer Runtime Test
+
+Health Check
+
+---
+
+# Documentation
 
 Update:
 
-* docs/ai/CURRENT_STATE.md
-* docs/ai/PROJECT_MAP.md
-* docs/ai/ACCESS_CONTROL.md
-* docs/ai/DECISIONS.md only for lasting architectural changes
+docs/ai/CURRENT_STATE.md
 
-Final report must contain:
+docs/ai/PROJECT_MAP.md
 
-* Features completed
-* Files changed
-* Migration names
-* New entities
-* APIs created
-* UI pages created
-* Security assertions and results
-* Known limitations
-* Items deferred to Phase 3
+docs/ai/ACCESS_CONTROL.md
 
-Do not implement complete HR onboarding workflows, payroll calculations, attendance calculations, shift roster generation or inventory transactions during this phase.
+docs/ai/DECISIONS.md
+
+Only record permanent architectural decisions.
+
+---
+
+# Deliverables
+
+Return:
+
+Completed Features
+
+Files Created
+
+Files Modified
+
+Prisma Migrations
+
+New Models
+
+New APIs
+
+New UI Pages
+
+Security Test Results
+
+PgBouncer Verification
+
+Known Limitations
+
+Deferred Work
+
+---
+
+# Explicitly Deferred to Phase 3
+
+Do NOT implement:
+
+HR onboarding workflow
+
+Document verification workflow
+
+Attendance engine
+
+Shift scheduling
+
+Payroll calculations
+
+Inventory transactions
+
+Purchase orders
+
+Kitchen production
+
+Reporting
+
+Only build the organizational foundation required for those future modules.
