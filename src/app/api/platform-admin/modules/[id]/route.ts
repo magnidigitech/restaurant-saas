@@ -38,7 +38,7 @@ export async function PATCH(
     const updated = await prisma.module.update({
       where: { id },
       data: {
-        priceMonthly: new Prisma.Decimal(result.data.priceMonthly),
+        priceMonthly: result.data.priceMonthly,
         ...(result.data.status && { status: result.data.status }),
       },
     });
