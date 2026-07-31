@@ -11,7 +11,7 @@ const updateProfileSchema = z.object({
   faviconUrl: z.string().nullable().optional(),
   primaryColor: z.string().optional(),
   secondaryColor: z.string().optional(),
-  supportEmail: z.string().email().nullable().optional(),
+  supportEmail: z.union([z.string().email(), z.literal("")]).nullable().optional(),
   supportPhone: z.string().nullable().optional(),
 });
 

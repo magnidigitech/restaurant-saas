@@ -71,7 +71,14 @@ export default function RestaurantProfilePage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update profile");
+      if (!res.ok) {
+        if (data.details?.fieldErrors) {
+          const firstField = Object.keys(data.details.fieldErrors)[0];
+          const firstMsg = data.details.fieldErrors[firstField]?.[0];
+          throw new Error(`Validation Error (${firstField}): ${firstMsg}`);
+        }
+        throw new Error(data.error || "Failed to update profile");
+      }
 
       setSuccess("Restaurant profile and branding updated successfully!");
       fetchProfile();
