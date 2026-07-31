@@ -40,6 +40,12 @@ export async function GET(req: NextRequest) {
             module: true,
           },
         },
+        invitations: {
+          where: { status: "SENT" },
+          select: { id: true, email: true, status: true, expiresAt: true },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
       },
       orderBy: {
         createdAt: "desc",

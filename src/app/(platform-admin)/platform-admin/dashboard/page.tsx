@@ -26,6 +26,13 @@ interface RestaurantModule {
   status: string;
 }
 
+interface StaffInvitation {
+  id: string;
+  email: string;
+  status: string;
+  expiresAt: string;
+}
+
 interface Restaurant {
   id: string;
   name: string;
@@ -34,6 +41,7 @@ interface Restaurant {
   branding?: Branding | null;
   subscriptions: Subscription[];
   modules: RestaurantModule[];
+  invitations: StaffInvitation[];
   createdAt: string;
 }
 
@@ -79,6 +87,9 @@ export default function PlatformAdminDashboard() {
   const [createdInvite, setCreatedInvite] = useState<{ url: string; subdomain: string } | null>(null);
   const [expandedTenant, setExpandedTenant] = useState<string | null>(null);
   const [statusLoading, setStatusLoading] = useState<string | null>(null);
+  const [inviteUrls, setInviteUrls] = useState<Record<string, string>>({});
+  const [inviteLoadingId, setInviteLoadingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Module List
   const availableModules = [
@@ -235,12 +246,34 @@ export default function PlatformAdminDashboard() {
     }
   };
 
-  // Build activation URL for a tenant
-  const buildInviteUrl = (subdomain: string, token: string) => {
-    const originParts = window.location.origin.split("//");
-    const protocol = originParts[0];
-    const rootHost = originParts[1].replace("admin.", "");
-    return `${protocol}//${subdomain}.${rootHost}/activate?token=${token}`;
+  // Generate / resend an activation invite link for a tenant
+  const handleGenerateInvite = async (restaurantId: string, subdomain: string) => {
+    setInviteLoadingId(restaurantId);
+    try {
+      const res = await fetch(`/api/platform-admin/restaurants/${restaurantId}/resend-invite`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate link");
+
+      const protocol = window.location.protocol;
+      const rootHost = window.location.host.replace(/^admin\./, "");
+      const url = `${protocol}//${subdomain}.${rootHost}/activate?token=${data.token}`;
+      setInviteUrls((prev) => ({ ...prev, [restaurantId]: url }));
+    } catch (e: any) {
+      console.error(e);
+      alert("Error: " + e.message);
+    } finally {
+      setInviteLoadingId(null);
+    }
+  };
+
+  const handleCopyUrl = (restaurantId: string) => {
+    const url = inviteUrls[restaurantId];
+    if (!url) return;
+    navigator.clipboard.writeText(url);
+    setCopiedId(restaurantId);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   // Plan Selection Syncs limits
@@ -438,24 +471,59 @@ export default function PlatformAdminDashboard() {
 
                                   {/* Invite Link */}
                                   <div>
-                                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block mb-2">
-                                      Admin Activation URL
-                                    </span>
-                                    <div className="flex items-center gap-2 bg-slate-900 p-3 rounded-lg border border-slate-800 font-mono">
-                                      <span className="text-xs text-blue-300 truncate flex-1">
-                                        {restaurant.subdomain}.yourplatform.com/activate?token=...
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
+                                        Admin Activation URL
                                       </span>
-                                      <button
-                                        onClick={() => {
-                                          const base = window.location.origin.replace("//admin.", "//" + restaurant.subdomain + ".");
-                                          const url = base + "/activate";
-                                          navigator.clipboard.writeText(url);
-                                        }}
-                                        className="px-3 py-1 bg-slate-800 text-xs font-bold rounded border border-slate-700 hover:bg-slate-700 cursor-pointer shrink-0"
-                                      >
-                                        Copy Base URL
-                                      </button>
+                                      {restaurant.invitations.length > 0 && (
+                                        <span className="text-xs text-slate-500">
+                                          Pending invite for: <span className="text-slate-300">{restaurant.invitations[0].email}</span>
+                                        </span>
+                                      )}
                                     </div>
+
+                                    {inviteUrls[restaurant.id] ? (
+                                      <div className="space-y-2">
+                                        <div className="flex items-center gap-2 bg-slate-900 p-3 rounded-lg border border-blue-900">
+                                          <input
+                                            readOnly
+                                            value={inviteUrls[restaurant.id]}
+                                            className="w-full bg-transparent text-xs text-blue-300 font-mono focus:outline-none selection:bg-blue-900"
+                                          />
+                                        </div>
+                                        <div className="flex gap-2">
+                                          <button
+                                            onClick={() => handleCopyUrl(restaurant.id)}
+                                            className={`flex-1 px-3 py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                                              copiedId === restaurant.id
+                                                ? "bg-green-950 border-green-800 text-green-200"
+                                                : "bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
+                                            }`}
+                                          >
+                                            {copiedId === restaurant.id ? "✓ Copied!" : "Copy URL"}
+                                          </button>
+                                          <button
+                                            onClick={() => handleGenerateInvite(restaurant.id, restaurant.subdomain)}
+                                            disabled={inviteLoadingId === restaurant.id}
+                                            className="px-3 py-2 text-xs font-bold rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-all cursor-pointer disabled:opacity-40"
+                                          >
+                                            {inviteLoadingId === restaurant.id ? "Generating..." : "↻ Regenerate"}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleGenerateInvite(restaurant.id, restaurant.subdomain)}
+                                        disabled={inviteLoadingId === restaurant.id || restaurant.invitations.length === 0}
+                                        className="w-full py-2.5 text-sm font-semibold rounded-lg border border-blue-800 text-blue-300 hover:bg-blue-950 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                      >
+                                        {inviteLoadingId === restaurant.id
+                                          ? "Generating link..."
+                                          : restaurant.invitations.length === 0
+                                          ? "No pending invitation"
+                                          : "Generate Activation Link"}
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               )}
