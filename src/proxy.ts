@@ -14,6 +14,17 @@ export const config = {
 const PLATFORM_SESSION_COOKIE = "platform_admin_session";
 const TENANT_SESSION_COOKIE = "tenant_session";
 
+function createCleanRedirectUrl(targetPath: string, req: NextRequest, customHost?: string): URL {
+  const cleanUrl = new URL(targetPath, req.url);
+  const rawProto = req.headers.get("x-forwarded-proto") || "https";
+  cleanUrl.protocol = `${rawProto.split(",")[0].trim()}:`;
+  cleanUrl.port = "";
+  if (customHost) {
+    cleanUrl.hostname = customHost;
+  }
+  return cleanUrl;
+}
+
 export async function proxy(req: NextRequest) {
   const url = req.nextUrl.clone();
   const path = url.pathname;
@@ -70,9 +81,9 @@ export async function proxy(req: NextRequest) {
       const token = req.cookies.get(PLATFORM_SESSION_COOKIE)?.value;
       const session = token ? await verifyToken(token) : null;
       if (!session || session.role !== "PLATFORM_ADMIN") {
-        return NextResponse.redirect(new URL("/platform-admin/login", req.url));
+        return NextResponse.redirect(createCleanRedirectUrl("/platform-admin/login", req));
       }
-      return NextResponse.redirect(new URL("/platform-admin/dashboard", req.url));
+      return NextResponse.redirect(createCleanRedirectUrl("/platform-admin/dashboard", req));
     }
 
     if (path.startsWith("/platform-admin")) {
@@ -84,7 +95,7 @@ export async function proxy(req: NextRequest) {
       const session = token ? await verifyToken(token) : null;
 
       if (!session || session.role !== "PLATFORM_ADMIN") {
-        return NextResponse.redirect(new URL("/platform-admin/login", req.url));
+        return NextResponse.redirect(createCleanRedirectUrl("/platform-admin/login", req));
       }
 
       return NextResponse.next();
@@ -138,7 +149,7 @@ export async function proxy(req: NextRequest) {
       const session = token ? await verifyToken(token) : null;
 
       if (!session || session.activeRestaurantSubdomain !== subdomain) {
-        return NextResponse.redirect(new URL("/login", req.url));
+        return NextResponse.redirect(createCleanRedirectUrl("/login", req));
       }
 
       const targetPath = path === "/" ? "/dashboard" : path;
@@ -148,12 +159,9 @@ export async function proxy(req: NextRequest) {
   }
 
   // 4. Root Base Domain Fallback (e.g. restiq.magnidigitech.com without subdomain)
-  // Automatically redirect to Platform Admin Login
+  // Automatically redirect to Platform Admin Login without internal port 3000
   if (!path.startsWith("/api") && !path.startsWith("/_next") && !path.startsWith("/static")) {
-    const adminUrl = new URL(req.url);
-    adminUrl.hostname = `admin.${baseDomain}`;
-    adminUrl.pathname = "/platform-admin/login";
-    return NextResponse.redirect(adminUrl);
+    return NextResponse.redirect(createCleanRedirectUrl("/platform-admin/login", req, `admin.${baseDomain}`));
   }
 
   return NextResponse.next();
