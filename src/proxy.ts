@@ -15,13 +15,26 @@ const PLATFORM_SESSION_COOKIE = "platform_admin_session";
 const TENANT_SESSION_COOKIE = "tenant_session";
 
 function createCleanRedirectUrl(targetPath: string, req: NextRequest, customHost?: string): URL {
-  const cleanUrl = new URL(targetPath, req.url);
-  const rawProto = req.headers.get("x-forwarded-proto") || "https";
-  cleanUrl.protocol = `${rawProto.split(",")[0].trim()}:`;
-  cleanUrl.port = "";
-  if (customHost) {
-    cleanUrl.hostname = customHost;
+  const rawHost = req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
+  const host = rawHost.split(",")[0].trim().split(":")[0].toLowerCase();
+  
+  const baseDomain = (process.env.ROOT_DOMAIN || "restiq.magnidigitech.com").toLowerCase();
+  
+  let effectiveHost = customHost;
+  if (!effectiveHost) {
+    if (host && host !== "0.0.0.0" && host !== "127.0.0.1") {
+      effectiveHost = host;
+    } else {
+      effectiveHost = baseDomain;
+    }
   }
+
+  const rawProto = req.headers.get("x-forwarded-proto") || "https";
+  const proto = rawProto.split(",")[0].trim();
+
+  const cleanUrl = new URL(`https://${effectiveHost}${targetPath}`);
+  cleanUrl.protocol = `${proto}:`;
+  cleanUrl.port = "";
   return cleanUrl;
 }
 
@@ -159,7 +172,7 @@ export async function proxy(req: NextRequest) {
   }
 
   // 4. Root Base Domain Fallback (e.g. restiq.magnidigitech.com without subdomain)
-  // Automatically redirect to Platform Admin Login without internal port 3000
+  // Automatically redirect to Platform Admin Login without internal port 3000 or 0.0.0.0 IP
   if (!path.startsWith("/api") && !path.startsWith("/_next") && !path.startsWith("/static")) {
     return NextResponse.redirect(createCleanRedirectUrl("/platform-admin/login", req, `admin.${baseDomain}`));
   }
