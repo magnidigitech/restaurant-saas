@@ -20,6 +20,9 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.restaurant-saas-app.rule=Host(`restiq.magnidigitech.com`) || HostRegexp(`{subdomain:[a-z0-9-]+}.restiq.magnidigitech.com`)"
       - "traefik.http.services.restaurant-saas-app.loadbalancer.server.port=3000"
+    networks:
+      - default
+      - coolify
     depends_on:
       - db
 
@@ -32,8 +35,14 @@ services:
       POSTGRES_DB: restaurant_saas
     ports:
       - "5432:5432"
+    networks:
+      - default
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+networks:
+  coolify:
+    external: true
 
 volumes:
   postgres_data:
