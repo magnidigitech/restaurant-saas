@@ -22,5 +22,5 @@ ENV HOSTNAME="0.0.0.0"
 
 EXPOSE 3000
 
-# Run Prisma database migrations on container start and launch server
-CMD ["sh", "-c", "npx prisma migrate deploy && node .next/standalone/server.js"]
+# Launch Next.js standalone server immediately (starts in < 200ms)
+CMD ["node", ".next/standalone/server.js"]
