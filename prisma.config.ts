@@ -8,6 +8,6 @@ export default defineConfig({
     seed: "npx tsx prisma/seed.ts",
   },
   datasource: {
-    url: process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL || "",
+    url: process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL || "postgresql://postgres:postgres@db:5432/restaurant_saas?schema=public",
   },
 });
