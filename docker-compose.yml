@@ -16,6 +16,10 @@ services:
       - "3000"
     ports:
       - "3000:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.restaurant-saas-app.rule=Host(`restiq.magnidigitech.com`) || HostRegexp(`{subdomain:[a-z0-9-]+}.restiq.magnidigitech.com`)"
+      - "traefik.http.services.restaurant-saas-app.loadbalancer.server.port=3000"
     depends_on:
       - db
 
