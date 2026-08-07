@@ -1,52 +1,39 @@
+version: '3.8'
+
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    expose:
-      - "3000"
+    restart: always
     environment:
-      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@pgbouncer:6432/restaurant_saas?schema=public
-      - DIRECT_DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/restaurant_saas?schema=public
-      - JWT_SECRET=${JWT_SECRET:-local_testing_secret_key_1234567890}
-      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/restaurant_saas?schema=public
+      - ROOT_DOMAIN=${ROOT_DOMAIN:-restiq.magnidigitech.com}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-https://restiq.magnidigitech.com}
+      - JWT_SECRET=${JWT_SECRET:-super-secret-jwt-token-change-in-coolify}
       - PORT=3000
+    ports:
+      - "3000:3000"
     depends_on:
-      - pgbouncer
-    restart: unless-stopped
+      db:
+        condition: service_healthy
 
-  postgres:
-    image: postgres:17-alpine
+  db:
+    image: postgres:16-alpine
+    restart: always
     environment:
-      POSTGRES_DB: restaurant_saas
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-    # Bind to loopback interface for local development access
+      POSTGRES_DB: restaurant_saas
     ports:
-      - "127.0.0.1:5432:5432"
+      - "5432:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
-    restart: unless-stopped
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d restaurant_saas"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
       timeout: 5s
       retries: 5
 
-  pgbouncer:
-    build:
-      context: .
-      dockerfile: ./infra/pgbouncer/Dockerfile
-    command:
-      - /usr/bin/pgbouncer
-      - /etc/pgbouncer/pgbouncer.ini
-    # Bind to loopback interface for local development access
-    ports:
-      - "127.0.0.1:6432:6432"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-
 volumes:
-  postgres-data:
+  postgres_data:

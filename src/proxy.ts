@@ -5,11 +5,7 @@ import { verifyToken } from "./core/auth/jwt";
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - api (unless it's custom tenant/admin APIs we want to gate)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
+     * Match all request paths except for static assets
      */
     "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
@@ -22,26 +18,38 @@ export async function proxy(req: NextRequest) {
   const url = req.nextUrl.clone();
   const path = url.pathname;
 
-  // 1. Resolve host and subdomain
-  const host = req.headers.get("host") || "";
-  
-  // We assume host looks like: admin.localhost:3000, coyote.localhost:3000, localhost:3000
-  const hostParts = host.split(":");
-  const domain = hostParts[0];
-  const domainParts = domain.split(".");
+  // 1. Resolve host and subdomain from X-Forwarded-Host or Host header
+  const rawHost = req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
+  const host = rawHost.split(",")[0].trim();
+  const domain = host.split(":")[0].toLowerCase();
+
+  const baseDomain = (process.env.ROOT_DOMAIN || "restiq.magnidigitech.com").toLowerCase();
 
   let subdomain = "";
-  if (domainParts.length > 1 && domainParts[domainParts.length - 2] !== "localhost") {
-    // e.g. subdomain.domain.com
-    subdomain = domainParts[0];
-  } else if (domainParts.length === 2 && domainParts[1] === "localhost") {
-    // e.g. subdomain.localhost
-    subdomain = domainParts[0];
+
+  if (domain.endsWith(".sslip.io")) {
+    const sslipParts = domain.replace(".sslip.io", "").split(".");
+    if (sslipParts.length > 5) {
+      subdomain = sslipParts[0];
+    }
+  } else if (domain.endsWith("localhost") || domain.includes("127.0.0.1")) {
+    const domainParts = domain.split(".");
+    if (domainParts.length > 1 && domainParts[0] !== "localhost") {
+      subdomain = domainParts[0];
+    }
+  } else if (domain.endsWith(baseDomain)) {
+    if (domain !== baseDomain) {
+      subdomain = domain.replace(`.${baseDomain}`, "");
+    }
+  } else {
+    const domainParts = domain.split(".");
+    if (domainParts.length > 2) {
+      subdomain = domainParts[0];
+    }
   }
 
   // 2. Check for Platform Admin Scope
-  if (subdomain === "admin") {
-    // Gate platform-admin pathing
+  if (subdomain === "admin" || path.startsWith("/platform-admin")) {
     if (path.startsWith("/api/platform-admin") && path !== "/api/platform-admin/auth/login") {
       const token = req.cookies.get(PLATFORM_SESSION_COOKIE)?.value;
       const session = token ? await verifyToken(token) : null;
@@ -59,6 +67,11 @@ export async function proxy(req: NextRequest) {
     }
 
     if (path === "/" || path === "/platform-admin") {
+      const token = req.cookies.get(PLATFORM_SESSION_COOKIE)?.value;
+      const session = token ? await verifyToken(token) : null;
+      if (!session || session.role !== "PLATFORM_ADMIN") {
+        return NextResponse.redirect(new URL("/platform-admin/login", req.url));
+      }
       return NextResponse.redirect(new URL("/platform-admin/dashboard", req.url));
     }
 
@@ -67,7 +80,6 @@ export async function proxy(req: NextRequest) {
         return NextResponse.next();
       }
 
-      // Check auth cookie
       const token = req.cookies.get(PLATFORM_SESSION_COOKIE)?.value;
       const session = token ? await verifyToken(token) : null;
 
@@ -78,20 +90,23 @@ export async function proxy(req: NextRequest) {
       return NextResponse.next();
     }
 
-    // Rewrite any other path to admin space
     url.pathname = `/platform-admin${path}`;
     return NextResponse.rewrite(url);
   }
 
   // 3. Check for Restaurant Subdomain Scope
   if (subdomain && subdomain !== "www") {
-    // Don't intercept global api folders except tenant APIs
+    if (path.startsWith("/onboarding/portal")) {
+      return NextResponse.next();
+    }
+
     if (path.startsWith("/api")) {
       if (path.startsWith("/api/restaurant")) {
         const isPublicTenantApi = 
           path === "/api/restaurant/auth/login" || 
           path === "/api/restaurant/activate" || 
-          path.endsWith("/branding");
+          path.endsWith("/branding") ||
+          path.startsWith("/api/restaurant/onboarding/portal");
 
         if (!isPublicTenantApi) {
           const token = req.cookies.get(TENANT_SESSION_COOKIE)?.value;
@@ -108,22 +123,17 @@ export async function proxy(req: NextRequest) {
       return NextResponse.next();
     }
 
-    // Don't intercept system assets
-    if (path.startsWith("/images") || path.startsWith("/static")) {
+    if (path.startsWith("/images") || path.startsWith("/static") || path.startsWith("/uploads")) {
       return NextResponse.next();
     }
 
-    // Inside dynamic path rewrite.
-    // If the path does not already start with /restaurant/[subdomain]
     const tenantPathPrefix = `/restaurant/${subdomain}`;
     if (!path.startsWith(tenantPathPrefix)) {
       if (path === "/login" || path === "/activate" || path.startsWith("/login/") || path.startsWith("/activate/")) {
-        // Allow public pages inside the subfolder rewrite
         url.pathname = `/restaurant/${subdomain}${path}`;
         return NextResponse.rewrite(url);
       }
 
-      // Verification check for protected page routes
       const token = req.cookies.get(TENANT_SESSION_COOKIE)?.value;
       const session = token ? await verifyToken(token) : null;
 
@@ -131,17 +141,19 @@ export async function proxy(req: NextRequest) {
         return NextResponse.redirect(new URL("/login", req.url));
       }
 
-      // Rewrite home page to dashboard
       const targetPath = path === "/" ? "/dashboard" : path;
       url.pathname = `/restaurant/${subdomain}${targetPath}`;
       return NextResponse.rewrite(url);
     }
   }
 
-  // Fallback for main landing domain (e.g. localhost:3000)
-  if (path === "/") {
-    // Render landing page or redirect to admin login if no subdomain
-    return NextResponse.next();
+  // 4. Root Base Domain Fallback (e.g. restiq.magnidigitech.com without subdomain)
+  // Automatically redirect to Platform Admin Login
+  if (!path.startsWith("/api") && !path.startsWith("/_next") && !path.startsWith("/static")) {
+    const adminUrl = new URL(req.url);
+    adminUrl.hostname = `admin.${baseDomain}`;
+    adminUrl.pathname = "/platform-admin/login";
+    return NextResponse.redirect(adminUrl);
   }
 
   return NextResponse.next();

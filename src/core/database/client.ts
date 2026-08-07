@@ -12,22 +12,23 @@ if (!process.env.DATABASE_URL) {
 }
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient | undefined };
-let prismaInstance: PrismaClient;
 
 const connectionString = process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/restaurant_saas?schema=public";
 
-if (!globalForPrisma.prisma) {
+export function createPrismaClient() {
   const pool = new Pool({
     connectionString,
-    max: 15, // conservative pool size appropriate for PgBouncer
+    max: 15,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 2000,
   });
   const adapter = new PrismaPg(pool);
-  globalForPrisma.prisma = new PrismaClient({ adapter });
+  return new PrismaClient({ adapter });
 }
 
-prismaInstance = globalForPrisma.prisma;
+if (!globalForPrisma.prisma || !(globalForPrisma.prisma as any).vendorItem || !(globalForPrisma.prisma as any).purchaseOrder) {
+  globalForPrisma.prisma = createPrismaClient();
+}
 
-export const prisma = prismaInstance;
+export const prisma = globalForPrisma.prisma;
 export { connectionString };

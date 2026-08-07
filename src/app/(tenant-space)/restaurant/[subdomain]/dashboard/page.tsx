@@ -17,6 +17,11 @@ interface Branding {
   logoUrl: string | null;
 }
 
+const MODULE_ROUTES: Record<string, string> = {
+  hr_onboarding: "/workforce/onboarding",
+  inventory: "/inventory",
+};
+
 export default function TenantDashboard() {
   const router = useRouter();
   const params = useParams();
@@ -26,6 +31,7 @@ export default function TenantDashboard() {
   const [branding, setBranding] = useState<Branding | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
 
   const fetchData = async () => {
     try {
@@ -138,7 +144,10 @@ export default function TenantDashboard() {
                     <p className="text-sm text-slate-400 line-clamp-3">{mod.description}</p>
                   </div>
                   <button
-                    onClick={() => router.push(`/modules/${mod.key}`)}
+                    onClick={() => {
+                      const target = MODULE_ROUTES[mod.key] || `/modules/${mod.key}`;
+                      router.push(target);
+                    }}
                     className="w-full py-2 bg-slate-950 hover:bg-slate-900 border border-slate-800 rounded-lg text-xs font-semibold tracking-wider uppercase text-slate-300 hover:text-white transition-all cursor-pointer"
                   >
                     Open Module
@@ -158,6 +167,7 @@ export default function TenantDashboard() {
               { label: "Outlets Management", desc: "Manage physical branches and timezones", path: "/settings/outlets" },
               { label: "Master Data", desc: "Departments, designations, job grades, cost centers", path: "/settings/master-data" },
               { label: "Employee Directory", desc: "Workforce directory and profiles", path: "/workforce/employees" },
+              { label: "HR Onboarding", desc: "Onboarding sessions, templates and approvals", path: "/workforce/onboarding" },
               { label: "Users & Invitations", desc: "App login access and staff invites", path: "/workforce/users" },
               { label: "Roles & Permissions", desc: "Custom roles and access matrices", path: "/settings/roles-permissions" },
               { label: "Access Grants", desc: "Module and outlet access controls", path: "/settings/access-grants" },
@@ -178,6 +188,28 @@ export default function TenantDashboard() {
             ))}
           </div>
         </div>
+
+        {/* Operational Modules Section */}
+        {modules.some((m) => ["inventory"].includes(m.key)) && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold tracking-tight uppercase text-slate-400">Operations</h3>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {modules.filter((m) => ["inventory"].includes(m.key)).map((mod) => (
+                <div
+                  key={mod.key}
+                  onClick={() => router.push(`/inventory`)}
+                  className="bg-slate-900/20 border border-slate-900 p-5 rounded-2xl hover:border-slate-800 hover:bg-slate-900/40 transition-all cursor-pointer space-y-2 flex flex-col justify-between"
+                >
+                  <div>
+                    <h4 className="text-base font-bold text-white">{mod.name}</h4>
+                    <p className="text-xs text-slate-400 mt-1">{mod.description}</p>
+                  </div>
+                  <span className="text-xs font-semibold text-blue-400 flex items-center gap-1 pt-2">Open →</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

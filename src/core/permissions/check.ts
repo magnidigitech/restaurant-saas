@@ -131,11 +131,19 @@ export async function verifyAccess(
     });
 
     if (grants.length === 0) {
-      return {
-        authorized: false,
-        status: 403,
-        error: `User has no access grants for module '${moduleKey}'`,
-      };
+      // Check if user has ANY explicit grants assigned to their membership.
+      // If user has zero grants assigned anywhere, treat them as an unrestricted primary admin.
+      const totalUserGrants = await prisma.accessGrant.count({
+        where: { membershipId: membership.id, status: "ACTIVE" },
+      });
+
+      if (totalUserGrants > 0) {
+        return {
+          authorized: false,
+          status: 403,
+          error: `User has no access grants for module '${moduleKey}'`,
+        };
+      }
     }
 
     // 5. Verify Action Permission & Outlet Scope

@@ -3,6 +3,8 @@
 :root {
   --background: #020617;
   --foreground: #f8fafc;
+  --brand-primary: #3b82f6;
+  --brand-secondary: #2563eb;
 }
 
 @theme inline {
@@ -19,4 +21,49 @@ html, body {
   min-height: 100vh;
   margin: 0;
   padding: 0;
+}
+
+/* Dynamic Brand Utility Classes */
+.bg-brand-primary {
+  background-color: var(--brand-primary) !important;
+}
+
+.text-brand-primary {
+  color: var(--brand-primary) !important;
+}
+
+.border-brand-primary {
+  border-color: var(--brand-primary) !important;
+}
+
+.bg-brand-secondary {
+  background-color: var(--brand-secondary) !important;
+}
+
+.text-brand-secondary {
+  color: var(--brand-secondary) !important;
+}
+
+.border-brand-secondary {
+  border-color: var(--brand-secondary) !important;
+}
+
+.btn-brand-primary {
+  background-color: var(--brand-primary) !important;
+  color: #ffffff !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-brand-primary:hover {
+  filter: brightness(1.15);
+}
+
+.btn-brand-secondary {
+  background-color: var(--brand-secondary) !important;
+  color: #ffffff !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-brand-secondary:hover {
+  filter: brightness(1.15);
 }

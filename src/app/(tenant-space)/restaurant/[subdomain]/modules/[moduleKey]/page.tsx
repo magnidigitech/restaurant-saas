@@ -3,6 +3,13 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 
+const MODULE_ROUTES: Record<string, string> = {
+  hr_onboarding: "/workforce/onboarding",
+  inventory: "/inventory",
+  vendor_management: "/inventory/vendors",
+  purchase_management: "/inventory/purchase-orders",
+};
+
 export default function ModuleMockPage() {
   const params = useParams();
   const router = useRouter();
@@ -32,6 +39,11 @@ export default function ModuleMockPage() {
           setError(`Module '${moduleKey}' is not enabled or entitled for this restaurant.`);
         } else {
           setModuleName(currentMod.name);
+          // If a dedicated route exists for this module, redirect to it
+          if (MODULE_ROUTES[moduleKey]) {
+            router.replace(MODULE_ROUTES[moduleKey]);
+            return;
+          }
         }
       } catch (e) {
         setError("Error validating module permissions.");
@@ -43,7 +55,7 @@ export default function ModuleMockPage() {
     if (subdomain && moduleKey) {
       verifyModuleAccess();
     }
-  }, [subdomain, moduleKey]);
+  }, [subdomain, moduleKey, router]);
 
   if (loading) {
     return (
@@ -86,13 +98,15 @@ export default function ModuleMockPage() {
           </button>
         </div>
 
-        <div className="bg-slate-900/10 border border-slate-900 p-12 rounded-2xl text-center text-slate-500 font-medium">
-          Mock operational workflow interface for module: <span className="text-slate-300 font-semibold">{moduleName}</span>.
-          <p className="text-xs text-slate-600 mt-2">
-            During Phase 1, business logic pages are represented by functional wrappers to focus on foundation checks.
+        <div className="bg-slate-900/20 border border-slate-800 p-12 rounded-2xl text-center space-y-3">
+          <div className="text-4xl">🚀</div>
+          <h3 className="text-lg font-bold text-white">{moduleName} Module</h3>
+          <p className="text-sm text-slate-400 max-w-md mx-auto">
+            This module is enabled for your restaurant and scheduled for release in an upcoming phase.
           </p>
         </div>
       </div>
     </main>
   );
 }
+

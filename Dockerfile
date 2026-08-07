@@ -1,40 +1,49 @@
-FROM node:22-alpine AS base
+# Multi-stage Dockerfile for Next.js 16 + Prisma Standalone Deployment on Coolify
 
-# 1. Install dependencies only when needed
+FROM node:20-alpine AS base
+WORKDIR /app
+
+# Step 1: Install dependencies
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
-WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm install
+RUN npm ci
 
-# 2. Rebuild the source code only when needed
+# Step 2: Build the application
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
+
+# Generate Prisma Client
 RUN npx prisma generate
+
+ENV NEXT_TELEMETRY_DISABLED 1
 RUN npm run build
 
-# 3. Production image, copy all the files and run next
+# Step 3: Production runner
 FROM base AS runner
 WORKDIR /app
+
 ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Copy static assets and standalone bundle
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
-COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules ./node_modules
 
 USER nextjs
+
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# Auto-run Prisma database migrations on startup and start server
+CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]

@@ -40,13 +40,23 @@ model Restaurant {
   invitations   StaffInvitation[]
   accessGrants  AccessGrant[]
   roles         Role[]
-  departments       Department[]
-  designations      Designation[]
-  jobGrades         JobGrade[]
-  costCenters       CostCenter[]
-  employees         Employee[]
-  employmentRecords EmploymentRecord[]
-  outletAssignments EmployeeOutletAssignment[]
+  departments          Department[]
+  designations         Designation[]
+  jobGrades            JobGrade[]
+  costCenters          CostCenter[]
+  employees            Employee[]
+  employmentRecords    EmploymentRecord[]
+  outletAssignments    EmployeeOutletAssignment[]
+  onboardingTemplates  OnboardingTemplate[]
+  onboardings          EmployeeOnboarding[]
+  fileUploads          EmployeeFileUpload[]
+  inventoryCategories  InventoryCategory[]
+  inventoryItems       InventoryItem[]
+  stockLedger          StockLedger[]
+  wastageLogs          WastageLog[]
+  vendors              Vendor[]
+  purchaseOrders       PurchaseOrder[]
+  vendorItems          VendorItem[]
 
   @@map("restaurants")
 }
@@ -108,11 +118,14 @@ model RestaurantOutlet {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   // Relations
-  restaurant   Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  accessGrants AccessGrant[]
-  invitations  StaffInvitation[]
+  restaurant        Restaurant                 @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  accessGrants      AccessGrant[]
+  invitations       StaffInvitation[]
   employmentRecords EmploymentRecord[]
-  outletAssignments  EmployeeOutletAssignment[]
+  outletAssignments EmployeeOutletAssignment[]
+  stockLedger       StockLedger[]
+  wastageLogs       WastageLog[]
+  purchaseOrders    PurchaseOrder[]
 
   @@index([restaurantId])
   @@map("restaurant_outlets")
@@ -497,6 +510,7 @@ model Employee {
   emergencyContacts EmployeeEmergencyContact[]
   documents         EmployeeDocument[]
   memberships       RestaurantMembership[]
+  onboardings       EmployeeOnboarding[]
 
   @@unique([restaurantId, employeeCode])
   @@index([restaurantId])
@@ -632,3 +646,406 @@ enum DocumentType {
   FOOD_LICENSE
 }
 
+// ----------------------------------------------------
+// 7. Phase 3: HR Onboarding Entities
+// ----------------------------------------------------
+
+model OnboardingTemplate {
+  id           String   @id @default(uuid())
+  restaurantId String   @map("restaurant_id")
+  name         String
+  description  String?
+  isDefault    Boolean  @default(false) @map("is_default")
+  archivedAt   DateTime? @map("archived_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant  Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tasks       OnboardingTask[]
+  onboardings EmployeeOnboarding[]
+
+  @@index([restaurantId])
+  @@map("onboarding_templates")
+}
+
+model OnboardingTask {
+  id          String   @id @default(uuid())
+  templateId  String   @map("template_id")
+  title       String
+  description String?
+  isRequired  Boolean  @default(true) @map("is_required")
+  sortOrder   Int      @default(0) @map("sort_order")
+  requiresDoc Boolean  @default(false) @map("requires_doc")
+  taskType    TaskType @default(CHECKBOX) @map("task_type")
+  fieldConfig String?  @map("field_config") // JSON string for placeholder, options, help text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  template   OnboardingTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  progresses OnboardingTaskProgress[]
+
+  @@index([templateId])
+  @@map("onboarding_tasks")
+}
+
+model EmployeeOnboarding {
+  id           String           @id @default(uuid())
+  restaurantId String           @map("restaurant_id")
+  employeeId   String           @map("employee_id")
+  templateId   String           @map("template_id")
+  accessToken  String           @default(dbgenerated("gen_random_uuid()")) @map("access_token")
+  status       OnboardingStatus @default(PENDING)
+  startedAt    DateTime?        @map("started_at")
+  submittedAt  DateTime?        @map("submitted_at")
+  reviewedAt   DateTime?        @map("reviewed_at")
+  reviewedBy   String?          @map("reviewed_by") // User ID
+  reviewNotes  String?          @map("review_notes")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant              @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  employee   Employee                @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  template   OnboardingTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  progresses OnboardingTaskProgress[]
+  uploads    EmployeeFileUpload[]
+
+  @@index([restaurantId])
+  @@index([employeeId])
+  @@index([accessToken])
+  @@map("employee_onboardings")
+}
+
+model OnboardingTaskProgress {
+  id           String     @id @default(uuid())
+  onboardingId String     @map("onboarding_id")
+  taskId       String     @map("task_id")
+  status       TaskStatus @default(PENDING)
+  responseValue String?   @map("response_value") // Signature data URL, text response, or date value
+  completedAt  DateTime?  @map("completed_at")
+  notes        String?
+  fileUploadId String?    @map("file_upload_id")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  onboarding EmployeeOnboarding @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+  task       OnboardingTask     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fileUpload EmployeeFileUpload? @relation(fields: [fileUploadId], references: [id], onDelete: SetNull)
+
+  @@unique([onboardingId, taskId])
+  @@index([onboardingId])
+  @@map("onboarding_task_progress")
+}
+
+enum TaskType {
+  CHECKBOX
+  DOCUMENT
+  FORM_INPUT
+  SIGNATURE
+  DATE
+}
+
+model EmployeeFileUpload {
+  id           String       @id @default(uuid())
+  restaurantId String       @map("restaurant_id")
+  onboardingId String?      @map("onboarding_id")
+  uploadedBy   String       @map("uploaded_by") // User ID
+  fileKey      String       @map("file_key")   // e.g. "uploads/restaurantId/uuid.pdf"
+  fileUrl      String       @map("file_url")
+  fileName     String       @map("file_name")
+  mimeType     String       @map("mime_type")
+  sizeBytes    Int          @map("size_bytes")
+  category     FileCategory @default(DOCUMENT)
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  restaurant     Restaurant               @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  onboarding     EmployeeOnboarding?      @relation(fields: [onboardingId], references: [id], onDelete: SetNull)
+  taskProgresses OnboardingTaskProgress[]
+
+  @@index([restaurantId])
+  @@index([onboardingId])
+  @@map("employee_file_uploads")
+}
+
+enum OnboardingStatus {
+  PENDING
+  IN_PROGRESS
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum TaskStatus {
+  PENDING
+  COMPLETED
+  WAIVED
+  REJECTED
+}
+
+enum FileCategory {
+  DOCUMENT
+  PHOTO
+  CONTRACT
+  OTHER
+}
+
+// ----------------------------------------------------
+// 8. Phase 3: Inventory Entities
+// ----------------------------------------------------
+
+model InventoryCategory {
+  id           String    @id @default(uuid())
+  restaurantId String    @map("restaurant_id")
+  name         String
+  description  String?
+  parentId     String?   @map("parent_id")
+  sortOrder    Int       @default(0) @map("sort_order")
+  archivedAt   DateTime? @map("archived_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  parent     InventoryCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children   InventoryCategory[] @relation("CategoryHierarchy")
+  items      InventoryItem[]
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId])
+  @@index([parentId])
+  @@map("inventory_categories")
+}
+
+model InventoryItem {
+  id              String        @id @default(uuid())
+  restaurantId    String        @map("restaurant_id")
+  categoryId      String?       @map("category_id")
+  name            String
+  sku             String?
+  description     String?
+  unitOfMeasure   UnitOfMeasure @default(PIECES) @map("unit_of_measure")
+  reorderPoint    Decimal       @default(0) @map("reorder_point")
+  parLevel        Decimal       @default(0) @map("par_level")
+  costPerUnit     Decimal       @default(0) @map("cost_per_unit")
+  archivedAt      DateTime?     @map("archived_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant   Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  category     InventoryCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  stockLedger  StockLedger[]
+  wastageLogs  WastageLog[]
+  poItems      PurchaseOrderItem[]
+  vendorItems  VendorItem[]
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId])
+  @@index([categoryId])
+  @@map("inventory_items")
+}
+
+model StockLedger {
+  id           String            @id @default(uuid())
+  restaurantId String            @map("restaurant_id")
+  outletId     String            @map("outlet_id")
+  itemId       String            @map("item_id")
+  movementType StockMovementType @map("movement_type")
+  quantity     Decimal           // positive = stock in, negative = stock out
+  referenceId  String?           @map("reference_id")  // PO id, transfer id, etc.
+  notes        String?
+  recordedBy   String            @map("recorded_by")   // User ID
+  occurredAt   DateTime          @default(now()) @map("occurred_at")
+  createdAt    DateTime          @default(now()) @map("created_at")
+
+  // Relations
+  restaurant Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet     RestaurantOutlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  item       InventoryItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([outletId])
+  @@index([itemId])
+  @@index([occurredAt])
+  @@map("stock_ledger")
+}
+
+model WastageLog {
+  id           String       @id @default(uuid())
+  restaurantId String       @map("restaurant_id")
+  outletId     String       @map("outlet_id")
+  itemId       String       @map("item_id")
+  quantity     Decimal
+  reason       WastageReason
+  notes        String?
+  recordedBy   String       @map("recorded_by")
+  occurredAt   DateTime     @default(now()) @map("occurred_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  restaurant Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet     RestaurantOutlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  item       InventoryItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([outletId])
+  @@index([itemId])
+  @@map("wastage_logs")
+}
+
+enum StockMovementType {
+  PURCHASE
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT
+  CONSUMPTION
+  WASTAGE
+  RETURN
+}
+
+enum WastageReason {
+  EXPIRED
+  DAMAGED
+  SPILLAGE
+  THEFT
+  OVERPRODUCTION
+  OTHER
+}
+
+enum UnitOfMeasure {
+  KG
+  G
+  L
+  ML
+  PIECES
+  DOZEN
+  BOX
+  PACKET
+}
+
+model Vendor {
+  id            String        @id @default(uuid())
+  restaurantId  String        @map("restaurant_id")
+  name          String
+  code          String?
+  contactPerson String?       @map("contact_person")
+  email         String?
+  phone         String?
+  address       String?
+  taxId         String?       @map("tax_id")
+  paymentTerms  PaymentTerms  @default(NET30) @map("payment_terms")
+  status        VendorStatus  @default(ACTIVE)
+  notes         String?
+  archivedAt    DateTime?     @map("archived_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant     Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  purchaseOrders PurchaseOrder[]
+  vendorItems    VendorItem[]
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId])
+  @@map("inventory_vendors")
+}
+
+enum PaymentTerms {
+  COD
+  IMMEDIATE
+  NET7
+  NET15
+  NET30
+  NET60
+}
+
+enum VendorStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+model PurchaseOrder {
+  id                   String            @id @default(uuid())
+  restaurantId         String            @map("restaurant_id")
+  outletId             String            @map("outlet_id")
+  vendorId             String            @map("vendor_id")
+  poNumber             String            @map("po_number")
+  status               POStatus          @default(DRAFT)
+  totalAmount          Decimal           @default(0) @map("total_amount")
+  taxAmount            Decimal           @default(0) @map("tax_amount")
+  grandTotal           Decimal           @default(0) @map("grand_total")
+  expectedDeliveryDate DateTime?         @map("expected_delivery_date")
+  notes                String?
+  createdBy            String            @map("created_by")
+  receivedAt           DateTime?         @map("received_at")
+  archivedAt           DateTime?         @map("archived_at")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet     RestaurantOutlet  @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  vendor     Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  items      PurchaseOrderItem[]
+
+  @@unique([restaurantId, poNumber])
+  @@index([restaurantId])
+  @@index([outletId])
+  @@index([vendorId])
+  @@map("inventory_purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id               String   @id @default(uuid())
+  purchaseOrderId  String   @map("purchase_order_id")
+  itemId           String   @map("item_id")
+  orderedQuantity  Decimal  @map("ordered_quantity")
+  receivedQuantity Decimal  @default(0) @map("received_quantity")
+  unitCost         Decimal  @map("unit_cost")
+  totalCost        Decimal  @map("total_cost")
+
+  // Relations
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  item          InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseOrderId])
+  @@index([itemId])
+  @@map("inventory_purchase_order_items")
+}
+
+enum POStatus {
+  DRAFT
+  SENT
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+model VendorItem {
+  id           String   @id @default(uuid())
+  restaurantId String   @map("restaurant_id")
+  vendorId     String   @map("vendor_id")
+  itemId       String   @map("item_id")
+  vendorSku    String?  @map("vendor_sku")
+  unitCost     Decimal? @map("unit_cost")
+  leadTimeDays Int?     @map("lead_time_days")
+  isPreferred  Boolean  @default(false) @map("is_preferred")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  vendor     Vendor        @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  item       InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, itemId])
+  @@index([restaurantId])
+  @@index([vendorId])
+  @@index([itemId])
+  @@map("inventory_vendor_items")
+}

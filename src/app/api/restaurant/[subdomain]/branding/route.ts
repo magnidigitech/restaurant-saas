@@ -22,9 +22,10 @@ export async function GET(
     return NextResponse.json({
       name: restaurant.name,
       applicationName: restaurant.branding?.applicationName || restaurant.name,
-      primaryColor: restaurant.branding?.primaryColor || "#0f172a",
-      secondaryColor: restaurant.branding?.secondaryColor || "#3b82f6",
+      primaryColor: restaurant.branding?.primaryColor || "#3b82f6",
+      secondaryColor: restaurant.branding?.secondaryColor || "#1d4ed8",
       logoUrl: restaurant.branding?.logoUrl || null,
+      faviconUrl: restaurant.branding?.faviconUrl || null,
       status: restaurant.status,
     });
   } catch (error: any) {

@@ -55,39 +55,90 @@ export async function POST(req: NextRequest) {
         data: { status: "ACCEPTED" },
       });
 
-      // Find user
-      const user = await tx.user.findUnique({
+      // Hash password
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Find or create User
+      let user = await tx.user.findUnique({
         where: { email: invitation.email },
       });
 
       if (!user) {
-        throw new Error("Target user record not found");
+        user = await tx.user.create({
+          data: {
+            email: invitation.email,
+            name,
+            passwordHash,
+          },
+        });
+      } else {
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            name,
+            passwordHash,
+          },
+        });
       }
 
-      // Hash password
-      const passwordHash = await bcrypt.hash(password, 10);
-
-      // Update user details
-      await tx.user.update({
-        where: { id: user.id },
-        data: {
-          name,
-          passwordHash,
-        },
-      });
-
-      // Update membership status to ACTIVE
-      await tx.restaurantMembership.update({
+      // Find or create RestaurantMembership
+      let membership = await tx.restaurantMembership.findUnique({
         where: {
           restaurantId_userId: {
             restaurantId: invitation.restaurantId,
             userId: user.id,
           },
         },
-        data: {
-          status: "ACTIVE",
-        },
       });
+
+      if (!membership) {
+        membership = await tx.restaurantMembership.create({
+          data: {
+            restaurantId: invitation.restaurantId,
+            userId: user.id,
+            status: "ACTIVE",
+          },
+        });
+      } else {
+        await tx.restaurantMembership.update({
+          where: { id: membership.id },
+          data: { status: "ACTIVE" },
+        });
+      }
+
+      // Assign AccessGrants if invitation specified a role
+      if (invitation.roleId) {
+        const rolePermissions = await tx.rolePermission.findMany({
+          where: { roleId: invitation.roleId },
+          include: { permission: true },
+        });
+
+        const moduleIds = [...new Set(rolePermissions.map((rp) => rp.permission.moduleId))];
+
+        for (const moduleId of moduleIds) {
+          const existingGrant = await tx.accessGrant.findFirst({
+            where: {
+              restaurantId: invitation.restaurantId,
+              membershipId: membership.id,
+              moduleId,
+              roleId: invitation.roleId,
+            },
+          });
+
+          if (!existingGrant) {
+            await tx.accessGrant.create({
+              data: {
+                restaurantId: invitation.restaurantId,
+                membershipId: membership.id,
+                moduleId,
+                roleId: invitation.roleId,
+                outletId: invitation.outletId || null,
+                status: "ACTIVE",
+              },
+            });
+          }
+        }
+      }
 
       // Audit entry
       await tx.auditLog.create({
