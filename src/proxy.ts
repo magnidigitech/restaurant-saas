@@ -128,6 +128,11 @@ export async function proxy(req: NextRequest) {
     }
   }
 
+  // 3.5 Global Public Routes (e.g. /activate)
+  if (path === "/activate" || path.startsWith("/activate/")) {
+    return NextResponse.next();
+  }
+
   // 4. Check for Platform Super Admin Scope (admin.domain, /platform-admin, or /api/platform-admin)
   if (subdomain === "admin" || path.startsWith("/platform-admin") || path.startsWith("/api/platform-admin")) {
     if (path.startsWith("/api/platform-admin") && path !== "/api/platform-admin/auth/login") {
