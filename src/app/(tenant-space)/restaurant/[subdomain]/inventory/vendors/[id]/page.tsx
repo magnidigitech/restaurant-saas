@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import React, { useState, useEffect, use } from "react";
+import { useRouter } from "next/navigation";
+import { useTheme } from "@/core/theme/ThemeContext";
+import RestaurantNavbar from "@/components/RestaurantNavbar";
 
 interface VendorItemMap {
   id: string;
@@ -54,10 +56,14 @@ interface MultiSelectItemRow {
   existingPreferredVendor?: string | null;
 }
 
-export default function VendorDetailPage() {
+export default function VendorDetailPage({
+  params,
+}: {
+  params: Promise<{ subdomain: string; id: string }>;
+}) {
   const router = useRouter();
-  const params = useParams();
-  const vendorId = params?.id as string;
+  const { subdomain, id: vendorId } = use(params);
+  const { isDark } = useTheme();
 
   const [vendor, setVendor] = useState<VendorDetail | null>(null);
   const [vendorItems, setVendorItems] = useState<VendorItemMap[]>([]);
@@ -87,7 +93,7 @@ export default function VendorDetailPage() {
     notes: "",
   });
 
-  // Custom Confirm Dialog Modal State
+  // Custom Apple Confirm Dialog Modal State
   const [confirmDialog, setConfirmDialog] = useState<{
     show: boolean;
     title: string;
@@ -134,68 +140,28 @@ export default function VendorDetailPage() {
         setError(dataVendor.error || "Vendor not found");
       }
 
-      const fetchedVItems: VendorItemMap[] = resVendorItems.ok ? dataVItems.vendorItems || [] : [];
-      const fetchedAllVItems: VendorItemMap[] = resAllVendorItems.ok ? dataAllVItems.vendorItems || [] : [];
-      const fetchedAllItems: InventoryItem[] = resAllItems.ok ? dataAllItems.items || [] : [];
-
-      setVendorItems(fetchedVItems);
-      setAllRestaurantVendorItems(fetchedAllVItems);
-      setAllItems(fetchedAllItems);
-
-      // Build preferred supplier lookup map
-      const preferredMap: Record<string, string> = {};
-      fetchedAllVItems.forEach((m) => {
-        if (m.isPreferred && m.vendor?.name) {
-          preferredMap[m.itemId] = m.vendor.name;
-        }
-      });
-
-      // Build rows for ALL inventory items (showing selected state, unit cost, SKU, and preferred status)
-      setMultiSelectRows(
-        fetchedAllItems.map((i) => {
-          const existing = fetchedVItems.find((vi) => vi.itemId === i.id);
-          const isSel = Boolean(existing);
-          const cost = existing?.unitCost ?? i.costPerUnit ?? 0;
-          return {
-            itemId: i.id,
-            name: i.name,
-            unitOfMeasure: i.unitOfMeasure,
-            selected: isSel,
-            isPreferred: existing ? existing.isPreferred : false,
-            unitCost: cost.toString(),
-            vendorSku: existing?.vendorSku || "",
-            existingPreferredVendor: preferredMap[i.id] || null,
-          };
-        })
-      );
+      if (resVendorItems.ok) setVendorItems(dataVItems.vendorItems || []);
+      if (resAllVendorItems.ok) setAllRestaurantVendorItems(dataAllVItems.vendorItems || []);
+      if (resAllItems.ok) setAllItems(dataAllItems.items || []);
     } catch {
-      setError("Failed to load vendor detail");
-    } fontally: {
-      setLoading(false);
-    }
-  };
-
-  const fetchVendorDetailWithFinally = async () => {
-    try {
-      await fetchVendorDetail();
+      setError("Failed to load vendor details");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (vendorId) fetchVendorDetailWithFinally();
+    if (vendorId) fetchVendorDetail();
   }, [vendorId]);
 
   const openMultiSelectModal = () => {
     const preferredMap: Record<string, string> = {};
-    allRestaurantVendorItems.forEach((m) => {
-      if (m.isPreferred && m.vendor?.name) {
-        preferredMap[m.itemId] = m.vendor.name;
+    allRestaurantVendorItems.forEach((vi) => {
+      if (vi.isPreferred && vi.vendorId !== vendorId) {
+        preferredMap[vi.itemId] = vi.vendor?.name || "Another Supplier";
       }
     });
 
-    // Populate ALL items in the system with their current linked state for this vendor
     setMultiSelectRows(
       allItems.map((i) => {
         const existing = vendorItems.find((vi) => vi.itemId === i.id);
@@ -242,49 +208,51 @@ export default function VendorDetailPage() {
   };
 
   const handleBulkLinkItems = async () => {
-    setSubmitting(true); setError("");
+    setSubmitting(true);
+    setError("");
     try {
       const selectedRows = multiSelectRows.filter((r) => r.selected);
       const unselectedPreviouslyLinked = multiSelectRows.filter(
         (r) => !r.selected && vendorItems.some((vi) => vi.itemId === r.itemId)
       );
 
-      // Unlink items that were unchecked
       for (const unselected of unselectedPreviouslyLinked) {
         await fetch(`/api/restaurant/inventory/vendor-items?vendorId=${vendorId}&itemId=${unselected.itemId}`, {
           method: "DELETE",
         });
       }
 
-      // Upsert selected items (updates unit cost, SKU, and preferred flag)
       if (selectedRows.length > 0) {
-        const res = await fetch(`/api/restaurant/inventory/vendor-items`, {
+        const payload = {
+          vendorId,
+          items: selectedRows.map((r) => ({
+            itemId: r.itemId,
+            vendorSku: r.vendorSku || undefined,
+            unitCost: Number(r.unitCost) || undefined,
+            isPreferred: r.isPreferred,
+          })),
+        };
+
+        const res = await fetch("/api/restaurant/inventory/vendor-items", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            vendorId,
-            items: selectedRows.map((s) => ({
-              itemId: s.itemId,
-              vendorSku: s.vendorSku || undefined,
-              unitCost: Number(s.unitCost) || 0,
-              isPreferred: s.isPreferred,
-            })),
-          }),
+          body: JSON.stringify(payload),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
       }
 
       setShowLinkModal(false);
-      fetchVendorDetailWithFinally();
+      fetchVendorDetail();
     } catch (e: any) {
-      setError(e.message || "Failed to save product catalog changes");
+      setError(e.message || "Failed to update vendor item catalog");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleUpdate = async () => {
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!form.name) {
       setError("Vendor name is required");
       return;
@@ -300,7 +268,7 @@ export default function VendorDetailPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setShowEdit(false);
-      fetchVendorDetailWithFinally();
+      fetchVendorDetail();
     } catch (e: any) {
       setError(e.message || "Failed to update vendor");
     } finally {
@@ -312,14 +280,14 @@ export default function VendorDetailPage() {
     setConfirmDialog({
       show: true,
       title: "Unlink Product Mapping",
-      message: "Are you sure you want to remove this product mapping for this vendor?",
-      confirmText: "Yes, Unlink Product",
+      message: "Are you sure you want to remove this product price mapping for this vendor?",
+      confirmText: "Unlink Product",
       onConfirm: async () => {
         try {
           const res = await fetch(`/api/restaurant/inventory/vendor-items?vendorId=${vendorId}&itemId=${itemId}`, {
             method: "DELETE",
           });
-          if (res.ok) fetchVendorDetailWithFinally();
+          if (res.ok) fetchVendorDetail();
         } catch {
           setError("Failed to unlink item");
         }
@@ -330,15 +298,15 @@ export default function VendorDetailPage() {
   const handleArchive = async () => {
     setConfirmDialog({
       show: true,
-      title: "Archive Vendor?",
-      message: `Are you sure you want to archive vendor "${vendor?.name}"?`,
-      confirmText: "Yes, Archive Vendor",
+      title: "Archive Supplier Profile",
+      message: `Are you sure you want to archive vendor "${vendor?.name}"? All associated item mappings will be deactivated.`,
+      confirmText: "Archive Vendor",
       onConfirm: async () => {
         try {
           const res = await fetch(`/api/restaurant/inventory/vendors/${vendorId}`, {
             method: "DELETE",
           });
-          if (res.ok) router.push("/inventory/vendors");
+          if (res.ok) router.push(`/restaurant/${subdomain}/inventory/vendors`);
         } catch {
           setError("Failed to archive vendor");
         }
@@ -348,17 +316,37 @@ export default function VendorDetailPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-gray-50 text-gray-500 font-semibold">
-        Loading vendor profile...
-      </main>
+      <div
+        className={`min-h-screen flex flex-col items-center justify-center font-sans antialiased ${
+          isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+        }`}
+      >
+        <div className="w-8 h-8 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-xs font-medium">Loading Supplier Profile...</p>
+      </div>
     );
   }
 
   if (error && !vendor) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-gray-50 text-red-600 font-semibold">
-        {error || "Vendor not found"}
-      </main>
+      <div
+        className={`min-h-screen flex flex-col font-sans antialiased ${
+          isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+        }`}
+      >
+        <RestaurantNavbar activeSection="Vendor Details" />
+        <main className="max-w-4xl mx-auto p-6 space-y-4">
+          <button
+            onClick={() => router.push(`/restaurant/${subdomain}/inventory/vendors`)}
+            className="text-xs text-[#0071E3] hover:underline cursor-pointer"
+          >
+            ← Back to Suppliers
+          </button>
+          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl">
+            {error || "Vendor not found"}
+          </div>
+        </main>
+      </div>
     );
   }
 
@@ -370,152 +358,197 @@ export default function VendorDetailPage() {
     filteredModalRows.length > 0 && filteredModalRows.every((r) => r.selected);
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
-      {/* Top Navbar Header */}
-      <header className="border-b border-gray-200 bg-white sticky top-0 z-40 px-6 py-4 flex justify-between items-center shadow-sm">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => router.back()}
-            className="text-gray-600 hover:text-gray-900 font-semibold transition-colors cursor-pointer text-sm"
-          >
-            ← Back to Directory
-          </button>
-          <div className="h-4 w-px bg-gray-200" />
-          <div>
-            <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              {vendor?.name}
-              <span
-                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-                  vendor?.status === "ACTIVE"
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : vendor?.status === "INACTIVE"
-                    ? "bg-gray-100 text-gray-600 border-gray-200"
-                    : "bg-red-50 text-red-700 border-red-200"
+    <div
+      className={`min-h-screen font-sans antialiased transition-colors duration-200 flex flex-col ${
+        isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+      }`}
+    >
+      <RestaurantNavbar activeSection="Vendor Details" />
+
+      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Executive Header Banner */}
+        <div
+          className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+            isDark
+              ? "bg-[#121622]/60 border-white/[0.06]"
+              : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
+          }`}
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push(`/restaurant/${subdomain}/inventory/vendors`)}
+                className={`text-xs font-medium transition cursor-pointer ${
+                  isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
                 }`}
               >
-                [{vendor?.status}]
+                ← All Suppliers
+              </button>
+              <span className={`text-xs ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
+              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                vendor?.status === "ACTIVE"
+                  ? isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-100 text-emerald-800 border-emerald-200"
+                  : isDark ? "bg-rose-500/15 text-rose-300 border-rose-500/25" : "bg-rose-100 text-rose-800 border-rose-200"
+              }`}>
+                {vendor?.status}
               </span>
+            </div>
+
+            <h1 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+              {vendor?.name}
             </h1>
-            <p className="text-xs text-gray-500">{vendorItems.length} mapped products • Added: {vendor ? new Date(vendor.createdAt).toLocaleDateString() : ""}</p>
+            <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Code: <span className="font-mono font-semibold">{vendor?.code || "N/A"}</span> • {vendorItems.length} mapped catalog items
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowEdit(true)}
+              className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
+            >
+              Edit Profile
+            </button>
+            <button
+              onClick={handleArchive}
+              className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition cursor-pointer flex items-center gap-1.5 ${
+                isDark
+                  ? "bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20"
+                  : "bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100"
+              }`}
+            >
+              <svg className="w-3.5 h-3.5 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <span>Archive</span>
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowEdit(true)}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
-          >
-            Edit Profile
-          </button>
-          <button
-            onClick={handleArchive}
-            className="px-3 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 text-xs font-bold rounded-xl transition-all cursor-pointer"
-          >
-            Archive Vendor
-          </button>
-        </div>
-      </header>
-
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl font-semibold">
+          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl">
             {error}
           </div>
         )}
 
-        {/* Overview Banner */}
-        <div className="bg-white border-t-4 border-t-indigo-600 border-x border-b border-gray-200 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">{vendor?.name}</h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Code: <strong className="text-gray-900">{vendor?.code || "N/A"}</strong> • Contact Person: <strong className="text-gray-900">{vendor?.contactPerson || "N/A"}</strong>
+        {/* Vendor Contact & Payment Details Card */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5">
+          <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Payment Terms
+            </span>
+            <p className={`text-base font-bold font-mono tracking-tight mt-1 ${isDark ? "text-white" : "text-slate-900"}`}>
+              {vendor?.paymentTerms}
             </p>
           </div>
 
-          <div className="bg-gray-50 border border-gray-200 rounded-xl px-5 py-3 text-right space-y-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">Payment Terms</span>
-            <span className="text-lg font-extrabold text-indigo-700 font-mono">{vendor?.paymentTerms}</span>
+          <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Representative
+            </span>
+            <p className={`text-sm font-bold tracking-tight mt-1 truncate ${isDark ? "text-white" : "text-slate-900"}`}>
+              {vendor?.contactPerson || "Direct Line"}
+            </p>
+          </div>
+
+          <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Phone / WhatsApp
+            </span>
+            <p className={`text-xs font-mono font-bold tracking-tight mt-1.5 truncate ${
+              vendor?.phone ? (isDark ? "text-[#25D366]" : "text-emerald-600") : (isDark ? "text-[#8F95A3]" : "text-slate-400")
+            }`}>
+              {vendor?.phone || "—"}
+            </p>
+          </div>
+
+          <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Email Address
+            </span>
+            <p className={`text-xs font-mono font-medium tracking-tight mt-1.5 truncate ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+              {vendor?.email || "—"}
+            </p>
+          </div>
+
+          <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Tax ID / GST
+            </span>
+            <p className={`text-xs font-mono font-semibold tracking-tight mt-1.5 ${isDark ? "text-white" : "text-slate-900"}`}>
+              {vendor?.taxId || "Not Registered"}
+            </p>
           </div>
         </div>
 
-        {/* Info Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-2 text-xs">
-            <h3 className="font-bold uppercase tracking-wider text-gray-500 text-[11px]">Contact Information</h3>
-            <p className="text-gray-700 font-mono">Phone: {vendor?.phone || "—"}</p>
-            <p className="text-gray-700 font-mono">Email: {vendor?.email || "—"}</p>
-            <p className="text-gray-700">Tax ID / GSTIN: {vendor?.taxId || "—"}</p>
-            <p className="text-gray-700">Address: {vendor?.address || "—"}</p>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-2 text-xs">
-            <h3 className="font-bold uppercase tracking-wider text-gray-500 text-[11px]">Notes & Catalog Summary</h3>
-            <p className="text-gray-700 font-medium">{vendor?.notes || "No additional notes provided."}</p>
-            <p className="text-indigo-600 font-bold mt-2">Mapped Items: {vendorItems.length} active SKU links</p>
-          </div>
-        </div>
-
-        {/* Supplied Products Catalog Manager */}
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden p-6 space-y-4">
+        {/* Product Price Catalog */}
+        <div
+          className={`p-6 rounded-3xl border transition space-y-4 ${
+            isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+          }`}
+        >
           <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500">Supplied Products Catalog ({vendorItems.length})</h3>
-              <p className="text-xs text-gray-400 mt-0.5">Link inventory items supplied by this vendor for automated PO auto-fill</p>
-            </div>
+            <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+              Product Catalog & Contract Pricing ({vendorItems.length})
+            </h2>
             <button
               onClick={openMultiSelectModal}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-sm flex items-center gap-1.5"
+              className="px-3.5 py-1.5 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer shadow-xs"
             >
-              + Manage Catalog / Edit Prices (Multi-Select)
+              + Map Catalog Items
             </button>
           </div>
 
           {vendorItems.length === 0 ? (
-            <div className="text-center py-12 border border-dashed border-gray-200 rounded-xl space-y-1">
-              <p className="text-gray-700 font-bold text-sm">No Supplied Items Linked</p>
-              <p className="text-xs text-gray-400">Link items to enable dynamic PO filtering and 1-click auto-filling.</p>
+            <div className={`p-10 text-center text-xs space-y-2 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+              <p className="font-semibold text-sm">No items mapped to this vendor</p>
+              <p className="opacity-75">Click &quot;+ Map Catalog Items&quot; to link inventory ingredients with supplier pricing.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                    <th className="py-3 px-4">Item Name & UOM</th>
-                    <th className="py-3 px-4 text-right">Vendor Unit Cost (₹)</th>
-                    <th className="py-3 px-4">Vendor SKU</th>
-                    <th className="py-3 px-4 text-center">Preferred Supplier</th>
-                    <th className="py-3 px-4 text-right">Action</th>
+                  <tr className={`border-b text-[11px] font-semibold uppercase tracking-wider ${
+                    isDark ? "border-white/[0.06] text-[#8F95A3]" : "border-slate-200 text-slate-500"
+                  }`}>
+                    <th className="pb-3 px-3">Item Name</th>
+                    <th className="pb-3 px-3">Vendor SKU</th>
+                    <th className="pb-3 px-3 text-right">Negotiated Cost</th>
+                    <th className="pb-3 px-3 text-center">Preference</th>
+                    <th className="pb-3 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 text-xs">
+                <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
                   {vendorItems.map((vi) => (
-                    <tr key={vi.id} className="hover:bg-gray-50">
-                      <td className="py-3 px-4 font-bold text-gray-900">
-                        {vi.item?.name} <span className="text-[11px] text-gray-500 font-normal">({vi.item?.unitOfMeasure})</span>
+                    <tr key={vi.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition">
+                      <td className={`py-3.5 px-3 font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                        {vi.item?.name} <span className="text-[10px] opacity-75 font-normal">({vi.item?.unitOfMeasure})</span>
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-indigo-700">
-                        ₹{Number(vi.unitCost ?? vi.item?.costPerUnit ?? 0).toFixed(2)}
+                      <td className={`py-3.5 px-3 font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                        {vi.vendorSku || "—"}
                       </td>
-                      <td className="py-3 px-4 font-mono text-gray-600">{vi.vendorSku || "—"}</td>
-                      <td className="py-3 px-4 text-center">
+                      <td className={`py-3.5 px-3 text-right font-mono font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                        ${Number(vi.unitCost ?? vi.item?.costPerUnit ?? 0).toFixed(2)}
+                      </td>
+                      <td className="py-3.5 px-3 text-center">
                         {vi.isPreferred ? (
-                          <span className="text-[10px] font-bold px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
-                            ★ Preferred Supplier
+                          <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 rounded-full">
+                            Preferred Supplier
                           </span>
                         ) : (
-                          <span className="text-[10px] text-gray-400">—</span>
+                          <span className="text-[10px] text-slate-400">Secondary</span>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-right flex justify-end gap-3">
+                      <td className="py-3.5 px-3 text-right space-x-2">
                         <button
                           onClick={openMultiSelectModal}
-                          className="text-xs text-indigo-600 hover:text-indigo-700 font-bold cursor-pointer"
+                          className="text-xs text-[#0071E3] hover:underline cursor-pointer font-medium"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => handleUnlinkItem(vi.itemId)}
-                          className="text-xs text-red-600 hover:text-red-700 font-bold cursor-pointer"
+                          className="text-xs text-rose-500 hover:underline cursor-pointer font-medium"
                         >
                           Unlink
                         </button>
@@ -529,247 +562,370 @@ export default function VendorDetailPage() {
         </div>
       </main>
 
-      {/* Multi-Select Link / Edit Products Modal */}
+      {/* Multi-Select Link Items Modal */}
       {showLinkModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-3xl space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
-            <div className="flex justify-between items-start">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div
+            className={`w-full max-w-4xl max-h-[85vh] overflow-y-auto p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
+              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">Manage Supplied Catalog & Prices</h2>
-                <p className="text-xs text-gray-500 mt-0.5">Select/deselect products, edit vendor unit costs, and toggle preferred supplier status</p>
+                <h2 className="text-base font-bold tracking-tight">Map Catalog Products</h2>
+                <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Select items provided by {vendor?.name} and configure negotiated unit costs.
+                </p>
               </div>
-              <span className="text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full">
-                {selectedCount} linked products
-              </span>
+              <button onClick={() => setShowLinkModal(false)} className="text-slate-400 hover:text-white cursor-pointer">
+                ✕
+              </button>
             </div>
 
-            {error && <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg font-semibold">{error}</div>}
-
-            {/* Filter Search inside Modal */}
-            <div>
+            <div className="flex items-center gap-3">
               <input
-                placeholder="Search inventory items..."
+                placeholder="Search catalog items..."
                 value={modalSearch}
                 onChange={(e) => setModalSearch(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-xs text-gray-900 focus:outline-none focus:border-indigo-600"
+                className={`flex-1 px-3.5 py-2 text-xs rounded-xl border transition ${
+                  isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                }`}
               />
+              <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={allFilteredSelected}
+                  onChange={(e) => handleToggleSelectAll(e.target.checked)}
+                  className="accent-[#0071E3]"
+                />
+                <span>Select All Filtered</span>
+              </label>
             </div>
 
-            {/* Scrollable Items Table showing ALL items */}
-            <div className="flex-1 overflow-y-auto border border-gray-200 rounded-xl">
-              {filteredModalRows.length === 0 ? (
-                <div className="p-8 text-center text-xs text-gray-500 font-medium">
-                  No matching inventory items found.
-                </div>
-              ) : (
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10 text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                    <tr>
-                      <th className="py-2.5 px-3 w-10 text-center">
+            <div className="overflow-x-auto max-h-96 border rounded-2xl">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className={`border-b text-[10px] font-bold uppercase tracking-wider ${
+                    isDark ? "bg-[#0A0C12] border-white/[0.06] text-[#8F95A3]" : "bg-slate-50 border-slate-200 text-slate-600"
+                  }`}>
+                    <th className="py-2.5 px-3 w-8">Select</th>
+                    <th className="py-2.5 px-3">Item Name</th>
+                    <th className="py-2.5 px-3">Unit Cost ($)</th>
+                    <th className="py-2.5 px-3">Vendor SKU</th>
+                    <th className="py-2.5 px-3 text-center">Preferred</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
+                  {filteredModalRows.map((row) => (
+                    <tr key={row.itemId} className={row.selected ? (isDark ? "bg-[#0071E3]/10" : "bg-blue-50/50") : ""}>
+                      <td className="py-2.5 px-3">
                         <input
                           type="checkbox"
-                          checked={allFilteredSelected}
-                          onChange={(e) => handleToggleSelectAll(e.target.checked)}
-                          className="rounded text-indigo-600 cursor-pointer"
+                          checked={row.selected}
+                          onChange={(e) => handleRowChange(row.itemId, "selected", e.target.checked)}
+                          className="accent-[#0071E3]"
                         />
-                      </th>
-                      <th className="py-2.5 px-3">Item Name & Status</th>
-                      <th className="py-2.5 px-3 w-28 text-center">Preferred</th>
-                      <th className="py-2.5 px-3 w-32 text-right">Vendor Cost (₹)</th>
-                      <th className="py-2.5 px-3 w-32">Vendor SKU</th>
+                      </td>
+                      <td className="py-2.5 px-3 font-semibold">
+                        {row.name} <span className="text-[10px] opacity-75 font-normal">({row.unitOfMeasure})</span>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={row.unitCost}
+                          onChange={(e) => handleRowChange(row.itemId, "unitCost", e.target.value)}
+                          className={`w-24 px-2 py-1 text-xs rounded-lg border font-mono ${
+                            isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                          }`}
+                        />
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <input
+                          type="text"
+                          value={row.vendorSku}
+                          placeholder="SKU"
+                          onChange={(e) => handleRowChange(row.itemId, "vendorSku", e.target.value)}
+                          className={`w-28 px-2 py-1 text-xs rounded-lg border font-mono ${
+                            isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                          }`}
+                        />
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={row.isPreferred}
+                          onChange={(e) => handleRowChange(row.itemId, "isPreferred", e.target.checked)}
+                          className="accent-[#0071E3]"
+                        />
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 text-xs">
-                    {filteredModalRows.map((row) => (
-                      <tr key={row.itemId} className={`hover:bg-indigo-50/30 transition-all ${row.selected ? "bg-indigo-50/40" : ""}`}>
-                        <td className="py-2.5 px-3 text-center">
-                          <input
-                            type="checkbox"
-                            checked={row.selected}
-                            onChange={(e) => handleRowChange(row.itemId, "selected", e.target.checked)}
-                            className="rounded text-indigo-600 cursor-pointer"
-                          />
-                        </td>
-                        <td className="py-2.5 px-3 font-semibold text-gray-900">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span>{row.name}</span>
-                            <span className="text-[11px] text-gray-500 font-normal">({row.unitOfMeasure})</span>
-                            {row.existingPreferredVendor ? (
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${
-                                row.existingPreferredVendor === vendor?.name
-                                  ? "text-emerald-700 bg-emerald-50 border-emerald-200"
-                                  : "text-amber-700 bg-amber-50 border-amber-200"
-                              }`}>
-                                ★ Preferred: {row.existingPreferredVendor}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-gray-400 font-normal">No preferred supplier set</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <input
-                            type="checkbox"
-                            checked={row.isPreferred}
-                            onChange={(e) => handleRowChange(row.itemId, "isPreferred", e.target.checked)}
-                            className="rounded text-emerald-600 cursor-pointer"
-                            title="Mark as Preferred Supplier"
-                          />
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
-                          <input
-                            type="number"
-                            placeholder="0.00"
-                            min="0"
-                            step="0.01"
-                            value={row.unitCost}
-                            onChange={(e) => handleRowChange(row.itemId, "unitCost", e.target.value)}
-                            disabled={!row.selected}
-                            className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs text-right font-mono font-bold text-indigo-700 focus:outline-none focus:border-indigo-600 disabled:opacity-40"
-                          />
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <input
-                            placeholder="e.g. SKU-101"
-                            value={row.vendorSku}
-                            onChange={(e) => handleRowChange(row.itemId, "vendorSku", e.target.value)}
-                            disabled={!row.selected}
-                            className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs font-mono text-gray-800 focus:outline-none focus:border-indigo-600 disabled:opacity-40"
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                  ))}
+                </tbody>
+              </table>
             </div>
 
-            {/* Modal Footer Controls */}
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setShowLinkModal(false)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 text-xs cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleBulkLinkItems}
-                disabled={submitting}
-                className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm cursor-pointer disabled:opacity-50"
-              >
-                {submitting ? "Saving Catalog..." : `Save Catalog (${selectedCount} items linked)`}
-              </button>
+            <div className="flex justify-between items-center pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+              <span className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                {selectedCount} item(s) selected
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowLinkModal(false)}
+                  className={`px-4 py-2 rounded-xl text-xs font-medium ${
+                    isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkLinkItems}
+                  disabled={submitting}
+                  className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer"
+                >
+                  {submitting ? "Saving..." : "Save Catalog Mappings"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Edit Profile Modal */}
+      {/* Edit Vendor Modal */}
       {showEdit && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
-            <h2 className="text-lg font-bold text-gray-900">Edit Vendor Profile</h2>
-            {error && <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg font-semibold">{error}</div>}
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div
+            className={`w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
+              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex justify-between items-center">
+              <h2 className="text-base font-bold tracking-tight">Edit Supplier Details</h2>
+              <button onClick={() => setShowEdit(false)} className="text-slate-400 hover:text-white cursor-pointer">
+                ✕
+              </button>
+            </div>
 
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-gray-700 mb-1">Vendor Name *</label>
-                <input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 font-semibold focus:outline-none focus:border-indigo-600"
-                />
+            <form onSubmit={handleUpdate} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Vendor Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Code
+                  </label>
+                  <input
+                    type="text"
+                    value={form.code}
+                    onChange={(e) => setForm({ ...form, code: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs font-mono rounded-xl border transition ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Contact Person</label>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Representative
+                  </label>
                   <input
+                    type="text"
+                    placeholder="Contact person"
                     value={form.contactPerson}
                     onChange={(e) => setForm({ ...form, contactPerson: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 focus:outline-none focus:border-indigo-600"
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
                   />
                 </div>
+
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Phone</label>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Phone / Mobile (WhatsApp)
+                  </label>
                   <input
+                    type="tel"
+                    placeholder="e.g. +91 98765 43210"
                     value={form.phone}
                     onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 focus:outline-none focus:border-indigo-600 font-mono"
+                    className={`w-full px-3.5 py-2.5 text-xs font-mono rounded-xl border transition ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Email</label>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Email Address
+                  </label>
                   <input
                     type="email"
+                    placeholder="orders@vendor.com"
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 focus:outline-none focus:border-indigo-600 font-mono"
+                    className={`w-full px-3.5 py-2.5 text-xs font-mono rounded-xl border transition ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
                   />
                 </div>
+
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Payment Terms</label>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Tax ID / GST
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Tax registration ID"
+                    value={form.taxId}
+                    onChange={(e) => setForm({ ...form, taxId: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs font-mono rounded-xl border transition ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Payment Terms
+                  </label>
                   <select
                     value={form.paymentTerms}
                     onChange={(e) => setForm({ ...form, paymentTerms: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 font-semibold focus:outline-none focus:border-indigo-600 cursor-pointer"
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition cursor-pointer ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
                   >
-                    <option value="COD">COD</option>
-                    <option value="IMMEDIATE">IMMEDIATE</option>
-                    <option value="NET7">NET 7</option>
-                    <option value="NET15">NET 15</option>
-                    <option value="NET30">NET 30</option>
-                    <option value="NET60">NET 60</option>
+                    <option value="PREPAID">Prepaid</option>
+                    <option value="COD">Cash On Delivery (COD)</option>
+                    <option value="NET7">Net 7 Days</option>
+                    <option value="NET15">Net 15 Days</option>
+                    <option value="NET30">Net 30 Days</option>
+                    <option value="NET60">Net 60 Days</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Status
+                  </label>
+                  <select
+                    value={form.status}
+                    onChange={(e) => setForm({ ...form, status: e.target.value as any })}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition cursor-pointer ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  >
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="INACTIVE">INACTIVE</option>
+                    <option value="BLOCKED">BLOCKED</option>
                   </select>
                 </div>
               </div>
-            </div>
 
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setShowEdit(false)}
-                className="flex-1 py-2 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 text-xs cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleUpdate}
-                disabled={submitting}
-                className="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm cursor-pointer disabled:opacity-50"
-              >
-                {submitting ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
+              <div>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                  Address / Warehouse Location
+                </label>
+                <input
+                  type="text"
+                  placeholder="Street, City, Postal Code"
+                  value={form.address}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition ${
+                    isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                  }`}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+                <button
+                  type="button"
+                  onClick={() => setShowEdit(false)}
+                  className={`px-4 py-2 rounded-xl text-xs font-medium ${
+                    isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer"
+                >
+                  {submitting ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* Custom Confirmation Modal Dialog Box UI */}
+      {/* Custom Confirmation Modal */}
       {confirmDialog.show && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
-            <div className="space-y-1">
-              <h3 className="text-lg font-bold text-gray-900">{confirmDialog.title}</h3>
-              <p className="text-xs text-gray-600 leading-relaxed">{confirmDialog.message}</p>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div
+            className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 ${
+              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+
+              <div className="space-y-1 min-w-0 flex-1">
+                <h2 className={`text-base font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {confirmDialog.title}
+                </h2>
+                <p className={`text-xs leading-relaxed ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                  {confirmDialog.message}
+                </p>
+              </div>
             </div>
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
               <button
+                type="button"
                 onClick={() => setConfirmDialog((prev) => ({ ...prev, show: false }))}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 text-xs font-bold hover:bg-gray-50 transition-all cursor-pointer"
+                className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                  isDark
+                    ? "bg-white/[0.04] text-[#8F95A3] hover:text-white hover:bg-white/[0.08]"
+                    : "bg-slate-100 text-slate-700 hover:text-slate-900 hover:bg-slate-200"
+                }`}
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={() => {
                   const onConf = confirmDialog.onConfirm;
                   setConfirmDialog((prev) => ({ ...prev, show: false }));
                   if (onConf) onConf();
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all cursor-pointer shadow-sm"
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm shadow-rose-600/20 cursor-pointer"
               >
                 {confirmDialog.confirmText}
               </button>

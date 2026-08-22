@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import React, { useState, useEffect, use } from "react";
+import { useRouter } from "next/navigation";
+import { useTheme } from "@/core/theme/ThemeContext";
+import RestaurantNavbar from "@/components/RestaurantNavbar";
 
 interface POItem {
   id: string;
@@ -39,10 +41,16 @@ interface ReceiveItemRow {
   unitCost: string;
 }
 
-export default function PurchaseOrderDetailPage() {
+export default function PurchaseOrderDetailPage({
+  params,
+}: {
+  params: Promise<{ subdomain: string; id: string }>;
+}) {
   const router = useRouter();
-  const params = useParams();
-  const poId = params?.id as string;
+  const { subdomain, id: poId } = use(params);
+  const { isDark } = useTheme();
+
+  const formatCurrency = (val: number) => `$${Number(val || 0).toFixed(2)}`;
 
   const [po, setPO] = useState<PODetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +63,7 @@ export default function PurchaseOrderDetailPage() {
   const [receiveRows, setReceiveRows] = useState<ReceiveItemRow[]>([]);
   const [receiveError, setReceiveError] = useState("");
 
-  // Custom Confirm Dialog Modal State
+  // Custom Apple Confirm Dialog Modal State
   const [confirmDialog, setConfirmDialog] = useState<{
     show: boolean;
     title: string;
@@ -92,6 +100,284 @@ export default function PurchaseOrderDetailPage() {
     if (poId) fetchPODetail();
   }, [poId]);
 
+  const handleShareWhatsApp = () => {
+    if (!po) return;
+
+    const itemsText = po.items
+      .map(
+        (pi, index) =>
+          `*${index + 1}. ${pi.item?.name}* (${pi.item?.unitOfMeasure || "Units"})\n   Qty: *${pi.orderedQuantity}* × $${Number(pi.unitCost).toFixed(2)} = *$${Number(pi.totalCost).toFixed(2)}*`
+      )
+      .join("\n\n");
+
+    const messageParts = [
+      `*PURCHASE ORDER: ${po.poNumber}*`,
+      `────────────────────────`,
+      `*Vendor:* ${po.vendor.name}`,
+      `*Delivery Branch:* ${po.outlet.name}`,
+      `*Order Date:* ${new Date(po.createdAt).toLocaleDateString()}`,
+      po.expectedDeliveryDate ? `*Expected Delivery:* ${new Date(po.expectedDeliveryDate).toLocaleDateString()}` : null,
+      `────────────────────────`,
+      `*ORDERED ITEMS:*`,
+      itemsText,
+      `────────────────────────`,
+      `*GRAND TOTAL: $${Number(po.grandTotal).toFixed(2)}*`,
+      po.notes ? `\n*Notes:* ${po.notes}` : null,
+      `\n_Please confirm order receipt & delivery schedule. Thank you._`,
+    ];
+
+    const message = messageParts.filter(Boolean).join("\n\n");
+    const cleanPhone = po.vendor.phone ? po.vendor.phone.replace(/[^0-9]/g, "") : "";
+    const waUrl = cleanPhone
+      ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+
+    window.open(waUrl, "_blank");
+  };
+
+  const handlePrintPDF = () => {
+    if (!po) return;
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    const itemsRows = po.items
+      .map(
+        (pi, idx) => `
+        <tr>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: center; color: #64748B;">${idx + 1}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; font-weight: 600; color: #1E293B;">
+            ${pi.item?.name} <span style="font-size: 11px; font-weight: 400; color: #64748B;">(${pi.item?.unitOfMeasure})</span>
+          </td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: right; font-family: monospace; font-weight: 700; color: #0F172A;">
+            ${pi.orderedQuantity}
+          </td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: right; font-family: monospace; color: #475569;">
+            $${Number(pi.unitCost).toFixed(2)}
+          </td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: right; font-family: monospace; font-weight: 700; color: #0071E3;">
+            $${Number(pi.totalCost).toFixed(2)}
+          </td>
+        </tr>
+      `
+      )
+      .join("");
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Purchase Order - ${po.poNumber}</title>
+        <meta charset="utf-8" />
+        <style>
+          @page { size: A4; margin: 16mm; }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #1E293B;
+            margin: 0;
+            padding: 24px;
+            font-size: 13px;
+            line-height: 1.5;
+            background: #FFF;
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #0071E3;
+            padding-bottom: 16px;
+            margin-bottom: 24px;
+          }
+          .title-section h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 800;
+            color: #0071E3;
+            letter-spacing: -0.5px;
+          }
+          .title-section p {
+            margin: 3px 0 0;
+            color: #64748B;
+            font-size: 12px;
+          }
+          .meta-box {
+            text-align: right;
+          }
+          .po-pill {
+            display: inline-block;
+            background: #EFF6FF;
+            color: #0071E3;
+            border: 1px solid #BFDBFE;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-weight: 700;
+            font-size: 14px;
+          }
+          .grid-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 24px;
+          }
+          .card {
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            padding: 14px;
+          }
+          .card h3 {
+            margin: 0 0 8px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748B;
+          }
+          .card p {
+            margin: 2px 0;
+            font-size: 12px;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 24px;
+          }
+          th {
+            background: #F1F5F9;
+            color: #475569;
+            text-transform: uppercase;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            padding: 10px 12px;
+            border-top: 1px solid #CBD5E1;
+            border-bottom: 1px solid #CBD5E1;
+          }
+          .totals-wrap {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 30px;
+          }
+          .totals-table {
+            width: 280px;
+          }
+          .totals-table td {
+            padding: 6px 10px;
+          }
+          .grand-total-row td {
+            border-top: 2px solid #0071E3;
+            font-size: 15px;
+            font-weight: 800;
+            color: #0071E3;
+            padding-top: 10px;
+          }
+          .footer-section {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px dashed #CBD5E1;
+            display: flex;
+            justify-content: space-between;
+          }
+          .sig-box {
+            width: 200px;
+            border-top: 1px solid #94A3B8;
+            text-align: center;
+            padding-top: 6px;
+            font-size: 11px;
+            color: #64748B;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="title-section">
+            <h1>PURCHASE ORDER</h1>
+            <p>Official Material Requisition & Supply Order</p>
+          </div>
+          <div class="meta-box">
+            <div class="po-pill">${po.poNumber}</div>
+            <p style="margin: 6px 0 0; color: #64748B; font-size: 11px;">Status: <strong>${po.status}</strong></p>
+            <p style="margin: 2px 0 0; color: #64748B; font-size: 11px;">Date: ${new Date(po.createdAt).toLocaleDateString()}</p>
+          </div>
+        </div>
+
+        <div class="grid-info">
+          <div class="card">
+            <h3>Supplier Vendor</h3>
+            <p style="font-weight: 700; font-size: 14px; color: #0F172A;">${po.vendor.name}</p>
+            ${po.vendor.code ? `<p style="color: #64748B;">Code: ${po.vendor.code}</p>` : ""}
+            ${po.vendor.phone ? `<p>Phone: ${po.vendor.phone}</p>` : ""}
+            ${po.vendor.email ? `<p>Email: ${po.vendor.email}</p>` : ""}
+          </div>
+
+          <div class="card">
+            <h3>Delivery Branch / Outlet</h3>
+            <p style="font-weight: 700; font-size: 14px; color: #0F172A;">${po.outlet.name}</p>
+            ${po.expectedDeliveryDate ? `<p style="color: #0071E3; font-weight: 600;">Expected Date: ${new Date(po.expectedDeliveryDate).toLocaleDateString()}</p>` : ""}
+            ${po.notes ? `<p style="color: #64748B; margin-top: 6px;"><em>Notes: ${po.notes}</em></p>` : ""}
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 35px; text-align: center;">#</th>
+              <th>Item Description</th>
+              <th style="width: 100px; text-align: right;">Ordered Qty</th>
+              <th style="width: 100px; text-align: right;">Unit Price</th>
+              <th style="width: 110px; text-align: right;">Line Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsRows}
+          </tbody>
+        </table>
+
+        <div class="totals-wrap">
+          <table class="totals-table">
+            <tr>
+              <td style="color: #64748B;">Subtotal:</td>
+              <td style="text-align: right; font-family: monospace; font-weight: 600;">$${Number(po.totalAmount).toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td style="color: #64748B;">Tax Amount:</td>
+              <td style="text-align: right; font-family: monospace; font-weight: 600;">$${Number(po.taxAmount || 0).toFixed(2)}</td>
+            </tr>
+            <tr class="grand-total-row">
+              <td>Grand Total:</td>
+              <td style="text-align: right; font-family: monospace;">$${Number(po.grandTotal).toFixed(2)}</td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="footer-section">
+          <div class="sig-box">
+            Authorized Signature
+          </div>
+          <div class="sig-box">
+            Vendor Acknowledgment
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 300);
+          }
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   const handleUpdateStatus = async (status: "SENT" | "CANCELLED") => {
     const isCancel = status === "CANCELLED";
 
@@ -101,10 +387,12 @@ export default function PurchaseOrderDetailPage() {
       message: isCancel
         ? `Are you sure you want to cancel purchase order "${po?.poNumber}"?`
         : `Mark purchase order "${po?.poNumber}" as SENT to vendor "${po?.vendor.name}"?`,
-      confirmText: isCancel ? "Yes, Cancel PO" : "Yes, Mark as Sent",
+      confirmText: isCancel ? "Cancel PO" : "Mark as Sent",
       variant: isCancel ? "red" : "indigo",
       onConfirm: async () => {
-        setUpdating(true); setError(""); setSuccessMsg("");
+        setUpdating(true);
+        setError("");
+        setSuccessMsg("");
         try {
           const res = await fetch(`/api/restaurant/inventory/purchase-orders/${poId}`, {
             method: "PATCH",
@@ -124,62 +412,75 @@ export default function PurchaseOrderDetailPage() {
     });
   };
 
-  const openReceiveGoodsModal = () => {
+  const openReceiveModal = () => {
     if (!po) return;
-    setReceiveError("");
     setReceiveRows(
-      po.items.map((i) => {
-        const prev = Number(i.receivedQuantity || 0);
-        const rem = Math.max(0, Number(i.orderedQuantity) - prev);
+      po.items.map((pi) => {
+        const remaining = Math.max(0, pi.orderedQuantity - (pi.receivedQuantity || 0));
         return {
-          itemId: i.itemId,
-          itemName: i.item?.name || "Unknown Item",
-          unitOfMeasure: i.item?.unitOfMeasure || "unit",
-          orderedQuantity: Number(i.orderedQuantity),
-          previouslyReceived: prev,
-          receivingQuantity: rem.toString(),
-          unitCost: (i.unitCost ?? 0).toString(),
+          itemId: pi.itemId,
+          itemName: pi.item?.name || "Item",
+          unitOfMeasure: pi.item?.unitOfMeasure || "PIECES",
+          orderedQuantity: pi.orderedQuantity,
+          previouslyReceived: pi.receivedQuantity || 0,
+          receivingQuantity: remaining.toString(),
+          unitCost: pi.unitCost.toString(),
         };
       })
     );
+    setReceiveError("");
     setShowReceiveModal(true);
   };
 
-  const handleReceiveRowChange = (itemId: string, field: string, value: string) => {
+  const handleReceiveRowChange = (itemId: string, val: string) => {
     setReceiveRows((prev) =>
-      prev.map((r) => (r.itemId === itemId ? { ...r, [field]: value } : r))
+      prev.map((r) => (r.itemId === itemId ? { ...r, receivingQuantity: val } : r))
     );
   };
 
-  const submitReceiveStock = async (targetStatus: "RECEIVED" | "PARTIALLY_RECEIVED") => {
-    setUpdating(true); setReceiveError(""); setError(""); setSuccessMsg("");
-    try {
-      const itemsPayload = receiveRows.map((r) => ({
+  const handleReceiveUnitCostChange = (itemId: string, val: string) => {
+    setReceiveRows((prev) =>
+      prev.map((r) => (r.itemId === itemId ? { ...r, unitCost: val } : r))
+    );
+  };
+
+  const handleSubmitReceive = async () => {
+    setReceiveError("");
+    const receivingItems = receiveRows
+      .filter((r) => parseFloat(r.receivingQuantity) > 0)
+      .map((r) => ({
         itemId: r.itemId,
-        receivedQuantity: Math.max(0, Number(r.receivingQuantity) || 0),
-        unitCost: Math.max(0, Number(r.unitCost) || 0),
+        receivedQuantity: parseFloat(r.receivingQuantity),
+        unitCost: parseFloat(r.unitCost || "0"),
       }));
 
+    if (receivingItems.length === 0) {
+      setReceiveError("Please enter a positive receiving quantity for at least one item");
+      return;
+    }
+
+    setUpdating(true);
+    setError("");
+    setSuccessMsg("");
+
+    try {
       const res = await fetch(`/api/restaurant/inventory/purchase-orders/${poId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "receive",
-          receiveData: {
-            status: targetStatus,
-            items: itemsPayload,
-          },
+          action: "receive_items",
+          items: receivingItems,
         }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
       setShowReceiveModal(false);
-      setSuccessMsg(`✓ Inventory stock updated successfully! Status set to [${targetStatus}].`);
+      const targetStatus = data.purchaseOrder?.status || "RECEIVED";
+      setSuccessMsg(`Inventory stock updated successfully! Status set to [${targetStatus}].`);
       fetchPODetail();
     } catch (e: any) {
-      setReceiveError(e.message || "Failed to receive stock");
+      setReceiveError(e.message || "Failed to process stock receipt");
     } finally {
       setUpdating(false);
     }
@@ -187,157 +488,230 @@ export default function PurchaseOrderDetailPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-gray-50 text-gray-500 font-semibold">
-        Loading purchase order details...
-      </main>
+      <div
+        className={`min-h-screen flex flex-col items-center justify-center font-sans antialiased ${
+          isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+        }`}
+      >
+        <div className="w-8 h-8 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-xs font-medium">Loading Purchase Order...</p>
+      </div>
     );
   }
 
-  if (error || !po) {
+  if (!po) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-gray-50 text-red-600 font-semibold">
-        {error || "Purchase order not found"}
-      </main>
+      <div
+        className={`min-h-screen flex flex-col font-sans antialiased ${
+          isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+        }`}
+      >
+        <RestaurantNavbar activeSection="PO Inspection" />
+        <main className="max-w-4xl mx-auto p-6 space-y-4">
+          <button
+            onClick={() => router.push(`/restaurant/${subdomain}/inventory/purchase-orders`)}
+            className="text-xs text-[#0071E3] hover:underline cursor-pointer"
+          >
+            ← Back to Purchase Orders
+          </button>
+          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl">
+            {error || "Purchase order not found"}
+          </div>
+        </main>
+      </div>
     );
   }
 
-  const receivingGrandTotal = receiveRows.reduce((sum, r) => {
-    return sum + (Number(r.receivingQuantity) || 0) * (Number(r.unitCost) || 0);
-  }, 0);
+  const isEditable = po.status === "DRAFT";
+  const isSendable = po.status === "DRAFT";
+  const isReceivable = ["SENT", "PARTIALLY_RECEIVED"].includes(po.status);
+  const isCancellable = ["DRAFT", "SENT"].includes(po.status);
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
-      {/* Top Navbar Header */}
-      <header className="border-b border-gray-200 bg-white sticky top-0 z-40 px-6 py-4 flex justify-between items-center shadow-sm">
-        <div className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="text-gray-600 hover:text-gray-900 font-semibold transition-colors cursor-pointer text-sm">
-            ← Back to Directory
-          </button>
-          <div className="h-4 w-px bg-gray-200" />
-          <div>
-            <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              {po.poNumber}
-              <span
-                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-                  po.status === "RECEIVED"
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : po.status === "PARTIALLY_RECEIVED"
-                    ? "bg-purple-50 text-purple-700 border-purple-200"
-                    : po.status === "SENT"
-                    ? "bg-blue-50 text-blue-700 border-blue-200"
-                    : po.status === "DRAFT"
-                    ? "bg-amber-50 text-amber-700 border-amber-200"
-                    : "bg-gray-100 text-gray-600 border-gray-200"
+    <div
+      className={`min-h-screen font-sans antialiased transition-colors duration-200 flex flex-col ${
+        isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+      }`}
+    >
+      <RestaurantNavbar activeSection="PO Inspection" />
+
+      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Executive Header Banner */}
+        <div
+          className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+            isDark
+              ? "bg-[#121622]/60 border-white/[0.06]"
+              : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
+          }`}
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push(`/restaurant/${subdomain}/inventory/purchase-orders`)}
+                className={`text-xs font-medium transition cursor-pointer ${
+                  isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
                 }`}
               >
-                [{po.status}]
+                ← All Orders
+              </button>
+              <span className={`text-xs ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
+              <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-md border ${
+                isDark ? "bg-white/[0.04] text-[#8F95A3] border-white/[0.08]" : "bg-slate-100 text-slate-600 border-slate-200"
+              }`}>
+                {po.poNumber}
               </span>
+              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                po.status === "RECEIVED"
+                  ? isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-100 text-emerald-800 border-emerald-200"
+                  : po.status === "SENT" || po.status === "PARTIALLY_RECEIVED"
+                  ? isDark ? "bg-amber-500/15 text-amber-300 border-amber-500/25" : "bg-amber-100 text-amber-800 border-amber-200"
+                  : po.status === "CANCELLED"
+                  ? isDark ? "bg-rose-500/15 text-rose-300 border-rose-500/25" : "bg-rose-100 text-rose-800 border-rose-200"
+                  : isDark ? "bg-white/[0.04] text-[#BAC0CD] border-white/[0.08]" : "bg-slate-100 text-slate-700 border-slate-200"
+              }`}>
+                {po.status.replace(/_/g, " ")}
+              </span>
+            </div>
+
+            <h1 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+              {po.vendor.name}
             </h1>
-            <p className="text-xs text-gray-500">Created: {new Date(po.createdAt).toLocaleString()}</p>
+            <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Destination: <span className="font-semibold">{po.outlet.name}</span> • Created {new Date(po.createdAt).toLocaleDateString()}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Share on WhatsApp */}
+            <button
+              onClick={handleShareWhatsApp}
+              className="px-3.5 py-2 bg-[#25D366] hover:bg-[#20bd5a] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer flex items-center gap-1.5"
+              title="Share Purchase Order on WhatsApp"
+            >
+              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+              </svg>
+              <span>Share on WhatsApp</span>
+            </button>
+
+            {/* Create PO PDF */}
+            <button
+              onClick={handlePrintPDF}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer flex items-center gap-1.5 shadow-xs ${
+                isDark
+                  ? "bg-white/[0.06] text-white border-white/[0.1] hover:bg-white/[0.1]"
+                  : "bg-white text-slate-800 border-slate-300 hover:bg-slate-50"
+              }`}
+              title="Generate and Download / Print PO PDF"
+            >
+              <svg className="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              <span>Create PO PDF</span>
+            </button>
+
+            {isSendable && (
+              <button
+                onClick={() => handleUpdateStatus("SENT")}
+                disabled={updating}
+                className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                Mark as Sent →
+              </button>
+            )}
+
+            {isReceivable && (
+              <button
+                onClick={openReceiveModal}
+                disabled={updating}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                + Receive Delivery Stock
+              </button>
+            )}
+
+            {isCancellable && (
+              <button
+                onClick={() => handleUpdateStatus("CANCELLED")}
+                disabled={updating}
+                className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition cursor-pointer ${
+                  isDark
+                    ? "bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20"
+                    : "bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100"
+                }`}
+              >
+                Cancel Order
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Workflow Action Buttons */}
-        <div className="flex items-center gap-3">
-          {po.status === "DRAFT" && (
-            <button
-              onClick={() => handleUpdateStatus("SENT")}
-              disabled={updating}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm disabled:opacity-50"
-            >
-              Send to Vendor
-            </button>
-          )}
-
-          {["DRAFT", "SENT", "PARTIALLY_RECEIVED"].includes(po.status) && (
-            <button
-              onClick={openReceiveGoodsModal}
-              disabled={updating}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm disabled:opacity-50 flex items-center gap-1.5"
-            >
-              📦 Receive / Inspect Goods Stock
-            </button>
-          )}
-
-          {["DRAFT", "SENT"].includes(po.status) && (
-            <button
-              onClick={() => handleUpdateStatus("CANCELLED")}
-              disabled={updating}
-              className="px-3 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 text-xs font-bold rounded-xl transition-all cursor-pointer disabled:opacity-50"
-            >
-              Cancel PO
-            </button>
-          )}
-        </div>
-      </header>
-
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl font-semibold">
+          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl">
             {error}
           </div>
         )}
 
         {successMsg && (
-          <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm px-4 py-3 rounded-xl font-semibold">
+          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-2xl">
             {successMsg}
           </div>
         )}
 
-        {/* Overview Banner */}
-        <div className="bg-white border-t-4 border-t-indigo-600 border-x border-b border-gray-200 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-600">Supplier Vendor</span>
-            <h2 className="text-xl font-bold text-gray-900">{po.vendor.name}</h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Phone: {po.vendor.phone || "N/A"} • Email: {po.vendor.email || "N/A"}
-            </p>
-          </div>
-
-          <div className="flex gap-4">
-            <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-right">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">Destination Outlet</span>
-              <span className="text-sm font-bold text-gray-900">{po.outlet.name}</span>
-            </div>
-            <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-2.5 text-right">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 block">PO Grand Total</span>
-              <span className="text-lg font-extrabold text-indigo-700 font-mono">₹{Number(po.grandTotal).toFixed(2)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Line Items Table */}
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden p-6 space-y-4">
+        {/* PO Line Items Table */}
+        <div
+          className={`p-6 rounded-3xl border transition space-y-4 ${
+            isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+          }`}
+        >
           <div className="flex justify-between items-center">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500">Ordered Line Items ({po.items.length})</h3>
-            {po.receivedAt && (
-              <span className="text-xs text-gray-500 font-medium">Last Received: {new Date(po.receivedAt).toLocaleString()}</span>
-            )}
+            <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+              Ordered Line Items ({po.items.length})
+            </h2>
+            <span className={`text-xs font-mono font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+              Grand Total: ${Number(po.grandTotal).toFixed(2)}
+            </span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left text-xs">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                  <th className="py-3 px-4">Item Name & UOM</th>
-                  <th className="py-3 px-4 text-center">Ordered Qty</th>
-                  <th className="py-3 px-4 text-center">Received Qty</th>
-                  <th className="py-3 px-4 text-right">Unit Cost (₹)</th>
-                  <th className="py-3 px-4 text-right">Line Total (₹)</th>
+                <tr className={`border-b text-[11px] font-semibold uppercase tracking-wider ${
+                  isDark ? "border-white/[0.06] text-[#8F95A3]" : "border-slate-200 text-slate-500"
+                }`}>
+                  <th className="pb-3 px-3">Item Description</th>
+                  <th className="pb-3 px-3 text-right">Ordered Qty</th>
+                  <th className="pb-3 px-3 text-right">Received Qty</th>
+                  <th className="pb-3 px-3 text-right">Unit Price</th>
+                  <th className="pb-3 px-3 text-right">Line Total</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 text-xs">
-                {po.items.map((row) => (
-                  <tr key={row.id} className="hover:bg-gray-50">
-                    <td className="py-3 px-4 font-bold text-gray-900">
-                      {row.item?.name} <span className="text-[11px] text-gray-500 font-normal">({row.item?.unitOfMeasure})</span>
+              <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
+                {po.items.map((pi) => (
+                  <tr key={pi.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition">
+                    <td className={`py-3.5 px-3 font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                      {pi.item?.name} <span className="text-[10px] opacity-75 font-normal">({pi.item?.unitOfMeasure})</span>
                     </td>
-                    <td className="py-3 px-4 text-center font-mono font-semibold text-gray-700">{row.orderedQuantity}</td>
-                    <td className="py-3 px-4 text-center font-mono font-bold text-emerald-600">
-                      {row.receivedQuantity || 0}
+                    <td className={`py-3.5 px-3 text-right font-mono font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                      {pi.orderedQuantity}
                     </td>
-                    <td className="py-3 px-4 text-right font-mono text-gray-700">₹{Number(row.unitCost).toFixed(2)}</td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-gray-900">₹{Number(row.totalCost).toFixed(2)}</td>
+                    <td className="py-3.5 px-3 text-right font-mono">
+                      <span className={`font-bold ${
+                        pi.receivedQuantity >= pi.orderedQuantity
+                          ? "text-emerald-500"
+                          : pi.receivedQuantity > 0
+                          ? "text-amber-500"
+                          : isDark ? "text-[#8F95A3]" : "text-slate-400"
+                      }`}>
+                        {pi.receivedQuantity || 0}
+                      </span>
+                    </td>
+                    <td className={`py-3.5 px-3 text-right font-mono ${isDark ? "text-[#BAC0CD]" : "text-slate-600"}`}>
+                      ${Number(pi.unitCost).toFixed(2)}
+                    </td>
+                    <td className={`py-3.5 px-3 text-right font-mono font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                      ${Number(pi.totalCost).toFixed(2)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -346,77 +720,83 @@ export default function PurchaseOrderDetailPage() {
         </div>
       </main>
 
-      {/* Interactive Receive / Inspect Goods Modal */}
+      {/* Receive Stock Modal */}
       {showReceiveModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-3xl space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
-            <div className="flex justify-between items-start">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div
+            className={`w-full max-w-2xl max-h-[88vh] overflow-y-auto p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
+              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">Receive Goods & Adjust Stock Quantities</h2>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Verify actual quantities and unit costs received for outlet: <strong className="text-gray-900">{po.outlet.name}</strong>
+                <h2 className="text-base font-bold tracking-tight">Receive Purchase Order Stock</h2>
+                <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Verify delivered quantities and automatically increment branch stock ledgers.
                 </p>
               </div>
-              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
-                GRN Entry
-              </span>
+              <button onClick={() => setShowReceiveModal(false)} className="text-slate-400 hover:text-white cursor-pointer">
+                ✕
+              </button>
             </div>
 
             {receiveError && (
-              <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg font-semibold">
+              <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-xl">
                 {receiveError}
               </div>
             )}
 
-            {/* Line Items Receiving Table */}
-            <div className="flex-1 overflow-y-auto border border-gray-200 rounded-xl">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10 text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                  <tr>
-                    <th className="py-2.5 px-3">Item Name & UOM</th>
-                    <th className="py-2.5 px-3 text-center w-24">Ordered</th>
-                    <th className="py-2.5 px-3 text-center w-24">Prev. Recv</th>
-                    <th className="py-2.5 px-3 text-right w-32">Receiving Now</th>
-                    <th className="py-2.5 px-3 text-right w-32">Unit Cost (₹)</th>
-                    <th className="py-2.5 px-3 text-right w-32">Subtotal (₹)</th>
+            <div className="overflow-x-auto border rounded-2xl">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className={`border-b text-[10px] font-bold uppercase tracking-wider ${
+                    isDark ? "bg-[#0A0C12] border-white/[0.06] text-[#8F95A3]" : "bg-slate-50 border-slate-200 text-slate-600"
+                  }`}>
+                    <th className="py-2.5 px-3">Item</th>
+                    <th className="py-2.5 px-3 text-right">Ordered</th>
+                    <th className="py-2.5 px-3 text-right">Prev. Received</th>
+                    <th className="py-2.5 px-3 text-right">Receive Qty</th>
+                    <th className="py-2.5 px-3 text-right">Actual Unit Price</th>
+                    <th className="py-2.5 px-3 text-right">Line Total</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 text-xs">
-                  {receiveRows.map((row) => {
-                    const rowTotal = (Number(row.receivingQuantity) || 0) * (Number(row.unitCost) || 0);
+                <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
+                  {receiveRows.map((r) => {
+                    const recQty = parseFloat(r.receivingQuantity || "0") || 0;
+                    const unitPrice = parseFloat(r.unitCost || "0") || 0;
+                    const lineTotal = recQty * unitPrice;
+
                     return (
-                      <tr key={row.itemId} className="hover:bg-gray-50">
-                        <td className="py-2.5 px-3 font-semibold text-gray-900">
-                          {row.itemName} <span className="text-[11px] text-gray-500 font-normal">({row.unitOfMeasure})</span>
+                      <tr key={r.itemId}>
+                        <td className="py-2.5 px-3 font-semibold">
+                          {r.itemName} <span className="text-[10px] opacity-75 font-normal">({r.unitOfMeasure})</span>
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono font-semibold text-gray-700">
-                          {row.orderedQuantity}
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-mono text-gray-500">
-                          {row.previouslyReceived}
-                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono">{r.orderedQuantity}</td>
+                        <td className="py-2.5 px-3 text-right font-mono text-slate-400">{r.previouslyReceived}</td>
                         <td className="py-2.5 px-3 text-right">
                           <input
                             type="number"
-                            min="0"
-                            step="1"
-                            value={row.receivingQuantity}
-                            onChange={(e) => handleReceiveRowChange(row.itemId, "receivingQuantity", e.target.value)}
-                            className="w-full bg-emerald-50/50 border border-emerald-300 rounded-lg px-2 py-1 text-xs text-right font-mono font-bold text-emerald-800 focus:outline-none focus:border-emerald-600"
-                          />
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
-                          <input
-                            type="number"
-                            min="0"
                             step="0.01"
-                            value={row.unitCost}
-                            onChange={(e) => handleReceiveRowChange(row.itemId, "unitCost", e.target.value)}
-                            className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs text-right font-mono text-gray-800 focus:outline-none focus:border-indigo-600"
+                            value={r.receivingQuantity}
+                            onChange={(e) => handleReceiveRowChange(r.itemId, e.target.value)}
+                            className={`w-20 px-2 py-1 text-xs font-mono rounded-lg border text-right focus:outline-none focus:border-[#0071E3] ${
+                              isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                            }`}
                           />
                         </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-900">
-                          ₹{rowTotal.toFixed(2)}
+                        <td className="py-2.5 px-3 text-right">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={r.unitCost}
+                            onChange={(e) => handleReceiveUnitCostChange(r.itemId, e.target.value)}
+                            className={`w-24 px-2 py-1 text-xs font-mono rounded-lg border text-right focus:outline-none focus:border-emerald-500 font-semibold ${
+                              isDark ? "bg-[#0A0C12] border-white/[0.08] text-emerald-400" : "bg-white border-slate-200 text-emerald-700"
+                            }`}
+                          />
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-bold">
+                          {formatCurrency(lineTotal)}
                         </td>
                       </tr>
                     );
@@ -425,67 +805,104 @@ export default function PurchaseOrderDetailPage() {
               </table>
             </div>
 
-            {/* Receiving Summary Footer */}
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 flex justify-between items-center">
-              <span className="text-xs font-bold text-gray-600">Total Receiving Batch Value:</span>
-              <span className="text-lg font-extrabold text-emerald-700 font-mono">₹{receivingGrandTotal.toFixed(2)}</span>
+            {/* Total Receiving Valuation Summary */}
+            <div className={`p-3 rounded-xl border flex items-center justify-between gap-3 text-xs ${
+              isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"
+            }`}>
+              <span className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                💡 Updating unit price re-calculates the Purchase Order value and updates latest item cost.
+              </span>
+              <div className="text-right flex-shrink-0">
+                <span className={`text-[10px] uppercase font-bold mr-2 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Total Receiving Value:
+                </span>
+                <span className="font-mono font-bold text-sm text-emerald-500">
+                  {formatCurrency(
+                    receiveRows.reduce((acc, r) => {
+                      const recQty = parseFloat(r.receivingQuantity || "0") || 0;
+                      const unitPrice = parseFloat(r.unitCost || "0") || 0;
+                      return acc + recQty * unitPrice;
+                    }, 0)
+                  )}
+                </span>
+              </div>
             </div>
 
-            {/* Modal Controls */}
-            <div className="flex gap-3 pt-2">
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
               <button
+                type="button"
                 onClick={() => setShowReceiveModal(false)}
-                className="py-2.5 px-4 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 text-xs cursor-pointer"
+                className={`px-4 py-2 rounded-xl text-xs font-medium ${
+                  isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
+                }`}
               >
                 Cancel
               </button>
               <button
-                onClick={() => submitReceiveStock("PARTIALLY_RECEIVED")}
+                type="button"
+                onClick={handleSubmitReceive}
                 disabled={updating}
-                className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-sm cursor-pointer disabled:opacity-50"
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer shadow-xs"
               >
-                {updating ? "Saving..." : "Mark as PARTIALLY RECEIVED"}
-              </button>
-              <button
-                onClick={() => submitReceiveStock("RECEIVED")}
-                disabled={updating}
-                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm cursor-pointer disabled:opacity-50"
-              >
-                {updating ? "Completing..." : "Complete & Mark RECEIVED"}
+                {updating ? "Processing..." : "Confirm & Update Stock"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Custom Confirmation Modal Dialog Box UI */}
+      {/* Custom Confirmation Modal */}
       {confirmDialog.show && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
-            <div className="space-y-1">
-              <h3 className="text-lg font-bold text-gray-900">{confirmDialog.title}</h3>
-              <p className="text-xs text-gray-600 leading-relaxed">{confirmDialog.message}</p>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div
+            className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 ${
+              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex items-start gap-4">
+              <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center flex-shrink-0 ${
+                confirmDialog.variant === "red"
+                  ? "bg-rose-500/10 border-rose-500/20 text-rose-500"
+                  : "bg-[#0071E3]/10 border-[#0071E3]/20 text-[#0071E3]"
+              }`}>
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+
+              <div className="space-y-1 min-w-0 flex-1">
+                <h2 className={`text-base font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {confirmDialog.title}
+                </h2>
+                <p className={`text-xs leading-relaxed ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                  {confirmDialog.message}
+                </p>
+              </div>
             </div>
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
               <button
+                type="button"
                 onClick={() => setConfirmDialog((prev) => ({ ...prev, show: false }))}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 text-xs font-bold hover:bg-gray-50 transition-all cursor-pointer"
+                className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                  isDark
+                    ? "bg-white/[0.04] text-[#8F95A3] hover:text-white hover:bg-white/[0.08]"
+                    : "bg-slate-100 text-slate-700 hover:text-slate-900 hover:bg-slate-200"
+                }`}
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={() => {
                   const onConf = confirmDialog.onConfirm;
                   setConfirmDialog((prev) => ({ ...prev, show: false }));
                   if (onConf) onConf();
                 }}
-                className={`flex-1 py-2.5 rounded-xl text-white text-xs font-bold transition-all cursor-pointer shadow-sm ${
+                className={`px-5 py-2.5 text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer ${
                   confirmDialog.variant === "red"
-                    ? "bg-red-600 hover:bg-red-500"
-                    : confirmDialog.variant === "indigo"
-                    ? "bg-indigo-600 hover:bg-indigo-500"
-                    : "bg-emerald-600 hover:bg-emerald-500"
+                    ? "bg-rose-600 hover:bg-rose-700"
+                    : "bg-[#0071E3] hover:bg-[#0077ED]"
                 }`}
               >
                 {confirmDialog.confirmText}

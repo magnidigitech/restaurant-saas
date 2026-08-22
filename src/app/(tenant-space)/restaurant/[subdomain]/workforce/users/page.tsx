@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
+import { useTheme } from "@/core/theme/ThemeContext";
+import RestaurantNavbar from "@/components/RestaurantNavbar";
 
 interface Role {
   id: string;
@@ -22,8 +24,14 @@ interface Employee {
   archivedAt: string | null;
 }
 
-export default function InternalUsersPage() {
+export default function InternalUsersPage({
+  params,
+}: {
+  params: Promise<{ subdomain: string }>;
+}) {
   const router = useRouter();
+  const { subdomain } = use(params);
+  const { isDark } = useTheme();
 
   const [memberships, setMemberships] = useState<any[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
@@ -37,6 +45,7 @@ export default function InternalUsersPage() {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [createdInviteUrl, setCreatedInviteUrl] = useState("");
+  const [copiedInvite, setCopiedInvite] = useState(false);
 
   const [formData, setFormData] = useState({
     employeeId: "",
@@ -67,7 +76,7 @@ export default function InternalUsersPage() {
       if (resEmps.ok) setEmployees(dataEmps.employees || []);
       if (resRoles.ok) setRoles(dataRoles.roles || []);
       if (resOutlets.ok) setOutlets(dataOutlets.outlets || []);
-    } catch (e) {
+    } catch {
       setError("Network error loading user data");
     } finally {
       setLoading(false);
@@ -105,7 +114,7 @@ export default function InternalUsersPage() {
 
       const protocol = window.location.protocol;
       const host = window.location.host;
-      const url = `${protocol}//${host}/activate?token=${data.inviteToken}`;
+      const url = `${protocol}//${host}/restaurant/${subdomain}/activate?token=${data.inviteToken}`;
       setCreatedInviteUrl(url);
 
       fetchData();
@@ -116,215 +125,339 @@ export default function InternalUsersPage() {
     }
   };
 
-  return (
-    <div className="w-full min-h-screen bg-slate-950 text-slate-100">
-      <main className="max-w-7xl mx-auto p-6 md:p-8 space-y-8 font-sans">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <button onClick={() => router.back()} className="text-xs text-blue-400 hover:text-blue-300 mb-2 cursor-pointer">
-            &larr; Back to Dashboard
-          </button>
-          <h2 className="text-3xl font-extrabold text-white">App Users & Staff Invitations</h2>
-          <p className="text-sm text-slate-400 mt-1">Grant application login credentials to existing employees.</p>
-        </div>
-        <button
-          onClick={() => { setError(""); setCreatedInviteUrl(""); setShowModal(true); }}
-          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-lg transition-all cursor-pointer shadow-lg"
-        >
-          + Grant App Access to Employee
-        </button>
+  const handleCopyLink = () => {
+    if (createdInviteUrl) {
+      navigator.clipboard.writeText(createdInviteUrl);
+      setCopiedInvite(true);
+      setTimeout(() => setCopiedInvite(false), 3000);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div
+        className={`min-h-screen flex flex-col items-center justify-center font-sans antialiased ${
+          isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+        }`}
+      >
+        <div className="w-8 h-8 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-xs font-medium">Loading User Accounts...</p>
       </div>
+    );
+  }
 
-      {error && (
-        <div className="bg-red-950/50 border border-red-800 text-red-200 text-sm px-4 py-3 rounded-lg text-center font-medium">
-          {error}
+  return (
+    <div
+      className={`min-h-screen font-sans antialiased transition-colors duration-200 flex flex-col ${
+        isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+      }`}
+    >
+      <RestaurantNavbar activeSection="User Accounts" />
+
+      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Executive Header Banner */}
+        <div
+          className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+            isDark
+              ? "bg-[#121622]/60 border-white/[0.06]"
+              : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
+          }`}
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push(`/restaurant/${subdomain}/dashboard`)}
+                className={`text-xs font-medium transition cursor-pointer ${
+                  isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                ← Dashboard
+              </button>
+              <span className={`text-xs ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
+              <span className="w-2 h-2 rounded-full bg-[#0071E3]" />
+              <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                Administration
+              </span>
+            </div>
+
+            <h1 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+              User Accounts & Staff Logins
+            </h1>
+            <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Grant application login credentials and manage access memberships for staff members.
+            </p>
+          </div>
+
+          <button
+            onClick={() => {
+              setError("");
+              setCreatedInviteUrl("");
+              setShowModal(true);
+            }}
+            className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
+          >
+            + Grant App Access
+          </button>
         </div>
-      )}
 
-      {loading ? (
-        <div className="text-slate-500 py-12 text-center">Loading users...</div>
-      ) : (
-        <div className="space-y-8">
-          {/* Active Memberships */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-white">Active App Memberships ({memberships.length})</h3>
-            {memberships.length === 0 ? (
-              <div className="text-slate-500 py-8 text-center border border-dashed border-slate-800 rounded-2xl">
-                No active user memberships found.
-              </div>
-            ) : (
-              <div className="bg-slate-900/20 border border-slate-900 rounded-2xl overflow-hidden shadow-xl">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-900/50 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-900">
-                      <th className="p-4">User Email</th>
-                      <th className="p-4">Linked Employee</th>
-                      <th className="p-4">Joined Date</th>
-                      <th className="p-4">Status</th>
+        {error && (
+          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl">
+            {error}
+          </div>
+        )}
+
+        {/* Active Memberships Table */}
+        <div
+          className={`p-6 rounded-3xl border transition space-y-4 ${
+            isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+          }`}
+        >
+          <div className="flex justify-between items-center">
+            <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+              Active App Memberships ({memberships.length})
+            </h2>
+          </div>
+
+          {memberships.length === 0 ? (
+            <div className={`p-8 text-center text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+              No active user accounts logged.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className={`border-b text-[11px] font-semibold uppercase tracking-wider ${
+                    isDark ? "border-white/[0.06] text-[#8F95A3]" : "border-slate-200 text-slate-500"
+                  }`}>
+                    <th className="pb-3 px-3">User Email</th>
+                    <th className="pb-3 px-3">Linked Staff Profile</th>
+                    <th className="pb-3 px-3">Member Since</th>
+                    <th className="pb-3 px-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
+                  {memberships.map((m) => (
+                    <tr key={m.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition">
+                      <td className={`py-3.5 px-3 font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                        {m.user.email}
+                      </td>
+                      <td className={`py-3.5 px-3 ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+                        {m.employee ? `${m.employee.firstName} ${m.employee.lastName} (${m.employee.employeeCode})` : "Unlinked Account"}
+                      </td>
+                      <td className={`py-3.5 px-3 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                        {new Date(m.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                          Active
+                        </span>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-900 text-sm">
-                    {memberships.map((m) => (
-                      <tr key={m.id} className="hover:bg-slate-900/10">
-                        <td className="p-4 text-white font-bold">{m.user.email}</td>
-                        <td className="p-4 text-slate-300">
-                          {m.employee ? (
-                            <span className="font-semibold text-blue-400">
-                              {m.employee.firstName} {m.employee.lastName} ({m.employee.employeeCode})
-                            </span>
-                          ) : (
-                            <span className="text-slate-500 italic">Unlinked</span>
-                          )}
-                        </td>
-                        <td className="p-4 text-slate-400 text-xs">{new Date(m.joinedAt).toLocaleDateString()}</td>
-                        <td className="p-4">
-                          <span className="text-xs px-2.5 py-1 rounded bg-green-950 text-green-200 border border-green-800 font-bold uppercase">
-                            {m.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Pending Invitations */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-white">Pending Invitations ({pendingInvitations.length})</h3>
-            {pendingInvitations.length === 0 ? (
-              <div className="text-slate-500 py-6 text-center border border-dashed border-slate-800 rounded-2xl text-sm">
-                No pending invitations.
-              </div>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {pendingInvitations.map((inv) => (
-                  <div key={inv.id} className="bg-slate-900/30 border border-slate-900 p-5 rounded-2xl space-y-2">
-                    <div className="flex justify-between items-center">
-                      <h4 className="font-bold text-white">{inv.email}</h4>
-                      <span className="text-xs px-2 py-0.5 rounded bg-yellow-950 text-yellow-200 border border-yellow-800 font-bold uppercase">
-                        SENT
-                      </span>
-                    </div>
-                    <div className="text-xs text-slate-400 space-y-0.5">
-                      <p>Initial Role: <span className="text-slate-200 font-semibold">{inv.role?.name || "-"}</span></p>
-                      <p>Outlet Scope: <span className="text-slate-200">{inv.outlet?.name || "Restaurant-Wide"}</span></p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
 
-      {/* Creation Modal */}
+        {/* Pending Invitations Table */}
+        <div
+          className={`p-6 rounded-3xl border transition space-y-4 ${
+            isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+          }`}
+        >
+          <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+            Pending Staff Invitations ({pendingInvitations.length})
+          </h2>
+
+          {pendingInvitations.length === 0 ? (
+            <div className={`p-8 text-center text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+              No pending staff invitations awaiting activation.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className={`border-b text-[11px] font-semibold uppercase tracking-wider ${
+                    isDark ? "border-white/[0.06] text-[#8F95A3]" : "border-slate-200 text-slate-500"
+                  }`}>
+                    <th className="pb-3 px-3">Invited Email</th>
+                    <th className="pb-3 px-3">Role Assigned</th>
+                    <th className="pb-3 px-3">Branch Outlet</th>
+                    <th className="pb-3 px-3">Expires</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
+                  {pendingInvitations.map((inv) => (
+                    <tr key={inv.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition">
+                      <td className={`py-3.5 px-3 font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                        {inv.email}
+                      </td>
+                      <td className={`py-3.5 px-3 ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+                        {inv.role?.name || "General Access"}
+                      </td>
+                      <td className={`py-3.5 px-3 ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+                        {inv.outlet?.name || "All Outlets"}
+                      </td>
+                      <td className={`py-3.5 px-3 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                        {new Date(inv.expiresAt).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* Grant App Access Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md p-6 rounded-2xl space-y-6 shadow-2xl">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div
+            className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
+              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
             <div className="flex justify-between items-center">
-              <h3 className="text-xl font-bold text-white">Grant Application Access</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white cursor-pointer">&times;</button>
+              <div>
+                <h2 className="text-base font-bold tracking-tight">Grant App Access</h2>
+                <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Invite a staff member to access the management portal.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  setError("");
+                  setCreatedInviteUrl("");
+                }}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-base cursor-pointer"
+              >
+                ✕
+              </button>
             </div>
 
             {createdInviteUrl ? (
-              <div className="space-y-4">
-                <div className="p-4 bg-green-950/40 border border-green-800 text-green-200 text-xs rounded-xl space-y-2">
-                  <p className="font-bold">✓ Activation Link Created Successfully!</p>
-                  <p className="text-slate-300">Copy and share this secure link with the employee to set their password:</p>
+              <div className="space-y-4 pt-2">
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-2xl space-y-2">
+                  <p className="font-semibold">Staff Invitation Generated!</p>
+                  <p className="opacity-90">Share this activation link with the staff member to let them set up their account password.</p>
                 </div>
-                <input
-                  readOnly
-                  value={createdInviteUrl}
-                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-blue-300 selection:bg-blue-900"
-                />
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(createdInviteUrl);
-                    alert("Activation URL copied to clipboard!");
-                  }}
-                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-lg cursor-pointer"
-                >
-                  Copy Activation URL
-                </button>
+
+                <div className="space-y-1.5">
+                  <input
+                    type="text"
+                    readOnly
+                    value={createdInviteUrl}
+                    className={`w-full px-3.5 py-2.5 text-xs font-mono rounded-xl border ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-slate-50 border-slate-200 text-slate-900"
+                    }`}
+                  />
+                  <button
+                    onClick={handleCopyLink}
+                    className="w-full py-2.5 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer"
+                  >
+                    {copiedInvite ? "✓ Link Copied to Clipboard" : "Copy Activation Link"}
+                  </button>
+                </div>
               </div>
             ) : (
               <form onSubmit={handleCreateInvite} className="space-y-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase block mb-1">Select Employee *</label>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Select Staff Member
+                  </label>
                   <select
-                    required
                     value={formData.employeeId}
                     onChange={(e) => handleEmployeeSelect(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-800 bg-slate-950 text-white text-sm"
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
                   >
-                    <option value="">Select an employee...</option>
-                    {employees
-                      .filter((e) => !e.archivedAt)
-                      .map((emp) => (
-                        <option key={emp.id} value={emp.id}>
-                          {emp.firstName} {emp.lastName} ({emp.employeeCode})
-                        </option>
-                      ))}
+                    <option value="">Choose employee profile...</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.firstName} {emp.lastName} ({emp.employeeCode})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase block mb-1">Login Email *</label>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Login Email Address *
+                  </label>
                   <input
-                    required
                     type="email"
+                    required
                     value={formData.email}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-                    placeholder="employee@restaurant.com"
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-800 bg-slate-950 text-white text-sm"
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
                   />
                 </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase block mb-1">Initial Role *</label>
-                  <select
-                    required
-                    value={formData.roleId}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, roleId: e.target.value }))}
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-800 bg-slate-950 text-white text-sm"
-                  >
-                    <option value="">Select role...</option>
-                    {roles.map((r) => (
-                      <option key={r.id} value={r.id}>{r.name}</option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      System Role *
+                    </label>
+                    <select
+                      required
+                      value={formData.roleId}
+                      onChange={(e) => setFormData({ ...formData, roleId: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    >
+                      <option value="">Select Role...</option>
+                      {roles.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Branch Outlet Scope
+                    </label>
+                    <select
+                      value={formData.outletId}
+                      onChange={(e) => setFormData({ ...formData, outletId: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    >
+                      <option value="">All Outlets (Global)</option>
+                      {outlets.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase block mb-1">Outlet Scope (Optional)</label>
-                  <select
-                    value={formData.outletId}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, outletId: e.target.value }))}
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-800 bg-slate-950 text-white text-sm"
-                  >
-                    <option value="">All Outlets (Restaurant-Wide)</option>
-                    {outlets.map((o) => (
-                      <option key={o.id} value={o.id}>{o.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="pt-4 flex justify-end space-x-3">
+                <div className="flex justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
                   <button
                     type="button"
                     onClick={() => setShowModal(false)}
-                    className="px-4 py-2 text-sm text-slate-400 hover:text-white cursor-pointer"
+                    className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                      isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
+                    }`}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={saving}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                    className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
                   >
-                    {saving ? "Generating..." : "Generate Invitation Link"}
+                    {saving ? "Generating..." : "Generate Invitation"}
                   </button>
                 </div>
               </form>
@@ -332,7 +465,6 @@ export default function InternalUsersPage() {
           </div>
         </div>
       )}
-    </main>
-  </div>
-);
+    </div>
+  );
 }

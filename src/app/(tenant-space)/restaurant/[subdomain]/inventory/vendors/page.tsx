@@ -1,7 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
+import { useTheme } from "@/core/theme/ThemeContext";
+import RestaurantNavbar from "@/components/RestaurantNavbar";
+import ModuleAccessGuard from "@/components/ModuleAccessGuard";
 
 interface Vendor {
   id: string;
@@ -18,8 +21,14 @@ interface Vendor {
   createdAt: string;
 }
 
-export default function VendorDirectoryPage() {
+export default function VendorDirectoryPage({
+  params,
+}: {
+  params: Promise<{ subdomain: string }>;
+}) {
   const router = useRouter();
+  const { subdomain } = use(params);
+  const { isDark } = useTheme();
 
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,10 +53,10 @@ export default function VendorDirectoryPage() {
 
   const fetchVendors = async (s = search, st = statusFilter) => {
     try {
-      const params = new URLSearchParams();
-      if (s) params.set("search", s);
-      if (st) params.set("status", st);
-      const res = await fetch(`/api/restaurant/inventory/vendors?${params}`);
+      const p = new URLSearchParams();
+      if (s) p.set("search", s);
+      if (st) p.set("status", st);
+      const res = await fetch(`/api/restaurant/inventory/vendors?${p}`);
       const data = await res.json();
       if (res.ok) setVendors(data.vendors || []);
     } catch {
@@ -71,7 +80,8 @@ export default function VendorDirectoryPage() {
     fetchVendors(search, val);
   };
 
-  const handleCreate = async () => {
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!form.name) {
       setError("Vendor name is required");
       return;
@@ -86,7 +96,7 @@ export default function VendorDirectoryPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      
+
       setShowCreate(false);
       setForm({
         name: "",
@@ -100,12 +110,7 @@ export default function VendorDirectoryPage() {
         status: "ACTIVE",
         notes: "",
       });
-
-      // Optimistic instant state update + AJAX re-fetch
-      if (data.vendor) {
-        setVendors((prev) => [data.vendor, ...prev]);
-      }
-      await fetchVendors();
+      fetchVendors();
     } catch (e: any) {
       setError(e.message || "Failed to create vendor");
     } finally {
@@ -115,79 +120,90 @@ export default function VendorDirectoryPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-gray-50 text-gray-500 font-semibold">
-        Loading vendor directory...
-      </main>
+      <div
+        className={`min-h-screen flex flex-col items-center justify-center font-sans antialiased ${
+          isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+        }`}
+      >
+        <div className="w-8 h-8 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-xs font-medium">Loading Vendor Directory...</p>
+      </div>
     );
   }
 
-  const activeCount = vendors.filter((v) => v.status === "ACTIVE").length;
-  const creditCount = vendors.filter((v) => ["NET7", "NET15", "NET30", "NET60"].includes(v.paymentTerms)).length;
-
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
-      {/* Top Header Navbar */}
-      <header className="border-b border-gray-200 bg-white sticky top-0 z-40 px-6 py-4 flex justify-between items-center shadow-sm">
-        <div className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="text-gray-600 hover:text-gray-900 font-semibold transition-colors cursor-pointer text-sm">
-            ← Back
-          </button>
-          <div className="h-4 w-px bg-gray-200" />
-          <div>
-            <h1 className="text-lg font-bold text-gray-900">Vendor Management</h1>
-            <p className="text-xs text-gray-500">{vendors.length} vendors total • {activeCount} active suppliers</p>
-          </div>
-        </div>
+    <ModuleAccessGuard moduleKey="vendor_management" moduleName="Vendor Management" activeSection="Vendors">
+      <div
+        className={`min-h-screen font-sans antialiased transition-colors duration-200 flex flex-col ${
+          isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+        }`}
+      >
+        <RestaurantNavbar activeSection="Vendors" />
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => fetchVendors()}
-            className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer border border-gray-200"
-          >
-            Refresh
-          </button>
+      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Executive Header Banner */}
+        <div
+          className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+            isDark
+              ? "bg-[#121622]/60 border-white/[0.06]"
+              : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
+          }`}
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push(`/restaurant/${subdomain}/inventory`)}
+                className={`text-xs font-medium transition cursor-pointer ${
+                  isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                ← Inventory Hub
+              </button>
+              <span className={`text-xs ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
+              <span className="w-2 h-2 rounded-full bg-[#0071E3]" />
+              <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                Procurement Partners
+              </span>
+            </div>
+
+            <h1 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+              Supplier & Vendor Directory
+            </h1>
+            <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Manage commercial distributors, payment credit terms, contact leads, and item price contracts.
+            </p>
+          </div>
+
           <button
             onClick={() => setShowCreate(true)}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
+            className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
           >
-            + Register Vendor
+            + Add Vendor
           </button>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8 space-y-6">
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl font-semibold">{error}</div>}
-
-        {/* Overview Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Total Registered Suppliers</span>
-            <p className="text-3xl font-extrabold text-gray-900 font-mono">{vendors.length}</p>
+        {error && (
+          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl">
+            {error}
           </div>
+        )}
 
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Active Suppliers</span>
-            <p className="text-3xl font-extrabold text-emerald-600 font-mono">{activeCount}</p>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Credit Term Suppliers</span>
-            <p className="text-3xl font-extrabold text-indigo-600 font-mono">{creditCount}</p>
-          </div>
-        </div>
-
-        {/* Search & Status Filter */}
+        {/* Filter Controls */}
         <div className="flex gap-3 flex-wrap">
           <input
-            placeholder="Search vendor name, code, contact person, or phone..."
+            placeholder="Search suppliers by name, code, contact or email..."
             value={search}
             onChange={(e) => handleSearch(e.target.value)}
-            className="flex-1 min-w-56 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-indigo-600 shadow-sm"
+            className={`flex-1 min-w-56 px-4 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+              isDark ? "bg-[#121622]/60 border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
           />
           <select
             value={statusFilter}
             onChange={(e) => handleStatusFilter(e.target.value)}
-            className="bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none focus:border-indigo-600 cursor-pointer shadow-sm"
+            className={`px-3.5 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+              isDark ? "bg-[#121622]/60 border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
           >
             <option value="">All Statuses</option>
             <option value="ACTIVE">ACTIVE</option>
@@ -196,59 +212,74 @@ export default function VendorDirectoryPage() {
           </select>
         </div>
 
-        {/* Vendor Table */}
-        {vendors.length === 0 ? (
-          <div className="text-center py-20 border border-dashed border-gray-300 bg-white rounded-2xl space-y-2">
-            <p className="text-gray-900 font-bold text-lg">No Vendors Registered</p>
-            <p className="text-gray-500 text-xs">Register your first vendor/supplier using the button above.</p>
-          </div>
-        ) : (
-          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+        {/* Vendors Table */}
+        <div
+          className={`p-6 rounded-3xl border transition space-y-4 ${
+            isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+          }`}
+        >
+          {vendors.length === 0 ? (
+            <div className={`p-12 text-center text-xs space-y-1 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+              <p className="font-semibold text-sm">No suppliers registered</p>
+              <p className="opacity-75">Click &quot;+ Add Vendor&quot; to configure your procurement supply lines.</p>
+            </div>
+          ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                    <th className="py-3.5 px-4">Vendor & Code</th>
-                    <th className="py-3.5 px-4">Contact Person</th>
-                    <th className="py-3.5 px-4">Phone / Email</th>
-                    <th className="py-3.5 px-4">Tax ID / GSTIN</th>
-                    <th className="py-3.5 px-4">Payment Terms</th>
-                    <th className="py-3.5 px-4 text-center">Status</th>
+                  <tr className={`border-b text-[11px] font-semibold uppercase tracking-wider ${
+                    isDark ? "border-white/[0.06] text-[#8F95A3]" : "border-slate-200 text-slate-500"
+                  }`}>
+                    <th className="pb-3 px-3">Vendor / Company</th>
+                    <th className="pb-3 px-3">Representative Contact</th>
+                    <th className="pb-3 px-3">Payment Terms</th>
+                    <th className="pb-3 px-3">Tax Identifier</th>
+                    <th className="pb-3 px-3">Status</th>
+                    <th className="pb-3 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 text-xs">
-                  {vendors.map((vendor) => (
+                <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
+                  {vendors.map((v) => (
                     <tr
-                      key={vendor.id}
-                      onClick={() => router.push(`/inventory/vendors/${vendor.id}`)}
-                      className="hover:bg-indigo-50/40 cursor-pointer transition-all"
+                      key={v.id}
+                      onClick={() => router.push(`/restaurant/${subdomain}/inventory/vendors/${v.id}`)}
+                      className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition cursor-pointer group"
                     >
-                      <td className="py-3.5 px-4">
-                        <p className="font-bold text-gray-900 text-sm">{vendor.name}</p>
-                        {vendor.code && <p className="text-[11px] text-gray-500 font-mono">{vendor.code}</p>}
+                      <td className="py-3 px-3">
+                        <span className={`font-semibold block ${isDark ? "text-white" : "text-slate-900"}`}>
+                          {v.name}
+                        </span>
+                        {v.code && (
+                          <span className={`text-[10px] font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                            CODE: {v.code}
+                          </span>
+                        )}
                       </td>
-                      <td className="py-3.5 px-4 text-gray-700 font-semibold">{vendor.contactPerson || "—"}</td>
-                      <td className="py-3.5 px-4 space-y-0.5">
-                        <p className="text-gray-900 font-mono">{vendor.phone || "—"}</p>
-                        {vendor.email && <p className="text-gray-500 text-[11px]">{vendor.email}</p>}
+                      <td className={`py-3 px-3 ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+                        <span className="block font-medium">{v.contactPerson || "Primary Contact"}</span>
+                        {v.phone && <span className={`text-[10px] font-mono block ${isDark ? "text-[#25D366]" : "text-emerald-700 font-semibold"}`}>{v.phone}</span>}
+                        {v.email && <span className={`text-[10px] block opacity-75 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>{v.email}</span>}
                       </td>
-                      <td className="py-3.5 px-4 text-gray-600 font-mono">{vendor.taxId || "—"}</td>
-                      <td className="py-3.5 px-4">
-                        <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded text-[11px]">
-                          {vendor.paymentTerms}
+                      <td className={`py-3 px-3 font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                        {v.paymentTerms}
+                      </td>
+                      <td className={`py-3 px-3 font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                        {v.taxId || "—"}
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                          v.status === "ACTIVE"
+                            ? isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-100 text-emerald-800 border-emerald-200"
+                            : v.status === "BLOCKED"
+                            ? isDark ? "bg-rose-500/15 text-rose-300 border-rose-500/25" : "bg-rose-100 text-rose-800 border-rose-200"
+                            : isDark ? "bg-white/[0.04] text-[#8F95A3] border-white/[0.08]" : "bg-slate-100 text-slate-600 border-slate-200"
+                        }`}>
+                          {v.status}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <span
-                          className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-                            vendor.status === "ACTIVE"
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : vendor.status === "INACTIVE"
-                              ? "bg-gray-100 text-gray-600 border-gray-200"
-                              : "bg-red-50 text-red-700 border-red-200"
-                          }`}
-                        >
-                          [{vendor.status}]
+                      <td className="py-3 px-3 text-right">
+                        <span className="text-[#0071E3] font-medium group-hover:underline text-xs">
+                          Catalog →
                         </span>
                       </td>
                     </tr>
@@ -256,134 +287,169 @@ export default function VendorDirectoryPage() {
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </main>
 
-      {/* Register Vendor Modal */}
+      {/* Add Vendor Modal */}
       {showCreate && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-lg space-y-5 shadow-2xl">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Register New Vendor</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Add vendor details, contact info, and credit payment terms</p>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div
+            className={`w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
+              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-base font-bold tracking-tight">Register Supplier Profile</h2>
+                <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Add commercial credentials, payment terms, and direct contacts.
+                </p>
+              </div>
+              <button onClick={() => setShowCreate(false)} className="text-slate-400 hover:text-white cursor-pointer">
+                ✕
+              </button>
             </div>
 
-            {error && <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3.5 py-2.5 rounded-xl font-semibold">{error}</div>}
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Vendor Legal Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Sysco Foods Inc."
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  />
+                </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600 mb-1">Vendor Name *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Fresh Agro Traders"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 focus:bg-white focus:outline-none focus:border-indigo-600"
-                />
+                <div>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Vendor Code
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. VEN-SYS"
+                    value={form.code}
+                    onChange={(e) => setForm({ ...form, code: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs font-mono rounded-xl border transition ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  />
+                </div>
               </div>
 
-              <div className="col-span-2 sm:col-span-1">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600 mb-1">Vendor Code</label>
-                <input
-                  type="text"
-                  placeholder="e.g. VEND-001"
-                  value={form.code}
-                  onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 focus:bg-white focus:outline-none focus:border-indigo-600"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Representative Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="John Doe"
+                    value={form.contactPerson}
+                    onChange={(e) => setForm({ ...form, contactPerson: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="orders@vendor.com"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600 mb-1">Contact Person</label>
-                <input
-                  type="text"
-                  placeholder="Contact manager name"
-                  value={form.contactPerson}
-                  onChange={(e) => setForm((f) => ({ ...f, contactPerson: e.target.value }))}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 focus:bg-white focus:outline-none focus:border-indigo-600"
-                />
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Payment Terms
+                  </label>
+                  <select
+                    value={form.paymentTerms}
+                    onChange={(e) => setForm({ ...form, paymentTerms: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition cursor-pointer ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  >
+                    <option value="PREPAID">Prepaid</option>
+                    <option value="COD">Cash On Delivery</option>
+                    <option value="NET7">Net 7 Days</option>
+                    <option value="NET15">Net 15 Days</option>
+                    <option value="NET30">Net 30 Days</option>
+                    <option value="NET60">Net 60 Days</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Tax ID / GST
+                  </label>
+                  <input
+                    type="text"
+                    value={form.taxId}
+                    onChange={(e) => setForm({ ...form, taxId: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs font-mono rounded-xl border transition ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600 mb-1">Phone Number</label>
-                <input
-                  type="text"
-                  placeholder="+91 9876543210"
-                  value={form.phone}
-                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 focus:bg-white focus:outline-none focus:border-indigo-600 font-mono"
-                />
-              </div>
-
-              <div className="col-span-2">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600 mb-1">Email Address</label>
-                <input
-                  type="email"
-                  placeholder="vendor@company.com"
-                  value={form.email}
-                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 focus:bg-white focus:outline-none focus:border-indigo-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600 mb-1">GSTIN / Tax ID</label>
-                <input
-                  type="text"
-                  placeholder="22AAAAA0000A1Z5"
-                  value={form.taxId}
-                  onChange={(e) => setForm((f) => ({ ...f, taxId: e.target.value }))}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 focus:bg-white focus:outline-none focus:border-indigo-600 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600 mb-1">Payment Terms</label>
-                <select
-                  value={form.paymentTerms}
-                  onChange={(e) => setForm((f) => ({ ...f, paymentTerms: e.target.value }))}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none focus:border-indigo-600 cursor-pointer"
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+                <button
+                  type="button"
+                  onClick={() => setShowCreate(false)}
+                  className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                    isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
+                  }`}
                 >
-                  <option value="COD">COD (Cash on Delivery)</option>
-                  <option value="IMMEDIATE">Immediate Payment</option>
-                  <option value="NET7">Net 7 Days</option>
-                  <option value="NET15">Net 15 Days</option>
-                  <option value="NET30">Net 30 Days</option>
-                  <option value="NET60">Net 60 Days</option>
-                </select>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
+                >
+                  {submitting ? "Saving..." : "Register Vendor"}
+                </button>
               </div>
-
-              <div className="col-span-2">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600 mb-1">Address</label>
-                <textarea
-                  placeholder="Full supplier address..."
-                  value={form.address}
-                  onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                  rows={2}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 focus:bg-white focus:outline-none focus:border-indigo-600 resize-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => { setShowCreate(false); setError(""); }}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-xs font-bold hover:bg-gray-50 transition-all cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreate}
-                disabled={submitting}
-                className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-50 shadow-sm"
-              >
-                {submitting ? "Registering..." : "Register Vendor"}
-              </button>
-            </div>
+            </form>
           </div>
         </div>
       )}
     </div>
+    </ModuleAccessGuard>
   );
 }

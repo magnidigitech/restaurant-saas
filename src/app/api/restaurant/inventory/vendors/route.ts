@@ -12,7 +12,7 @@ const createVendorSchema = z.object({
   phone: z.string().optional().or(z.literal("")),
   address: z.string().optional().or(z.literal("")),
   taxId: z.string().optional().or(z.literal("")),
-  paymentTerms: z.enum(["COD", "IMMEDIATE", "NET7", "NET15", "NET30", "NET60"]).optional(),
+  paymentTerms: z.enum(["COD", "IMMEDIATE", "PREPAID", "NET7", "NET15", "NET30", "NET60"]).optional(),
   status: z.enum(["ACTIVE", "INACTIVE", "BLOCKED"]).optional(),
   notes: z.string().optional().or(z.literal("")),
 });

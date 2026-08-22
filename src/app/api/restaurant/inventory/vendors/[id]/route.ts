@@ -6,15 +6,15 @@ import { z } from "zod";
 
 const updateVendorSchema = z.object({
   name: z.string().min(1).optional(),
-  code: z.string().optional(),
-  contactPerson: z.string().optional(),
+  code: z.string().optional().or(z.literal("")),
+  contactPerson: z.string().optional().or(z.literal("")),
   email: z.string().email().optional().or(z.literal("")),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  taxId: z.string().optional(),
-  paymentTerms: z.enum(["COD", "IMMEDIATE", "NET7", "NET15", "NET30", "NET60"]).optional(),
+  phone: z.string().optional().or(z.literal("")),
+  address: z.string().optional().or(z.literal("")),
+  taxId: z.string().optional().or(z.literal("")),
+  paymentTerms: z.enum(["COD", "IMMEDIATE", "PREPAID", "NET7", "NET15", "NET30", "NET60"]).optional(),
   status: z.enum(["ACTIVE", "INACTIVE", "BLOCKED"]).optional(),
-  notes: z.string().optional(),
+  notes: z.string().optional().or(z.literal("")),
 });
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

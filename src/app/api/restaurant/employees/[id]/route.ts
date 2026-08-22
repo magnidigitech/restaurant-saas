@@ -14,6 +14,7 @@ const updateEmployeeSchema = z.object({
   dateOfBirth: z.string().nullable().optional(),
   joiningDate: z.string().optional(),
   workerType: z.enum(["FULL_TIME", "PART_TIME", "CONTRACT", "INTERN", "CONSULTANT", "TEMPORARY"]).optional(),
+  weeklyHoursLimit: z.number().positive().nullable().optional(),
   archived: z.boolean().optional(),
 });
 
@@ -58,6 +59,27 @@ export async function GET(
         documents: true,
         memberships: {
           include: { user: true },
+        },
+        salaryStructures: {
+          orderBy: { effectiveFrom: "desc" },
+        },
+        payslips: {
+          include: {
+            payrollRun: {
+              select: {
+                id: true,
+                title: true,
+                periodStart: true,
+                periodEnd: true,
+                paymentDate: true,
+                status: true,
+              },
+            },
+            earnings: true,
+            deductions: true,
+            payments: true,
+          },
+          orderBy: { periodStart: "desc" },
         },
       },
     });
@@ -122,6 +144,7 @@ export async function PATCH(
         ...(data.dateOfBirth !== undefined && { dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null }),
         ...(data.joiningDate && { joiningDate: new Date(data.joiningDate) }),
         ...(data.workerType && { workerType: data.workerType }),
+        ...(data.weeklyHoursLimit !== undefined && { weeklyHoursLimit: data.weeklyHoursLimit }),
         ...(data.archived !== undefined && { archivedAt: data.archived ? new Date() : null }),
       },
     });

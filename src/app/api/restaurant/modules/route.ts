@@ -6,7 +6,7 @@ import { verifyAccess } from "@/core/permissions/check";
 export async function GET(req: NextRequest) {
   try {
     const session = await getTenantSession();
-    if (!session || session.role !== "RESTAURANT_USER" || !session.activeRestaurantId) {
+    if (!session || !session.activeRestaurantId) {
       return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
     }
 

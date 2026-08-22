@@ -37,7 +37,7 @@ export const PurchaseService = {
         where,
         include: {
           vendor: { select: { id: true, name: true, code: true, paymentTerms: true } },
-          outlet: { select: { id: true, name: true, code: true } },
+          outlet: { select: { id: true, name: true } },
           items: {
             include: {
               item: { select: { id: true, name: true, unitOfMeasure: true, costPerUnit: true } },
@@ -53,7 +53,7 @@ export const PurchaseService = {
         where,
         include: {
           vendor: { select: { id: true, name: true, code: true, paymentTerms: true } },
-          outlet: { select: { id: true, name: true, code: true } },
+          outlet: { select: { id: true, name: true } },
           items: {
             include: {
               item: { select: { id: true, name: true, unitOfMeasure: true, costPerUnit: true } },
@@ -111,8 +111,23 @@ export const PurchaseService = {
   ) {
     let db = getPrisma();
     const executeCreate = async (client: any) => {
-      const count = await client.purchaseOrder.count({ where: { restaurantId } });
-      const poNumber = `PO-${(count + 1).toString().padStart(5, "0")}`;
+      // Collision-safe sequential PO Number
+      const lastPO = await client.purchaseOrder.findFirst({
+        where: { restaurantId },
+        orderBy: { createdAt: "desc" },
+        select: { poNumber: true },
+      });
+      let nextNum = 1;
+      if (lastPO?.poNumber && lastPO.poNumber.startsWith("PO-")) {
+        const parsed = parseInt(lastPO.poNumber.replace("PO-", ""), 10);
+        if (!isNaN(parsed)) {
+          nextNum = parsed + 1;
+        }
+      } else {
+        const count = await client.purchaseOrder.count({ where: { restaurantId } });
+        nextNum = count + 1;
+      }
+      const poNumber = `PO-${nextNum.toString().padStart(5, "0")}`;
 
       let totalAmount = 0;
       const poItemsData = data.items.map((i) => {
@@ -156,10 +171,16 @@ export const PurchaseService = {
 
     try {
       return await executeCreate(db);
-    } catch {
-      const freshDb = createPrismaClient() as any;
-      (globalThis as any).prisma = freshDb;
-      return await executeCreate(freshDb);
+    } catch (e: any) {
+      console.error("[PurchaseService.createPO] Primary attempt failed:", e.message);
+      try {
+        const freshDb = createPrismaClient() as any;
+        (globalThis as any).prisma = freshDb;
+        return await executeCreate(freshDb);
+      } catch (freshErr: any) {
+        console.error("[PurchaseService.createPO] Retry failed:", freshErr.message);
+        throw freshErr;
+      }
     }
   },
 
@@ -236,9 +257,17 @@ export const PurchaseService = {
             data: {
               receivedQuantity: cumulativeReceived,
               unitCost: newUnitCost,
-              totalCost: cumulativeReceived * newUnitCost,
+              totalCost: Number(existingItem.orderedQuantity) * newUnitCost,
             },
           });
+
+          // Sync inventory item latest cost price
+          if (newUnitCost > 0) {
+            await tx.inventoryItem.update({
+              where: { id: existingItem.itemId },
+              data: { costPerUnit: newUnitCost },
+            }).catch(() => {});
+          }
 
           // Log Stock Ledger movement if quantity received > 0
           if (qtyToReceive > 0) {
@@ -250,7 +279,7 @@ export const PurchaseService = {
                 movementType: "PURCHASE",
                 quantity: qtyToReceive,
                 referenceId: po.poNumber,
-                notes: `Received via Purchase Order ${po.poNumber}${reqItem.unitCost !== undefined ? ` @ ₹${reqItem.unitCost}/unit` : ""}`,
+                notes: `Received via Purchase Order ${po.poNumber} @ ₹${newUnitCost}/unit`,
                 recordedBy: userId,
               },
             });
@@ -262,16 +291,20 @@ export const PurchaseService = {
           where: { purchaseOrderId: poId },
         });
 
-        let updatedTotalAmount = 0;
+        let updatedSubtotal = 0;
         let checkAllReceived = true;
 
         updatedPOItems.forEach((item: any) => {
-          const total = Number(item.receivedQuantity > 0 ? item.receivedQuantity : item.orderedQuantity) * Number(item.unitCost);
-          updatedTotalAmount += total;
+          const total = Number(item.orderedQuantity) * Number(item.unitCost);
+          updatedSubtotal += total;
           if (Number(item.receivedQuantity || 0) < Number(item.orderedQuantity)) {
             checkAllReceived = false;
           }
         });
+
+        const taxRate = (po as any).taxRate ? Number((po as any).taxRate) : 0;
+        const taxAmount = (updatedSubtotal * taxRate) / 100;
+        const updatedGrandTotal = updatedSubtotal + taxAmount;
 
         const targetStatus = receiveData?.status
           ? receiveData.status
@@ -284,8 +317,9 @@ export const PurchaseService = {
           data: {
             status: targetStatus,
             receivedAt: new Date(),
-            totalAmount: updatedTotalAmount,
-            grandTotal: updatedTotalAmount,
+            totalAmount: updatedGrandTotal,
+            taxAmount,
+            grandTotal: updatedGrandTotal,
           },
           include: {
             vendor: true,

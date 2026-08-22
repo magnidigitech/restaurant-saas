@@ -27,7 +27,8 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search") || undefined;
-    const status = searchParams.get("status") || undefined;
+    const rawStatus = searchParams.get("status");
+    const status = rawStatus && rawStatus !== "ALL" && rawStatus.trim() !== "" ? rawStatus : undefined;
     const vendorId = searchParams.get("vendorId") || undefined;
 
     const purchaseOrders = await PurchaseService.getPurchaseOrders(session.activeRestaurantId, { search, status, vendorId });

@@ -1,10 +1,18 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
+import { useTheme } from "@/core/theme/ThemeContext";
+import RestaurantNavbar from "@/components/RestaurantNavbar";
 
-export default function AccessGrantsPage() {
+export default function AccessGrantsPage({
+  params,
+}: {
+  params: Promise<{ subdomain: string }>;
+}) {
   const router = useRouter();
+  const { subdomain } = use(params);
+  const { isDark } = useTheme();
 
   const [grants, setGrants] = useState<any[]>([]);
   const [memberships, setMemberships] = useState<any[]>([]);
@@ -47,7 +55,7 @@ export default function AccessGrantsPage() {
       if (resMods.ok) setModules(dataMods.modules || []);
       if (resRoles.ok) setRoles(dataRoles.roles || []);
       if (resOutlets.ok) setOutlets(dataOutlets.outlets || []);
-    } catch (e) {
+    } catch {
       setError("Network error loading access grants");
     } finally {
       setLoading(false);
@@ -67,7 +75,12 @@ export default function AccessGrantsPage() {
       const res = await fetch("/api/restaurant/access-grants", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          membershipId: formData.membershipId,
+          moduleId: formData.moduleId || undefined,
+          roleId: formData.roleId || undefined,
+          outletId: formData.outletId || undefined,
+        }),
       });
 
       const data = await res.json();
@@ -77,7 +90,7 @@ export default function AccessGrantsPage() {
       setFormData({ membershipId: "", moduleId: "", roleId: "", outletId: "" });
       fetchData();
     } catch (err: any) {
-      setError(err.message || "Error creating grant");
+      setError(err.message || "Error creating access grant");
     } finally {
       setSaving(false);
     }
@@ -85,112 +98,209 @@ export default function AccessGrantsPage() {
 
   const handleRevokeGrant = async (grantId: string) => {
     if (!confirm("Are you sure you want to revoke this access grant?")) return;
-
     try {
-      const res = await fetch(`/api/restaurant/access-grants?grantId=${grantId}`, {
+      const res = await fetch(`/api/restaurant/access-grants?id=${grantId}`, {
         method: "DELETE",
       });
       if (res.ok) fetchData();
-    } catch (e) {
-      console.error(e);
+    } catch {
+      setError("Failed to revoke grant");
     }
   };
 
-  return (
-    <div className="w-full min-h-screen bg-slate-950 text-slate-100">
-      <main className="max-w-7xl mx-auto p-6 md:p-8 space-y-8 font-sans">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <button onClick={() => router.back()} className="text-xs text-blue-400 hover:text-blue-300 mb-2 cursor-pointer">
-            &larr; Back to Dashboard
-          </button>
-          <h2 className="text-3xl font-extrabold text-white">Module Access Grants</h2>
-          <p className="text-sm text-slate-400 mt-1">Assign module-level roles and outlet restrictions to user memberships.</p>
-        </div>
-        <button
-          onClick={() => { setError(""); setShowModal(true); }}
-          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-lg transition-all cursor-pointer shadow-lg"
-        >
-          + Create Access Grant
-        </button>
+  if (loading) {
+    return (
+      <div
+        className={`min-h-screen flex flex-col items-center justify-center font-sans antialiased ${
+          isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+        }`}
+      >
+        <div className="w-8 h-8 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-xs font-medium">Loading Access Grants...</p>
       </div>
+    );
+  }
 
-      {error && (
-        <div className="bg-red-950/50 border border-red-800 text-red-200 text-sm px-4 py-3 rounded-lg text-center font-medium">
-          {error}
-        </div>
-      )}
+  return (
+    <div
+      className={`min-h-screen font-sans antialiased transition-colors duration-200 flex flex-col ${
+        isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+      }`}
+    >
+      <RestaurantNavbar activeSection="Access Grants" />
 
-      {loading ? (
-        <div className="text-slate-500 py-12 text-center">Loading access grants...</div>
-      ) : grants.length === 0 ? (
-        <div className="text-slate-500 py-16 text-center border border-dashed border-slate-800 rounded-2xl">
-          No access grants active. Click &quot;Create Access Grant&quot; to assign access.
-        </div>
-      ) : (
-        <div className="bg-slate-900/20 border border-slate-900 rounded-2xl overflow-hidden shadow-xl">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-900/50 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-900">
-                <th className="p-4">User / Member</th>
-                <th className="p-4">Module</th>
-                <th className="p-4">Assigned Role</th>
-                <th className="p-4">Outlet Scope</th>
-                <th className="p-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-900 text-sm">
-              {grants.map((g) => (
-                <tr key={g.id} className="hover:bg-slate-900/10">
-                  <td className="p-4 text-white font-semibold">
-                    {g.membership?.user?.email}
-                    {g.membership?.employee && (
-                      <span className="block text-xs text-slate-400 font-normal">
-                        {g.membership.employee.firstName} {g.membership.employee.lastName}
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-4">
-                    <span className="text-xs px-2.5 py-1 rounded bg-blue-950 text-blue-300 border border-blue-800 font-mono">
-                      {g.module?.name || g.moduleId}
-                    </span>
-                  </td>
-                  <td className="p-4 text-slate-200 font-medium">{g.role?.name}</td>
-                  <td className="p-4 text-slate-400 text-xs">{g.outlet?.name || "Restaurant-Wide"}</td>
-                  <td className="p-4 text-right">
-                    <button
-                      onClick={() => handleRevokeGrant(g.id)}
-                      className="px-3 py-1 bg-red-950 hover:bg-red-900 border border-red-800 text-red-200 text-xs font-semibold rounded cursor-pointer"
-                    >
-                      Revoke
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Executive Header Banner */}
+        <div
+          className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+            isDark
+              ? "bg-[#121622]/60 border-white/[0.06]"
+              : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
+          }`}
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push(`/restaurant/${subdomain}/dashboard`)}
+                className={`text-xs font-medium transition cursor-pointer ${
+                  isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                ← Dashboard
+              </button>
+              <span className={`text-xs ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
+              <span className="w-2 h-2 rounded-full bg-[#0071E3]" />
+              <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                Administration
+              </span>
+            </div>
 
-      {/* Creation Modal */}
+            <h1 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+              User Access Grants & Scopes
+            </h1>
+            <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Manage fine-grained module authorizations and branch outlet scoping per user membership.
+            </p>
+          </div>
+
+          <button
+            onClick={() => {
+              setError("");
+              setShowModal(true);
+            }}
+            className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
+          >
+            + New Access Grant
+          </button>
+        </div>
+
+        {error && (
+          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl">
+            {error}
+          </div>
+        )}
+
+        {/* Access Grants Table */}
+        <div
+          className={`p-6 rounded-3xl border transition space-y-4 ${
+            isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+          }`}
+        >
+          <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+            Configured Access Grants ({grants.length})
+          </h2>
+
+          {grants.length === 0 ? (
+            <div className={`p-12 text-center text-xs space-y-1 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+              <p className="font-semibold text-sm">No access grants configured</p>
+              <p className="opacity-75">Click &quot;+ New Access Grant&quot; to assign custom role or module scopes.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className={`border-b text-[11px] font-semibold uppercase tracking-wider ${
+                    isDark ? "border-white/[0.06] text-[#8F95A3]" : "border-slate-200 text-slate-500"
+                  }`}>
+                    <th className="pb-3 px-3">User / Staff</th>
+                    <th className="pb-3 px-3">Module Scope</th>
+                    <th className="pb-3 px-3">Role Assigned</th>
+                    <th className="pb-3 px-3">Outlet Scope</th>
+                    <th className="pb-3 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
+                  {grants.map((g) => (
+                    <tr key={g.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition">
+                      <td className="py-3 px-3">
+                        <span className={`font-semibold block ${isDark ? "text-white" : "text-slate-900"}`}>
+                          {g.membership?.user?.email || "Unknown User"}
+                        </span>
+                        {g.membership?.employee && (
+                          <span className={`text-[10px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                            {g.membership.employee.firstName} {g.membership.employee.lastName}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3">
+                        {g.module ? (
+                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded border ${
+                            isDark ? "bg-white/[0.04] text-[#BAC0CD] border-white/[0.08]" : "bg-slate-100 text-slate-700 border-slate-200"
+                          }`}>
+                            {g.module.name}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">All Modules</span>
+                        )}
+                      </td>
+                      <td className={`py-3 px-3 font-medium ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+                        {g.role?.name || "Global Entitlement"}
+                      </td>
+                      <td className="py-3 px-3">
+                        {g.outlet ? (
+                          <span className={`text-[10px] px-2 py-0.5 rounded border ${
+                            isDark ? "bg-blue-500/10 text-blue-300 border-blue-500/20" : "bg-blue-50 text-blue-800 border-blue-200"
+                          }`}>
+                            {g.outlet.name}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">All Outlets</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <button
+                          onClick={() => handleRevokeGrant(g.id)}
+                          className="text-xs text-rose-500 hover:underline cursor-pointer font-medium"
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* New Grant Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md p-6 rounded-2xl space-y-6 shadow-2xl">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div
+            className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
+              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
             <div className="flex justify-between items-center">
-              <h3 className="text-xl font-bold text-white">Create Access Grant</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white cursor-pointer">&times;</button>
+              <div>
+                <h2 className="text-base font-bold tracking-tight">Create Access Grant</h2>
+                <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Bind a user to a specific module, role, or outlet.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-base cursor-pointer"
+              >
+                ✕
+              </button>
             </div>
 
             <form onSubmit={handleCreateGrant} className="space-y-4">
               <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase block mb-1">Select User Membership *</label>
+                <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                  User Membership *
+                </label>
                 <select
                   required
                   value={formData.membershipId}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, membershipId: e.target.value }))}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-800 bg-slate-950 text-white text-sm"
+                  onChange={(e) => setFormData({ ...formData, membershipId: e.target.value })}
+                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                    isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                  }`}
                 >
-                  <option value="">Select membership...</option>
+                  <option value="">Select User...</option>
                   {memberships.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.user.email} {m.employee ? `(${m.employee.firstName} ${m.employee.lastName})` : ""}
@@ -200,70 +310,87 @@ export default function AccessGrantsPage() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase block mb-1">Entitled Module *</label>
+                <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                  Module Scope (Optional)
+                </label>
                 <select
-                  required
                   value={formData.moduleId}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, moduleId: e.target.value }))}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-800 bg-slate-950 text-white text-sm"
+                  onChange={(e) => setFormData({ ...formData, moduleId: e.target.value })}
+                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                    isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                  }`}
                 >
-                  <option value="">Select entitled module...</option>
+                  <option value="">All Enabled Modules</option>
                   {modules.map((mod) => (
-                    <option key={mod.key} value={mod.key}>{mod.name}</option>
+                    <option key={mod.id} value={mod.id}>
+                      {mod.name}
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase block mb-1">Role *</label>
+                <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                  Role Scope (Optional)
+                </label>
                 <select
-                  required
                   value={formData.roleId}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, roleId: e.target.value }))}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-800 bg-slate-950 text-white text-sm"
+                  onChange={(e) => setFormData({ ...formData, roleId: e.target.value })}
+                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                    isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                  }`}
                 >
-                  <option value="">Select role...</option>
+                  <option value="">Default Permissions</option>
                   {roles.map((r) => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase block mb-1">Outlet Scope (Optional)</label>
+                <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                  Outlet Scope (Optional)
+                </label>
                 <select
                   value={formData.outletId}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, outletId: e.target.value }))}
-                  className="w-full px-4 py-2.5 rounded-lg border border-slate-800 bg-slate-950 text-white text-sm"
+                  onChange={(e) => setFormData({ ...formData, outletId: e.target.value })}
+                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                    isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                  }`}
                 >
-                  <option value="">All Outlets (Restaurant-Wide)</option>
+                  <option value="">All Outlets (Global)</option>
                   {outlets.map((o) => (
-                    <option key={o.id} value={o.id}>{o.name}</option>
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
                   ))}
                 </select>
               </div>
 
-              <div className="pt-4 flex justify-end space-x-3">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-sm text-slate-400 hover:text-white cursor-pointer"
+                  className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                    isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
+                  }`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
                 >
-                  {saving ? "Creating..." : "Create Access Grant"}
+                  {saving ? "Granting..." : "Create Grant"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </main>
-  </div>
-);
+    </div>
+  );
 }

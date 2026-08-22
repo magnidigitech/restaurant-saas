@@ -57,6 +57,32 @@ model Restaurant {
   vendors              Vendor[]
   purchaseOrders       PurchaseOrder[]
   vendorItems          VendorItem[]
+  shiftTemplates       ShiftTemplate[]
+  shiftRosters         ShiftRoster[]
+  shiftAssignments     ShiftAssignment[]
+  shiftAvailabilities  ShiftAvailability[]
+  rosterDateAvailabilities  RosterDateAvailability[]
+  rosterEmployeeSubmissions RosterEmployeeSubmission[]
+  shiftSwaps           ShiftSwapRequest[]
+  salaryStructures     SalaryStructure[]
+  payrollRuns          PayrollRun[]
+  payslips             Payslip[]
+  recipes              Recipe[]
+  posOrders            PosOrder[]
+  vaultFolders         VaultFolder[]
+  vaultItems           VaultItem[]
+  vaultAuditLogs       VaultAuditLog[]
+  attendanceRecords    AttendanceRecord[]
+  timePunches          TimePunch[]
+  leaveRequests        LeaveRequest[]
+  tipPoolRules         TipPoolRule[]
+  tipPoolRuns          TipPoolRun[]
+  financialTransactions FinancialTransaction[]
+  upcomingBills        UpcomingBill[]
+  checklistTemplates   ShiftChecklistTemplate[]
+  checklistExecutions  ShiftChecklistExecution[]
+  cateringOrders       CateringOrder[]
+  cateringPackages     CateringPackage[]
 
   @@map("restaurants")
 }
@@ -126,6 +152,16 @@ model RestaurantOutlet {
   stockLedger       StockLedger[]
   wastageLogs       WastageLog[]
   purchaseOrders    PurchaseOrder[]
+  shiftRosters      ShiftRoster[]
+  shiftAssignments  ShiftAssignment[]
+  payrollRuns          PayrollRun[]
+  posOrders            PosOrder[]
+  attendanceRecords    AttendanceRecord[]
+  timePunches          TimePunch[]
+  financialTransactions FinancialTransaction[]
+  upcomingBills        UpcomingBill[]
+  checklistExecutions  ShiftChecklistExecution[]
+  cateringOrders       CateringOrder[]
 
   @@index([restaurantId])
   @@map("restaurant_outlets")
@@ -145,7 +181,11 @@ model User {
   tokenVersion Int      @default(0) @map("token_version")
 
   // Relations
-  memberships RestaurantMembership[]
+  memberships              RestaurantMembership[]
+  vaultProfiles            UserVaultProfile[]
+  vaultItemsCreated        VaultItem[]            @relation("VaultItemAuthor")
+  vaultItemSharesReceived  VaultItemShare[]       @relation("VaultShareRecipient")
+  vaultAuditLogs           VaultAuditLog[]
 
   @@map("users")
 }
@@ -238,8 +278,9 @@ model Role {
   // Relations
   restaurant   Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   permissions  RolePermission[]
-  accessGrants AccessGrant[]
-  invitations  StaffInvitation[]
+  accessGrants    AccessGrant[]
+  invitations     StaffInvitation[]
+  vaultItemShares VaultItemShare[]
 
   @@unique([restaurantId, name])
   @@index([restaurantId])
@@ -417,7 +458,9 @@ model Department {
 
   // Relations
   restaurant        Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  employmentRecords EmploymentRecord[]
+  employmentRecords  EmploymentRecord[]
+  vaultItemShares    VaultItemShare[]
+  checklistTemplates ShiftChecklistTemplate[]
 
   @@unique([restaurantId, code])
   @@unique([restaurantId, name])
@@ -477,7 +520,8 @@ model CostCenter {
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  restaurant            Restaurant             @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  financialTransactions FinancialTransaction[]
 
   @@unique([restaurantId, code])
   @@index([restaurantId])
@@ -498,19 +542,35 @@ model Employee {
   joiningDate     DateTime     @map("joining_date")
   profilePhotoUrl String?      @map("profile_photo_url")
   workerType      WorkerType   @default(FULL_TIME) @map("worker_type")
-  archivedAt      DateTime?    @map("archived_at")
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
+  weeklyHoursLimit Float?      @map("weekly_hours_limit")
+  kioskPin         String?      @map("kiosk_pin") // 4-digit PIN for tablet kiosk punch
+  archivedAt       DateTime?    @map("archived_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
 
   // Relations
-  restaurant        Restaurant                 @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  employmentRecords EmploymentRecord[]         @relation("EmployeeHistory")
-  managedRecords    EmploymentRecord[]         @relation("ReportingManager")
-  outletAssignments EmployeeOutletAssignment[]
-  emergencyContacts EmployeeEmergencyContact[]
-  documents         EmployeeDocument[]
-  memberships       RestaurantMembership[]
-  onboardings       EmployeeOnboarding[]
+  restaurant                Restaurant                 @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  employmentRecords         EmploymentRecord[]         @relation("EmployeeHistory")
+  managedRecords            EmploymentRecord[]         @relation("ReportingManager")
+  outletAssignments         EmployeeOutletAssignment[]
+  emergencyContacts         EmployeeEmergencyContact[]
+  documents                 EmployeeDocument[]
+  memberships               RestaurantMembership[]
+  onboardings               EmployeeOnboarding[]
+  shiftAssignments          ShiftAssignment[]
+  shiftAvailabilities       ShiftAvailability[]
+  rosterDateAvailabilities  RosterDateAvailability[]
+  rosterEmployeeSubmissions RosterEmployeeSubmission[]
+  shiftSwapRequestsMade     ShiftSwapRequest[]         @relation("SwapRequester")
+  shiftSwapRequestsReceived ShiftSwapRequest[]        @relation("SwapTarget")
+  salaryStructures          SalaryStructure[]
+  payslips                  Payslip[]
+  attendanceRecords         AttendanceRecord[]
+  timePunches               TimePunch[]
+  leaveRequests             LeaveRequest[]
+  assignedChecklists        ShiftChecklistExecution[]     @relation("AssignedStaff")
+  verifiedChecklists        ShiftChecklistExecution[]     @relation("VerifiedBySupervisor")
+  completedChecklistItems   ShiftChecklistItemExecution[] @relation("CompletedByStaff")
 
   @@unique([restaurantId, employeeCode])
   @@index([restaurantId])
@@ -842,6 +902,7 @@ model InventoryItem {
   wastageLogs  WastageLog[]
   poItems      PurchaseOrderItem[]
   vendorItems  VendorItem[]
+  recipeItems  RecipeItem[]
 
   @@unique([restaurantId, name])
   @@index([restaurantId])
@@ -917,12 +978,28 @@ enum WastageReason {
 }
 
 enum UnitOfMeasure {
+  // Weight Units
   KG
   G
+  LB
+  OZ
+
+  // Volume & Kitchen Culinary Units
   L
   ML
+  GAL
+  QT
+  PT
+  CUP
+  FL_OZ
+  TBSP
+  TSP
+  LADLE
+
+  // Count & Portions
   PIECES
   DOZEN
+  PORTION
   BOX
   PACKET
 }
@@ -1049,3 +1126,1329 @@ model VendorItem {
   @@index([itemId])
   @@map("inventory_vendor_items")
 }
+
+// ----------------------------------------------------
+// 9. Phase 4: Shift Management Entities
+// ----------------------------------------------------
+
+model ShiftTemplate {
+  id           String    @id @default(uuid())
+  restaurantId String    @map("restaurant_id")
+  name         String
+  startTime    String    @map("start_time")
+  endTime      String    @map("end_time")
+  breakMinutes Int       @default(0) @map("break_minutes")
+  color        String    @default("#3b82f6")
+  status       String    @default("ACTIVE")
+  archivedAt   DateTime? @map("archived_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant  Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  assignments ShiftAssignment[]
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId])
+  @@map("shift_templates")
+}
+
+model ShiftRoster {
+  id                   String       @id @default(uuid())
+  restaurantId         String       @map("restaurant_id")
+  outletId             String       @map("outlet_id")
+  name                 String
+  startDate            DateTime     @map("start_date")
+  endDate              DateTime     @map("end_date")
+  availabilityDeadline DateTime?    @map("availability_deadline")
+  departments          Json?        @map("departments")
+  status               RosterStatus @default(DRAFT)
+  publishedAt          DateTime?    @map("published_at")
+  publishedBy          String?      @map("published_by")
+  notes                String?
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant          Restaurant                 @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet              RestaurantOutlet           @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  assignments         ShiftAssignment[]
+  dateAvailabilities  RosterDateAvailability[]
+  employeeSubmissions RosterEmployeeSubmission[]
+
+  @@index([restaurantId])
+  @@index([outletId])
+  @@map("shift_rosters")
+}
+
+enum RosterStatus {
+  DRAFT
+  AVAILABILITY_OPEN
+  AVAILABILITY_LOCKED
+  ASSIGNMENT_IN_PROGRESS
+  PUBLISHED
+  COMPLETED
+  ARCHIVED
+}
+
+model ShiftAssignment {
+  id           String                @id @default(uuid())
+  restaurantId String                @map("restaurant_id")
+  rosterId     String?               @map("roster_id")
+  templateId   String?               @map("template_id")
+  employeeId   String                @map("employee_id")
+  outletId     String                @map("outlet_id")
+  shiftDate    DateTime              @map("shift_date")
+  startTime    String                @map("start_time")
+  endTime      String                @map("end_time")
+  breakMinutes Int                   @default(0) @map("break_minutes")
+  status       ShiftAssignmentStatus @default(SCHEDULED)
+  notes        String?
+  createdAt    DateTime              @default(now()) @map("created_at")
+  updatedAt    DateTime              @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant           Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  roster               ShiftRoster?       @relation(fields: [rosterId], references: [id], onDelete: SetNull)
+  template             ShiftTemplate?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  employee             Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  outlet               RestaurantOutlet   @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  swapRequestsMade     ShiftSwapRequest[] @relation("RequesterAssignment")
+  swapRequestsTargeted ShiftSwapRequest[] @relation("TargetAssignment")
+  attendanceRecord     AttendanceRecord?
+
+  @@index([restaurantId])
+  @@index([rosterId])
+  @@index([employeeId])
+  @@index([outletId])
+  @@index([shiftDate])
+  @@map("shift_assignments")
+}
+
+enum ShiftAssignmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model ShiftAvailability {
+  id                 String    @id @default(uuid())
+  restaurantId       String    @map("restaurant_id")
+  employeeId         String    @map("employee_id")
+  dayOfWeek          Int       @map("day_of_week")
+  isAvailable        Boolean   @default(true) @map("is_available")
+  preferredStartTime String?   @map("preferred_start_time")
+  preferredEndTime   String?   @map("preferred_end_time")
+  notes              String?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, dayOfWeek])
+  @@index([restaurantId])
+  @@index([employeeId])
+  @@map("shift_availabilities")
+}
+
+enum DateAvailabilityType {
+  AVAILABLE
+  NOT_AVAILABLE
+  SPECIFIC_TIME
+  LEAVE
+}
+
+model RosterDateAvailability {
+  id                 String               @id @default(uuid())
+  restaurantId       String               @map("restaurant_id")
+  rosterId           String               @map("roster_id")
+  employeeId         String               @map("employee_id")
+  date               DateTime             @map("date")
+  type               DateAvailabilityType @default(AVAILABLE)
+  availableFrom      String?              @map("available_from")
+  availableUntil     String?              @map("available_until")
+  notes              String?
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  roster     ShiftRoster @relation(fields: [rosterId], references: [id], onDelete: Cascade)
+  employee   Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([rosterId, employeeId, date])
+  @@index([restaurantId])
+  @@index([rosterId])
+  @@index([employeeId])
+  @@index([date])
+  @@map("roster_date_availabilities")
+}
+
+enum AvailabilitySubmissionStatus {
+  DRAFT
+  SUBMITTED
+  LOCKED
+}
+
+model RosterEmployeeSubmission {
+  id           String                       @id @default(uuid())
+  restaurantId String                       @map("restaurant_id")
+  rosterId     String                       @map("roster_id")
+  employeeId   String                       @map("employee_id")
+  status       AvailabilitySubmissionStatus @default(DRAFT)
+  submittedAt  DateTime?                    @map("submitted_at")
+  notes        String?
+  createdAt    DateTime                     @default(now()) @map("created_at")
+  updatedAt    DateTime                     @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  roster     ShiftRoster @relation(fields: [rosterId], references: [id], onDelete: Cascade)
+  employee   Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([rosterId, employeeId])
+  @@index([restaurantId])
+  @@index([rosterId])
+  @@index([employeeId])
+  @@map("roster_employee_submissions")
+}
+
+model ShiftSwapRequest {
+  id                  String            @id @default(uuid())
+  restaurantId        String            @map("restaurant_id")
+  assignmentId        String            @map("assignment_id")
+  requesterEmployeeId String            @map("requester_employee_id")
+  targetEmployeeId    String?           @map("target_employee_id")
+  targetAssignmentId  String?           @map("target_assignment_id")
+  status              SwapRequestStatus @default(PENDING)
+  reason              String?
+  reviewNotes         String?           @map("review_notes")
+  reviewedBy          String?           @map("reviewed_by")
+  reviewedAt          DateTime?         @map("reviewed_at")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant          Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  requesterAssignment ShiftAssignment  @relation("RequesterAssignment", fields: [assignmentId], references: [id], onDelete: Cascade)
+  targetAssignment    ShiftAssignment? @relation("TargetAssignment", fields: [targetAssignmentId], references: [id], onDelete: SetNull)
+  requesterEmployee   Employee         @relation("SwapRequester", fields: [requesterEmployeeId], references: [id], onDelete: Cascade)
+  targetEmployee      Employee?        @relation("SwapTarget", fields: [targetEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId])
+  @@index([assignmentId])
+  @@index([requesterEmployeeId])
+  @@index([targetEmployeeId])
+  @@map("shift_swap_requests")
+}
+
+enum SwapRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+// ----------------------------------------------------
+// 10. Phase 4: Payroll Entities
+// ----------------------------------------------------
+
+model SalaryStructure {
+  id             String       @id @default(uuid())
+  restaurantId   String       @map("restaurant_id")
+  employeeId     String       @map("employee_id")
+  payFrequency   PayFrequency @default(MONTHLY) @map("pay_frequency")
+  currency       String       @default("USD")
+  baseSalary     Decimal      @default(0) @map("base_salary")
+  hourlyRate     Decimal      @default(0) @map("hourly_rate")
+  allowancesJson String?      @map("allowances_json")
+  deductionsJson String?      @map("deductions_json")
+  effectiveFrom  DateTime     @default(now()) @map("effective_from")
+  effectiveTo    DateTime?    @map("effective_to")
+  status         String       @default("ACTIVE")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([employeeId])
+  @@map("payroll_salary_structures")
+}
+
+enum PayFrequency {
+  MONTHLY
+  BI_WEEKLY
+  WEEKLY
+  HOURLY
+}
+
+model PayrollRun {
+  id              String           @id @default(uuid())
+  restaurantId    String           @map("restaurant_id")
+  outletId        String?          @map("outlet_id")
+  title           String
+  periodStart     DateTime         @map("period_start")
+  periodEnd       DateTime         @map("period_end")
+  paymentDate     DateTime         @map("payment_date")
+  status          PayrollRunStatus @default(DRAFT)
+  totalGross      Decimal          @default(0) @map("total_gross")
+  totalAllowances Decimal          @default(0) @map("total_allowances")
+  totalDeductions Decimal          @default(0) @map("total_deductions")
+  totalNet        Decimal          @default(0) @map("total_net")
+  processedBy     String?          @map("processed_by")
+  approvedBy      String?          @map("approved_by")
+  approvedAt      DateTime?        @map("approved_at")
+  notes           String?
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant  Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet      RestaurantOutlet? @relation(fields: [outletId], references: [id], onDelete: SetNull)
+  payslips    Payslip[]
+  tipPoolRuns TipPoolRun[]
+
+  @@index([restaurantId])
+  @@index([outletId])
+  @@map("payroll_runs")
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  CALCULATING
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+model Payslip {
+  id                 String        @id @default(uuid())
+  restaurantId       String        @map("restaurant_id")
+  payrollRunId       String        @map("payroll_run_id")
+  employeeId         String        @map("employee_id")
+  periodStart        DateTime      @map("period_start")
+  periodEnd          DateTime      @map("period_end")
+  currency           String        @default("USD")
+  hoursWorked        Decimal       @default(0) @map("hours_worked")
+  overtimeHours      Decimal       @default(0) @map("overtime_hours")
+  pooledTipsAmount   Decimal       @default(0) @map("pooled_tips_amount")
+  timesheetSyncCount Int           @default(0) @map("timesheet_sync_count")
+  basePay            Decimal       @default(0) @map("base_pay")
+  totalAllowances    Decimal       @default(0) @map("total_allowances")
+  totalDeductions    Decimal       @default(0) @map("total_deductions")
+  netPay             Decimal       @default(0) @map("net_pay")
+  status             PayslipStatus @default(DRAFT)
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  payrollRun PayrollRun         @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employee   Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  earnings   PayrollEarning[]
+  deductions PayrollDeduction[]
+  payments   PayrollPayment[]
+
+  @@unique([payrollRunId, employeeId])
+  @@index([restaurantId])
+  @@index([payrollRunId])
+  @@index([employeeId])
+  @@map("payroll_payslips")
+}
+
+enum PayslipStatus {
+  DRAFT
+  GENERATED
+  PAID
+}
+
+model PayrollEarning {
+  id        String      @id @default(uuid())
+  payslipId String      @map("payslip_id")
+  name      String
+  amount    Decimal
+  type      EarningType @default(BASE)
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  payslip Payslip @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+
+  @@index([payslipId])
+  @@map("payroll_earnings")
+}
+
+enum EarningType {
+  BASE
+  OVERTIME
+  BONUS
+  ALLOWANCE
+  COMMISSION
+  TIPS
+  OTHER
+}
+
+model PayrollDeduction {
+  id        String        @id @default(uuid())
+  payslipId String        @map("payslip_id")
+  name      String
+  amount    Decimal
+  type      DeductionType @default(TAX)
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  payslip Payslip @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+
+  @@index([payslipId])
+  @@map("payroll_deductions")
+}
+
+enum DeductionType {
+  TAX
+  RETIREMENT
+  HEALTH
+  UNPAID_LEAVE
+  LOAN
+  OTHER
+}
+
+model PayrollPayment {
+  id                   String        @id @default(uuid())
+  payslipId            String        @map("payslip_id")
+  amount               Decimal
+  paymentMethod        PaymentMethod @default(BANK_TRANSFER) @map("payment_method")
+  transactionReference String?       @map("transaction_reference")
+  paidAt               DateTime      @default(now()) @map("paid_at")
+  status               PaymentStatus @default(COMPLETED)
+  notes                String?
+  createdAt            DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  payslip Payslip @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+
+  @@index([payslipId])
+  @@map("payroll_payments")
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  CHECK
+  CASH
+  DIRECT_DEPOSIT
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+// ----------------------------------------------------
+// 8. Recipe Management & POS Depletion Engine
+// ----------------------------------------------------
+
+enum RecipeType {
+  DISH
+  SUB_RECIPE
+}
+
+enum RecipeComponentType {
+  INVENTORY_ITEM
+  SUB_RECIPE
+}
+
+model Recipe {
+  id                 String        @id @default(uuid())
+  restaurantId       String        @map("restaurant_id")
+  name               String
+  type               RecipeType    @default(DISH)
+  description        String?
+  yieldQuantity      Decimal       @default(1) @map("yield_quantity")
+  yieldUnit          UnitOfMeasure @default(PIECES) @map("yield_unit")
+  servingSize        String?       @map("serving_size")
+  prepTimeMin        Int?          @map("prep_time_min")
+  sellingPrice       Decimal       @default(0) @map("selling_price")
+  costPerUnit        Decimal       @default(0) @map("cost_per_unit")
+  totalCost          Decimal       @default(0) @map("total_cost")
+  grossMarginPercent Decimal       @default(0) @map("gross_margin_percent")
+  archivedAt         DateTime?     @map("archived_at")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant         Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  items              RecipeItem[]   @relation("ParentRecipe")
+  usedInRecipeItems  RecipeItem[]   @relation("ComponentSubRecipe")
+  posOrderItems      PosOrderItem[]
+  cateringOrderItems CateringOrderItem[]
+  cateringPackageItems CateringPackageItem[]
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId])
+  @@map("recipes")
+}
+
+model RecipeItem {
+  id              String              @id @default(uuid())
+  recipeId        String              @map("recipe_id")
+  componentType   RecipeComponentType @default(INVENTORY_ITEM) @map("component_type")
+  inventoryItemId String?             @map("inventory_item_id")
+  subRecipeId     String?             @map("sub_recipe_id")
+  quantity        Decimal
+  unitOfMeasure   UnitOfMeasure       @map("unit_of_measure")
+  wastagePercent  Decimal             @default(0) @map("wastage_percent")
+  unitCost        Decimal             @default(0) @map("unit_cost")
+  totalCost       Decimal             @default(0) @map("total_cost")
+  notes           String?
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  recipe        Recipe         @relation("ParentRecipe", fields: [recipeId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  subRecipe     Recipe?        @relation("ComponentSubRecipe", fields: [subRecipeId], references: [id], onDelete: Cascade)
+
+  @@index([recipeId])
+  @@index([inventoryItemId])
+  @@index([subRecipeId])
+  @@map("recipe_items")
+}
+
+enum PosOrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+}
+
+enum PosOrderStatus {
+  PENDING
+  PREPARING
+  COMPLETED
+  CANCELLED
+}
+
+enum PosPaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+}
+
+model PosOrder {
+  id             String           @id @default(uuid())
+  restaurantId   String           @map("restaurant_id")
+  outletId       String           @map("outlet_id")
+  orderNumber    String           @map("order_number")
+  tableNumber    String?          @map("table_number")
+  orderType      PosOrderType     @default(DINE_IN) @map("order_type")
+  status         PosOrderStatus   @default(COMPLETED)
+  totalAmount    Decimal          @map("total_amount")
+  taxAmount      Decimal          @default(0) @map("tax_amount")
+  discountAmount Decimal          @default(0) @map("discount_amount")
+  finalAmount    Decimal          @map("final_amount")
+  paymentStatus  PosPaymentStatus @default(PAID) @map("payment_status")
+  paymentMethod  String?          @map("payment_method")
+  depletedAt     DateTime?        @map("depleted_at")
+  notes          String?
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant     Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet         RestaurantOutlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  items          PosOrderItem[]
+
+  @@index([restaurantId])
+  @@index([outletId])
+  @@index([orderNumber])
+  @@map("pos_orders")
+}
+
+model PosOrderItem {
+  id         String   @id @default(uuid())
+  orderId    String   @map("order_id")
+  recipeId   String?  @map("recipe_id")
+  name       String
+  quantity   Int      @default(1)
+  unitPrice  Decimal  @map("unit_price")
+  totalPrice Decimal  @map("total_price")
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  order      PosOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  recipe     Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([recipeId])
+  @@map("pos_order_items")
+}
+
+// ----------------------------------------------------
+// 9. Enterprise Zero-Knowledge Password & Secret Vault
+// ----------------------------------------------------
+
+enum VaultItemType {
+  LOGIN
+  SECURE_NOTE
+  SOFTWARE_LICENSE
+  API_KEY
+  CREDIT_CARD
+}
+
+enum VaultSharePermission {
+  READ_ONLY
+  AUTOFILL_ONLY
+  CAN_EDIT
+  FULL_CONTROL
+}
+
+enum VaultAuditAction {
+  VAULT_UNLOCKED
+  ITEM_CREATED
+  ITEM_VIEWED
+  ITEM_COPIED_PASSWORD
+  ITEM_COPIED_USERNAME
+  ITEM_UPDATED
+  ITEM_SHARED
+  ITEM_SHARE_REVOKED
+  ITEM_ARCHIVED
+  ITEM_DELETED
+}
+
+model UserVaultProfile {
+  id               String   @id @default(uuid())
+  userId           String   @map("user_id")
+  masterSalt       String   @map("master_salt") // Hex/Base64 salt for PBKDF2
+  keyVerifierHash  String   @map("key_verifier_hash") // Verifier to check correct master password client-side
+  encryptedMasterKey String? @map("encrypted_master_key")
+  publicKeyPem     String?  @map("public_key_pem") // For asymmetric team secret sharing
+  encryptedPrivKey String?  @map("encrypted_priv_key")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId])
+  @@map("user_vault_profiles")
+}
+
+model VaultFolder {
+  id           String   @id @default(uuid())
+  restaurantId String   @map("restaurant_id")
+  name         String
+  description  String?
+  icon         String?  @default("folder")
+  color        String?  @default("#0071E3")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  items      VaultItem[]
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId])
+  @@map("vault_folders")
+}
+
+model VaultItem {
+  id           String        @id @default(uuid())
+  restaurantId String        @map("restaurant_id")
+  authorId     String        @map("author_id")
+  folderId     String?       @map("folder_id")
+  title        String
+  itemType     VaultItemType @default(LOGIN) @map("item_type")
+  websiteUrl   String?       @map("website_url")
+  
+  // Zero-Knowledge Encrypted Payload
+  encryptedData String       @map("encrypted_data") // Base64 ciphertext containing username, password, notes, TOTP seed, etc.
+  iv            String       // Base64 Initialization Vector (12 bytes)
+  authTag       String       @map("auth_tag") // Base64 GCM Auth Tag (16 bytes)
+  
+  isFavorite    Boolean      @default(false) @map("is_favorite")
+  tags          String[]     @default([])
+  archivedAt    DateTime?    @map("archived_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  author     User             @relation("VaultItemAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  folder     VaultFolder?     @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  shares     VaultItemShare[]
+  auditLogs  VaultAuditLog[]
+
+  @@index([restaurantId])
+  @@index([authorId])
+  @@index([folderId])
+  @@map("vault_items")
+}
+
+model VaultItemShare {
+  id           String               @id @default(uuid())
+  vaultItemId  String               @map("vault_item_id")
+  recipientId  String?              @map("recipient_id")
+  roleId       String?              @map("role_id")
+  departmentId String?              @map("department_id")
+  permission   VaultSharePermission @default(READ_ONLY)
+  
+  // Re-encrypted secret payload for recipient (encrypted with recipient's public key)
+  encryptedKeyForRecipient String?  @map("encrypted_key_for_recipient")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+
+  // Relations
+  vaultItem    VaultItem   @relation(fields: [vaultItemId], references: [id], onDelete: Cascade)
+  recipient    User?       @relation("VaultShareRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  role         Role?       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@index([vaultItemId])
+  @@index([recipientId])
+  @@index([roleId])
+  @@index([departmentId])
+  @@map("vault_item_shares")
+}
+
+model VaultAuditLog {
+  id           String           @id @default(uuid())
+  restaurantId String           @map("restaurant_id")
+  userId       String           @map("user_id")
+  userEmail    String           @map("user_email")
+  vaultItemId  String?          @map("vault_item_id")
+  action       VaultAuditAction
+  details      String?
+  ipAddress    String?          @map("ip_address")
+  userAgent    String?          @map("user_agent")
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  // Relations
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vaultItem  VaultItem? @relation(fields: [vaultItemId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId])
+  @@index([userId])
+  @@index([vaultItemId])
+  @@map("vault_audit_logs")
+}
+
+// ----------------------------------------------------
+// 12. Staff Attendance, Time Tracking & Leave Entities
+// ----------------------------------------------------
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ON_BREAK
+  EARLY_DEPARTURE
+  HALF_DAY
+  ABSENT
+  ON_LEAVE
+}
+
+enum PunchType {
+  CLOCK_IN
+  CLOCK_OUT
+  BREAK_START
+  BREAK_END
+}
+
+enum LeaveType {
+  CASUAL
+  SICK
+  ANNUAL
+  UNPAID
+  MATERNITY_PATERNITY
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model AttendanceRecord {
+  id                String           @id @default(uuid())
+  restaurantId      String           @map("restaurant_id")
+  employeeId        String           @map("employee_id")
+  outletId          String           @map("outlet_id")
+  shiftAssignmentId String?          @unique @map("shift_assignment_id")
+  workDate          DateTime         @map("work_date") // Date of the work day (midnight UTC)
+  status            AttendanceStatus @default(PRESENT)
+  clockInTime       DateTime?        @map("clock_in_time")
+  clockOutTime      DateTime?        @map("clock_out_time")
+  totalWorkMinutes  Int              @default(0) @map("total_work_minutes")
+  totalBreakMinutes Int              @default(0) @map("total_break_minutes")
+  overtimeMinutes   Int              @default(0) @map("overtime_minutes")
+  lateMinutes       Int              @default(0) @map("late_minutes")
+  earlyExitMinutes  Int              @default(0) @map("early_exit_minutes")
+  isApproved        Boolean          @default(false) @map("is_approved")
+  approvedBy        String?          @map("approved_by")
+  approvedAt        DateTime?        @map("approved_at")
+  managerNotes      String?          @map("manager_notes")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant      Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  employee        Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  outlet          RestaurantOutlet  @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  shiftAssignment ShiftAssignment?  @relation(fields: [shiftAssignmentId], references: [id], onDelete: SetNull)
+  timePunches     TimePunch[]
+
+  @@unique([employeeId, workDate])
+  @@index([restaurantId])
+  @@index([employeeId])
+  @@index([outletId])
+  @@index([workDate])
+  @@index([status])
+  @@map("attendance_records")
+}
+
+model TimePunch {
+  id                 String           @id @default(uuid())
+  restaurantId       String           @map("restaurant_id")
+  employeeId         String           @map("employee_id")
+  outletId           String           @map("outlet_id")
+  attendanceRecordId String?          @map("attendance_record_id")
+  punchType          PunchType        @map("punch_type")
+  punchTime          DateTime         @default(now()) @map("punch_time")
+  latitude           Float?
+  longitude          Float?
+  ipAddress          String?          @map("ip_address")
+  deviceInfo         String?          @map("device_info") // e.g. "Kitchen iPad 01" / "Web Kiosk"
+  photoUrl           String?          @map("photo_url")
+  notes              String?
+  createdAt          DateTime         @default(now()) @map("created_at")
+
+  // Relations
+  restaurant       Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  employee         Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  outlet           RestaurantOutlet  @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  attendanceRecord AttendanceRecord? @relation(fields: [attendanceRecordId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([employeeId])
+  @@index([outletId])
+  @@index([attendanceRecordId])
+  @@index([punchTime])
+  @@map("time_punches")
+}
+
+model LeaveRequest {
+  id           String      @id @default(uuid())
+  restaurantId String      @map("restaurant_id")
+  employeeId   String      @map("employee_id")
+  leaveType    LeaveType   @map("leave_type")
+  startDate    DateTime    @map("start_date")
+  endDate      DateTime    @map("end_date")
+  totalDays    Float       @map("total_days")
+  status       LeaveStatus @default(PENDING)
+  reason       String
+  managerNotes String?     @map("manager_notes")
+  reviewedBy   String?     @map("reviewed_by")
+  reviewedAt   DateTime?   @map("reviewed_at")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([employeeId])
+  @@index([status])
+  @@index([startDate])
+  @@map("leave_requests")
+}
+
+// ----------------------------------------------------
+// 13. Tip Pooling & Distribution Entities
+// ----------------------------------------------------
+
+enum TipDistributionMethod {
+  HOURS_WORKED
+  EQUAL_SPLIT
+  ROLE_POINT_SYSTEM
+}
+
+model TipPoolRule {
+  id                 String                @id @default(uuid())
+  restaurantId       String                @map("restaurant_id")
+  name               String                @default("Standard Restaurant Pool")
+  fohPercentage      Float                 @default(70) @map("foh_percentage") // 70% FOH
+  bohPercentage      Float                 @default(30) @map("boh_percentage") // 30% BOH
+  distributionMethod TipDistributionMethod @default(HOURS_WORKED) @map("distribution_method")
+  rolePointsJson     Json?                 @map("role_points_json")
+  isActive           Boolean               @default(true) @map("is_active")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tipRuns    TipPoolRun[]
+
+  @@index([restaurantId])
+  @@map("tip_pool_rules")
+}
+
+model TipPoolRun {
+  id                 String       @id @default(uuid())
+  restaurantId       String       @map("restaurant_id")
+  payrollRunId       String?      @map("payroll_run_id")
+  ruleId             String?      @map("rule_id")
+  periodStart        DateTime     @map("period_start")
+  periodEnd          DateTime     @map("period_end")
+  totalCollectedTips Float        @map("total_collected_tips")
+  fohPoolAmount      Float        @map("foh_pool_amount")
+  bohPoolAmount      Float        @map("boh_pool_amount")
+  distributionsJson  Json         @map("distributions_json")
+  createdAt          DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  restaurant Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  payrollRun PayrollRun?  @relation(fields: [payrollRunId], references: [id], onDelete: SetNull)
+  rule       TipPoolRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId])
+  @@index([payrollRunId])
+  @@map("tip_pool_runs")
+}
+
+// ----------------------------------------------------
+// 14. Financial Accounting, Expenses & Revenue Ledger
+// ----------------------------------------------------
+
+enum TransactionType {
+  EXPENSE
+  REVENUE
+}
+
+enum FinancialCategory {
+  // 15 User Expense Categories
+  FOOD_BEVERAGE_SUPPLIERS
+  PACKAGING_CONSUMABLES
+  RENT_PROPERTY_LEASE
+  UTILITIES
+  STAFF_PAYROLL
+  EQUIPMENT_FINANCING_LEASE
+  MAINTENANCE_REPAIRS
+  CLEANING_HYGIENE
+  TAXES_LICENSES
+  SAAS_TECHNOLOGY
+  MARKETING_ADVERTISING
+  INSURANCE
+  BANKING_PAYMENT_PROCESSING
+  DELIVERY_LOGISTICS
+  OTHER_OPERATIONAL_EXPENSES
+
+  // Legacy/System expense categories
+  COGS_INVENTORY
+  PAYROLL_LABOR
+  RENT_OCCUPANCY
+  EQUIPMENT_MAINTENANCE
+  SOFTWARE_SUBSCRIPTION
+  WASTAGE
+  MISC_EXPENSE
+
+  // Revenue categories
+  POS_SALES
+  POS_DINE_IN
+  POS_TAKEAWAY
+  POS_DELIVERY
+  CATERING_EVENTS
+  THIRD_PARTY_DELIVERY
+  MERCHANDISE
+  REBATES_CREDITS
+  OTHER_INCOME
+}
+
+enum TransactionSource {
+  AUTOMATIC_POS
+  AUTOMATIC_PO
+  AUTOMATIC_PAYROLL
+  AUTOMATIC_WASTAGE
+  MANUAL_ENTRY
+}
+
+model FinancialTransaction {
+  id                String            @id @default(uuid())
+  restaurantId      String            @map("restaurant_id")
+  outletId          String?           @map("outlet_id")
+  costCenterId      String?           @map("cost_center_id")
+  type              TransactionType
+  category          FinancialCategory
+  source            TransactionSource @default(MANUAL_ENTRY)
+  sourceReferenceId String?           @map("source_reference_id")
+  title             String
+  description       String?
+  amount            Decimal
+  taxAmount         Decimal           @default(0) @map("tax_amount")
+  netAmount         Decimal           @default(0) @map("net_amount")
+  transactionDate   DateTime          @map("transaction_date")
+  vendorOrPayer     String?           @map("vendor_or_payer")
+  paymentMethod     String?           @map("payment_method")
+  receiptUrl        String?           @map("receipt_url")
+  isRecurring       Boolean           @default(false) @map("is_recurring")
+  createdBy         String?           @map("created_by")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet     RestaurantOutlet? @relation(fields: [outletId], references: [id], onDelete: SetNull)
+  costCenter CostCenter?       @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId])
+  @@index([outletId])
+  @@index([costCenterId])
+  @@index([transactionDate])
+  @@index([type])
+  @@index([category])
+  @@map("financial_transactions")
+}
+
+// ----------------------------------------------------
+// 15. Upcoming Payment Bills & Early Reminder System
+// ----------------------------------------------------
+
+enum BillCategory {
+  // 15 User Categories
+  FOOD_BEVERAGE_SUPPLIERS
+  PACKAGING_CONSUMABLES
+  RENT_PROPERTY_LEASE
+  UTILITIES
+  STAFF_PAYROLL
+  EQUIPMENT_FINANCING_LEASE
+  MAINTENANCE_REPAIRS
+  CLEANING_HYGIENE
+  TAXES_LICENSES
+  SAAS_TECHNOLOGY
+  MARKETING_ADVERTISING
+  INSURANCE
+  BANKING_PAYMENT_PROCESSING
+  DELIVERY_LOGISTICS
+  OTHER_OPERATIONAL_EXPENSES
+
+  // Legacy mappings
+  CREDIT_CARD
+  VENDOR_INVOICE
+  RENT_OCCUPANCY
+  UTILITY
+  LOAN_LEASE
+  TAX_GOVERNMENT
+  SUBSCRIPTION
+  OTHER
+}
+
+enum BillStatus {
+  UPCOMING
+  DUE_SOON
+  OVERDUE
+  PAID
+  DEFERRED
+}
+
+model UpcomingBill {
+  id                   String        @id @default(uuid())
+  restaurantId         String        @map("restaurant_id")
+  outletId             String?       @map("outlet_id")
+  title                String
+  category             BillCategory  @default(CREDIT_CARD)
+  vendorOrInstitution  String        @map("vendor_or_institution")
+  accountLast4         String?       @map("account_last4")
+  amount               Decimal
+  adjustedAmount       Decimal?      @map("adjusted_amount")
+  dueDate              DateTime      @map("due_date")
+  reminderDaysBefore   Int           @default(5) @map("reminder_days_before")
+  status               BillStatus    @default(UPCOMING)
+  notes                String?
+  receiptOrInvoiceUrl  String?       @map("receipt_or_invoice_url")
+  autoConvertToExpense Boolean       @default(true) @map("auto_convert_to_expense")
+  isRecurring          Boolean       @default(false) @map("is_recurring")
+  recurringFrequency   String?       @map("recurring_frequency")
+  paidAt               DateTime?     @map("paid_at")
+  paidAmount           Decimal?      @map("paid_amount")
+  paymentMethod        String?       @map("payment_method")
+  financialTxId        String?       @map("financial_tx_id")
+  createdBy            String?       @map("created_by")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet     RestaurantOutlet? @relation(fields: [outletId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId])
+  @@index([outletId])
+  @@index([dueDate])
+  @@index([status])
+  @@index([category])
+  @@map("upcoming_bills")
+}
+
+// ----------------------------------------------------
+// 17. Operations & Shift Checklists
+// ----------------------------------------------------
+
+enum ChecklistType {
+  OPENING
+  CLOSING
+  MID_DAY
+  FOOD_SAFETY
+  WEEKLY_MAINTENANCE
+  CUSTOM
+}
+
+enum ChecklistStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+}
+
+enum ItemPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model ShiftChecklistTemplate {
+  id               String                 @id @default(uuid())
+  restaurantId     String                 @map("restaurant_id")
+  name             String
+  type             ChecklistType          @default(OPENING)
+  departmentId     String?                @map("department_id")
+  description      String?
+  estimatedMinutes Int                    @default(20) @map("estimated_minutes")
+  isActive         Boolean                @default(true) @map("is_active")
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant  Restaurant                 @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  department  Department?                @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  items       ShiftChecklistItem[]
+  executions  ShiftChecklistExecution[]
+
+  @@index([restaurantId])
+  @@index([type])
+  @@map("shift_checklist_templates")
+}
+
+model ShiftChecklistItem {
+  id                 String                 @id @default(uuid())
+  templateId         String                 @map("template_id")
+  title              String
+  description        String?
+  roleRequired       String?                @map("role_required")
+  priority           ItemPriority           @default(MEDIUM)
+  requiresValueInput Boolean                @default(false) @map("requires_value_input")
+  valueInputLabel    String?                @map("value_input_label")
+  requiresPhoto      Boolean                @default(false) @map("requires_photo")
+  sortOrder          Int                    @default(0) @map("sort_order")
+  createdAt          DateTime               @default(now()) @map("created_at")
+
+  // Relations
+  template           ShiftChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  itemExecutions     ShiftChecklistItemExecution[]
+
+  @@index([templateId])
+  @@map("shift_checklist_items")
+}
+
+model ShiftChecklistExecution {
+  id                   String                        @id @default(uuid())
+  restaurantId         String                        @map("restaurant_id")
+  outletId             String                        @map("outlet_id")
+  templateId           String                        @map("template_id")
+  shiftAssignmentId    String?                       @map("shift_assignment_id")
+  title                String
+  type                 ChecklistType                 @default(OPENING)
+  executionDate        DateTime                      @map("execution_date")
+  status               ChecklistStatus               @default(PENDING)
+  assignedEmployeeId   String?                       @map("assigned_employee_id")
+  verifiedByEmployeeId String?                       @map("verified_by_employee_id")
+  verifiedAt           DateTime?                     @map("verified_at")
+  notes                String?
+  createdAt            DateTime                      @default(now()) @map("created_at")
+  updatedAt            DateTime                      @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant         Restaurant                    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet             RestaurantOutlet              @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  template           ShiftChecklistTemplate        @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  assignedEmployee   Employee?                     @relation("AssignedStaff", fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
+  verifiedBy         Employee?                     @relation("VerifiedBySupervisor", fields: [verifiedByEmployeeId], references: [id], onDelete: SetNull)
+  items              ShiftChecklistItemExecution[]
+
+  @@index([restaurantId])
+  @@index([outletId])
+  @@index([executionDate])
+  @@index([status])
+  @@map("shift_checklist_executions")
+}
+
+model ShiftChecklistItemExecution {
+  id                    String                  @id @default(uuid())
+  executionId           String                  @map("execution_id")
+  templateItemId        String?                 @map("template_item_id")
+  title                 String
+  description           String?
+  roleRequired          String?                 @map("role_required")
+  priority              ItemPriority            @default(MEDIUM)
+  isCompleted           Boolean                 @default(false) @map("is_completed")
+  completedAt           DateTime?               @map("completed_at")
+  completedByEmployeeId String?                 @map("completed_by_employee_id")
+  inputValue            String?                 @map("input_value")
+  photoUrl              String?                 @map("photo_url")
+  notes                 String?
+  sortOrder             Int                     @default(0) @map("sort_order")
+
+  // Relations
+  execution             ShiftChecklistExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  templateItem          ShiftChecklistItem?     @relation(fields: [templateItemId], references: [id], onDelete: SetNull)
+  completedByEmployee   Employee?               @relation("CompletedByStaff", fields: [completedByEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([executionId])
+  @@map("shift_checklist_item_executions")
+}
+
+// ----------------------------------------------------
+// 15. Catering & Event Management Engine
+// ----------------------------------------------------
+
+enum CateringEventType {
+  WEDDING
+  CORPORATE
+  BIRTHDAY
+  PRIVATE_DINING
+  BUFFET
+  PACKED_MEALS
+  OTHER
+}
+
+enum CateringOrderStatus {
+  DRAFT
+  CONFIRMED
+  IN_PREPARATION
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+model CateringOrder {
+  id             String              @id @default(uuid())
+  restaurantId   String              @map("restaurant_id")
+  outletId       String?             @map("outlet_id")
+  orderNumber    String              @map("order_number")
+  eventName      String              @map("event_name")
+  clientName     String              @map("client_name")
+  clientEmail    String?             @map("client_email")
+  clientPhone    String?             @map("client_phone")
+  eventDate      DateTime            @map("event_date")
+  eventTime      String?             @map("event_time")
+  eventType      CateringEventType   @default(BUFFET) @map("event_type")
+  guestCount     Int                 @default(50) @map("guest_count")
+  venueAddress   String?             @map("venue_address")
+  status         CateringOrderStatus @default(DRAFT)
+  subtotal       Decimal             @default(0)
+  taxAmount      Decimal             @default(0) @map("tax_amount")
+  discountAmount Decimal             @default(0) @map("discount_amount")
+  totalAmount    Decimal             @default(0) @map("total_amount")
+  advancePaid    Decimal             @default(0) @map("advance_paid")
+  balanceDue     Decimal             @default(0) @map("balance_due")
+  notes          String?
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet     RestaurantOutlet? @relation(fields: [outletId], references: [id], onDelete: SetNull)
+  items      CateringOrderItem[]
+
+  @@unique([restaurantId, orderNumber])
+  @@index([restaurantId])
+  @@index([eventDate])
+  @@map("catering_orders")
+}
+
+model CateringOrderItem {
+  id              String   @id @default(uuid())
+  cateringOrderId String   @map("catering_order_id")
+  recipeId        String?  @map("recipe_id")
+  itemName        String   @map("item_name")
+  category        String?  @default("Main Course")
+  unitPrice       Decimal  @default(0) @map("unit_price")
+  quantity        Decimal  @default(1)
+  totalPrice      Decimal  @default(0) @map("total_price")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  cateringOrder CateringOrder @relation(fields: [cateringOrderId], references: [id], onDelete: Cascade)
+  recipe        Recipe?       @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+
+  @@index([cateringOrderId])
+  @@index([recipeId])
+  @@map("catering_order_items")
+}
+
+model CateringPackage {
+  id           String   @id @default(uuid())
+  restaurantId String   @map("restaurant_id")
+  name         String
+  description  String?
+  category     String?  @default("Buffet")
+  pricePerPax  Decimal  @default(0) @map("price_per_pax")
+  suggestedPax Int      @default(50) @map("suggested_pax")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  items      CateringPackageItem[]
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId])
+  @@map("catering_packages")
+}
+
+model CateringPackageItem {
+  id                String   @id @default(uuid())
+  cateringPackageId String   @map("catering_package_id")
+  recipeId          String?  @map("recipe_id")
+  itemName          String   @map("item_name")
+  category          String?  @default("Main Course")
+  unitPrice         Decimal  @default(0) @map("unit_price")
+  portionQtyPerPax  Decimal  @default(1) @map("portion_qty_per_pax")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  cateringPackage CateringPackage @relation(fields: [cateringPackageId], references: [id], onDelete: Cascade)
+  recipe          Recipe?          @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+
+  @@index([cateringPackageId])
+  @@index([recipeId])
+  @@map("catering_package_items")
+}
+
+
+
+
+
+
+
+

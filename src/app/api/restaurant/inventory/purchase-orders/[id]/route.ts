@@ -5,8 +5,17 @@ import { PurchaseService } from "@/modules/inventory/purchase-service";
 import { z } from "zod";
 
 const updatePOSchema = z.object({
-  action: z.enum(["update_status", "receive"]),
+  action: z.enum(["update_status", "receive", "receive_items"]),
   status: z.enum(["DRAFT", "SENT", "CANCELLED"]).optional(),
+  items: z
+    .array(
+      z.object({
+        itemId: z.string(),
+        receivedQuantity: z.number().min(0),
+        unitCost: z.number().min(0).optional(),
+      })
+    )
+    .optional(),
   receiveData: z
     .object({
       status: z.enum(["RECEIVED", "PARTIALLY_RECEIVED"]).optional(),
@@ -50,12 +59,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const result = updatePOSchema.safeParse(body);
     if (!result.success) return NextResponse.json({ error: "Invalid payload", details: result.error.flatten() }, { status: 400 });
 
-    if (result.data.action === "receive") {
+    if (result.data.action === "receive" || result.data.action === "receive_items") {
+      const itemsToReceive = result.data.items || result.data.receiveData?.items;
       const purchaseOrder = await PurchaseService.receivePOItems(
         session.activeRestaurantId,
         session.userId,
         id,
-        result.data.receiveData
+        {
+          status: result.data.receiveData?.status,
+          items: itemsToReceive,
+        }
       );
       return NextResponse.json({ success: true, purchaseOrder, message: "Inventory stock updated successfully via PO receiving." });
     }

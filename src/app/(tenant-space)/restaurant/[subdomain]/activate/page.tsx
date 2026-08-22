@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, useParams } from "next/navigation";
 
 function ActivateAccountContent() {
   const router = useRouter();
+  const params = useParams();
   const searchParams = useSearchParams();
   const token = searchParams.get("token") || "";
+  const subdomain = (params?.subdomain as string) || searchParams.get("subdomain") || "";
 
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -45,8 +47,12 @@ function ActivateAccountContent() {
 
       setSuccess(true);
       setTimeout(() => {
-        router.push("/login");
-      }, 3000);
+        if (subdomain) {
+          router.push(`/restaurant/${subdomain}/login`);
+        } else {
+          router.push("/login");
+        }
+      }, 2000);
     } catch (err: any) {
       setError(err.message || "An error occurred during activation.");
     } finally {

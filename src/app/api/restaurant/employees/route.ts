@@ -14,6 +14,7 @@ const createEmployeeSchema = z.object({
   dateOfBirth: z.string().optional(),
   joiningDate: z.string().optional(),
   workerType: z.enum(["FULL_TIME", "PART_TIME", "CONTRACT", "INTERN", "CONSULTANT", "TEMPORARY"]).default("FULL_TIME"),
+  weeklyHoursLimit: z.number().positive().nullable().optional(),
   // Optional initial employment record details
   departmentId: z.string().optional(),
   designationId: z.string().optional(),
@@ -173,6 +174,7 @@ export async function POST(req: NextRequest) {
           dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
           joiningDate: data.joiningDate ? new Date(data.joiningDate) : new Date(),
           workerType: data.workerType,
+          weeklyHoursLimit: data.weeklyHoursLimit || null,
         },
       });
 

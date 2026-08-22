@@ -6,8 +6,8 @@ This document captures the current status of the project, including completed wo
 
 ## 1. Project Phase Summary
 
-* **Current Phase**: Phase 3 (Core Module Operations — HR Onboarding & Inventory Management)
-* **Status**: Completed
+* **Current Phase**: Phase 4 (Intermediate Module Operations — Shift Management & Payroll Management)
+* **Status**: Completed ✅
 
 ### Work Completed:
 1. **Workspace Bootstrap & Production Hardening**: Next.js App Router workspace set up with Tailwind CSS, Zod, TypeScript, ESLint, PgBouncer transaction pooling, tokenVersion session invalidation, and hashed invitation tokens.
@@ -25,21 +25,37 @@ This document captures the current status of the project, including completed wo
    - `settings/roles-permissions` (Custom role builder & permissions matrix)
    - `settings/access-grants` (Module & outlet access grant matrix)
 7. **Security & Verification Suite**: Built `src/core/tests/phase2-security.test.ts` verifying all 14 Phase 2 security requirements (tenant isolation, limit enforcement, employee/user separation, disabled module grant rejection, access revocation, tokenVersion invalidation). Both `security.test.ts` and `phase2-security.test.ts` pass 100% (28/28 assertions total).
-8. **Production Build & Verification**: Passed `npx tsc --noEmit`, ESLint, and `npm run build` compilation with 0 errors.
-9. **Phase 3 — HR Onboarding Module**:
-   - **Database Entities**: `OnboardingTemplate`, `OnboardingTask`, `EmployeeOnboarding`, `OnboardingTaskProgress`, `EmployeeFileUpload` with enums `OnboardingStatus`, `TaskStatus`, `FileCategory`. Migration: `20260806161738_phase3_hr_inventory`.
-   - **Service Module**: `src/modules/hr-onboarding/service.ts` — full template CRUD, onboarding session lifecycle state machine (`PENDING → IN_PROGRESS → PENDING_APPROVAL → APPROVED / REJECTED → IN_PROGRESS`), task progress tracking, and approval/rejection flows.
-   - **API Routes**: 8 endpoints under `/api/restaurant/onboarding/` — templates (GET, POST), template [id] (GET, PATCH, DELETE with add/update/delete task sub-actions), sessions (GET, POST), session [id] (GET), tasks (GET, PATCH), submit, approve, reject.
-   - **File Upload API**: `/api/restaurant/uploads` — multipart form data upload, 10MB per-file limit, MIME allowlist, per-tenant `storageQuotaGb` enforcement, writes to `public/uploads/<restaurantId>/`.
-   - **UI Pages**: `workforce/onboarding/` (session dashboard with stats, status filters, progress bars), `workforce/onboarding/templates/` (two-panel template editor with task management), `workforce/onboarding/[sessionId]/` (task checklist, file upload per task, approval panel).
-10. **Phase 3 — Inventory Module**:
-    - **Database Entities**: `InventoryCategory` (hierarchical tree with `parentId`), `InventoryItem`, `StockLedger` (immutable journal), `WastageLog` with enums `StockMovementType`, `WastageReason`, `UnitOfMeasure`.
-    - **Service Module**: `src/modules/inventory/service.ts` — categories CRUD, items CRUD with stock aggregation from ledger, stock movement recording (transactional), wastage logging (auto-creates negative ledger entry), low-stock alerts (items ≤ reorder point), per-outlet stock views.
-    - **API Routes**: 7 endpoints under `/api/restaurant/inventory/` — categories (GET, POST), categories/[id] (PATCH, DELETE), items (GET, POST), items/[id] (GET, PATCH, DELETE), stock (GET, POST), wastage (GET, POST), alerts (GET).
-    - **UI Pages**: `inventory/` (dashboard with stat cards, alert banner, nav cards), `inventory/items/` (desktop table + mobile cards, low-stock indicators), `inventory/categories/` (recursive tree with sub-category indentation), `inventory/stock/` (outlet-scoped stock bars, adjust + wastage modals), `inventory/alerts/` (severity bars, deficit + suggested order quantities).
-11. **Dashboard Navigation Updated**: Added HR Onboarding card to Workforce section, Inventory section in Operations grid (module-gated).
-12. **Phase 3 Security Tests**: `src/core/tests/phase3-security.test.ts` — 10/10 assertions pass covering tenant isolation for all 5 new entity types and cross-tenant operation blocking.
-13. **Production Build & Verification**: `npx tsc --noEmit` 0 errors, `npm run build` 0 errors — 74 routes compiled (37 static, 37 dynamic).
+8. **Phase 3 — HR Onboarding & Inventory Modules**:
+   - Database Entities: `OnboardingTemplate`, `OnboardingTask`, `EmployeeOnboarding`, `OnboardingTaskProgress`, `EmployeeFileUpload`, `InventoryCategory`, `InventoryItem`, `StockLedger`, `WastageLog`, `Vendor`, `PurchaseOrder`, `PurchaseOrderItem`, `VendorItem`.
+   - Service Modules: `src/modules/hr-onboarding/service.ts`, `src/modules/inventory/service.ts`.
+   - UI Pages: Onboarding sessions & templates editor, item master, purchase order manager, wastage & stock adjusting, minimum-stock alerts.
+   - Verification: `phase3-security.test.ts` passing 10/10 assertions.
+9. **Phase 4 — Shift Management Module**:
+   - **Database Entities**: `ShiftTemplate`, `ShiftRoster`, `ShiftAssignment`, `ShiftAvailability`, `ShiftSwapRequest` with enums `RosterStatus`, `ShiftAssignmentStatus`, `SwapRequestStatus`. Migration: `20260816170600_phase4_shifts_payroll`.
+   - **Service Module**: `src/modules/shifts/service.ts` — shift template CRUD, weekly/monthly roster creation and publication, shift assignment engine with outlet scoping, recurring employee availability tracking, and shift swap approval state machine (which automatically swaps employee assignments on the roster upon approval).
+   - **API Routes**: 8 endpoints under `/api/restaurant/shifts/` — templates (GET, POST), templates/[id] (GET, PATCH, DELETE), rosters (GET, POST), rosters/[id] (GET, PATCH, DELETE), rosters/[id]/publish (POST), assignments (GET, POST, PATCH, DELETE), availability (GET, POST), swaps (GET, POST), swaps/[id] (PATCH).
+   - **UI Pages**:
+     - `shifts/` (dashboard with active templates, published rosters, scheduled shifts, pending swaps, and upcoming preview)
+     - `shifts/templates/` (template manager modal with time picker, break minutes, and color coding)
+     - `shifts/rosters/` (interactive 7-day weekly schedule grid by outlet, roster draft/publish controls, and shift assignment modal)
+     - `shifts/swaps/` (trade request review cards with one-click approve/reject actions and review notes)
+10. **Phase 4 — Payroll Management Module**:
+    - **Database Entities**: `SalaryStructure`, `PayrollRun`, `Payslip`, `PayrollEarning`, `PayrollDeduction`, `PayrollPayment` with enums `PayFrequency`, `PayrollRunStatus`, `PayslipStatus`, `EarningType`, `DeductionType`, `PaymentMethod`, `PaymentStatus`.
+    - **Service Module**: `src/modules/payroll/service.ts` — employee salary structure definitions (base rate, pay frequency, allowances JSON, deduction withholding JSON), monthly/bi-weekly calculation run engine, payslip generation, and payment settlement.
+    - **Loose Shift Integration**: The calculation engine automatically checks if the `shifts` module is active for the tenant; if enabled, aggregates scheduled hours worked in the period to compute hourly wages, with immediate fallback to base monthly pay or manual inputs.
+    - **API Routes**: 7 endpoints under `/api/restaurant/payroll/` — salary-structures (GET, POST), salary-structures/[employeeId] (GET), runs (GET, POST), runs/[id] (GET, DELETE), runs/[id]/calculate (POST), runs/[id]/approve (POST), runs/[id]/pay (POST), payslips (GET), payslips/[id] (GET).
+    - **UI Pages**:
+      - `payroll/` (dashboard with YTD spend, latest run net, pending runs, and historical run list)
+      - `payroll/salary-structures/` (employee compensation directory and structure configuration drawer)
+      - `payroll/runs/` (pay cycles table & initiate new pay cycle wizard)
+      - `payroll/runs/[id]/` (calculation engine runner, KPI cards, employee breakdown, approve and mark paid controls)
+      - `payroll/payslips/[id]/` (itemized official printable salary payslip)
+11. **Phase 4 Security & Verification**:
+    - `src/core/tests/phase4-security.test.ts` — 21/21 assertions pass verifying strict multi-tenant isolation across all shift and payroll entities, cross-restaurant blocking, shift swap state transition, and loose integration calculation accuracy.
+    - Total test assertions across all suites: 59 passed, 0 failed.
+12. **Production Build & Verification**:
+    - `npx tsc --noEmit` passed with 0 errors.
+    - `npm run build` compiled 113 routes with 0 errors.
 
 ### Database Status:
 * Relational database schema fully synced to PostgreSQL database `restaurant_saas` at `localhost:5432`.
@@ -52,7 +68,8 @@ This document captures the current status of the project, including completed wo
   - `20260731094440_add_module_pricing` — Module pricing field
   - `20260731124545_add_master_data_descriptions` — Master data descriptions
   - `20260806161738_phase3_hr_inventory` — Phase 3 HR Onboarding + Inventory entities
-
+  - `20260806164548_phase3_advanced_onboarding` — Advanced onboarding fields
+  - `20260816170600_phase4_shifts_payroll` — Phase 4 Shift & Payroll entities
 
 ---
 
@@ -64,7 +81,7 @@ This document captures the current status of the project, including completed wo
 |  System  |    | Next.js  |     | Tenant   |     | Inventory|     | Shifts   |     | Audit    |
 | Design & | -> | Shell &  |  -> | Auth &   |  -> | & HR     |  -> | & Payroll|  -> | Branding |
 | Planning |    | Super    |     | Access   |     | Modules  |     | Modules  |     | & Launch |
-| (Done)   |    | Admin    |     | Control  |     | (Done ✅) |     | (Next)   |     | (Prod)   |
+| (Done)   |    | Admin    |     | Control  |     | (Done ✅) |     | (Done ✅) |     | (Next)   |
 +----------+    +----------+     +----------+     +----------+     +----------+     +----------+
 ```
 
@@ -75,18 +92,14 @@ This document captures the current status of the project, including completed wo
 * Completed — Employee directory, roles/permissions, access grants, workforce UI.
 
 ### Phase 3: Core Module Operations (HR & Inventory) ✅
-* Completed — HR Onboarding state machine + UI, Inventory stock ledger + UI.
+* Completed — HR Onboarding state machine + UI, Inventory stock ledger, purchase orders + UI.
 
-### Phase 4: Intermediate Modules & Integrations (Shifts & Payroll)
-* **Goals**: Complete scheduling and financial operations.
-* **Deliverables**:
-  * **Shift Management**: Shift template generator, weekly roster scheduler, shift swap request workflow.
-  * **Payroll Management**: Salary structure config, automated monthly run calculation, payslip rendering.
-  * **Integration hooks**: Make payroll optional integration with shift schedules (automatically pulling hours worked if enabled, falling back to manual input).
+### Phase 4: Intermediate Modules & Integrations (Shifts & Payroll) ✅
+* Completed — Shift templates, weekly visual roster scheduler, swap approval workflow, salary structures, payroll calculation engine (with auto shift aggregation), payslip generation & printing.
 
-### Phase 5: Audit, Branding & Launch Readiness
-* **Goals**: Wrap up enterprise requirements and launch.
+### Phase 5: Audit, Branding & Launch Readiness (Next)
+* **Goals**: Enterprise white-labeling, audit logging, and production readiness.
 * **Deliverables**:
-  * Audit logging module recording database changes, IP addresses, and user actions.
-  * Tenant-specific white-labeling injection (Logo, Application Title, CSS Theme override).
-  * System-wide performance validation and security penetration audits.
+  * Centralized audit logging middleware recording IP addresses, browser agents, previous/new value diffs.
+  * Restaurant white-labeling injection (Logo, custom CSS theme, dynamic favicon and application branding).
+  * Production hardening and deployment verification.

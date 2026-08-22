@@ -92,17 +92,21 @@ export async function verifyAccess(
   const { moduleKey, permissionKey, outletId } = options;
 
   if (moduleKey) {
+    const moduleKeys =
+      moduleKey === "shifts" || moduleKey === "shift_management"
+        ? ["shifts", "shift_management"]
+        : [moduleKey];
+
     // 3. Verify Restaurant Module Entitlement
-    const entitlement = await prisma.restaurantModule.findUnique({
+    const entitlement = await prisma.restaurantModule.findFirst({
       where: {
-        restaurantId_moduleId: {
-          restaurantId,
-          moduleId: moduleKey,
-        },
+        restaurantId,
+        moduleId: { in: moduleKeys },
+        status: "ACTIVE",
       },
     });
 
-    if (!entitlement || entitlement.status !== "ACTIVE") {
+    if (!entitlement) {
       return {
         authorized: false,
         status: 403,
@@ -114,7 +118,7 @@ export async function verifyAccess(
     const grants = await prisma.accessGrant.findMany({
       where: {
         membershipId: membership.id,
-        moduleId: moduleKey,
+        moduleId: { in: moduleKeys },
         status: "ACTIVE",
       },
       include: {
@@ -131,23 +135,32 @@ export async function verifyAccess(
     });
 
     if (grants.length === 0) {
-      // Check if user has ANY explicit grants assigned to their membership.
-      // If user has zero grants assigned anywhere, treat them as an unrestricted primary admin.
-      const totalUserGrants = await prisma.accessGrant.count({
-        where: { membershipId: membership.id, status: "ACTIVE" },
+      // Check if user has an active Restaurant Owner role or has zero restricted grants
+      const hasAdminRole = await prisma.accessGrant.findFirst({
+        where: {
+          membershipId: membership.id,
+          status: "ACTIVE",
+          role: { name: { in: ["Restaurant Owner", "Admin", "Owner"] } },
+        },
       });
 
-      if (totalUserGrants > 0) {
-        return {
-          authorized: false,
-          status: 403,
-          error: `User has no access grants for module '${moduleKey}'`,
-        };
+      if (!hasAdminRole) {
+        const totalUserGrants = await prisma.accessGrant.count({
+          where: { membershipId: membership.id, status: "ACTIVE" },
+        });
+
+        if (totalUserGrants > 0) {
+          return {
+            authorized: false,
+            status: 403,
+            error: `User has no access grants for module '${moduleKey}'`,
+          };
+        }
       }
     }
 
     // 5. Verify Action Permission & Outlet Scope
-    if (permissionKey) {
+    if (permissionKey && grants.length > 0) {
       let permissionFound = false;
 
       for (const grant of grants) {

@@ -40,11 +40,24 @@ export async function GET(req: NextRequest) {
             module: true,
           },
         },
+        memberships: {
+          include: {
+            user: {
+              select: { id: true, email: true, name: true, createdAt: true, tokenVersion: true },
+            },
+          },
+        },
         invitations: {
-          where: { status: "SENT" },
-          select: { id: true, email: true, status: true, expiresAt: true },
+          select: { id: true, email: true, status: true, expiresAt: true, createdAt: true },
           orderBy: { createdAt: "desc" },
-          take: 1,
+          take: 5,
+        },
+        _count: {
+          select: {
+            outlets: true,
+            employees: true,
+            memberships: true,
+          },
         },
       },
       orderBy: {
@@ -120,7 +133,13 @@ export async function POST(req: NextRequest) {
       });
 
       // 4. Create RestaurantModules
-      for (const moduleKey of data.enabledModules) {
+      const dbModules = await tx.module.findMany({ select: { id: true } });
+      const validModuleIds = new Set(dbModules.map((m) => m.id));
+      const validEnabledModules = Array.from(
+        new Set((data.enabledModules || []).filter((mKey) => validModuleIds.has(mKey)))
+      );
+
+      for (const moduleKey of validEnabledModules) {
         await tx.restaurantModule.create({
           data: {
             restaurantId: restaurant.id,
@@ -164,7 +183,7 @@ export async function POST(req: NextRequest) {
       const permissions = await tx.permission.findMany({
         where: {
           moduleId: {
-            in: data.enabledModules,
+            in: validEnabledModules,
           },
         },
       });
@@ -180,7 +199,7 @@ export async function POST(req: NextRequest) {
       }
 
       // 8. Grant access to all enabled modules for the owner
-      for (const moduleKey of data.enabledModules) {
+      for (const moduleKey of validEnabledModules) {
         await tx.accessGrant.create({
           data: {
             restaurantId: restaurant.id,
@@ -232,9 +251,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      restaurant: transaction.restaurant,
       restaurantId: transaction.restaurant.id,
       subdomain: transaction.restaurant.subdomain,
       invitationToken: transaction.inviteToken,
+      activationUrl: `/activate?token=${transaction.inviteToken}&subdomain=${transaction.restaurant.subdomain}`,
     });
   } catch (error: any) {
     console.error("Create Restaurant Error:", error);

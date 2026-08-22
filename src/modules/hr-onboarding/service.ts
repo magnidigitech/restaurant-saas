@@ -385,4 +385,13 @@ export const HROnboardingService = {
       data: { status: "REJECTED", reviewedAt: new Date(), reviewedBy, reviewNotes },
     });
   },
+
+  async deleteSession(restaurantId: string, sessionId: string) {
+    await prisma.employeeOnboarding.findFirstOrThrow({
+      where: { id: sessionId, restaurantId },
+    });
+    return prisma.employeeOnboarding.delete({
+      where: { id: sessionId },
+    });
+  },
 };

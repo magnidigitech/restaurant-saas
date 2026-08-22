@@ -14,12 +14,28 @@ export const config = {
 const PLATFORM_SESSION_COOKIE = "platform_admin_session";
 const TENANT_SESSION_COOKIE = "tenant_session";
 
+function isLocalHost(host: string): boolean {
+  return (
+    host.startsWith("localhost") ||
+    host.includes("127.0.0.1") ||
+    host.startsWith("0.0.0.0") ||
+    host.endsWith(".local")
+  );
+}
+
 function createCleanRedirectUrl(targetPath: string, req: NextRequest, customHost?: string): URL {
   const rawHost = req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
   const host = rawHost.split(",")[0].trim().split(":")[0].toLowerCase();
-  
+  const rawPort = rawHost.includes(":") ? rawHost.split(":")[1] : "";
+
   const baseDomain = (process.env.ROOT_DOMAIN || "restiq.magnidigitech.com").toLowerCase();
-  
+
+  // If local development on localhost, keep localhost URL and port
+  if (isLocalHost(host)) {
+    const port = rawPort || "3000";
+    return new URL(`http://localhost:${port}${targetPath}`);
+  }
+
   let effectiveHost = customHost;
   if (!effectiveHost) {
     if (host && host !== "0.0.0.0" && host !== "127.0.0.1") {
@@ -42,7 +58,18 @@ export async function proxy(req: NextRequest) {
   const url = req.nextUrl.clone();
   const path = url.pathname;
 
-  // 1. Resolve host and subdomain from X-Forwarded-Host or Host header
+  // 1. Static assets and internal next routes
+  if (
+    path.startsWith("/_next") ||
+    path.startsWith("/static") ||
+    path.startsWith("/images") ||
+    path.startsWith("/uploads") ||
+    path === "/favicon.ico"
+  ) {
+    return NextResponse.next();
+  }
+
+  // 2. Resolve host and subdomain from X-Forwarded-Host or Host header
   const rawHost = req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
   const host = rawHost.split(",")[0].trim();
   const domain = host.split(":")[0].toLowerCase();
@@ -56,7 +83,7 @@ export async function proxy(req: NextRequest) {
     if (sslipParts.length > 5) {
       subdomain = sslipParts[0];
     }
-  } else if (domain.endsWith("localhost") || domain.includes("127.0.0.1")) {
+  } else if (isLocalHost(domain)) {
     const domainParts = domain.split(".");
     if (domainParts.length > 1 && domainParts[0] !== "localhost") {
       subdomain = domainParts[0];
@@ -72,8 +99,37 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  // 2. Check for Platform Admin Scope
-  if (subdomain === "admin" || path.startsWith("/platform-admin")) {
+  // 3. Direct /restaurant/[subdomain] path routing (local testing or subpath navigation)
+  if (path.startsWith("/restaurant/")) {
+    const pathParts = path.split("/");
+    const pathSubdomain = pathParts[2];
+
+    if (pathSubdomain) {
+      const isPublicPath =
+        path === `/restaurant/${pathSubdomain}/login` ||
+        path === `/restaurant/${pathSubdomain}/activate` ||
+        path.startsWith(`/restaurant/${pathSubdomain}/activate/`);
+
+      if (isPublicPath) {
+        return NextResponse.next();
+      }
+
+      // Check tenant session authentication
+      const token = req.cookies.get(TENANT_SESSION_COOKIE)?.value;
+      const session = token ? await verifyToken(token) : null;
+
+      if (!session || session.activeRestaurantSubdomain !== pathSubdomain) {
+        return NextResponse.redirect(
+          createCleanRedirectUrl(`/restaurant/${pathSubdomain}/login`, req)
+        );
+      }
+
+      return NextResponse.next();
+    }
+  }
+
+  // 4. Check for Platform Super Admin Scope (admin.domain, /platform-admin, or /api/platform-admin)
+  if (subdomain === "admin" || path.startsWith("/platform-admin") || path.startsWith("/api/platform-admin")) {
     if (path.startsWith("/api/platform-admin") && path !== "/api/platform-admin/auth/login") {
       const token = req.cookies.get(PLATFORM_SESSION_COOKIE)?.value;
       const session = token ? await verifyToken(token) : null;
@@ -118,7 +174,7 @@ export async function proxy(req: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  // 3. Check for Restaurant Subdomain Scope
+  // 5. Check for Subdomain-based Restaurant Scope (e.g. magni.restiq.magnidigitech.com)
   if (subdomain && subdomain !== "www") {
     if (path.startsWith("/onboarding/portal")) {
       return NextResponse.next();
@@ -126,9 +182,9 @@ export async function proxy(req: NextRequest) {
 
     if (path.startsWith("/api")) {
       if (path.startsWith("/api/restaurant")) {
-        const isPublicTenantApi = 
-          path === "/api/restaurant/auth/login" || 
-          path === "/api/restaurant/activate" || 
+        const isPublicTenantApi =
+          path === "/api/restaurant/auth/login" ||
+          path === "/api/restaurant/activate" ||
           path.endsWith("/branding") ||
           path.startsWith("/api/restaurant/onboarding/portal");
 
@@ -144,10 +200,6 @@ export async function proxy(req: NextRequest) {
           }
         }
       }
-      return NextResponse.next();
-    }
-
-    if (path.startsWith("/images") || path.startsWith("/static") || path.startsWith("/uploads")) {
       return NextResponse.next();
     }
 
@@ -171,11 +223,15 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  // 4. Root Base Domain Fallback (e.g. restiq.magnidigitech.com without subdomain)
-  // Automatically redirect to Platform Admin Login without internal port 3000 or 0.0.0.0 IP
-  if (!path.startsWith("/api") && !path.startsWith("/_next") && !path.startsWith("/static")) {
-    return NextResponse.redirect(createCleanRedirectUrl("/platform-admin/login", req, `admin.${baseDomain}`));
+  // 6. Public APIs & Activation Token route
+  if (path.startsWith("/api") || path.startsWith("/activate") || path.startsWith("/onboarding")) {
+    return NextResponse.next();
   }
 
-  return NextResponse.next();
+  // 7. Fallback Root Path
+  if (isLocalHost(domain)) {
+    return NextResponse.redirect(createCleanRedirectUrl("/platform-admin/login", req));
+  } else {
+    return NextResponse.redirect(createCleanRedirectUrl("/platform-admin/login", req, `admin.${baseDomain}`));
+  }
 }

@@ -4,12 +4,14 @@ import { verifyAccess } from "@/core/permissions/check";
 import { InventoryService } from "@/modules/inventory/service";
 import { z } from "zod";
 
+import { UnitOfMeasure } from "@prisma/client";
+
 const updateItemSchema = z.object({
   name: z.string().min(1).optional(),
   sku: z.string().optional(),
   description: z.string().optional(),
   categoryId: z.string().nullable().optional(),
-  unitOfMeasure: z.enum(["KG", "G", "L", "ML", "PIECES", "DOZEN", "BOX", "PACKET"]).optional(),
+  unitOfMeasure: z.nativeEnum(UnitOfMeasure).optional(),
   reorderPoint: z.number().min(0).optional(),
   parLevel: z.number().min(0).optional(),
   costPerUnit: z.number().min(0).optional(),

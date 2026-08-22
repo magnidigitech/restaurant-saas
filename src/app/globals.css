@@ -1,10 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --background: #020617;
-  --foreground: #f8fafc;
-  --brand-primary: #3b82f6;
-  --brand-secondary: #2563eb;
+  --background: #F5F5F7;
+  --foreground: #1D1D1F;
+  --card-bg: #FFFFFF;
+  --card-border: rgba(0, 0, 0, 0.08);
+  --brand-primary: #0071E3;
+  --brand-secondary: #0077ED;
+}
+
+.dark {
+  --background: #090B10;
+  --foreground: #F5F5F7;
+  --card-bg: #121622;
+  --card-border: rgba(255, 255, 255, 0.08);
 }
 
 @theme inline {
@@ -14,13 +23,37 @@
   --font-mono: var(--font-geist-mono);
 }
 
-html, body {
-  background-color: #020617 !important;
-  color: #f8fafc;
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   min-height: 100vh;
   margin: 0;
   padding: 0;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(150, 150, 150, 0.3);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(150, 150, 150, 0.5);
 }
 
 /* Dynamic Brand Utility Classes */
@@ -36,18 +69,6 @@ html, body {
   border-color: var(--brand-primary) !important;
 }
 
-.bg-brand-secondary {
-  background-color: var(--brand-secondary) !important;
-}
-
-.text-brand-secondary {
-  color: var(--brand-secondary) !important;
-}
-
-.border-brand-secondary {
-  border-color: var(--brand-secondary) !important;
-}
-
 .btn-brand-primary {
   background-color: var(--brand-primary) !important;
   color: #ffffff !important;
@@ -55,15 +76,5 @@ html, body {
 }
 
 .btn-brand-primary:hover {
-  filter: brightness(1.15);
-}
-
-.btn-brand-secondary {
-  background-color: var(--brand-secondary) !important;
-  color: #ffffff !important;
-  transition: all 0.2s ease-in-out;
-}
-
-.btn-brand-secondary:hover {
-  filter: brightness(1.15);
+  filter: brightness(1.1);
 }

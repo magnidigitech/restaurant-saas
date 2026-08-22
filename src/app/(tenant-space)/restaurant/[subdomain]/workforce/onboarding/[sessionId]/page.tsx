@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { useTheme } from "@/core/theme/ThemeContext";
+import RestaurantNavbar from "@/components/RestaurantNavbar";
 
 type TaskStatus = "PENDING" | "COMPLETED" | "WAIVED" | "REJECTED";
 type OnboardingStatus = "PENDING" | "IN_PROGRESS" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
@@ -38,25 +40,12 @@ interface OnboardingDetail {
   progresses: TaskProgress[];
 }
 
-const TASK_STATUS_CONFIG: Record<TaskStatus, { label: string; color: string }> = {
-  PENDING: { label: "Pending", color: "text-amber-700 bg-amber-50 border-amber-200" },
-  COMPLETED: { label: "Completed", color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
-  WAIVED: { label: "Waived", color: "text-gray-600 bg-gray-100 border-gray-200" },
-  REJECTED: { label: "Rejected", color: "text-red-700 bg-red-50 border-red-200" },
-};
-
-const SESSION_BADGE: Record<OnboardingStatus, string> = {
-  PENDING: "bg-gray-100 text-gray-700 border-gray-200",
-  IN_PROGRESS: "bg-indigo-50 text-indigo-700 border-indigo-200",
-  PENDING_APPROVAL: "bg-amber-50 text-amber-700 border-amber-200",
-  APPROVED: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  REJECTED: "bg-red-50 text-red-700 border-red-200",
-};
-
-export default function OnboardingSessionDetail() {
+export default function OnboardingSessionDetailPage() {
   const router = useRouter();
   const params = useParams();
+  const subdomain = (params?.subdomain as string) || "";
   const sessionId = params?.sessionId as string;
+  const { isDark } = useTheme();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [onboarding, setOnboarding] = useState<OnboardingDetail | null>(null);
@@ -71,9 +60,11 @@ export default function OnboardingSessionDetail() {
   const [uploading, setUploading] = useState(false);
   const [uploadedFileId, setUploadedFileId] = useState<string | null>(null);
 
-  // Portal link & Email dispatch states
+  // Portal link, Email dispatch, & Delete modal states
   const [copiedLink, setCopiedLink] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailSentSuccess, setEmailSentSuccess] = useState(false);
 
@@ -93,10 +84,13 @@ export default function OnboardingSessionDetail() {
     }
   };
 
-  useEffect(() => { if (sessionId) fetchSession(); }, [sessionId]);
+  useEffect(() => {
+    if (sessionId) fetchSession();
+  }, [sessionId]);
 
   const handleUpdateTask = async (taskId: string, status: TaskStatus) => {
-    setUpdating(true); setError("");
+    setUpdating(true);
+    setError("");
     try {
       const res = await fetch(`/api/restaurant/onboarding/sessions/${sessionId}/tasks`, {
         method: "PATCH",
@@ -105,20 +99,26 @@ export default function OnboardingSessionDetail() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setActionTask(null); setTaskNote(""); setUploadedFileId(null);
+      setActionTask(null);
+      setTaskNote("");
+      setUploadedFileId(null);
       fetchSession();
-    } catch (e: any) { setError(e.message || "Failed to update task"); }
-    finally { setUpdating(false); }
+    } catch (e: any) {
+      setError(e.message || "Failed to update task");
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const handleSubmit = async () => {
-    if (!confirm("Submit this onboarding for approval? Make sure all required tasks are completed.")) return;
     try {
       const res = await fetch(`/api/restaurant/onboarding/sessions/${sessionId}/submit`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       fetchSession();
-    } catch (e: any) { setError(e.message || "Failed to submit"); }
+    } catch (e: any) {
+      setError(e.message || "Failed to submit");
+    }
   };
 
   const handleApprove = async () => {
@@ -131,13 +131,20 @@ export default function OnboardingSessionDetail() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setReviewNote(""); fetchSession();
-    } catch (e: any) { setError(e.message || "Failed to approve"); }
-    finally { setApproving(false); }
+      setReviewNote("");
+      fetchSession();
+    } catch (e: any) {
+      setError(e.message || "Failed to approve");
+    } finally {
+      setApproving(false);
+    }
   };
 
   const handleReject = async () => {
-    if (!reviewNote) { setError("Please provide a rejection reason"); return; }
+    if (!reviewNote) {
+      setError("Please provide a rejection reason");
+      return;
+    }
     setRejecting(true);
     try {
       const res = await fetch(`/api/restaurant/onboarding/sessions/${sessionId}/reject`, {
@@ -147,9 +154,29 @@ export default function OnboardingSessionDetail() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setReviewNote(""); fetchSession();
-    } catch (e: any) { setError(e.message || "Failed to reject"); }
-    finally { setRejecting(false); }
+      setReviewNote("");
+      fetchSession();
+    } catch (e: any) {
+      setError(e.message || "Failed to reject");
+    } finally {
+      setRejecting(false);
+    }
+  };
+
+  const handleDeleteSession = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/restaurant/onboarding/sessions/${sessionId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete session");
+      router.push(`/restaurant/${subdomain}/workforce/onboarding`);
+    } catch (err: any) {
+      setError(err.message || "Error deleting session");
+      setDeleting(false);
+      setShowDeleteModal(false);
+    }
   };
 
   const handleFileUpload = async (file: File) => {
@@ -162,8 +189,11 @@ export default function OnboardingSessionDetail() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setUploadedFileId(data.upload.id);
-    } catch (e: any) { setError(e.message || "Upload failed"); }
-    finally { setUploading(false); }
+    } catch (e: any) {
+      setError(e.message || "Upload failed");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const getPortalUrl = () => {
@@ -193,8 +223,41 @@ export default function OnboardingSessionDetail() {
     }, 2500);
   };
 
-  if (loading) return <main className="flex min-h-screen items-center justify-center bg-gray-50 text-gray-500 font-semibold">Loading session details...</main>;
-  if (!onboarding) return <main className="flex min-h-screen items-center justify-center bg-gray-50 text-red-600 font-semibold">{error || "Session not found"}</main>;
+  if (loading) {
+    return (
+      <div
+        className={`min-h-screen flex flex-col items-center justify-center font-sans antialiased ${
+          isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+        }`}
+      >
+        <div className="w-8 h-8 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-xs font-medium">Loading session details...</p>
+      </div>
+    );
+  }
+
+  if (!onboarding) {
+    return (
+      <div
+        className={`min-h-screen flex flex-col font-sans antialiased ${
+          isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+        }`}
+      >
+        <RestaurantNavbar activeSection="Employees" />
+        <main className="max-w-4xl mx-auto p-6 space-y-4">
+          <button
+            onClick={() => router.push(`/restaurant/${subdomain}/workforce/onboarding`)}
+            className="text-xs text-[#0071E3] hover:underline cursor-pointer"
+          >
+            ← Back to Onboarding
+          </button>
+          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-xl">
+            {error || "Session not found"}
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   const completed = onboarding.progresses.filter((p) => ["COMPLETED", "WAIVED"].includes(p.status)).length;
   const total = onboarding.progresses.length;
@@ -203,289 +266,449 @@ export default function OnboardingSessionDetail() {
   const canApprove = onboarding.status === "PENDING_APPROVAL";
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
-      {/* Navbar Header */}
-      <header className="border-b border-gray-200 bg-white sticky top-0 z-40 px-6 py-4 flex justify-between items-center flex-wrap gap-4 shadow-sm">
-        <div className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="text-gray-600 hover:text-gray-900 font-semibold transition-colors cursor-pointer text-sm">
-            ← Back
-          </button>
-          <div className="h-4 w-px bg-gray-200" />
-          <div>
-            <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              {onboarding.employee.firstName} {onboarding.employee.lastName}
-              <span className="text-xs text-gray-500 font-mono font-normal">({onboarding.employee.employeeCode})</span>
-            </h1>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold border ${SESSION_BADGE[onboarding.status]}`}>
-                {onboarding.status.replace("_", " ")}
+    <div
+      className={`min-h-screen font-sans antialiased transition-colors duration-200 flex flex-col ${
+        isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+      }`}
+    >
+      <RestaurantNavbar activeSection="Employees" />
+
+      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Executive Header Banner */}
+        <div
+          className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+            isDark
+              ? "bg-[#121622]/60 border-white/[0.06]"
+              : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
+          }`}
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push(`/restaurant/${subdomain}/workforce/onboarding`)}
+                className={`text-xs font-medium transition cursor-pointer ${
+                  isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                ← All Onboardings
+              </button>
+              <span className={`text-xs ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
+              <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-md border ${
+                isDark ? "bg-white/[0.04] text-[#8F95A3] border-white/[0.08]" : "bg-slate-100 text-slate-600 border-slate-200"
+              }`}>
+                {onboarding.employee.employeeCode}
               </span>
-              <span className="text-xs text-gray-500 font-medium">• {onboarding.template.name}</span>
+              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                onboarding.status === "APPROVED"
+                  ? isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-100 text-emerald-800 border-emerald-200"
+                  : onboarding.status === "IN_PROGRESS"
+                  ? isDark ? "bg-[#0071E3]/15 text-[#58A6FF] border-[#0071E3]/25" : "bg-blue-100 text-blue-800 border-blue-200"
+                  : onboarding.status === "PENDING_APPROVAL"
+                  ? isDark ? "bg-amber-500/15 text-amber-300 border-amber-500/25" : "bg-amber-100 text-amber-800 border-amber-200"
+                  : isDark ? "bg-rose-500/15 text-rose-300 border-rose-500/25" : "bg-rose-100 text-rose-800 border-rose-200"
+              }`}>
+                {onboarding.status.replace(/_/g, " ")}
+              </span>
             </div>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleCopyLink}
-            className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 transition-all cursor-pointer"
-          >
-            {copiedLink ? "Link Copied" : "Copy Employee Portal Link"}
-          </button>
-          <button
-            onClick={() => setShowEmailModal(true)}
-            className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 transition-all cursor-pointer"
-          >
-            Send Email Link
-          </button>
-          {canSubmit && (
+            <h1 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+              {onboarding.employee.firstName} {onboarding.employee.lastName}
+            </h1>
+            <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Checklist Template: <span className="font-semibold">{onboarding.template.name}</span>
+            </p>
+          </div>
+
+          {/* Header Action Buttons including Delete Session */}
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             <button
-              onClick={handleSubmit}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
+              onClick={handleCopyLink}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                isDark
+                  ? "bg-white/[0.04] text-white border-white/[0.08] hover:bg-white/[0.08]"
+                  : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50 shadow-xs"
+              }`}
             >
-              Submit for Approval →
+              {copiedLink ? "✓ Copied" : "Copy Portal Link"}
             </button>
-          )}
-        </div>
-      </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">{error}</div>}
+            <button
+              onClick={() => setShowEmailModal(true)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                isDark
+                  ? "bg-white/[0.04] text-white border-white/[0.08] hover:bg-white/[0.08]"
+                  : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50 shadow-xs"
+              }`}
+            >
+              Send Email
+            </button>
 
-        {/* Shareable Link Box */}
-        <div className="bg-white border-t-4 border-t-indigo-600 border-x border-b border-gray-200 rounded-2xl p-6 shadow-sm space-y-3">
-          <div className="flex justify-between items-center">
-            <h3 className="font-bold text-gray-900 text-sm">
-              Employee Self-Service Link
-            </h3>
-            <span className="text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-200 font-mono font-bold px-2 py-0.5 rounded">Dynamic Token</span>
+            {canSubmit && (
+              <button
+                onClick={handleSubmit}
+                className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
+              >
+                Submit for Approval →
+              </button>
+            )}
+
+            {/* Prominent Apple Delete Session Button */}
+            <button
+              type="button"
+              onClick={() => setShowDeleteModal(true)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition cursor-pointer flex items-center gap-1.5 ${
+                isDark
+                  ? "bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20"
+                  : "bg-rose-50/80 border-rose-200/80 text-rose-600 hover:bg-rose-100"
+              }`}
+            >
+              <svg className="w-3.5 h-3.5 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <span>Delete Session</span>
+            </button>
           </div>
-          <p className="text-xs text-gray-600">
-            Share this link with <span className="text-gray-900 font-bold">{onboarding.employee.firstName}</span> to let them fill forms, upload documents, and sign digitally.
+        </div>
+
+        {error && (
+          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl">
+            {error}
+          </div>
+        )}
+
+        {/* Shareable Portal Link Card */}
+        <div
+          className={`p-6 rounded-3xl border transition space-y-3 ${
+            isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+          }`}
+        >
+          <div className="flex justify-between items-center">
+            <h3 className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+              Candidate Portal Access Link
+            </h3>
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#0071E3]/15 text-[#58A6FF] border border-[#0071E3]/25">
+              Self-Service Token
+            </span>
+          </div>
+          <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+            Share this private link with <span className="font-bold">{onboarding.employee.firstName}</span> to complete document verification and digital signature intake.
           </p>
           <div className="flex gap-2">
             <input
               type="text"
               readOnly
               value={getPortalUrl()}
-              className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-mono text-gray-800 focus:outline-none"
+              className={`flex-1 px-3.5 py-2.5 text-xs font-mono rounded-xl border transition ${
+                isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+              }`}
             />
             <button
               onClick={handleCopyLink}
-              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
+              className="px-5 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer"
             >
               {copiedLink ? "Copied" : "Copy Link"}
             </button>
           </div>
         </div>
 
-        {/* Progress Bar Card */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-3">
+        {/* Overall Progress */}
+        <div
+          className={`p-6 rounded-3xl border transition space-y-3 ${
+            isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+          }`}
+        >
           <div className="flex justify-between items-center">
-            <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Overall Progress</span>
-            <span className="text-2xl font-bold text-gray-900">{pct}%</span>
+            <h3 className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+              Overall Checklist Progress
+            </h3>
+            <span className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+              {completed} of {total} tasks ({pct}%)
+            </span>
           </div>
-          <div className="h-3 bg-gray-100 rounded-full overflow-hidden border border-gray-200">
+          <div className={`h-2.5 rounded-full overflow-hidden ${isDark ? "bg-white/[0.08]" : "bg-slate-100"}`}>
             <div
-              className="h-full bg-indigo-600 rounded-full transition-all duration-500"
+              className="h-full bg-[#0071E3] rounded-full transition-all duration-300"
               style={{ width: `${pct}%` }}
             />
           </div>
-          <p className="text-xs text-gray-500 font-medium">{completed} of {total} tasks completed or waived</p>
         </div>
 
-        {/* Approval Panel */}
+        {/* Task Checklist Items */}
+        <div className="space-y-3">
+          <h3 className={`text-xs font-bold uppercase tracking-wider px-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+            Onboarding Checklist ({total} Items)
+          </h3>
+
+          {onboarding.progresses.map((p, idx) => (
+            <div
+              key={p.id}
+              className={`p-5 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+              }`}
+            >
+              <div className="flex items-start gap-3.5">
+                <span className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-bold text-xs flex-shrink-0 ${
+                  isDark ? "bg-white/[0.04] text-[#8F95A3] border border-white/[0.08]" : "bg-slate-100 text-slate-600 border border-slate-200"
+                }`}>
+                  {idx + 1}
+                </span>
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                      {p.task.title}
+                    </p>
+                    {p.task.isRequired && (
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.2 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                        Required
+                      </span>
+                    )}
+                  </div>
+                  {p.task.description && (
+                    <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                      {p.task.description}
+                    </p>
+                  )}
+                  {p.responseValue && (
+                    <p className="text-xs text-[#0071E3] font-medium">
+                      Response: {p.responseValue}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full border ${
+                  p.status === "COMPLETED"
+                    ? isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-100 text-emerald-800 border-emerald-200"
+                    : p.status === "PENDING"
+                    ? isDark ? "bg-amber-500/15 text-amber-300 border-amber-500/25" : "bg-amber-100 text-amber-800 border-amber-200"
+                    : isDark ? "bg-rose-500/15 text-rose-300 border-rose-500/25" : "bg-rose-100 text-rose-800 border-rose-200"
+                }`}>
+                  {p.status}
+                </span>
+
+                <button
+                  onClick={() => {
+                    setActionTask(p);
+                    setTaskNote(p.notes || "");
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                    isDark
+                      ? "bg-white/[0.04] text-white border-white/[0.08] hover:bg-white/[0.08]"
+                      : "bg-slate-100 text-slate-800 border-slate-200 hover:bg-slate-200"
+                  }`}
+                >
+                  Review / Update
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* HR Approval Controls if Pending Approval */}
         {canApprove && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 space-y-4 shadow-sm">
-            <h3 className="font-bold text-amber-800 text-xs uppercase tracking-widest">Pending Manager Review</h3>
+          <div
+            className={`p-6 rounded-3xl border transition space-y-4 ${
+              isDark ? "bg-[#121622]/60 border-amber-500/30" : "bg-amber-50/50 border-amber-200 shadow-xs"
+            }`}
+          >
+            <h3 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+              HR Audit & Approval Actions
+            </h3>
             <textarea
-              placeholder="Review notes (optional for approval, required for rejection)..."
+              rows={2}
+              placeholder="Add audit notes or remarks..."
               value={reviewNote}
               onChange={(e) => setReviewNote(e.target.value)}
-              rows={2}
-              className="w-full bg-white border border-amber-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-amber-500 resize-none"
+              className={`w-full p-3 text-xs rounded-xl border transition ${
+                isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+              }`}
             />
-            <div className="flex gap-3">
-              <button
-                onClick={handleApprove}
-                disabled={approving}
-                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs cursor-pointer disabled:opacity-50 transition-all shadow-sm"
-              >
-                {approving ? "Approving..." : "Approve Session"}
-              </button>
+            <div className="flex justify-end gap-2.5">
               <button
                 onClick={handleReject}
                 disabled={rejecting}
-                className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-xs cursor-pointer disabled:opacity-50 transition-all shadow-sm"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl cursor-pointer"
               >
-                {rejecting ? "Rejecting..." : "Reject Session"}
+                {rejecting ? "Rejecting..." : "Reject Checklist"}
+              </button>
+              <button
+                onClick={handleApprove}
+                disabled={approving}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl cursor-pointer"
+              >
+                {approving ? "Approving..." : "Approve & Complete"}
               </button>
             </div>
           </div>
         )}
-
-        {/* Task Checklist */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500">Task Checklist</h3>
-            <span className="text-xs text-gray-400 font-medium">{total} total items</span>
-          </div>
-
-          <div className="space-y-3">
-            {[...onboarding.progresses].sort((a, b) => a.task.sortOrder - b.task.sortOrder).map((progress, idx) => {
-              const cfg = TASK_STATUS_CONFIG[progress.status];
-              const editable = ["IN_PROGRESS", "REJECTED"].includes(onboarding.status);
-
-              return (
-                <div key={progress.id} className="bg-white border border-gray-200 hover:border-gray-300 rounded-2xl p-5 transition-all shadow-sm space-y-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3 flex-1">
-                      <span className="w-6 h-6 rounded-full bg-gray-100 border border-gray-200 text-gray-700 flex items-center justify-center text-xs font-bold font-mono mt-0.5">
-                        {idx + 1}
-                      </span>
-                      <div className="space-y-1 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-bold text-gray-900 text-sm">{progress.task.title}</h4>
-                          {progress.task.isRequired && <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">*Required</span>}
-                          {progress.task.requiresDoc && <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">Document</span>}
-                        </div>
-                        {progress.task.description && <p className="text-xs text-gray-500">{progress.task.description}</p>}
-
-                        {/* Render saved signature or response values */}
-                        {progress.responseValue && progress.task.taskType === "SIGNATURE" && (
-                          <div className="pt-2">
-                            <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">Digital Signature Signature:</p>
-                            <img src={progress.responseValue} alt="Signature" className="h-12 bg-gray-50 border border-gray-200 rounded-lg p-1" />
-                          </div>
-                        )}
-                        {progress.responseValue && progress.task.taskType !== "SIGNATURE" && (
-                          <p className="text-xs text-indigo-700 font-semibold pt-1">Response: <span className="text-gray-900 font-normal">{progress.responseValue}</span></p>
-                        )}
-
-                        {progress.notes && <p className="text-xs text-gray-500 italic pt-1">Note: "{progress.notes}"</p>}
-                        {progress.fileUpload && (
-                          <a href={progress.fileUpload.fileUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-indigo-600 hover:underline pt-1 inline-block">
-                            Attached Document: {progress.fileUpload.fileName}
-                          </a>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Status Badge & Clean Action Link */}
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs px-2.5 py-1 rounded-lg font-bold border ${cfg.color}`}>
-                        {cfg.label}
-                      </span>
-                      {editable && (
-                        <button
-                          onClick={() => { setActionTask(progress); setTaskNote(progress.notes || ""); setUploadedFileId(null); }}
-                          className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-1.5 transition-all cursor-pointer"
-                        >
-                          Review / Update
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
       </main>
 
-      {/* Task Update Modal */}
-      {actionTask && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md space-y-5 shadow-2xl">
-            <div>
-              <h2 className="text-lg font-bold text-gray-900">{actionTask.task.title}</h2>
-              {actionTask.task.description && <p className="text-xs text-gray-500 mt-1">{actionTask.task.description}</p>}
-            </div>
-
-            {error && <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-xl">{error}</div>}
-
-            <textarea
-              placeholder="Notes or comments (optional)..."
-              value={taskNote}
-              onChange={(e) => setTaskNote(e.target.value)}
-              rows={2}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:bg-white focus:outline-none focus:border-indigo-600 resize-none"
-            />
-
-            {(actionTask.task.requiresDoc || actionTask.task.requiresDoc) && (
-              <div>
-                <input ref={fileRef} type="file" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])} />
-                <button
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                  className="w-full py-2.5 border border-dashed border-gray-300 hover:border-indigo-500 text-gray-600 hover:text-indigo-600 rounded-xl text-xs font-semibold cursor-pointer transition-all bg-gray-50"
-                >
-                  {uploading ? "Uploading..." : uploadedFileId ? "File attached successfully" : "Upload Document File"}
-                </button>
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div
+            className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 ${
+              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900 shadow-slate-900/10"
+            }`}
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                </svg>
               </div>
-            )}
 
-            <div className="grid grid-cols-2 gap-3">
-              {(["COMPLETED", "WAIVED"] as TaskStatus[]).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => handleUpdateTask(actionTask.taskId, s)}
-                  disabled={updating}
-                  className={`py-2.5 rounded-xl font-bold text-xs cursor-pointer disabled:opacity-50 transition-all ${
-                    s === "COMPLETED" ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm" : "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200"
-                  }`}
-                >
-                  {s === "COMPLETED" ? "Mark Complete" : "Waive Task"}
-                </button>
-              ))}
+              <div className="space-y-1 min-w-0 flex-1">
+                <h2 className={`text-base font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+                  Delete Onboarding Session
+                </h2>
+                <p className={`text-xs leading-relaxed ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                  Are you sure you want to delete this onboarding workflow for{" "}
+                  <span className={`font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                    {onboarding.employee.firstName} {onboarding.employee.lastName}
+                  </span>
+                  ? All checklist progress and documents tied to this session will be removed.
+                </p>
+                <div className="pt-1">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-medium border ${
+                    isDark ? "bg-white/[0.04] text-[#BAC0CD] border-white/[0.08]" : "bg-slate-100 text-slate-700 border-slate-200"
+                  }`}>
+                    Template: {onboarding.template.name}
+                  </span>
+                </div>
+              </div>
             </div>
-            <button
-              onClick={() => { setActionTask(null); setTaskNote(""); setUploadedFileId(null); setError(""); }}
-              className="w-full py-2 rounded-xl border border-gray-200 text-gray-500 text-xs font-semibold hover:bg-gray-50 cursor-pointer"
-            >
-              Cancel
-            </button>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setShowDeleteModal(false)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                  isDark
+                    ? "bg-white/[0.04] text-[#8F95A3] hover:text-white hover:bg-white/[0.08]"
+                    : "bg-slate-100 text-slate-700 hover:text-slate-900 hover:bg-slate-200"
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={handleDeleteSession}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm shadow-rose-600/20 cursor-pointer disabled:opacity-50"
+              >
+                {deleting ? "Deleting..." : "Delete Session"}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Email Dispatch Modal */}
-      {showEmailModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
+      {/* Task Update Modal */}
+      {actionTask && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div
+            className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
+              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex justify-between items-center">
+              <h2 className="text-base font-bold">Update Checklist Task</h2>
+              <button onClick={() => setActionTask(null)} className="text-slate-400 hover:text-white cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              {actionTask.task.title}
+            </p>
+
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Send Onboarding Link</h2>
-              <p className="text-xs text-gray-500 mt-1">
-                Dispatch an invitation to <span className="text-gray-900 font-bold">{onboarding.employee.firstName} {onboarding.employee.lastName}</span>
-              </p>
+              <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                Notes / Audit Remarks
+              </label>
+              <textarea
+                rows={2}
+                value={taskNote}
+                onChange={(e) => setTaskNote(e.target.value)}
+                className={`w-full p-3 text-xs rounded-xl border transition ${
+                  isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                }`}
+              />
             </div>
 
-            <div className="bg-gray-50 border border-gray-200 p-3 rounded-xl text-xs space-y-1">
-              <p><span className="text-gray-500">Recipient:</span> <span className="font-bold text-gray-900">{onboarding.employee.personalEmail || `${onboarding.employee.firstName.toLowerCase()}@restaurant.com`}</span></p>
-              <p><span className="text-gray-500">Subject:</span> <span className="font-medium text-gray-800">Complete your onboarding for {onboarding.template.name}</span></p>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <button
+                onClick={() => handleUpdateTask(actionTask.taskId, "COMPLETED")}
+                disabled={updating}
+                className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl"
+              >
+                Mark Completed
+              </button>
+              <button
+                onClick={() => handleUpdateTask(actionTask.taskId, "WAIVED")}
+                disabled={updating}
+                className="flex-1 py-2 bg-slate-600 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl"
+              >
+                Waive Task
+              </button>
+              <button
+                onClick={() => handleUpdateTask(actionTask.taskId, "REJECTED")}
+                disabled={updating}
+                className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl"
+              >
+                Reject Task
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Email Modal */}
+      {showEmailModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div
+            className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
+              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex justify-between items-center">
+              <h2 className="text-base font-bold">Email Portal Link</h2>
+              <button onClick={() => setShowEmailModal(false)} className="text-slate-400 hover:text-white cursor-pointer">
+                ✕
+              </button>
             </div>
 
-            {emailSentSuccess ? (
-              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-3 rounded-xl text-center font-bold">
-                Email notification queued and dispatched successfully
-              </div>
-            ) : (
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => setShowEmailModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-xs font-bold hover:bg-gray-50 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSendEmailSimulated}
-                  disabled={sendingEmail}
-                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer disabled:opacity-50 transition-all shadow-sm"
-                >
-                  {sendingEmail ? "Sending..." : "Send Email"}
-                </button>
+            <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+              Dispatch access invitation to: <span className="font-bold">{onboarding.employee.personalEmail || "Candidate email"}</span>
+            </p>
+
+            {emailSentSuccess && (
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-xl">
+                Invitation email dispatched successfully!
               </div>
             )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowEmailModal(false)}
+                className={`px-4 py-2 rounded-xl text-xs font-medium ${
+                  isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Close
+              </button>
+              <button
+                onClick={handleSendEmailSimulated}
+                disabled={sendingEmail || emailSentSuccess}
+                className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl disabled:opacity-50"
+              >
+                {sendingEmail ? "Sending..." : "Send Invitation"}
+              </button>
+            </div>
           </div>
         </div>
       )}
