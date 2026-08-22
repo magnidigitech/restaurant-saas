@@ -2,6 +2,11 @@
 
 import React, { useEffect, useRef } from "react";
 
+/**
+ * Apple-style Ambient Light WebGL Mesh Background
+ * Generates soft, flowing pastel light gradient Orbs in 3D WebGL
+ * on an off-white Apple backdrop (#fbfbfd) for maximum text readability and luxury visual depth.
+ */
 export default function WebGLCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -25,34 +30,58 @@ export default function WebGLCanvas() {
 
     window.addEventListener("resize", handleResize);
 
-    // Shader sources
+    // Vertex Shader
     const vsSource = `
-      attribute vec3 aPosition;
-      attribute vec3 aColor;
-      attribute float aSize;
-      uniform mat4 uProjection;
-      uniform mat4 uModelView;
-      varying vec3 vColor;
+      attribute vec2 aPosition;
+      varying vec2 vUv;
       void main() {
-        vColor = aColor;
-        vec4 mvPosition = uModelView * vec4(aPosition, 1.0);
-        gl_Position = uProjection * mvPosition;
-        gl_PointSize = aSize * (300.0 / -mvPosition.z);
+        vUv = aPosition * 0.5 + 0.5;
+        gl_Position = vec4(aPosition, 0.0, 1.0);
       }
     `;
 
+    // Fragment Shader - Apple Soft Ambient Light Blobs
     const fsSource = `
       precision mediump float;
-      varying vec3 vColor;
+      varying vec2 vUv;
+      uniform float uTime;
+      uniform vec2 uResolution;
+      uniform vec2 uMouse;
+
       void main() {
-        float dist = length(gl_PointCoord - vec2(0.5));
-        if (dist > 0.5) discard;
-        float alpha = (0.5 - dist) * 2.0;
-        gl_FragColor = vec4(vColor, alpha * 0.7);
+        vec2 st = gl_FragCoord.xy / uResolution.xy;
+        st.x *= uResolution.x / uResolution.y;
+
+        // Base Apple Off-White Background (#fbfbfd)
+        vec3 color = vec3(0.984, 0.984, 0.992);
+
+        // Soft Orb 1 - Soft Blue / Indigo
+        vec2 orb1 = vec2(0.3 + 0.15 * sin(uTime * 0.4), 0.7 + 0.1 * cos(uTime * 0.3) + uMouse.y * 0.05);
+        float d1 = length(st - orb1);
+        float alpha1 = smoothstep(0.7, 0.0, d1);
+        vec3 color1 = vec3(0.38, 0.52, 0.98); // Vibrant Apple Blue
+
+        // Soft Orb 2 - Soft Purple / Violet
+        vec2 orb2 = vec2(0.75 + 0.1 * cos(uTime * 0.5) + uMouse.x * 0.05, 0.3 + 0.15 * sin(uTime * 0.4));
+        float d2 = length(st - orb2);
+        float alpha2 = smoothstep(0.65, 0.0, d2);
+        vec3 color2 = vec3(0.62, 0.45, 0.96); // Soft Purple
+
+        // Soft Orb 3 - Soft Emerald / Mint
+        vec2 orb3 = vec2(0.5 + 0.2 * sin(uTime * 0.3), 0.2 + 0.1 * cos(uTime * 0.6));
+        float d3 = length(st - orb3);
+        float alpha3 = smoothstep(0.6, 0.0, d3);
+        vec3 color3 = vec3(0.32, 0.78, 0.68); // Mint Emerald
+
+        // Blend Ambient Light Blobs
+        color = mix(color, color1, alpha1 * 0.18);
+        color = mix(color, color2, alpha2 * 0.15);
+        color = mix(color, color3, alpha3 * 0.12);
+
+        gl_FragColor = vec4(color, 1.0);
       }
     `;
 
-    // Compile shader helper
     const createShader = (glCtx: WebGLRenderingContext, type: number, source: string) => {
       const shader = glCtx.createShader(type);
       if (!shader) return null;
@@ -78,144 +107,40 @@ export default function WebGLCanvas() {
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return;
     gl.useProgram(program);
 
-    // Generate 3D Particle Constellation Nodes
-    const particleCount = 280;
-    const positions = new Float32Array(particleCount * 3);
-    const colors = new Float32Array(particleCount * 3);
-    const sizes = new Float32Array(particleCount);
-    const velocities = new Float32Array(particleCount * 3);
-
-    for (let i = 0; i < particleCount; i++) {
-      const idx = i * 3;
-      positions[idx] = (Math.random() - 0.5) * 40;
-      positions[idx + 1] = (Math.random() - 0.5) * 30;
-      positions[idx + 2] = (Math.random() - 0.5) * 30 - 15;
-
-      // HSL tailored neon colors (Indigo/Purple/Cyan)
-      const colorType = Math.random();
-      if (colorType < 0.4) {
-        // Indigo
-        colors[idx] = 0.39;
-        colors[idx + 1] = 0.4;
-        colors[idx + 2] = 0.95;
-      } else if (colorType < 0.7) {
-        // Cyan
-        colors[idx] = 0.06;
-        colors[idx + 1] = 0.72;
-        colors[idx + 2] = 0.93;
-      } else {
-        // Purple/Pink
-        colors[idx] = 0.65;
-        colors[idx + 1] = 0.32;
-        colors[idx + 2] = 0.96;
-      }
-
-      sizes[i] = Math.random() * 2.5 + 1.2;
-
-      velocities[idx] = (Math.random() - 0.5) * 0.015;
-      velocities[idx + 1] = (Math.random() - 0.5) * 0.015;
-      velocities[idx + 2] = (Math.random() - 0.5) * 0.015;
-    }
-
+    // Quad geometry
+    const positions = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
     const posBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.DYNAMIC_DRAW);
-
-    const colorBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
-
-    const sizeBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, sizeBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, sizes, gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
 
     const aPos = gl.getAttribLocation(program, "aPosition");
-    const aColor = gl.getAttribLocation(program, "aColor");
-    const aSize = gl.getAttribLocation(program, "aSize");
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
-    const uProjection = gl.getUniformLocation(program, "uProjection");
-    const uModelView = gl.getUniformLocation(program, "uModelView");
-
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-    gl.enable(gl.DEPTH_TEST);
+    const uTime = gl.getUniformLocation(program, "uTime");
+    const uResolution = gl.getUniformLocation(program, "uResolution");
+    const uMouse = gl.getUniformLocation(program, "uMouse");
 
     let mouseX = 0;
     let mouseY = 0;
 
     const handleMouseMove = (e: MouseEvent) => {
-      mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
-      mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+      mouseX = e.clientX / window.innerWidth - 0.5;
+      mouseY = e.clientY / window.innerHeight - 0.5;
     };
     window.addEventListener("mousemove", handleMouseMove);
 
-    // Perspective Projection matrix helper
-    const createPerspective = (fovy: number, aspect: number, near: number, far: number) => {
-      const f = 1.0 / Math.tan(fovy / 2);
-      const nf = 1 / (near - far);
-      return new Float32Array([
-        f / aspect, 0, 0, 0,
-        0, f, 0, 0,
-        0, 0, (far + near) * nf, -1,
-        0, 0, 2 * far * near * nf, 0
-      ]);
-    };
-
-    let rotation = 0;
+    let startTime = performance.now();
 
     const render = () => {
-      rotation += 0.002;
+      const currentTime = (performance.now() - startTime) * 0.001;
 
       gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.clearColor(0.02, 0.04, 0.08, 1.0);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.uniform1f(uTime, currentTime);
+      gl.uniform2f(uResolution, canvas.width, canvas.height);
+      gl.uniform2f(uMouse, mouseX, mouseY);
 
-      // Animate particle positions
-      for (let i = 0; i < particleCount; i++) {
-        const idx = i * 3;
-        positions[idx] += velocities[idx] + mouseX * 0.003;
-        positions[idx + 1] += velocities[idx + 1] - mouseY * 0.003;
-        positions[idx + 2] += velocities[idx + 2];
-
-        // Bounds bounce
-        if (Math.abs(positions[idx]) > 25) velocities[idx] *= -1;
-        if (Math.abs(positions[idx + 1]) > 20) velocities[idx + 1] *= -1;
-        if (positions[idx + 2] > 5 || positions[idx + 2] < -35) velocities[idx + 2] *= -1;
-      }
-
-      gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
-      gl.bufferSubData(gl.ARRAY_BUFFER, 0, positions);
-
-      const projMatrix = createPerspective((45 * Math.PI) / 180, canvas.width / canvas.height, 0.1, 100);
-
-      // Model view matrix with rotation and camera tilt
-      const cosR = Math.cos(rotation * 0.5);
-      const sinR = Math.sin(rotation * 0.5);
-
-      const mvMatrix = new Float32Array([
-        cosR, 0, sinR, 0,
-        sinR * 0.1, 1, -cosR * 0.1, 0,
-        -sinR, 0, cosR, 0,
-        mouseX * 2, -mouseY * 2, -18, 1
-      ]);
-
-      gl.uniformMatrix4fv(uProjection, false, projMatrix);
-      gl.uniformMatrix4fv(uModelView, false, mvMatrix);
-
-      // Attributes
-      gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
-      gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
-      gl.enableVertexAttribArray(aPos);
-
-      gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-      gl.vertexAttribPointer(aColor, 3, gl.FLOAT, false, 0, 0);
-      gl.enableVertexAttribArray(aColor);
-
-      gl.bindBuffer(gl.ARRAY_BUFFER, sizeBuffer);
-      gl.vertexAttribPointer(aSize, 1, gl.FLOAT, false, 0, 0);
-      gl.enableVertexAttribArray(aSize);
-
-      gl.drawArrays(gl.POINTS, 0, particleCount);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
 
       animationFrameId = requestAnimationFrame(render);
     };
@@ -233,7 +158,6 @@ export default function WebGLCanvas() {
     <canvas
       ref={canvasRef}
       className="fixed inset-0 w-full h-full pointer-events-none z-0"
-      style={{ opacity: 0.85 }}
     />
   );
 }
