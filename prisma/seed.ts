@@ -116,6 +116,46 @@ async function main() {
       sortOrder: 13,
       availability: "GENERAL",
     },
+    {
+      id: "shifts",
+      name: "Shift Management",
+      description: "Manage schedules, rosters, templates and swaps.",
+      status: "ACTIVE",
+      sortOrder: 14,
+      availability: "GENERAL",
+    },
+    {
+      id: "workforce",
+      name: "Workforce & HR",
+      description: "Manage employee profiles, onboarding tasks and legal documents.",
+      status: "ACTIVE",
+      sortOrder: 15,
+      availability: "GENERAL",
+    },
+    {
+      id: "operations",
+      name: "Operations & Checklists",
+      description: "Opening/closing checklists and SOP temp audits.",
+      status: "ACTIVE",
+      sortOrder: 16,
+      availability: "GENERAL",
+    },
+    {
+      id: "masterdata",
+      name: "Master Data Settings",
+      description: "Multi-outlet profiles and tax rates.",
+      status: "ACTIVE",
+      sortOrder: 17,
+      availability: "GENERAL",
+    },
+    {
+      id: "rbac",
+      name: "Role Based Access Controls",
+      description: "Security roles and permissions.",
+      status: "ACTIVE",
+      sortOrder: 18,
+      availability: "GENERAL",
+    },
   ];
 
   for (const mod of modules) {

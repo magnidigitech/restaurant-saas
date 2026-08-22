@@ -53,7 +53,11 @@ export async function POST(
     }
 
     await prisma.$transaction(async (tx) => {
-      for (const mId of targetModuleIds) {
+      const dbModules = await tx.module.findMany({ select: { id: true } });
+      const validModuleSet = new Set(dbModules.map((m) => m.id));
+      const validTargetModuleIds = targetModuleIds.filter((mId) => validModuleSet.has(mId));
+
+      for (const mId of validTargetModuleIds) {
         if (isEnabled) {
           // Enable module
           await tx.restaurantModule.upsert({
