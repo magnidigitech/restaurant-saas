@@ -99,7 +99,12 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  // 3. Direct /restaurant/[subdomain] path routing (local testing or subpath navigation)
+  // 3. Global Public Routes (e.g. /activate, /onboarding/portal)
+  if (path === "/activate" || path.startsWith("/activate/") || path.startsWith("/onboarding/portal")) {
+    return NextResponse.next();
+  }
+
+  // 4. Direct /restaurant/[subdomain] path routing (e.g. /restaurant/bahubali/login, /restaurant/bahubali/dashboard)
   if (path.startsWith("/restaurant/")) {
     const pathParts = path.split("/");
     const pathSubdomain = pathParts[2];
@@ -128,12 +133,7 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  // 3.5 Global Public Routes (e.g. /activate)
-  if (path === "/activate" || path.startsWith("/activate/")) {
-    return NextResponse.next();
-  }
-
-  // 4. Check for Platform Super Admin Scope (admin.domain, /platform-admin, or /api/platform-admin)
+  // 5. Check for Platform Super Admin Scope (admin.domain, /platform-admin, or /api/platform-admin)
   if (subdomain === "admin" || path.startsWith("/platform-admin") || path.startsWith("/api/platform-admin")) {
     if (path.startsWith("/api/platform-admin") && path !== "/api/platform-admin/auth/login") {
       const token = req.cookies.get(PLATFORM_SESSION_COOKIE)?.value;
@@ -179,12 +179,8 @@ export async function proxy(req: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  // 5. Check for Subdomain-based Restaurant Scope (e.g. magni.restiq.magnidigitech.com)
+  // 6. Check for Subdomain-based Restaurant Scope (e.g. bahubali.restiq.magnidigitech.com)
   if (subdomain && subdomain !== "www") {
-    if (path.startsWith("/onboarding/portal")) {
-      return NextResponse.next();
-    }
-
     if (path.startsWith("/api")) {
       if (path.startsWith("/api/restaurant")) {
         const isPublicTenantApi =
@@ -228,15 +224,11 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  // 6. Public APIs & Activation Token route
+  // 7. Public APIs & Activation Token route
   if (path.startsWith("/api") || path.startsWith("/activate") || path.startsWith("/onboarding")) {
     return NextResponse.next();
   }
 
-  // 7. Fallback Root Path
-  if (isLocalHost(domain)) {
-    return NextResponse.redirect(createCleanRedirectUrl("/platform-admin/login", req));
-  } else {
-    return NextResponse.redirect(createCleanRedirectUrl("/platform-admin/login", req, `admin.${baseDomain}`));
-  }
+  // 8. Root Domain Landing Page (restiq.magnidigitech.com)
+  return NextResponse.next();
 }

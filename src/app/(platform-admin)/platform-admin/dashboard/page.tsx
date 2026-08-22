@@ -364,7 +364,10 @@ export default function ApplePlatformAdminDashboard() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to generate invite token");
 
-      const fullUrl = `${window.location.origin}/activate?token=${data.token}&subdomain=${data.subdomain}`;
+      const rootOrigin = window.location.origin.includes("admin.")
+        ? window.location.origin.replace("admin.", "")
+        : window.location.origin;
+      const fullUrl = `${rootOrigin}/activate?token=${data.token}&subdomain=${data.subdomain}`;
       setInviteUrls((prev) => ({ ...prev, [restaurantId]: fullUrl }));
       await navigator.clipboard.writeText(fullUrl);
       showToast("Activation link copied to clipboard");
@@ -527,12 +530,15 @@ export default function ApplePlatformAdminDashboard() {
       if (!res.ok) throw new Error(data.error || "Onboarding failed");
 
       const targetSubdomain = data.subdomain || data.restaurant?.subdomain || formData.subdomain;
+      const rootOrigin = window.location.origin.includes("admin.")
+        ? window.location.origin.replace("admin.", "")
+        : window.location.origin;
       const targetUrl =
         data.activationUrl ||
-        `${window.location.origin}/activate?token=${data.invitationToken || data.token}&subdomain=${targetSubdomain}`;
+        `${rootOrigin}/activate?token=${data.invitationToken || data.token}&subdomain=${targetSubdomain}`;
 
       setCreatedInvite({
-        url: targetUrl.startsWith("http") ? targetUrl : `${window.location.origin}${targetUrl}`,
+        url: targetUrl.startsWith("http") ? targetUrl : `${rootOrigin}${targetUrl}`,
         subdomain: targetSubdomain,
       });
       fetchData();
