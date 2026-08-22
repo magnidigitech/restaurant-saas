@@ -102,7 +102,7 @@ export const UNIFIED_CORE_MODULES = [
     id: "workforce",
     name: "Staff & Workforce",
     desc: "Employee Profiles, Code Sequences & HR Onboarding",
-    subIds: ["hr_onboarding"],
+    subIds: ["workforce", "hr_onboarding"],
   },
   {
     id: "shifts",
@@ -139,6 +139,30 @@ export const UNIFIED_CORE_MODULES = [
     name: "Secrets Vault & 2FA",
     desc: "Encrypted Credential Vault & 2FA Authenticator",
     subIds: ["vault"],
+  },
+  {
+    id: "catering",
+    name: "Catering & Event Management",
+    desc: "Banquet Orders, Pax Scaling, Package Builder & Proposals",
+    subIds: ["catering"],
+  },
+  {
+    id: "operations",
+    name: "Operations & SOP Audit",
+    desc: "Checklists & Temperature Compliance Audits",
+    subIds: ["operations"],
+  },
+  {
+    id: "masterdata",
+    name: "Master Data & Outlets",
+    desc: "Multi-Outlet Settings & Tax Profiles",
+    subIds: ["masterdata"],
+  },
+  {
+    id: "rbac",
+    name: "Role-Based Access Controls",
+    desc: "Granular Security Roles & Permission Grants",
+    subIds: ["rbac"],
   },
 ];
 

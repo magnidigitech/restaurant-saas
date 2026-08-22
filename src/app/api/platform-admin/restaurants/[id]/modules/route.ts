@@ -78,13 +78,29 @@ export async function POST(
             },
           });
 
-          // Query default Restaurant Owner role for this tenant
-          const ownerRole = await tx.role.findFirst({
+          // Query default Restaurant Owner or any role for this tenant
+          let ownerRole = await tx.role.findFirst({
             where: {
               restaurantId,
               name: "Restaurant Owner",
             },
           });
+
+          if (!ownerRole) {
+            ownerRole = await tx.role.findFirst({
+              where: { restaurantId },
+            });
+          }
+
+          if (!ownerRole) {
+            ownerRole = await tx.role.create({
+              data: {
+                restaurantId,
+                name: "Restaurant Owner",
+                description: "Primary Restaurant Owner Role",
+              },
+            });
+          }
 
           if (ownerRole) {
             // Fetch permissions for this module
