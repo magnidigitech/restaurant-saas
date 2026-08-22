@@ -237,6 +237,18 @@ async function main() {
     { id: "catering:manage_orders", moduleId: "catering", name: "Manage Catering Orders", description: "Create, edit, and update status of catering events" },
     { id: "catering:manage_packages", moduleId: "catering", name: "Manage Menu Packages", description: "Define custom event items & link recipe items" },
     { id: "catering:approve_deposit", moduleId: "catering", name: "Approve Deposits & Billing", description: "Record advance payments and balance settlements" },
+
+    // Module Aliases
+    { id: "shifts:view", moduleId: "shifts", name: "View Shifts", description: "View shift rosters" },
+    { id: "shifts:manage", moduleId: "shifts", name: "Manage Shifts", description: "Manage rosters and templates" },
+    { id: "workforce:view", moduleId: "workforce", name: "View Workforce", description: "View staff directory" },
+    { id: "workforce:manage", moduleId: "workforce", name: "Manage Workforce", description: "Manage employees and onboarding" },
+    { id: "operations:view", moduleId: "operations", name: "View Operations", description: "View checklists and temp logs" },
+    { id: "operations:manage", moduleId: "operations", name: "Manage Operations", description: "Manage SOP templates and audits" },
+    { id: "masterdata:view", moduleId: "masterdata", name: "View Master Data", description: "View outlet settings and tax rates" },
+    { id: "masterdata:manage", moduleId: "masterdata", name: "Manage Master Data", description: "Configure tax rates and outlets" },
+    { id: "rbac:view", moduleId: "rbac", name: "View RBAC", description: "View roles and permissions" },
+    { id: "rbac:manage", moduleId: "rbac", name: "Manage RBAC", description: "Create roles and grant permissions" },
   ];
 
   for (const perm of permissions) {
