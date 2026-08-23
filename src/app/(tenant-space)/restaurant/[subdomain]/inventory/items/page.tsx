@@ -135,6 +135,8 @@ export default function InventoryItemsPage({
 
   // Bulk Import States
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [previewFile, setPreviewFile] = useState<{ name: string; size: number } | null>(null);
+  const [parsedRows, setParsedRows] = useState<any[]>([]);
   const [importing, setImporting] = useState(false);
   const [importReport, setImportReport] = useState<{
     added: Array<{ row: number; name: string; sku?: string }>;
@@ -249,12 +251,11 @@ export default function InventoryItemsPage({
     URL.revokeObjectURL(url);
   };
 
-  // Handle File Upload & Processing
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Step 1: Handle File Selection & Local Parsing for Preview
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setImporting(true);
     setError("");
     setImportReport(null);
 
@@ -265,16 +266,34 @@ export default function InventoryItemsPage({
         throw new Error("The uploaded file contains no valid rows or readable item data.");
       }
 
+      setParsedRows(rows);
+      setPreviewFile({ name: file.name, size: file.size });
+    } catch (err: any) {
+      setError(err.message || "Failed to parse spreadsheet file.");
+    } finally {
+      e.target.value = "";
+    }
+  };
+
+  // Step 2: Confirm & Execute Bulk Import API
+  const handleConfirmImport = async () => {
+    if (!parsedRows || parsedRows.length === 0) return;
+
+    setImporting(true);
+    setError("");
+
+    try {
       const res = await fetch("/api/restaurant/inventory/items/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: rows }),
+        body: JSON.stringify({ items: parsedRows }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to process bulk import");
 
       setImportReport(data.report);
+      setPreviewFile(null);
       if (data.report.added.length > 0) {
         setReportTab("added");
       } else if (data.report.failed.length > 0) {
@@ -284,10 +303,9 @@ export default function InventoryItemsPage({
       }
       await fetchData();
     } catch (err: any) {
-      setError(err.message || "Failed to parse or upload file.");
+      setError(err.message || "Failed to import items.");
     } finally {
       setImporting(false);
-      e.target.value = "";
     }
   };
 
@@ -335,6 +353,8 @@ export default function InventoryItemsPage({
                 type="button"
                 onClick={() => {
                   setImportReport(null);
+                  setPreviewFile(null);
+                  setParsedRows([]);
                   setShowBulkModal(true);
                 }}
                 className={`px-3.5 py-2 text-xs font-semibold rounded-xl border transition cursor-pointer flex items-center gap-1.5 ${
@@ -486,22 +506,32 @@ export default function InventoryItemsPage({
             >
               <div className="flex justify-between items-center">
                 <div>
-                  <h2 className="text-lg font-bold tracking-tight">Bulk Import Inventory Items</h2>
+                  <h2 className="text-lg font-bold tracking-tight">
+                    {previewFile ? "Preview Data to Import" : importReport ? "Import Results Summary" : "Bulk Import Inventory Items"}
+                  </h2>
                   <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                    Upload your item catalog via Excel spreadsheet or CSV file.
+                    {previewFile
+                      ? `Review detected items from ${previewFile.name} before confirming import.`
+                      : importReport
+                      ? "Summary of added, skipped, and failed rows."
+                      : "Upload your item catalog via Excel spreadsheet or CSV file."}
                   </p>
                 </div>
                 <button
-                  onClick={() => setShowBulkModal(false)}
+                  onClick={() => {
+                    setShowBulkModal(false);
+                    setPreviewFile(null);
+                    setParsedRows([]);
+                  }}
                   className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-base cursor-pointer"
                 >
                   ✕
                 </button>
               </div>
 
-              {!importReport ? (
+              {/* STEP 1: FILE UPLOAD DROP BOX */}
+              {!previewFile && !importReport && (
                 <div className="space-y-5">
-                  {/* File Drag & Drop Box */}
                   <div
                     className={`border-2 border-dashed rounded-2xl p-8 text-center transition flex flex-col items-center justify-center space-y-3 relative ${
                       isDark
@@ -512,9 +542,8 @@ export default function InventoryItemsPage({
                     <input
                       type="file"
                       accept=".csv,.xlsx,.xls"
-                      onChange={handleFileUpload}
-                      disabled={importing}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                      onChange={handleFileSelect}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     />
                     <div className="w-12 h-12 rounded-2xl bg-[#0071E3]/10 border border-[#0071E3]/20 flex items-center justify-center text-[#0071E3]">
                       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -522,17 +551,13 @@ export default function InventoryItemsPage({
                       </svg>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold">
-                        {importing ? "Processing & importing items..." : "Click or drag & drop file to upload"}
-                      </p>
+                      <p className="text-sm font-semibold">Click or drag &amp; drop spreadsheet to upload</p>
                       <p className={`text-xs mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
                         Supports .CSV, .XLSX, .XLS files (up to 1,000 rows)
                       </p>
                     </div>
-                    {importing && <div className="text-xs text-[#0071E3] font-medium animate-pulse">Parsing file and validating rows...</div>}
                   </div>
 
-                  {/* Sample Download Prompt */}
                   <div
                     className={`p-4 rounded-2xl border flex items-center justify-between text-xs ${
                       isDark ? "bg-[#090B10] border-white/[0.06]" : "bg-blue-50/50 border-blue-100"
@@ -556,10 +581,104 @@ export default function InventoryItemsPage({
                     </button>
                   </div>
                 </div>
-              ) : (
-                /* IMPORT REPORT SUMMARY (ADDED, SKIPPED, FAILED) */
+              )}
+
+              {/* STEP 2: PREVIEW DATA TABLE & CONFIRMATION */}
+              {previewFile && !importReport && (
                 <div className="space-y-5">
-                  {/* Summary Badges Header */}
+                  <div className={`p-4 rounded-2xl border flex items-center justify-between ${isDark ? "bg-[#090B10] border-white/[0.08]" : "bg-blue-50/60 border-blue-100"}`}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#0071E3]/10 border border-[#0071E3]/20 flex items-center justify-center text-[#0071E3] shrink-0">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-bold">{previewFile.name}</h3>
+                        <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                          Detected <span className="font-bold text-[#0071E3]">{parsedRows.length} items</span> ready for import
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewFile(null);
+                        setParsedRows([]);
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition cursor-pointer ${
+                        isDark ? "bg-white/[0.04] border-white/[0.08] hover:bg-white/[0.08] text-slate-300" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      Re-select File
+                    </button>
+                  </div>
+
+                  <div className={`rounded-2xl border overflow-hidden max-h-64 overflow-y-auto text-xs ${isDark ? "bg-[#090B10] border-white/[0.08]" : "bg-white border-slate-200"}`}>
+                    <table className="w-full text-left border-collapse">
+                      <thead className="sticky top-0 z-10">
+                        <tr className={`border-b text-[10px] font-bold uppercase tracking-wider ${isDark ? "bg-[#161B29] border-white/[0.08] text-slate-400" : "bg-slate-100 border-slate-200 text-slate-600"}`}>
+                          <th className="py-2.5 px-3">#</th>
+                          <th className="py-2.5 px-3">Item Name</th>
+                          <th className="py-2.5 px-3">SKU</th>
+                          <th className="py-2.5 px-3">Category</th>
+                          <th className="py-2.5 px-3">UOM</th>
+                          <th className="py-2.5 px-3 text-right">Cost</th>
+                          <th className="py-2.5 px-3 text-right">Par Level</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
+                        {parsedRows.map((row, idx) => (
+                          <tr key={idx} className={isDark ? "hover:bg-white/[0.02]" : "hover:bg-slate-50"}>
+                            <td className="py-2 px-3 font-mono opacity-50 text-[11px]">{row.rowNumber || idx + 1}</td>
+                            <td className="py-2 px-3 font-semibold">{row.name || <span className="text-rose-500 font-normal">Missing Name</span>}</td>
+                            <td className="py-2 px-3 font-mono text-[11px] opacity-70">{row.sku || "—"}</td>
+                            <td className="py-2 px-3">{row.category || "—"}</td>
+                            <td className="py-2 px-3 font-mono text-[11px]">{row.unitOfMeasure || "PIECES"}</td>
+                            <td className="py-2 px-3 text-right font-mono">${Number(row.costPerUnit || 0).toFixed(2)}</td>
+                            <td className="py-2 px-3 text-right font-mono opacity-70">{row.parLevel || 0}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2 border-t border-black/[0.06] dark:border-white/[0.06]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewFile(null);
+                        setParsedRows([]);
+                      }}
+                      className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                        isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={importing}
+                      onClick={handleConfirmImport}
+                      className="px-5 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition cursor-pointer shadow-sm disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {importing ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Importing...</span>
+                        </>
+                      ) : (
+                        <span>Confirm &amp; Import ({parsedRows.length} Items)</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: IMPORT REPORT RESULTS SUMMARY */}
+              {importReport && (
+                <div className="space-y-5">
                   <div className="grid grid-cols-3 gap-3">
                     <button
                       type="button"
@@ -610,7 +729,6 @@ export default function InventoryItemsPage({
                     </button>
                   </div>
 
-                  {/* TAB DETAILED LIST */}
                   <div className={`p-4 rounded-2xl border text-xs max-h-64 overflow-y-auto ${isDark ? "bg-[#090B10] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
                     {reportTab === "added" && (
                       <div className="space-y-2">
@@ -667,14 +785,23 @@ export default function InventoryItemsPage({
                   <div className="flex justify-between items-center pt-2">
                     <button
                       type="button"
-                      onClick={() => setImportReport(null)}
+                      onClick={() => {
+                        setImportReport(null);
+                        setPreviewFile(null);
+                        setParsedRows([]);
+                      }}
                       className="text-xs font-semibold text-[#0071E3] hover:underline cursor-pointer"
                     >
                       ← Upload Another File
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowBulkModal(false)}
+                      onClick={() => {
+                        setShowBulkModal(false);
+                        setImportReport(null);
+                        setPreviewFile(null);
+                        setParsedRows([]);
+                      }}
                       className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer"
                     >
                       Done &amp; Close
