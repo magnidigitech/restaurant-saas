@@ -45,10 +45,17 @@ export default function ModuleAccessGuard({
         const activeKeys: string[] = (data.modules || []).map((m: any) => m.key.toLowerCase());
 
         const targetKey = moduleKey.toLowerCase();
+        const shiftKeys = ["shifts", "shift_management"];
+        const inventoryKeys = ["inventory", "vendor_management", "purchase_management"];
+        const attendanceKeys = ["attendance", "leave_management"];
+        const workforceKeys = ["workforce", "hr_onboarding"];
+
         const isEntitled =
           activeKeys.includes(targetKey) ||
-          (targetKey === "shifts" && activeKeys.includes("shift_management")) ||
-          (targetKey === "shift_management" && activeKeys.includes("shifts"));
+          (shiftKeys.includes(targetKey) && activeKeys.some((k) => shiftKeys.includes(k))) ||
+          (inventoryKeys.includes(targetKey) && activeKeys.some((k) => inventoryKeys.includes(k))) ||
+          (attendanceKeys.includes(targetKey) && activeKeys.some((k) => attendanceKeys.includes(k))) ||
+          (workforceKeys.includes(targetKey) && activeKeys.some((k) => workforceKeys.includes(k)));
 
         if (isMounted) {
           setHasAccess(isEntitled);

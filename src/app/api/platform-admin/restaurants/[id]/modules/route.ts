@@ -3,6 +3,9 @@ import { prisma } from "@/core/database/client";
 import { getPlatformSession } from "@/core/auth/session";
 import { z } from "zod";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const moduleStatusSchema = z.object({
   moduleId: z.string().min(1),
   enabled: z.boolean().optional(),
@@ -41,23 +44,66 @@ export async function POST(
       return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
     }
 
-    let targetModuleIds: string[] = [moduleId];
-    if (moduleId === "shifts" || moduleId === "shift_management") {
-      targetModuleIds = ["shifts", "shift_management"];
-    } else if (moduleId === "inventory" || moduleId === "vendor_management" || moduleId === "purchase_management") {
-      targetModuleIds = ["inventory", "vendor_management", "purchase_management"];
-    } else if (moduleId === "attendance" || moduleId === "leave_management") {
-      targetModuleIds = ["attendance", "leave_management"];
-    } else if (moduleId === "workforce" || moduleId === "hr_onboarding") {
-      targetModuleIds = ["workforce", "hr_onboarding"];
+    let targetModuleIds: string[] = [];
+    const UNIFIED_MODULE_MAP: Record<string, string[]> = {
+      inventory: ["inventory", "vendor_management", "purchase_management"],
+      attendance: ["attendance", "leave_management"],
+      workforce: ["workforce", "hr_onboarding"],
+      shifts: ["shifts", "shift_management"],
+      payroll: ["payroll"],
+      pos: ["pos"],
+      finance: ["finance"],
+      analytics: ["analytics"],
+      vault: ["vault"],
+      catering: ["catering"],
+      operations: ["operations"],
+      masterdata: ["masterdata"],
+      rbac: ["rbac"],
+    };
+
+    const MODULE_META: Record<string, { name: string; desc: string }> = {
+      inventory: { name: "Inventory & Stock Control", desc: "Track real-time stock levels, adjustments, recipes, and wastage." },
+      vendor_management: { name: "Vendor Management", desc: "Manage raw material vendors and supplier lists." },
+      purchase_management: { name: "Purchase Management", desc: "Generate and approve Purchase Orders for vendor shipments." },
+      attendance: { name: "Attendance", desc: "Track employee check-in, clock-out details and kiosk punch PINs." },
+      leave_management: { name: "Leave Management", desc: "Manage employee paid leaves, sick leaves and approvals." },
+      workforce: { name: "Workforce & HR", desc: "Manage employee profiles, onboarding tasks and legal documents." },
+      hr_onboarding: { name: "HR Onboarding", desc: "Manage employee profiles, onboarding tasks and legal documents." },
+      shifts: { name: "Shift Management", desc: "Manage schedules, rosters, templates and swaps." },
+      shift_management: { name: "Shift Management", desc: "Manage schedules, rosters, templates and swaps." },
+      payroll: { name: "Payroll & Compensation", desc: "Process monthly salaries, calculate deductions, tip pools and generate payslips." },
+      pos: { name: "Point of Sale (POS)", desc: "Digital table order taking, menu catalog, kitchen ticketing, and bill settlement." },
+      finance: { name: "Finance & P&L Tracker", desc: "Automated expense aggregation from payroll & POs, revenue tracker, and upcoming bills reminder." },
+      vault: { name: "Secrets Vault & 2FA", desc: "Enterprise zero-knowledge secret storage, password generator, 2FA TOTP authenticator." },
+      analytics: { name: "Analytics & Menu Engineering", desc: "Menu engineering matrix, food cost variance and profitability reports." },
+      catering: { name: "Catering & Event Management", desc: "Manage end-to-end catering events, menu packages, guest pax pricing." },
+      operations: { name: "Operations & Checklists", desc: "Opening/closing checklists and SOP temp audits." },
+      masterdata: { name: "Master Data Settings", desc: "Multi-outlet profiles and tax rates." },
+      rbac: { name: "Role Based Access Controls", desc: "Security roles and permissions." },
+    };
+
+    if (UNIFIED_MODULE_MAP[moduleId]) {
+      targetModuleIds = UNIFIED_MODULE_MAP[moduleId];
+    } else {
+      const matchedEntry = Object.values(UNIFIED_MODULE_MAP).find((subs) => subs.includes(moduleId));
+      targetModuleIds = matchedEntry ? matchedEntry : [moduleId];
     }
 
     await prisma.$transaction(async (tx) => {
-      const dbModules = await tx.module.findMany({ select: { id: true } });
-      const validModuleSet = new Set(dbModules.map((m) => m.id));
-      const validTargetModuleIds = targetModuleIds.filter((mId) => validModuleSet.has(mId));
+      for (const mId of targetModuleIds) {
+        // Ensure base module entry exists in Module table
+        await tx.module.upsert({
+          where: { id: mId },
+          update: {},
+          create: {
+            id: mId,
+            name: MODULE_META[mId]?.name || mId.toUpperCase(),
+            description: MODULE_META[mId]?.desc || `${mId} module`,
+            status: "ACTIVE",
+            availability: "GENERAL",
+          },
+        });
 
-      for (const mId of validTargetModuleIds) {
         if (isEnabled) {
           // Enable module
           await tx.restaurantModule.upsert({

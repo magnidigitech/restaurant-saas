@@ -268,10 +268,10 @@ export default function ApplePlatformAdminDashboard() {
   const fetchData = async () => {
     try {
       const [resTenants, resPlans, resModules, resLogs] = await Promise.all([
-        fetch("/api/platform-admin/restaurants"),
-        fetch("/api/platform-admin/subscription-plans"),
-        fetch("/api/platform-admin/modules"),
-        fetch("/api/platform-admin/audit-logs"),
+        fetch(`/api/platform-admin/restaurants?t=${Date.now()}`, { cache: "no-store" }),
+        fetch(`/api/platform-admin/subscription-plans?t=${Date.now()}`, { cache: "no-store" }),
+        fetch(`/api/platform-admin/modules?t=${Date.now()}`, { cache: "no-store" }),
+        fetch(`/api/platform-admin/audit-logs?t=${Date.now()}`, { cache: "no-store" }),
       ]);
 
       const dataTenants = resTenants.ok ? (await resTenants.json()).restaurants || [] : [];
@@ -325,10 +325,31 @@ export default function ApplePlatformAdminDashboard() {
     router.refresh();
   };
 
-  // Toggle Module
+  // Toggle Module with Optimistic UI Update & Uncached Re-fetch
   const handleToggleModule = async (restaurantId: string, moduleId: string, currentStatus: string) => {
     setModuleLoadingId(`${restaurantId}-${moduleId}`);
     const nextEnabled = currentStatus !== "ACTIVE";
+
+    // Optimistically update UI pill state immediately
+    const targetSubIds = UNIFIED_CORE_MODULES.find((u) => u.id === moduleId)?.subIds || [moduleId];
+    setRestaurants((prev) =>
+      prev.map((r) => {
+        if (r.id !== restaurantId) return r;
+        let updatedModules = [...(r.modules || [])];
+        targetSubIds.forEach((sId) => {
+          const idx = updatedModules.findIndex((m) => m.moduleId === sId);
+          if (idx >= 0) {
+            updatedModules[idx] = { ...updatedModules[idx], status: nextEnabled ? "ACTIVE" : "INACTIVE" };
+          } else if (nextEnabled) {
+            updatedModules.push({
+              moduleId: sId,
+              status: "ACTIVE",
+            });
+          }
+        });
+        return { ...r, modules: updatedModules };
+      })
+    );
 
     try {
       const res = await fetch(`/api/platform-admin/restaurants/${restaurantId}/modules`, {
@@ -343,9 +364,10 @@ export default function ApplePlatformAdminDashboard() {
       }
 
       showToast(`Module updated successfully`);
-      fetchData();
+      await fetchData();
     } catch (err: any) {
       showToast(err.message, "error");
+      await fetchData();
     } finally {
       setModuleLoadingId(null);
     }

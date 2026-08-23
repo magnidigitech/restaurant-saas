@@ -95,6 +95,12 @@ export async function verifyAccess(
     const moduleKeys =
       moduleKey === "shifts" || moduleKey === "shift_management"
         ? ["shifts", "shift_management"]
+        : moduleKey === "inventory" || moduleKey === "vendor_management" || moduleKey === "purchase_management"
+        ? ["inventory", "vendor_management", "purchase_management"]
+        : moduleKey === "attendance" || moduleKey === "leave_management"
+        ? ["attendance", "leave_management"]
+        : moduleKey === "workforce" || moduleKey === "hr_onboarding"
+        ? ["workforce", "hr_onboarding"]
         : [moduleKey];
 
     // 3. Verify Restaurant Module Entitlement

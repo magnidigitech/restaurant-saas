@@ -6,6 +6,9 @@ import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { createHash } from "node:crypto";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const createRestaurantSchema = z.object({
   name: z.string().min(2),
   subdomain: z.string().min(2).regex(/^[a-z0-9-]+$/),
@@ -133,15 +136,53 @@ export async function POST(req: NextRequest) {
       });
 
       // 4. Create RestaurantModules
-      const dbModules = await tx.module.findMany({ select: { id: true } });
-      const validModuleIds = new Set(dbModules.map((m) => m.id));
-      const validEnabledModules = Array.from(
-        new Set((data.enabledModules || []).filter((mKey) => validModuleIds.has(mKey)))
-      );
+      const UNIFIED_MODULE_MAP: Record<string, string[]> = {
+        inventory: ["inventory", "vendor_management", "purchase_management"],
+        attendance: ["attendance", "leave_management"],
+        workforce: ["workforce", "hr_onboarding"],
+        shifts: ["shifts", "shift_management"],
+        payroll: ["payroll"],
+        pos: ["pos"],
+        finance: ["finance"],
+        analytics: ["analytics"],
+        vault: ["vault"],
+        catering: ["catering"],
+        operations: ["operations"],
+        masterdata: ["masterdata"],
+        rbac: ["rbac"],
+      };
+
+      const expandedModules = new Set<string>();
+      (data.enabledModules || []).forEach((mKey: string) => {
+        const subs = UNIFIED_MODULE_MAP[mKey] || [mKey];
+        subs.forEach((s) => expandedModules.add(s));
+      });
+      const validEnabledModules = Array.from(expandedModules);
 
       for (const moduleKey of validEnabledModules) {
-        await tx.restaurantModule.create({
-          data: {
+        await tx.module.upsert({
+          where: { id: moduleKey },
+          update: {},
+          create: {
+            id: moduleKey,
+            name: moduleKey.toUpperCase(),
+            description: `${moduleKey} module`,
+            status: "ACTIVE",
+            availability: "GENERAL",
+          },
+        });
+
+        await tx.restaurantModule.upsert({
+          where: {
+            restaurantId_moduleId: {
+              restaurantId: restaurant.id,
+              moduleId: moduleKey,
+            },
+          },
+          update: {
+            status: "ACTIVE",
+          },
+          create: {
             restaurantId: restaurant.id,
             moduleId: moduleKey,
             status: "ACTIVE",
