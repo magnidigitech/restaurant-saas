@@ -232,9 +232,9 @@ export default function AppleShiftRostersPage() {
 
       if (resOutlets.ok && Array.isArray(dataOutlets.outlets)) {
         setOutlets(dataOutlets.outlets);
-        if (dataOutlets.outlets.length > 0 && !selectedOutlet) {
-          setSelectedOutlet(dataOutlets.outlets[0].id);
-          setRosterOutlet(dataOutlets.outlets[0].id);
+        if (dataOutlets.outlets.length > 0) {
+          if (!selectedOutlet) setSelectedOutlet(dataOutlets.outlets[0].id);
+          if (!rosterOutlet) setRosterOutlet(dataOutlets.outlets[0].id);
         }
       }
 
@@ -390,7 +390,8 @@ export default function AppleShiftRostersPage() {
   // 1. Create New Roster Period
   const handleCreateRoster = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rosterName || !rosterStart || !rosterEnd || !rosterOutlet) {
+    const effectiveOutlet = rosterOutlet || selectedOutlet || (outlets.length > 0 ? outlets[0].id : "");
+    if (!rosterName || !rosterStart || !rosterEnd || !effectiveOutlet) {
       setError("Please fill out all required roster period fields");
       return;
     }
@@ -402,7 +403,7 @@ export default function AppleShiftRostersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: rosterName.trim(),
-          outletId: rosterOutlet,
+          outletId: effectiveOutlet,
           startDate: rosterStart,
           endDate: rosterEnd,
           availabilityDeadline: rosterDeadline || undefined,
@@ -1350,6 +1351,23 @@ export default function AppleShiftRostersPage() {
               </div>
 
               <form onSubmit={handleCreateRoster} className="space-y-4 text-xs">
+                {outlets.length > 0 && (
+                  <div>
+                    <label className={`block font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>Outlet *</label>
+                    <select
+                      value={rosterOutlet || selectedOutlet || outlets[0]?.id || ""}
+                      onChange={(e) => setRosterOutlet(e.target.value)}
+                      className={`w-full px-3.5 py-2.5 rounded-xl border focus:outline-none focus:border-[#0071E3] ${isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-slate-50 border-slate-200 text-slate-900"}`}
+                    >
+                      {outlets.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div>
                   <label className={`block font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>Roster Period Name *</label>
                   <input
