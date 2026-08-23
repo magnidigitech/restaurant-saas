@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
+import { WORLDWIDE_CURRENCIES } from "@/core/constants/locales";
 
 interface Employee {
   id: string;
@@ -408,11 +409,11 @@ export default function AppleSalaryStructuresPage() {
                         : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                     }`}
                   >
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="GBP">GBP (£)</option>
-                    <option value="CAD">CAD ($)</option>
-                    <option value="AUD">AUD ($)</option>
+                    {WORLDWIDE_CURRENCIES.map((curr) => (
+                      <option key={curr.code} value={curr.code}>
+                        {curr.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>

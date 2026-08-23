@@ -4,6 +4,7 @@ import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
+import { WORLDWIDE_TIMEZONES, WORLDWIDE_CURRENCIES } from "@/core/constants/locales";
 
 interface Outlet {
   id: string;
@@ -386,13 +387,11 @@ export default function RestaurantOutletsPage({
                       isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                     }`}
                   >
-                    <option value="UTC">UTC</option>
-                    <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
-                    <option value="America/New_York">America/New_York (EST)</option>
-                    <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
-                    <option value="Europe/London">Europe/London (GMT)</option>
-                    <option value="Asia/Dubai">Asia/Dubai (GST)</option>
-                    <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
+                    {WORLDWIDE_TIMEZONES.map((tz) => (
+                      <option key={tz.value} value={tz.value}>
+                        {tz.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -407,12 +406,11 @@ export default function RestaurantOutletsPage({
                       isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                     }`}
                   >
-                    <option value="USD">USD ($)</option>
-                    <option value="INR">INR (₹)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="GBP">GBP (£)</option>
-                    <option value="AED">AED (د.إ)</option>
-                    <option value="SGD">SGD (S$)</option>
+                    {WORLDWIDE_CURRENCIES.map((curr) => (
+                      <option key={curr.code} value={curr.code}>
+                        {curr.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -506,13 +504,11 @@ export default function RestaurantOutletsPage({
                       isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                     }`}
                   >
-                    <option value="UTC">UTC</option>
-                    <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
-                    <option value="America/New_York">America/New_York (EST)</option>
-                    <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
-                    <option value="Europe/London">Europe/London (GMT)</option>
-                    <option value="Asia/Dubai">Asia/Dubai (GST)</option>
-                    <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
+                    {WORLDWIDE_TIMEZONES.map((tz) => (
+                      <option key={tz.value} value={tz.value}>
+                        {tz.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -527,12 +523,11 @@ export default function RestaurantOutletsPage({
                       isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                     }`}
                   >
-                    <option value="USD">USD ($)</option>
-                    <option value="INR">INR (₹)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="GBP">GBP (£)</option>
-                    <option value="AED">AED (د.إ)</option>
-                    <option value="SGD">SGD (S$)</option>
+                    {WORLDWIDE_CURRENCIES.map((curr) => (
+                      <option key={curr.code} value={curr.code}>
+                        {curr.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
