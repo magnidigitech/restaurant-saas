@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import ModuleAccessGuard from "@/components/ModuleAccessGuard";
+import { formatUnit } from "@/core/inventory/units";
 
 interface Item {
   id: string;
@@ -24,8 +25,6 @@ interface Category {
   id: string;
   name: string;
 }
-
-import { formatUnit } from "@/core/inventory/units";
 
 const CULINARY_UOM_GROUPS = [
   {
@@ -64,6 +63,58 @@ const CULINARY_UOM_GROUPS = [
   },
 ];
 
+// Simple & Robust CSV / Delimited Spreadsheet Parser
+function parseCSV(text: string) {
+  const lines = text.split(/\r\n|\n/).filter((l) => l.trim().length > 0);
+  if (lines.length < 2) return [];
+
+  const parseRow = (rowStr: string) => {
+    const row: string[] = [];
+    let insideQuotes = false;
+    let currentCell = "";
+    for (let i = 0; i < rowStr.length; i++) {
+      const char = rowStr[i];
+      if (char === '"') {
+        insideQuotes = !insideQuotes;
+      } else if ((char === "," || char === "\t" || char === ";") && !insideQuotes) {
+        row.push(currentCell.trim());
+        currentCell = "";
+      } else {
+        currentCell += char;
+      }
+    }
+    row.push(currentCell.trim());
+    return row;
+  };
+
+  const headers = parseRow(lines[0]).map((h) => h.toLowerCase().replace(/[^a-z0-9]/g, ""));
+  const dataRows: any[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const rawCells = parseRow(lines[i]);
+    if (rawCells.every((c) => !c)) continue;
+
+    const rowObj: any = { rowNumber: i + 1 };
+    headers.forEach((h, colIdx) => {
+      const val = rawCells[colIdx] || "";
+      if (h.includes("name") || h === "item") rowObj.name = val;
+      else if (h.includes("sku") || h.includes("code")) rowObj.sku = val;
+      else if (h.includes("cat") || h.includes("group")) rowObj.category = val;
+      else if (h.includes("uom") || h.includes("unit")) rowObj.unitOfMeasure = val;
+      else if (h.includes("cost") || h.includes("price")) rowObj.costPerUnit = val;
+      else if (h.includes("reorder") || h.includes("min")) rowObj.reorderPoint = val;
+      else if (h.includes("par") || h.includes("max")) rowObj.parLevel = val;
+      else if (h.includes("desc") || h.includes("note")) rowObj.description = val;
+    });
+
+    if (rowObj.name || rowObj.sku) {
+      dataRows.push(rowObj);
+    }
+  }
+
+  return dataRows;
+}
+
 export default function InventoryItemsPage({
   params,
 }: {
@@ -81,6 +132,16 @@ export default function InventoryItemsPage({
   const [showCreate, setShowCreate] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Bulk Import States
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importReport, setImportReport] = useState<{
+    added: Array<{ row: number; name: string; sku?: string }>;
+    skipped: Array<{ row: number; name: string; sku?: string; reason: string }>;
+    failed: Array<{ row: number; name: string; reason: string }>;
+  } | null>(null);
+  const [reportTab, setReportTab] = useState<"added" | "skipped" | "failed">("added");
 
   const [form, setForm] = useState({
     name: "",
@@ -159,225 +220,499 @@ export default function InventoryItemsPage({
         costPerUnit: "",
       });
       fetchData();
-    } catch (e: any) {
-      setError(e.message || "Failed to create item");
+    } catch (err: any) {
+      setError(err.message || "Failed to create item");
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div
-        className={`min-h-screen flex flex-col items-center justify-center font-sans antialiased ${
-          isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
-        }`}
-      >
-        <div className="w-8 h-8 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-xs font-medium">Loading Item Master...</p>
-      </div>
-    );
-  }
+  // Download Sample CSV Template
+  const handleDownloadTemplate = () => {
+    const headers = "Item Name,SKU Code,Category,Unit of Measure,Cost Per Unit,Reorder Point,Par Level,Description\n";
+    const sampleRows = [
+      'Chicken Breast,RAW-CHK-001,Meat & Poultry,LB,4.50,20,100,Fresh boneless skinless chicken breast',
+      'Olive Oil Extra Virgin,CON-OIL-002,Pantry & Condiments,GAL,32.00,5,15,Extra virgin cold pressed olive oil',
+      'Basmati Rice 10kg,DRY-RICE-003,Grains & Dry Goods,KG,2.80,50,200,Aromatic long grain basmati rice',
+      'Fresh Whole Milk 3.25%,DAI-MLK-004,Dairy & Eggs,L,1.95,30,120,Whole fresh pasteurized milk',
+      'Takeout Container 32oz,PKG-BOX-005,Packaging & Supplies,PIECES,0.35,200,1000,Microwavable 32oz food container',
+    ].join("\n");
+
+    const blob = new Blob([headers + sampleRows], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "inventory_items_template.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Handle File Upload & Processing
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    setError("");
+    setImportReport(null);
+
+    try {
+      const text = await file.text();
+      const rows = parseCSV(text);
+      if (rows.length === 0) {
+        throw new Error("The uploaded file contains no valid rows or readable item data.");
+      }
+
+      const res = await fetch("/api/restaurant/inventory/items/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: rows }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to process bulk import");
+
+      setImportReport(data.report);
+      if (data.report.added.length > 0) {
+        setReportTab("added");
+      } else if (data.report.failed.length > 0) {
+        setReportTab("failed");
+      } else {
+        setReportTab("skipped");
+      }
+      await fetchData();
+    } catch (err: any) {
+      setError(err.message || "Failed to parse or upload file.");
+    } finally {
+      setImporting(false);
+      e.target.value = "";
+    }
+  };
 
   const lowCount = items.filter((i) => i.isLowStock).length;
 
   return (
-    <ModuleAccessGuard moduleKey="inventory" moduleName="Inventory & Stock Control" activeSection="Item Master">
-      <div
-        className={`min-h-screen font-sans antialiased transition-colors duration-200 flex flex-col ${
-          isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
-        }`}
-      >
-        <RestaurantNavbar activeSection="Item Master" />
+    <ModuleAccessGuard moduleKey="inventory" moduleName="Inventory Item Master">
+      <div className={`min-h-screen ${isDark ? "bg-[#090B10]" : "bg-slate-50/50"}`}>
+        <RestaurantNavbar activeSection="Catalog & SKUs" />
 
-      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Executive Header Banner */}
-        <div
-          className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
-            isDark
-              ? "bg-[#121622]/60 border-white/[0.06]"
-              : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
-          }`}
-        >
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => router.push(`/restaurant/${subdomain}/inventory`)}
-                className={`text-xs font-medium transition cursor-pointer ${
-                  isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                ← Inventory Hub
-              </button>
-              <span className={`text-xs ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
-              <span className="w-2 h-2 rounded-full bg-[#0071E3]" />
-              <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                Catalog & SKUs
-              </span>
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+          {/* Header */}
+          <div
+            className={`p-6 rounded-3xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm ${
+              isDark ? "bg-[#121622] border-white/[0.08]" : "bg-white border-slate-200"
+            }`}
+          >
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => router.push(`/restaurant/${subdomain}/inventory`)}
+                  className={`text-xs font-medium transition cursor-pointer ${
+                    isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  ← Inventory Hub
+                </button>
+                <span className={`text-xs ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
+                <span className="w-2 h-2 rounded-full bg-[#0071E3]" />
+                <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Catalog &amp; SKUs
+                </span>
+              </div>
+
+              <h1 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+                Inventory Item Master
+              </h1>
+              <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                {items.length} items total • {lowCount > 0 ? <span className="text-amber-500 font-semibold">{lowCount} low stock alerts</span> : "all inventory healthy"}
+              </p>
             </div>
 
-            <h1 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-              Inventory Item Master
-            </h1>
-            <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              {items.length} items total • {lowCount > 0 ? <span className="text-amber-500 font-semibold">{lowCount} low stock alerts</span> : "all inventory healthy"}
-            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={handleDownloadTemplate}
+                className={`px-3 py-2 text-xs font-semibold rounded-xl border transition cursor-pointer flex items-center gap-1.5 ${
+                  isDark
+                    ? "bg-white/[0.04] border-white/[0.08] text-slate-200 hover:bg-white/[0.08]"
+                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-2xs"
+                }`}
+                title="Download CSV Template for Bulk Upload"
+              >
+                <span>📄 Download Template</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setImportReport(null);
+                  setShowBulkModal(true);
+                }}
+                className={`px-3.5 py-2 text-xs font-semibold rounded-xl border transition cursor-pointer flex items-center gap-1.5 ${
+                  isDark
+                    ? "bg-blue-500/10 border-blue-500/30 text-[#64B5FF] hover:bg-blue-500/20"
+                    : "bg-blue-50 border-blue-200 text-[#0071E3] hover:bg-blue-100 shadow-2xs"
+                }`}
+              >
+                <span>📥 Upload via Excel</span>
+              </button>
+
+              <button
+                onClick={() => setShowCreate(true)}
+                className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
+              >
+                + New Item
+              </button>
+            </div>
           </div>
 
-          <button
-            onClick={() => setShowCreate(true)}
-            className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
-          >
-            + New Item
-          </button>
-        </div>
+          {error && (
+            <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl">
+              {error}
+            </div>
+          )}
 
-        {error && (
-          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl">
-            {error}
+          {/* Filter Controls */}
+          <div className="flex gap-3 flex-wrap">
+            <input
+              placeholder="Search items by name or SKU code..."
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              className={`flex-1 min-w-56 px-4 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                isDark ? "bg-[#121622]/60 border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+              }`}
+            />
+            <select
+              value={categoryFilter}
+              onChange={(e) => handleCategoryFilter(e.target.value)}
+              className={`px-3.5 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                isDark ? "bg-[#121622]/60 border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+              }`}
+            >
+              <option value="">All Categories</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Items Table */}
+          {loading ? (
+            <div className="py-20 text-center text-xs opacity-50">Loading inventory catalog...</div>
+          ) : items.length === 0 ? (
+            <div
+              className={`p-12 rounded-3xl border text-center space-y-3 ${
+                isDark ? "bg-[#121622] border-white/[0.08]" : "bg-white border-slate-200"
+              }`}
+            >
+              <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-[#0071E3] mx-auto text-lg">
+                📦
+              </div>
+              <h3 className="text-sm font-semibold">No inventory items found</h3>
+              <p className={`text-xs max-w-sm mx-auto ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                Click "+ New Item" or "Upload via Excel" to import ingredients or kitchen supplies into your catalog.
+              </p>
+            </div>
+          ) : (
+            <div
+              className={`rounded-3xl border overflow-hidden shadow-sm ${
+                isDark ? "bg-[#121622] border-white/[0.08]" : "bg-white border-slate-200"
+              }`}
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className={`border-b text-[11px] font-semibold uppercase tracking-wider ${isDark ? "border-white/[0.08] text-[#8F95A3]" : "border-slate-200 text-slate-500 bg-slate-50/50"}`}>
+                      <th className="py-3.5 px-4">Item &amp; SKU</th>
+                      <th className="py-3.5 px-4">Category</th>
+                      <th className="py-3.5 px-4">Unit of Measure</th>
+                      <th className="py-3.5 px-4 text-right">Cost Per Unit</th>
+                      <th className="py-3.5 px-4 text-right">Current Stock</th>
+                      <th className="py-3.5 px-4 text-right">Par Level</th>
+                      <th className="py-3.5 px-4 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04] text-xs">
+                    {items.map((item) => (
+                      <tr key={item.id} className={`transition ${isDark ? "hover:bg-white/[0.02]" : "hover:bg-slate-50/80"}`}>
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold">{item.name}</div>
+                          {item.sku && <div className="text-[10px] font-mono opacity-50">SKU: {item.sku}</div>}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {item.category ? (
+                            <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-[#0071E3] dark:text-[#64B5FF] text-[11px] font-medium">
+                              {item.category.name}
+                            </span>
+                          ) : (
+                            <span className="opacity-40 text-[11px]">—</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 font-mono text-[11px]">
+                          {formatUnit(item.unitOfMeasure as any)}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-mono font-medium">
+                          ${Number(item.costPerUnit).toFixed(2)}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-mono font-bold">
+                          {item.currentStock}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-mono opacity-60">
+                          {item.parLevel}
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          {item.isLowStock ? (
+                            <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[10px] font-bold">
+                              Low Stock
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px] font-bold">
+                              In Stock
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </main>
+
+        {/* BULK IMPORT VIA EXCEL / CSV MODAL */}
+        {showBulkModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+            <div
+              className={`w-full max-w-2xl p-6 sm:p-8 rounded-3xl border shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150 ${
+                isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+              }`}
+            >
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-lg font-bold tracking-tight">Bulk Import Inventory Items</h2>
+                  <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    Upload your item catalog via Excel spreadsheet or CSV file.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowBulkModal(false)}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-base cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {!importReport ? (
+                <div className="space-y-5">
+                  {/* File Drag & Drop Box */}
+                  <div
+                    className={`border-2 border-dashed rounded-2xl p-8 text-center transition flex flex-col items-center justify-center space-y-3 relative ${
+                      isDark
+                        ? "border-white/10 hover:border-[#0071E3]/50 bg-[#090B10]/50"
+                        : "border-slate-300 hover:border-[#0071E3] bg-slate-50/50"
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      onChange={handleFileUpload}
+                      disabled={importing}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                    />
+                    <div className="w-12 h-12 rounded-2xl bg-[#0071E3]/10 border border-[#0071E3]/20 flex items-center justify-center text-[#0071E3] text-xl">
+                      📥
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold">
+                        {importing ? "Processing & importing items..." : "Click or drag & drop file to upload"}
+                      </p>
+                      <p className={`text-xs mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                        Supports .CSV, .XLSX, .XLS files (up to 1,000 rows)
+                      </p>
+                    </div>
+                    {importing && <div className="text-xs text-[#0071E3] font-medium animate-pulse">Parsing file and validating rows...</div>}
+                  </div>
+
+                  {/* Sample Download Prompt */}
+                  <div
+                    className={`p-4 rounded-2xl border flex items-center justify-between text-xs ${
+                      isDark ? "bg-[#090B10] border-white/[0.06]" : "bg-blue-50/50 border-blue-100"
+                    }`}
+                  >
+                    <div>
+                      <p className="font-semibold">Need the standard import format?</p>
+                      <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                        Includes sample rows for Item Name, SKU, Category, UOM &amp; Cost.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleDownloadTemplate}
+                      className="px-3 py-1.5 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-medium rounded-xl transition cursor-pointer shrink-0"
+                    >
+                      📄 Download Template
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* IMPORT REPORT SUMMARY (ADDED, SKIPPED, FAILED) */
+                <div className="space-y-5">
+                  {/* Summary Badges Header */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setReportTab("added")}
+                      className={`p-3.5 rounded-2xl border text-left transition cursor-pointer ${
+                        reportTab === "added"
+                          ? "bg-emerald-500/10 border-emerald-500/40 ring-1 ring-emerald-500/40"
+                          : isDark ? "bg-[#090B10] border-white/[0.06]" : "bg-slate-50 border-slate-200"
+                      }`}
+                    >
+                      <div className="text-xs font-bold text-emerald-500 flex items-center gap-1.5">
+                        <span>✓ Added</span>
+                      </div>
+                      <div className="text-xl font-extrabold text-emerald-500 mt-1">{importReport.added.length}</div>
+                      <div className="text-[10px] opacity-60">Successfully created</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setReportTab("skipped")}
+                      className={`p-3.5 rounded-2xl border text-left transition cursor-pointer ${
+                        reportTab === "skipped"
+                          ? "bg-amber-500/10 border-amber-500/40 ring-1 ring-amber-500/40"
+                          : isDark ? "bg-[#090B10] border-white/[0.06]" : "bg-slate-50 border-slate-200"
+                      }`}
+                    >
+                      <div className="text-xs font-bold text-amber-500 flex items-center gap-1.5">
+                        <span>⚡ Skipped</span>
+                      </div>
+                      <div className="text-xl font-extrabold text-amber-500 mt-1">{importReport.skipped.length}</div>
+                      <div className="text-[10px] opacity-60">Duplicates in catalog</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setReportTab("failed")}
+                      className={`p-3.5 rounded-2xl border text-left transition cursor-pointer ${
+                        reportTab === "failed"
+                          ? "bg-rose-500/10 border-rose-500/40 ring-1 ring-rose-500/40"
+                          : isDark ? "bg-[#090B10] border-white/[0.06]" : "bg-slate-50 border-slate-200"
+                      }`}
+                    >
+                      <div className="text-xs font-bold text-rose-500 flex items-center gap-1.5">
+                        <span>✕ Failed</span>
+                      </div>
+                      <div className="text-xl font-extrabold text-rose-500 mt-1">{importReport.failed.length}</div>
+                      <div className="text-[10px] opacity-60">Validation errors</div>
+                    </button>
+                  </div>
+
+                  {/* TAB DETAILED LIST */}
+                  <div className={`p-4 rounded-2xl border text-xs max-h-64 overflow-y-auto ${isDark ? "bg-[#090B10] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
+                    {reportTab === "added" && (
+                      <div className="space-y-2">
+                        <div className="font-semibold text-emerald-500 mb-2">Successfully Added Items ({importReport.added.length})</div>
+                        {importReport.added.length === 0 ? (
+                          <p className="opacity-50">No new items were added in this import run.</p>
+                        ) : (
+                          importReport.added.map((item, idx) => (
+                            <div key={idx} className="flex justify-between items-center py-1.5 border-b border-black/[0.04] dark:border-white/[0.04]">
+                              <span className="font-medium">Row {item.row}: {item.name}</span>
+                              {item.sku && <span className="font-mono text-[10px] opacity-60">SKU: {item.sku}</span>}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {reportTab === "skipped" && (
+                      <div className="space-y-2">
+                        <div className="font-semibold text-amber-500 mb-2">Skipped Duplicate Items ({importReport.skipped.length})</div>
+                        {importReport.skipped.length === 0 ? (
+                          <p className="opacity-50">No duplicate items skipped.</p>
+                        ) : (
+                          importReport.skipped.map((item, idx) => (
+                            <div key={idx} className="space-y-0.5 py-1.5 border-b border-black/[0.04] dark:border-white/[0.04]">
+                              <div className="flex justify-between font-medium">
+                                <span>Row {item.row}: {item.name}</span>
+                                {item.sku && <span className="font-mono text-[10px] opacity-60">SKU: {item.sku}</span>}
+                              </div>
+                              <p className="text-[11px] text-amber-500/80">{item.reason}</p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {reportTab === "failed" && (
+                      <div className="space-y-2">
+                        <div className="font-semibold text-rose-500 mb-2">Failed Validation Rows ({importReport.failed.length})</div>
+                        {importReport.failed.length === 0 ? (
+                          <p className="opacity-50">No validation errors occurred!</p>
+                        ) : (
+                          importReport.failed.map((item, idx) => (
+                            <div key={idx} className="space-y-0.5 py-1.5 border-b border-black/[0.04] dark:border-white/[0.04]">
+                              <div className="font-medium">Row {item.row}: {item.name}</div>
+                              <p className="text-[11px] text-rose-400">{item.reason}</p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setImportReport(null)}
+                      className="text-xs font-semibold text-[#0071E3] hover:underline cursor-pointer"
+                    >
+                      ← Upload Another File
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowBulkModal(false)}
+                      className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer"
+                    >
+                      Done &amp; Close
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Filter Controls */}
-        <div className="flex gap-3 flex-wrap">
-          <input
-            placeholder="Search items by name or SKU code..."
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            className={`flex-1 min-w-56 px-4 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-              isDark ? "bg-[#121622]/60 border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
-            }`}
-          />
-          <select
-            value={categoryFilter}
-            onChange={(e) => handleCategoryFilter(e.target.value)}
-            className={`px-3.5 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
-              isDark ? "bg-[#121622]/60 border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
-            }`}
-          >
-            <option value="">All Categories</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Items Table */}
-        <div
-          className={`p-6 rounded-3xl border transition space-y-4 ${
-            isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
-          }`}
-        >
-          {items.length === 0 ? (
-            <div className={`p-12 text-center text-xs space-y-1 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-              <p className="font-semibold text-sm">No items found</p>
-              <p className="opacity-75">Click &quot;+ New Item&quot; to add ingredients or supplies to your catalog.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className={`border-b text-[11px] font-semibold uppercase tracking-wider ${
-                    isDark ? "border-white/[0.06] text-[#8F95A3]" : "border-slate-200 text-slate-500"
-                  }`}>
-                    <th className="pb-3 px-3">Item Details</th>
-                    <th className="pb-3 px-3">Category</th>
-                    <th className="pb-3 px-3">Unit</th>
-                    <th className="pb-3 px-3">Current Stock</th>
-                    <th className="pb-3 px-3">Reorder Point</th>
-                    <th className="pb-3 px-3">Cost / Unit</th>
-                    <th className="pb-3 px-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
-                  {items.map((i) => (
-                    <tr
-                      key={i.id}
-                      onClick={() => router.push(`/restaurant/${subdomain}/inventory/items/${i.id}`)}
-                      className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition cursor-pointer group"
-                    >
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-semibold block ${isDark ? "text-white" : "text-slate-900"}`}>
-                            {i.name}
-                          </span>
-                          {i.isLowStock && (
-                            <span className="text-[9px] font-bold uppercase px-2 py-0.2 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25">
-                              Low
-                            </span>
-                          )}
-                        </div>
-                        {i.sku && (
-                          <span className={`text-[10px] font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-                            SKU: {i.sku}
-                          </span>
-                        )}
-                      </td>
-                      <td className={`py-3 px-3 ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
-                        {i.category?.name ? (
-                          <span className={`text-[10px] px-2 py-0.5 rounded border ${
-                            isDark ? "bg-white/[0.04] text-[#BAC0CD] border-white/[0.08]" : "bg-slate-100 text-slate-700 border-slate-200"
-                          }`}>
-                            {i.category.name}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-                      <td className={`py-3 px-3 font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                        {formatUnit(i.unitOfMeasure as any)}
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className={`font-bold ${
-                          i.isLowStock ? "text-amber-500" : isDark ? "text-emerald-400" : "text-emerald-600"
-                        }`}>
-                          {i.currentStock}
-                        </span>
-                      </td>
-                      <td className={`py-3 px-3 ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
-                        {i.reorderPoint}
-                      </td>
-                      <td className={`py-3 px-3 font-mono ${isDark ? "text-white" : "text-slate-900"}`}>
-                        ${Number(i.costPerUnit).toFixed(2)}
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <span className="text-[#0071E3] font-medium group-hover:underline text-xs">
-                          View →
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </main>
-
-      {/* New Item Modal */}
-      {showCreate && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
-          <div
-            className={`w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
-              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
-            }`}
-          >
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-base font-bold tracking-tight">Add New Inventory Item</h2>
-                <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                  Define catalog item specifications, reorder limits, and cost structure.
-                </p>
+        {/* CREATE SINGLE ITEM MODAL */}
+        {showCreate && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+            <div
+              className={`w-full max-w-lg p-6 sm:p-8 rounded-3xl border shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150 ${
+                isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+              }`}
+            >
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-base font-bold tracking-tight">Add New Inventory Item</h2>
+                  <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    Create a raw ingredient or stock SKU.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowCreate(false)}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-base cursor-pointer"
+                >
+                  ✕
+                </button>
               </div>
-              <button onClick={() => setShowCreate(false)} className="text-slate-400 hover:text-white cursor-pointer">
-                ✕
-              </button>
-            </div>
 
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <form onSubmit={handleCreate} className="space-y-4">
                 <div>
                   <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                     Item Name *
@@ -385,144 +720,163 @@ export default function InventoryItemsPage({
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Saffron / Rice"
+                    placeholder="e.g. Boneless Chicken Breast"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition ${
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
                       isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                     }`}
                   />
                 </div>
 
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      SKU Code
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. RAW-CHK-001"
+                      value={form.sku}
+                      onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Category
+                    </label>
+                    <select
+                      value={form.categoryId}
+                      onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    >
+                      <option value="">No Category</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Unit of Measure
+                    </label>
+                    <select
+                      value={form.unitOfMeasure}
+                      onChange={(e) => setForm({ ...form, unitOfMeasure: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    >
+                      {CULINARY_UOM_GROUPS.map((g) => (
+                        <optgroup key={g.group} label={g.group}>
+                          {g.options.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Cost Per Unit ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={form.costPerUnit}
+                      onChange={(e) => setForm({ ...form, costPerUnit: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Reorder Alert Point
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 10"
+                      value={form.reorderPoint}
+                      onChange={(e) => setForm({ ...form, reorderPoint: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Par Stock Level
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 50"
+                      value={form.parLevel}
+                      onChange={(e) => setForm({ ...form, parLevel: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                    SKU Code
+                    Description
                   </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. ING-001"
-                    value={form.sku}
-                    onChange={(e) => setForm({ ...form, sku: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs font-mono rounded-xl border transition ${
+                  <textarea
+                    rows={2}
+                    placeholder="Optional notes or supplier details..."
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
                       isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                     }`}
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                    Category
-                  </label>
-                  <select
-                    value={form.categoryId}
-                    onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition cursor-pointer ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                <div className="flex justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreate(false)}
+                    className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                      isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
                     }`}
                   >
-                    <option value="">No Category</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                    Unit of Measure *
-                  </label>
-                  <select
-                    value={form.unitOfMeasure}
-                    onChange={(e) => setForm({ ...form, unitOfMeasure: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition cursor-pointer ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
                   >
-                    {CULINARY_UOM_GROUPS.map((grp) => (
-                      <optgroup key={grp.group} label={grp.group}>
-                        {grp.options.map((u) => (
-                          <option key={u.value} value={u.value}>
-                            {u.label}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
+                    {submitting ? "Saving..." : "Create Item"}
+                  </button>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                    Reorder Point
-                  </label>
-                  <input
-                    type="number"
-                    value={form.reorderPoint}
-                    onChange={(e) => setForm({ ...form, reorderPoint: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                    Par Level
-                  </label>
-                  <input
-                    type="number"
-                    value={form.parLevel}
-                    onChange={(e) => setForm({ ...form, parLevel: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                    Cost / Unit ($)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={form.costPerUnit}
-                    onChange={(e) => setForm({ ...form, costPerUnit: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
-                <button
-                  type="button"
-                  onClick={() => setShowCreate(false)}
-                  className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
-                    isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
-                >
-                  {submitting ? "Saving..." : "Create Item"}
-                </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
     </ModuleAccessGuard>
   );
 }

@@ -138,6 +138,171 @@ export const InventoryService = {
     return prisma.inventoryItem.update({ where: { id }, data: { archivedAt: new Date() } });
   },
 
+  async bulkImportItems(
+    restaurantId: string,
+    rows: Array<{
+      rowNumber?: number;
+      name?: string;
+      sku?: string;
+      category?: string;
+      unitOfMeasure?: string;
+      costPerUnit?: number | string;
+      reorderPoint?: number | string;
+      parLevel?: number | string;
+      description?: string;
+    }>
+  ) {
+    const existingItems = await prisma.inventoryItem.findMany({
+      where: { restaurantId, archivedAt: null },
+      select: { name: true, sku: true },
+    });
+
+    const existingNameSet = new Set(existingItems.map((i) => i.name.trim().toLowerCase()));
+    const existingSkuSet = new Set(
+      existingItems.filter((i) => i.sku).map((i) => i.sku!.trim().toLowerCase())
+    );
+
+    const categories = await prisma.inventoryCategory.findMany({
+      where: { restaurantId },
+      select: { id: true, name: true },
+    });
+
+    const categoryMap = new Map<string, string>();
+    categories.forEach((c) => categoryMap.set(c.name.trim().toLowerCase(), c.id));
+
+    const validUoms = new Set([
+      "KG", "G", "LB", "OZ", "L", "ML", "GAL", "QT", "PT", "CUP",
+      "FL_OZ", "TBSP", "TSP", "LADLE", "PIECES", "DOZEN", "PORTION", "BOX", "PACKET"
+    ]);
+
+    const added: Array<{ row: number; name: string; sku?: string }> = [];
+    const skipped: Array<{ row: number; name: string; sku?: string; reason: string }> = [];
+    const failed: Array<{ row: number; name: string; reason: string }> = [];
+
+    for (let index = 0; index < rows.length; index++) {
+      const r = rows[index];
+      const rowNum = r.rowNumber || index + 1;
+      const name = (r.name || "").trim();
+      const sku = (r.sku || "").trim();
+      const catName = (r.category || "").trim();
+      const uomRaw = (r.unitOfMeasure || "PIECES").trim().toUpperCase();
+      const description = (r.description || "").trim();
+
+      if (!name) {
+        failed.push({
+          row: rowNum,
+          name: "Unnamed Item",
+          reason: "Item name is required",
+        });
+        continue;
+      }
+
+      const nameLower = name.toLowerCase();
+      const skuLower = sku.toLowerCase();
+
+      if (existingNameSet.has(nameLower)) {
+        skipped.push({
+          row: rowNum,
+          name,
+          sku: sku || undefined,
+          reason: `Item name '${name}' already exists in catalog`,
+        });
+        continue;
+      }
+
+      if (skuLower && existingSkuSet.has(skuLower)) {
+        skipped.push({
+          row: rowNum,
+          name,
+          sku,
+          reason: `SKU code '${sku}' is already assigned to another item`,
+        });
+        continue;
+      }
+
+      // Parse numeric fields safely
+      const costRaw = r.costPerUnit;
+      const costPerUnit = costRaw !== undefined && costRaw !== "" && costRaw !== null ? Number(costRaw) : 0;
+      if (isNaN(costPerUnit) || costPerUnit < 0) {
+        failed.push({
+          row: rowNum,
+          name,
+          reason: "Cost per unit must be a valid non-negative number",
+        });
+        continue;
+      }
+
+      const reorderPoint = Number(r.reorderPoint) || 0;
+      const parLevel = Number(r.parLevel) || 0;
+
+      // Match UOM
+      let unitOfMeasure = "PIECES";
+      if (validUoms.has(uomRaw)) {
+        unitOfMeasure = uomRaw;
+      } else if (uomRaw.includes("KG") || uomRaw.includes("KILO")) unitOfMeasure = "KG";
+      else if (uomRaw.includes("GRAM") || uomRaw === "G") unitOfMeasure = "G";
+      else if (uomRaw.includes("LB") || uomRaw.includes("POUND")) unitOfMeasure = "LB";
+      else if (uomRaw.includes("OZ") || uomRaw.includes("OUNCE")) unitOfMeasure = "OZ";
+      else if (uomRaw.includes("LITER") || uomRaw === "L") unitOfMeasure = "L";
+      else if (uomRaw.includes("ML") || uomRaw.includes("MILLI")) unitOfMeasure = "ML";
+
+      // Resolve Category ID
+      let categoryId: string | undefined = undefined;
+      if (catName) {
+        const catKey = catName.toLowerCase();
+        if (categoryMap.has(catKey)) {
+          categoryId = categoryMap.get(catKey);
+        } else {
+          try {
+            const newCat = await prisma.inventoryCategory.create({
+              data: {
+                restaurantId,
+                name: catName,
+              },
+            });
+            categoryId = newCat.id;
+            categoryMap.set(catKey, newCat.id);
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      try {
+        await prisma.inventoryItem.create({
+          data: {
+            restaurantId,
+            name,
+            sku: sku || null,
+            description: description || null,
+            categoryId: categoryId || null,
+            unitOfMeasure: unitOfMeasure as any,
+            costPerUnit,
+            reorderPoint,
+            parLevel,
+          },
+        });
+
+        existingNameSet.add(nameLower);
+        if (skuLower) existingSkuSet.add(skuLower);
+
+        added.push({
+          row: rowNum,
+          name,
+          sku: sku || undefined,
+        });
+      } catch (err: any) {
+        failed.push({
+          row: rowNum,
+          name,
+          reason: err.message || "Database creation error",
+        });
+      }
+    }
+
+    return { added, skipped, failed };
+  },
+
   // ── Stock Ledger ────────────────────────────────────────────────────────
   async addStockMovement(
     restaurantId: string,
