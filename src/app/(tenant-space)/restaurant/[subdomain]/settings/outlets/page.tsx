@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import { WORLDWIDE_TIMEZONES, WORLDWIDE_CURRENCIES } from "@/core/constants/locales";
+import SearchableTimezoneSelect from "@/components/SearchableTimezoneSelect";
+import SearchableCurrencySelect from "@/components/SearchableCurrencySelect";
 
 interface Outlet {
   id: string;
@@ -380,38 +382,20 @@ export default function RestaurantOutletsPage({
                   <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                     Timezone *
                   </label>
-                  <select
+                  <SearchableTimezoneSelect
                     value={formData.timezone}
-                    onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
-                  >
-                    {WORLDWIDE_TIMEZONES.map((tz) => (
-                      <option key={tz.value} value={tz.value}>
-                        {tz.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, timezone: val })}
+                  />
                 </div>
 
                 <div>
                   <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                     Currency *
                   </label>
-                  <select
+                  <SearchableCurrencySelect
                     value={formData.currency}
-                    onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
-                  >
-                    {WORLDWIDE_CURRENCIES.map((curr) => (
-                      <option key={curr.code} value={curr.code}>
-                        {curr.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, currency: val })}
+                  />
                 </div>
               </div>
 
@@ -497,38 +481,20 @@ export default function RestaurantOutletsPage({
                   <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                     Timezone *
                   </label>
-                  <select
+                  <SearchableTimezoneSelect
                     value={editFormData.timezone}
-                    onChange={(e) => setEditFormData({ ...editFormData, timezone: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
-                  >
-                    {WORLDWIDE_TIMEZONES.map((tz) => (
-                      <option key={tz.value} value={tz.value}>
-                        {tz.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setEditFormData({ ...editFormData, timezone: val })}
+                  />
                 </div>
 
                 <div>
                   <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                     Currency *
                   </label>
-                  <select
+                  <SearchableCurrencySelect
                     value={editFormData.currency}
-                    onChange={(e) => setEditFormData({ ...editFormData, currency: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
-                  >
-                    {WORLDWIDE_CURRENCIES.map((curr) => (
-                      <option key={curr.code} value={curr.code}>
-                        {curr.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setEditFormData({ ...editFormData, currency: val })}
+                  />
                 </div>
               </div>
 

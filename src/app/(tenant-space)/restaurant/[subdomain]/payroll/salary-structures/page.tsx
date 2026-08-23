@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import { WORLDWIDE_CURRENCIES } from "@/core/constants/locales";
+import SearchableCurrencySelect from "@/components/SearchableCurrencySelect";
 
 interface Employee {
   id: string;
@@ -400,21 +401,10 @@ export default function AppleSalaryStructuresPage() {
                   <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                     Currency
                   </label>
-                  <select
+                  <SearchableCurrencySelect
                     value={currency}
-                    onChange={(e) => setCurrency(e.target.value)}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                      isDark
-                        ? "bg-[#0A0C12] border-white/[0.08] text-white"
-                        : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
-                  >
-                    {WORLDWIDE_CURRENCIES.map((curr) => (
-                      <option key={curr.code} value={curr.code}>
-                        {curr.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setCurrency(val)}
+                  />
                 </div>
               </div>
 
