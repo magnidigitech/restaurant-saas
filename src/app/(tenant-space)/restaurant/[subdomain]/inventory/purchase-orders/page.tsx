@@ -657,9 +657,9 @@ export default function PurchaseOrdersDirectoryPage({
           </div>
         </div>
 
-        {/* Sub-Navigation Tabs */}
+        {/* Sub-Navigation Tabs: Single Line on All Screens */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className={`p-1.5 rounded-2xl border flex items-center gap-1.5 flex-wrap ${
+          <div className={`p-1 rounded-2xl border grid grid-cols-3 sm:flex items-center gap-1 w-full sm:w-auto ${
             isDark ? "bg-[#121622]/80 border-white/[0.06]" : "bg-slate-100/90 border-slate-200"
           }`}>
             <button
@@ -668,7 +668,7 @@ export default function PurchaseOrdersDirectoryPage({
                 setActiveTab("UPCOMING");
                 setStatusFilter("");
               }}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-2 ${
+              className={`px-2 sm:px-4 py-2 rounded-xl text-[11px] sm:text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
                 activeTab === "UPCOMING"
                   ? isDark
                     ? "bg-[#0071E3] text-white shadow-md"
@@ -678,8 +678,9 @@ export default function PurchaseOrdersDirectoryPage({
                   : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
               }`}
             >
-              <span>Upcoming & In-Flight POs</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              <span className="hidden sm:inline">Upcoming & In-Flight</span>
+              <span className="inline sm:hidden">Upcoming</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] font-bold ${
                 activeTab === "UPCOMING"
                   ? "bg-white/20 text-white"
                   : isDark
@@ -696,7 +697,7 @@ export default function PurchaseOrdersDirectoryPage({
                 setActiveTab("COMPLETED");
                 setStatusFilter("");
               }}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-2 ${
+              className={`px-2 sm:px-4 py-2 rounded-xl text-[11px] sm:text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
                 activeTab === "COMPLETED"
                   ? isDark
                     ? "bg-[#0071E3] text-white shadow-md"
@@ -706,8 +707,9 @@ export default function PurchaseOrdersDirectoryPage({
                   : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
               }`}
             >
-              <span>Completed & Received</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              <span className="hidden sm:inline">Completed & Received</span>
+              <span className="inline sm:hidden">Received</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] font-bold ${
                 activeTab === "COMPLETED"
                   ? "bg-white/20 text-white"
                   : isDark
@@ -721,7 +723,7 @@ export default function PurchaseOrdersDirectoryPage({
             <button
               type="button"
               onClick={() => setActiveTab("ALL")}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-2 ${
+              className={`px-2 sm:px-4 py-2 rounded-xl text-[11px] sm:text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
                 activeTab === "ALL"
                   ? isDark
                     ? "bg-[#0071E3] text-white shadow-md"
@@ -731,8 +733,9 @@ export default function PurchaseOrdersDirectoryPage({
                   : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
               }`}
             >
-              <span>All Orders</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              <span className="hidden sm:inline">All Orders</span>
+              <span className="inline sm:hidden">All</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] font-bold ${
                 activeTab === "ALL"
                   ? "bg-white/20 text-white"
                   : isDark
