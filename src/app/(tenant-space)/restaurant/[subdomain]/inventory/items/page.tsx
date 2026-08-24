@@ -1020,16 +1020,17 @@ export default function InventoryItemsPage({
 
               {/* STEP 2: PREVIEW DATA TABLE & CONFIRMATION */}
               {previewFile && !importReport && (
-                <div className="space-y-5">
-                  <div className={`p-4 rounded-2xl border flex items-center justify-between ${isDark ? "bg-[#090B10] border-white/[0.08]" : "bg-blue-50/60 border-blue-100"}`}>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#0071E3]/10 border border-[#0071E3]/20 flex items-center justify-center text-[#0071E3] shrink-0">
+                <div className="space-y-4">
+                  {/* File Info Banner */}
+                  <div className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${isDark ? "bg-[#090B10] border-white/[0.08]" : "bg-blue-50/60 border-blue-100"}`}>
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#0071E3]/10 border border-[#0071E3]/20 flex items-center justify-center text-[#0071E3] shrink-0">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                       </div>
-                      <div>
-                        <h3 className="text-xs font-bold">{previewFile.name}</h3>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-xs font-bold truncate text-slate-900 dark:text-white">{previewFile.name}</h3>
                         <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
                           Detected <span className="font-bold text-[#0071E3]">{parsedRows.length} items</span> ready for import
                         </p>
@@ -1041,7 +1042,7 @@ export default function InventoryItemsPage({
                         setPreviewFile(null);
                         setParsedRows([]);
                       }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition cursor-pointer ${
+                      className={`w-full sm:w-auto px-3 py-1.5 rounded-xl text-xs font-medium border transition cursor-pointer text-center shrink-0 ${
                         isDark ? "bg-white/[0.04] border-white/[0.08] hover:bg-white/[0.08] text-slate-300" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
                       }`}
                     >
@@ -1049,8 +1050,67 @@ export default function InventoryItemsPage({
                     </button>
                   </div>
 
-                  <div className={`rounded-2xl border overflow-hidden max-h-64 overflow-y-auto text-xs ${isDark ? "bg-[#090B10] border-white/[0.08]" : "bg-white border-slate-200"}`}>
-                    <table className="w-full text-left border-collapse">
+                  {/* MOBILE PREVIEW CARDS (block sm:hidden) */}
+                  <div className="block sm:hidden space-y-2.5 max-h-72 overflow-y-auto pr-0.5">
+                    {parsedRows.map((row, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-xl border space-y-2 text-xs ${
+                          isDark ? "bg-[#090B10] border-white/[0.06]" : "bg-slate-50/70 border-slate-200"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold text-slate-900 dark:text-white truncate">
+                              <span className="opacity-50 font-mono text-[10px] mr-1.5">#{row.rowNumber || idx + 1}</span>
+                              {row.name || <span className="text-rose-500 font-normal">Missing Name</span>}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                              {row.sku && (
+                                <span className="font-mono text-[10px] opacity-60">
+                                  SKU: {row.sku}
+                                </span>
+                              )}
+                              {row.category && (
+                                <span className="px-1.5 py-0.2 rounded bg-blue-500/10 text-[#0071E3] dark:text-[#64B5FF] text-[10px] font-semibold">
+                                  {row.category}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div
+                          className={`grid grid-cols-3 gap-1.5 p-2 rounded-lg border text-center ${
+                            isDark ? "bg-[#121622] border-white/[0.04]" : "bg-white border-slate-200"
+                          }`}
+                        >
+                          <div>
+                            <div className="text-[9px] font-medium opacity-50 uppercase">Unit</div>
+                            <div className="font-mono text-[11px] font-semibold mt-0.5">
+                              {row.unitOfMeasure || "PIECES"}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[9px] font-medium opacity-50 uppercase">Cost</div>
+                            <div className="font-mono text-[11px] font-semibold mt-0.5">
+                              ${Number(row.costPerUnit || 0).toFixed(2)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[9px] font-medium opacity-50 uppercase">Par</div>
+                            <div className="font-mono text-[11px] font-semibold mt-0.5 opacity-70">
+                              {row.parLevel || 0}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* DESKTOP PREVIEW TABLE (hidden sm:block) */}
+                  <div className={`hidden sm:block rounded-2xl border overflow-hidden max-h-64 overflow-y-auto text-xs ${isDark ? "bg-[#090B10] border-white/[0.08]" : "bg-white border-slate-200"}`}>
+                    <table className="w-full text-left border-collapse whitespace-nowrap">
                       <thead className="sticky top-0 z-10">
                         <tr className={`border-b text-[10px] font-bold uppercase tracking-wider ${isDark ? "bg-[#161B29] border-white/[0.08] text-slate-400" : "bg-slate-100 border-slate-200 text-slate-600"}`}>
                           <th className="py-2.5 px-3">#</th>
@@ -1078,14 +1138,14 @@ export default function InventoryItemsPage({
                     </table>
                   </div>
 
-                  <div className="flex justify-between items-center pt-2 border-t border-black/[0.06] dark:border-white/[0.06]">
+                  <div className="flex flex-col-reverse sm:flex-row sm:justify-between items-stretch sm:items-center gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
                     <button
                       type="button"
                       onClick={() => {
                         setPreviewFile(null);
                         setParsedRows([]);
                       }}
-                      className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                      className={`px-4 py-2.5 sm:py-2 rounded-xl text-xs font-medium transition cursor-pointer text-center ${
                         isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
                       }`}
                     >
@@ -1096,7 +1156,7 @@ export default function InventoryItemsPage({
                       type="button"
                       disabled={importing}
                       onClick={handleConfirmImport}
-                      className="px-5 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition cursor-pointer shadow-sm disabled:opacity-50 flex items-center gap-2"
+                      className="px-5 py-3 sm:py-2.5 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition cursor-pointer shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       {importing ? (
                         <>
