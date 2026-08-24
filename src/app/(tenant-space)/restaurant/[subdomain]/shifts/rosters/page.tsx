@@ -416,12 +416,9 @@ export default function AppleShiftRostersPage() {
         if (data.recommended && data.recommended.length > 0) {
           setSelectedEmployeesForShift(data.recommended.map((emp: any) => emp.employeeId));
           setAssignOverrideWarning(null);
-        } else if (data.partiallyAvailable && data.partiallyAvailable.length > 0) {
-          setSelectedEmployeesForShift([data.partiallyAvailable[0].employeeId]);
-          setAssignOverrideWarning(data.partiallyAvailable[0].reason || "Partially Available");
-        } else if (data.unavailable && data.unavailable.length > 0) {
-          setSelectedEmployeesForShift([data.unavailable[0].employeeId]);
-          setAssignOverrideWarning(data.unavailable[0].reason || "Unavailable");
+        } else {
+          setSelectedEmployeesForShift([]);
+          setAssignOverrideWarning(null);
         }
       }
     } catch {

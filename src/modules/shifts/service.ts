@@ -1272,8 +1272,8 @@ export const ShiftService = {
         reason: ""
       };
 
-      if (isOnLeave) {
-        empData.reason = "Employee is on approved leave for this date.";
+      if (isOnLeave || avail?.type === "LEAVE") {
+        empData.reason = isOnLeave ? "Employee is on approved leave for this date." : "Employee marked Leave for this date.";
         unavailable.push(empData);
       } else if (hasOverlap) {
         empData.reason = "Employee has an overlapping shift assigned on this date.";
@@ -1295,13 +1295,11 @@ export const ShiftService = {
           empData.reason = `Available only between ${avail.availableFrom || ''} - ${avail.availableUntil || ''} (Shift: ${startTime} - ${endTime}).`;
           partiallyAvailable.push(empData);
         }
+      } else if (avail?.type === "AVAILABLE") {
+        recommended.push(empData);
       } else {
-        if (avail?.type === "AVAILABLE") {
-          recommended.push(empData);
-        } else {
-          empData.reason = "Availability not explicitly updated yet.";
-          partiallyAvailable.push(empData);
-        }
+        empData.reason = "Availability not explicitly updated yet.";
+        partiallyAvailable.push(empData);
       }
     });
 
