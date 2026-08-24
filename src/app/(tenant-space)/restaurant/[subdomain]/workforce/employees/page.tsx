@@ -530,7 +530,7 @@ export default function AppleEmployeeDirectoryPage() {
                 setError("");
                 setShowModal(true);
               }}
-              className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
+              className="w-full sm:w-auto px-5 py-2.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer text-center"
             >
               + Add Employee
             </button>
@@ -538,7 +538,7 @@ export default function AppleEmployeeDirectoryPage() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {[
             { label: "Total Staff", value: stats.total, color: isDark ? "text-white" : "text-slate-900", sub: "Registered employees" },
             { label: "Full-Time", value: stats.fullTime, color: isDark ? "text-emerald-400" : "text-emerald-600", sub: "48h / week capacity" },
@@ -547,7 +547,7 @@ export default function AppleEmployeeDirectoryPage() {
           ].map((stat, idx) => (
             <div
               key={idx}
-              className={`p-5 rounded-2xl border transition space-y-1 ${
+              className={`p-4 sm:p-5 rounded-2xl border transition space-y-1 ${
                 isDark
                   ? "bg-[#121622]/60 border-white/[0.06]"
                   : "bg-white border-slate-200/80 shadow-xs"
@@ -556,7 +556,7 @@ export default function AppleEmployeeDirectoryPage() {
               <p className={`text-[10px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
                 {stat.label}
               </p>
-              <p className={`text-2xl font-bold tracking-tight ${stat.color}`}>
+              <p className={`text-xl sm:text-2xl font-bold tracking-tight ${stat.color}`}>
                 {stat.value}
               </p>
               <p className={`text-[11px] ${isDark ? "text-[#6C7280]" : "text-slate-400"}`}>
@@ -574,7 +574,7 @@ export default function AppleEmployeeDirectoryPage() {
 
         {/* Search & Filter Toolbar */}
         <div
-          className={`p-4 rounded-2xl border transition flex flex-col sm:flex-row items-center gap-3 ${
+          className={`p-3.5 sm:p-4 rounded-2xl border transition flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 ${
             isDark
               ? "bg-[#121622]/60 border-white/[0.06]"
               : "bg-white border-slate-200/80 shadow-xs"
@@ -585,7 +585,7 @@ export default function AppleEmployeeDirectoryPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name, employee code, or email..."
-              className={`w-full px-3.5 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+              className={`w-full px-3.5 py-2.5 sm:py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
                 isDark
                   ? "bg-[#0A0C12] border-white/[0.08] text-white placeholder-[#555C6D]"
                   : "bg-[#F5F5F7] border-slate-200 text-slate-900 placeholder-slate-400"
@@ -593,11 +593,11 @@ export default function AppleEmployeeDirectoryPage() {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-2 w-full sm:w-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full sm:w-auto">
             <select
               value={selectedDept}
               onChange={(e) => setSelectedDept(e.target.value)}
-              className={`px-3 py-2 text-xs font-medium rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+              className={`w-full px-3 py-2 text-xs font-medium rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
                 isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
               }`}
             >
@@ -612,7 +612,7 @@ export default function AppleEmployeeDirectoryPage() {
             <select
               value={selectedOutlet}
               onChange={(e) => setSelectedOutlet(e.target.value)}
-              className={`px-3 py-2 text-xs font-medium rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+              className={`w-full px-3 py-2 text-xs font-medium rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
                 isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
               }`}
             >
@@ -627,7 +627,7 @@ export default function AppleEmployeeDirectoryPage() {
             <select
               value={selectedWorkerType}
               onChange={(e) => setSelectedWorkerType(e.target.value)}
-              className={`px-3 py-2 text-xs font-medium rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+              className={`w-full px-3 py-2 text-xs font-medium rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
                 isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
               }`}
             >
@@ -642,127 +642,236 @@ export default function AppleEmployeeDirectoryPage() {
           </div>
         </div>
 
-        {/* Employees Table View */}
-        <div
-          className={`rounded-2xl sm:rounded-3xl border overflow-hidden transition shadow-xs ${
-            isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80"
-          }`}
-        >
-          {loading ? (
-            <div className="py-16 text-center text-xs opacity-60">Loading staff members...</div>
-          ) : filteredEmployees.length === 0 ? (
-            <div className="py-16 text-center text-xs opacity-60 space-y-1">
-              <p className="font-semibold text-sm">No employees found</p>
-              <p>Click &quot;+ Add Employee&quot; to register a staff profile.</p>
+        {/* Employees View (Responsive: Mobile Cards + Desktop Table) */}
+        {loading ? (
+          <div
+            className={`p-12 rounded-3xl border text-center text-xs opacity-60 ${
+              isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80"
+            }`}
+          >
+            Loading staff members...
+          </div>
+        ) : filteredEmployees.length === 0 ? (
+          <div
+            className={`p-12 rounded-3xl border text-center text-xs opacity-60 space-y-1.5 ${
+              isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80"
+            }`}
+          >
+            <p className="font-semibold text-sm">No employees found</p>
+            <p>Click &quot;+ Add Employee&quot; to register a staff profile.</p>
+          </div>
+        ) : (
+          <>
+            {/* Mobile Cards View */}
+            <div className="grid grid-cols-1 gap-3 md:hidden">
+              {filteredEmployees.map((emp) => {
+                const currentRec = emp.employmentRecords[0];
+                const hasLogin = emp.memberships.length > 0;
+                const wtBadge = getWorkerTypeBadge(emp.workerType, emp.weeklyHoursLimit);
+
+                return (
+                  <div
+                    key={emp.id}
+                    className={`p-4 rounded-2xl border transition space-y-3.5 ${
+                      isDark
+                        ? "bg-[#121622]/80 border-white/[0.08]"
+                        : "bg-white border-slate-200/80 shadow-xs"
+                    }`}
+                  >
+                    {/* Header Row: Avatar, Name, Worker Type */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-full bg-[#0071E3]/15 text-[#0071E3] flex items-center justify-center font-bold text-xs shrink-0">
+                          {emp.firstName.charAt(0)}
+                          {emp.lastName.charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className={`font-semibold text-sm truncate ${isDark ? "text-white" : "text-slate-900"}`}>
+                            {emp.firstName} {emp.lastName}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                              {emp.employeeCode}
+                            </span>
+                            {hasLogin ? (
+                              <span className="text-[10px] font-semibold text-emerald-500">
+                                Active User
+                              </span>
+                            ) : (
+                              <span className={`text-[10px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                                Profile Only
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border shrink-0 ${wtBadge.cls}`}>
+                        {wtBadge.label}
+                      </span>
+                    </div>
+
+                    {/* Details Info Grid */}
+                    <div className={`p-2.5 rounded-xl text-xs space-y-1.5 ${isDark ? "bg-white/[0.02] border border-white/[0.04]" : "bg-slate-50/70 border border-slate-100"}`}>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>Department</span>
+                        <span className={`font-medium ${isDark ? "text-white" : "text-slate-800"}`}>
+                          {currentRec?.department?.name || "Unassigned"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>Designation</span>
+                        <span className={`font-medium ${isDark ? "text-white" : "text-slate-800"}`}>
+                          {currentRec?.designation?.name || "Staff Member"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>Primary Outlet</span>
+                        <span className={`font-medium ${isDark ? "text-[#58A6FF]" : "text-blue-600"}`}>
+                          📍 {currentRec?.primaryOutlet?.name || "All Outlets"}
+                        </span>
+                      </div>
+                      {emp.personalEmail && (
+                        <div className="flex items-center justify-between pt-1 border-t border-black/[0.04] dark:border-white/[0.04]">
+                          <span className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>Email</span>
+                          <span className={`text-[11px] truncate max-w-[200px] ${isDark ? "text-[#BAC0CD]" : "text-slate-600"}`}>
+                            {emp.personalEmail}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* View Profile Action */}
+                    <button
+                      onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees/${emp.id}`)}
+                      className={`w-full py-2 rounded-xl text-xs font-medium border transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                        isDark
+                          ? "bg-white/[0.04] text-[#BAC0CD] hover:text-white hover:bg-white/[0.08] border-white/[0.08]"
+                          : "bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-100 border-slate-200 shadow-xs"
+                      }`}
+                    >
+                      <span>View Profile</span>
+                      <span>→</span>
+                    </button>
+                  </div>
+                );
+              })}
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[700px]">
-                <thead>
-                  <tr className={`border-b text-[11px] font-medium uppercase tracking-wider ${
-                    isDark ? "bg-[#0A0C12]/50 border-white/[0.06] text-[#8F95A3]" : "bg-slate-50/70 border-slate-100 text-slate-500"
-                  }`}>
-                    <th className="p-4">Staff Member</th>
-                    <th className="p-4">Worker Type</th>
-                    <th className="p-4">Department & Role</th>
-                    <th className="p-4">Primary Outlet</th>
-                    <th className="p-4">App Access</th>
-                    <th className="p-4 text-right">Action</th>
-                  </tr>
-                </thead>
 
-                <tbody className={`divide-y text-xs ${isDark ? "divide-white/[0.04]" : "divide-slate-100"}`}>
-                  {filteredEmployees.map((emp) => {
-                    const currentRec = emp.employmentRecords[0];
-                    const hasLogin = emp.memberships.length > 0;
-                    const wtBadge = getWorkerTypeBadge(emp.workerType, emp.weeklyHoursLimit);
+            {/* Desktop Table View */}
+            <div
+              className={`hidden md:block rounded-2xl sm:rounded-3xl border overflow-hidden transition shadow-xs ${
+                isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80"
+              }`}
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[700px]">
+                  <thead>
+                    <tr className={`border-b text-[11px] font-medium uppercase tracking-wider ${
+                      isDark ? "bg-[#0A0C12]/50 border-white/[0.06] text-[#8F95A3]" : "bg-slate-50/70 border-slate-100 text-slate-500"
+                    }`}>
+                      <th className="p-4">Staff Member</th>
+                      <th className="p-4">Worker Type</th>
+                      <th className="p-4">Department & Role</th>
+                      <th className="p-4">Primary Outlet</th>
+                      <th className="p-4">App Access</th>
+                      <th className="p-4 text-right">Action</th>
+                    </tr>
+                  </thead>
 
-                    return (
-                      <tr key={emp.id} className={`transition ${isDark ? "hover:bg-white/[0.01]" : "hover:bg-slate-50/50"}`}>
-                        <td className="p-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-[#0071E3]/15 text-[#0071E3] flex items-center justify-center font-bold text-xs flex-shrink-0">
-                              {emp.firstName.charAt(0)}
-                              {emp.lastName.charAt(0)}
-                            </div>
-                            <div className="min-w-0">
-                              <p className={`font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
-                                {emp.firstName} {emp.lastName}
-                              </p>
-                              <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className={`text-[10px] font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-                                  {emp.employeeCode}
-                                </span>
-                                {emp.personalEmail && (
-                                  <>
-                                    <span className={`text-[10px] ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
-                                    <span className={`text-[10px] truncate ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-                                      {emp.personalEmail}
-                                    </span>
-                                  </>
-                                )}
+                  <tbody className={`divide-y text-xs ${isDark ? "divide-white/[0.04]" : "divide-slate-100"}`}>
+                    {filteredEmployees.map((emp) => {
+                      const currentRec = emp.employmentRecords[0];
+                      const hasLogin = emp.memberships.length > 0;
+                      const wtBadge = getWorkerTypeBadge(emp.workerType, emp.weeklyHoursLimit);
+
+                      return (
+                        <tr key={emp.id} className={`transition ${isDark ? "hover:bg-white/[0.01]" : "hover:bg-slate-50/50"}`}>
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-[#0071E3]/15 text-[#0071E3] flex items-center justify-center font-bold text-xs flex-shrink-0">
+                                {emp.firstName.charAt(0)}
+                                {emp.lastName.charAt(0)}
+                              </div>
+                              <div className="min-w-0">
+                                <p className={`font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                                  {emp.firstName} {emp.lastName}
+                                </p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className={`text-[10px] font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                                    {emp.employeeCode}
+                                  </span>
+                                  {emp.personalEmail && (
+                                    <>
+                                      <span className={`text-[10px] ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
+                                      <span className={`text-[10px] truncate ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                                        {emp.personalEmail}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </td>
+                          </td>
 
-                        <td className="p-4">
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${wtBadge.cls}`}>
-                            {wtBadge.label}
-                          </span>
-                        </td>
-
-                        <td className="p-4">
-                          <p className={`font-medium ${isDark ? "text-white" : "text-slate-900"}`}>
-                            {currentRec?.department?.name || "Unassigned Dept"}
-                          </p>
-                          <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                            {currentRec?.designation?.name || "Staff Member"}
-                          </p>
-                        </td>
-
-                        <td className="p-4">
-                          <span className={`font-medium ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
-                            {currentRec?.primaryOutlet?.name || "All Outlets"}
-                          </span>
-                        </td>
-
-                        <td className="p-4">
-                          {hasLogin ? (
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                              isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-100 text-emerald-800 border-emerald-200"
-                            }`}>
-                              Active User
+                          <td className="p-4">
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${wtBadge.cls}`}>
+                              {wtBadge.label}
                             </span>
-                          ) : (
-                            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
-                              isDark ? "bg-white/[0.04] text-[#8F95A3] border-white/[0.08]" : "bg-slate-100 text-slate-500 border-slate-200"
-                            }`}>
-                              Employee Profile
-                            </span>
-                          )}
-                        </td>
+                          </td>
 
-                        <td className="p-4 text-right">
-                          <button
-                            onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees/${emp.id}`)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition cursor-pointer ${
-                              isDark
-                                ? "bg-white/[0.04] text-[#BAC0CD] hover:text-white hover:bg-white/[0.08] border-white/[0.08]"
-                                : "bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-100 border-slate-200"
-                            }`}
-                          >
-                            View Profile →
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          <td className="p-4">
+                            <p className={`font-medium ${isDark ? "text-white" : "text-slate-900"}`}>
+                              {currentRec?.department?.name || "Unassigned Dept"}
+                            </p>
+                            <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                              {currentRec?.designation?.name || "Staff Member"}
+                            </p>
+                          </td>
+
+                          <td className="p-4">
+                            <span className={`font-medium ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+                              {currentRec?.primaryOutlet?.name || "All Outlets"}
+                            </span>
+                          </td>
+
+                          <td className="p-4">
+                            {hasLogin ? (
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                                isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-100 text-emerald-800 border-emerald-200"
+                              }`}>
+                                Active User
+                              </span>
+                            ) : (
+                              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+                                isDark ? "bg-white/[0.04] text-[#8F95A3] border-white/[0.08]" : "bg-slate-100 text-slate-500 border-slate-200"
+                              }`}>
+                                Employee Profile
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="p-4 text-right">
+                            <button
+                              onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees/${emp.id}`)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition cursor-pointer ${
+                                isDark
+                                  ? "bg-white/[0.04] text-[#BAC0CD] hover:text-white hover:bg-white/[0.08] border-white/[0.08]"
+                                  : "bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-100 border-slate-200"
+                              }`}
+                            >
+                              View Profile →
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          )}
-        </div>
+          </>
+        )}
       </main>
 
       {/* Add Employee Modal / Mobile Bottom Sheet */}
