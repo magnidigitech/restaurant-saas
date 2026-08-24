@@ -62,12 +62,43 @@ export const InventoryService = {
       ];
     }
 
-    return prisma.inventoryItem.findMany({
+    const items = await prisma.inventoryItem.findMany({
       where,
       include: {
         category: { select: { id: true, name: true } },
       },
       orderBy: { name: "asc" },
+    });
+
+    const itemIds = items.map((i) => i.id);
+    const stockAggs = await prisma.stockLedger.groupBy({
+      by: ["itemId"],
+      where: {
+        restaurantId,
+        itemId: { in: itemIds },
+      },
+      _sum: { quantity: true },
+    });
+
+    const stockMap = new Map<string, number>();
+    stockAggs.forEach((agg) => {
+      stockMap.set(agg.itemId, Number(agg._sum.quantity ?? 0));
+    });
+
+    return items.map((item) => {
+      const currentStock = stockMap.get(item.id) ?? 0;
+      const reorderPoint = Number(item.reorderPoint ?? 0);
+      const isLowStock = currentStock > 0 && currentStock <= reorderPoint;
+      const isOutOfStock = currentStock <= 0;
+      return {
+        ...item,
+        costPerUnit: Number(item.costPerUnit ?? 0),
+        reorderPoint,
+        parLevel: Number(item.parLevel ?? 0),
+        currentStock,
+        isLowStock,
+        isOutOfStock,
+      };
     });
   },
 

@@ -18,6 +18,7 @@ interface Item {
   costPerUnit: number;
   currentStock: number;
   isLowStock: boolean;
+  isOutOfStock?: boolean;
   category?: { id: string; name: string } | null;
 }
 
@@ -130,8 +131,10 @@ export default function InventoryItemsPage({
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Bulk Import States
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -146,6 +149,17 @@ export default function InventoryItemsPage({
   const [reportTab, setReportTab] = useState<"added" | "skipped" | "failed">("added");
 
   const [form, setForm] = useState({
+    name: "",
+    sku: "",
+    description: "",
+    categoryId: "",
+    unitOfMeasure: "PIECES",
+    reorderPoint: "",
+    parLevel: "",
+    costPerUnit: "",
+  });
+
+  const [editForm, setEditForm] = useState({
     name: "",
     sku: "",
     description: "",
@@ -226,6 +240,78 @@ export default function InventoryItemsPage({
       setError(err.message || "Failed to create item");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleOpenEdit = (item: Item) => {
+    setEditingItem(item);
+    setEditForm({
+      name: item.name,
+      sku: item.sku || "",
+      description: item.description || "",
+      categoryId: item.category?.id || "",
+      unitOfMeasure: item.unitOfMeasure || "PIECES",
+      reorderPoint: String(item.reorderPoint ?? 0),
+      parLevel: String(item.parLevel ?? 0),
+      costPerUnit: String(item.costPerUnit ?? 0),
+    });
+    setError("");
+  };
+
+  const handleUpdateItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+    if (!editForm.name) {
+      setError("Item name is required");
+      return;
+    }
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/restaurant/inventory/items/${editingItem.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editForm.name,
+          sku: editForm.sku || undefined,
+          description: editForm.description || undefined,
+          categoryId: editForm.categoryId || null,
+          unitOfMeasure: editForm.unitOfMeasure,
+          reorderPoint: Number(editForm.reorderPoint) || 0,
+          parLevel: Number(editForm.parLevel) || 0,
+          costPerUnit: Number(editForm.costPerUnit) || 0,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setEditingItem(null);
+      fetchData();
+    } catch (err: any) {
+      setError(err.message || "Failed to update item");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteItem = async () => {
+    if (!editingItem) return;
+    if (!confirm(`Are you sure you want to remove '${editingItem.name}' from your catalog?`)) return;
+    setDeleting(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/restaurant/inventory/items/${editingItem.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to delete item");
+      }
+      setEditingItem(null);
+      fetchData();
+    } catch (err: any) {
+      setError(err.message || "Failed to delete item");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -310,6 +396,7 @@ export default function InventoryItemsPage({
   };
 
   const lowCount = items.filter((i) => i.isLowStock).length;
+  const outCount = items.filter((i) => (i.currentStock ?? 0) <= 0).length;
 
   return (
     <ModuleAccessGuard moduleKey="inventory" moduleName="Inventory Item Master">
@@ -344,7 +431,7 @@ export default function InventoryItemsPage({
                 Inventory Item Master
               </h1>
               <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                {items.length} items total • {lowCount > 0 ? <span className="text-amber-500 font-semibold">{lowCount} low stock alerts</span> : "all inventory healthy"}
+                {items.length} items total • {outCount > 0 ? <span className="text-rose-500 font-semibold">{outCount} out of stock</span> : lowCount > 0 ? <span className="text-amber-500 font-semibold">{lowCount} low stock</span> : "all inventory healthy"}
               </p>
             </div>
 
@@ -446,55 +533,281 @@ export default function InventoryItemsPage({
                       <th className="py-3.5 px-4 text-right">Current Stock</th>
                       <th className="py-3.5 px-4 text-right">Par Level</th>
                       <th className="py-3.5 px-4 text-center">Status</th>
+                      <th className="py-3.5 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04] text-xs">
-                    {items.map((item) => (
-                      <tr key={item.id} className={`transition ${isDark ? "hover:bg-white/[0.02]" : "hover:bg-slate-50/80"}`}>
-                        <td className="py-3.5 px-4">
-                          <div className="font-semibold">{item.name}</div>
-                          {item.sku && <div className="text-[10px] font-mono opacity-50">SKU: {item.sku}</div>}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          {item.category ? (
-                            <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-[#0071E3] dark:text-[#64B5FF] text-[11px] font-medium">
-                              {item.category.name}
+                    {items.map((item) => {
+                      const stock = Number(item.currentStock ?? 0);
+                      const reorder = Number(item.reorderPoint ?? 0);
+                      const isOutOfStock = stock <= 0;
+                      const isLowStock = stock > 0 && stock <= reorder;
+
+                      return (
+                        <tr key={item.id} className={`transition ${isDark ? "hover:bg-white/[0.02]" : "hover:bg-slate-50/80"}`}>
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold">{item.name}</div>
+                            {item.sku && <div className="text-[10px] font-mono opacity-50">SKU: {item.sku}</div>}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {item.category ? (
+                              <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-[#0071E3] dark:text-[#64B5FF] text-[11px] font-medium">
+                                {item.category.name}
+                              </span>
+                            ) : (
+                              <span className="opacity-40 text-[11px]">—</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 font-mono text-[11px]">
+                            {formatUnit(item.unitOfMeasure as any)}
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-mono font-medium">
+                            ${Number(item.costPerUnit).toFixed(2)}
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-mono font-bold">
+                            <span className={isOutOfStock ? "text-rose-500" : isLowStock ? "text-amber-500" : ""}>
+                              {stock}
                             </span>
-                          ) : (
-                            <span className="opacity-40 text-[11px]">—</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-[11px]">
-                          {formatUnit(item.unitOfMeasure as any)}
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-mono font-medium">
-                          ${Number(item.costPerUnit).toFixed(2)}
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-mono font-bold">
-                          {item.currentStock}
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-mono opacity-60">
-                          {item.parLevel}
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          {item.isLowStock ? (
-                            <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[10px] font-bold">
-                              Low Stock
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px] font-bold">
-                              In Stock
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-mono opacity-60">
+                            {item.parLevel}
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            {isOutOfStock ? (
+                              <span className="px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 text-[10px] font-bold">
+                                Out of Stock
+                              </span>
+                            ) : isLowStock ? (
+                              <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[10px] font-bold">
+                                Low Stock
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px] font-bold">
+                                In Stock
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(item)}
+                              className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition cursor-pointer ${
+                                isDark
+                                  ? "bg-white/[0.04] border-white/[0.08] hover:bg-white/[0.1] text-slate-200"
+                                  : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700 shadow-2xs"
+                              }`}
+                            >
+                              Edit
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             </div>
           )}
         </main>
+
+        {/* EDIT ITEM MODAL */}
+        {editingItem && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+            <div
+              className={`w-full max-w-lg p-6 sm:p-8 rounded-3xl border shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150 ${
+                isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+              }`}
+            >
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-base font-bold tracking-tight">Edit Inventory Item</h2>
+                  <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    Update details or cost for {editingItem.name}.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setEditingItem(null)}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-base cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateItem} className="space-y-4">
+                <div>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Item Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Boneless Chicken Breast"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      SKU Code
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. RAW-CHK-001"
+                      value={editForm.sku}
+                      onChange={(e) => setEditForm({ ...editForm, sku: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Category
+                    </label>
+                    <select
+                      value={editForm.categoryId}
+                      onChange={(e) => setEditForm({ ...editForm, categoryId: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    >
+                      <option value="">No Category</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Unit of Measure
+                    </label>
+                    <select
+                      value={editForm.unitOfMeasure}
+                      onChange={(e) => setEditForm({ ...editForm, unitOfMeasure: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    >
+                      {CULINARY_UOM_GROUPS.map((g) => (
+                        <optgroup key={g.group} label={g.group}>
+                          {g.options.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Cost Per Unit ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={editForm.costPerUnit}
+                      onChange={(e) => setEditForm({ ...editForm, costPerUnit: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Reorder Alert Point
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 10"
+                      value={editForm.reorderPoint}
+                      onChange={(e) => setEditForm({ ...editForm, reorderPoint: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Par Stock Level
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 50"
+                      value={editForm.parLevel}
+                      onChange={(e) => setEditForm({ ...editForm, parLevel: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Description
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Optional notes or supplier details..."
+                    value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  />
+                </div>
+
+                <div className="flex justify-between items-center pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+                  <button
+                    type="button"
+                    disabled={deleting}
+                    onClick={handleDeleteItem}
+                    className="px-3.5 py-2 text-rose-500 hover:bg-rose-500/10 rounded-xl text-xs font-semibold transition cursor-pointer"
+                  >
+                    {deleting ? "Removing..." : "Remove Item"}
+                  </button>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingItem(null)}
+                      className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                        isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
+                    >
+                      {submitting ? "Saving..." : "Save Changes"}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* BULK IMPORT VIA EXCEL / CSV MODAL */}
         {showBulkModal && (
