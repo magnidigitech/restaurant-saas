@@ -411,6 +411,25 @@ export default function VendorDetailPage({
   const locationText = getOutletNames(vendor?.outletIds);
   const isAllLocations = !vendor?.outletIds || vendor?.outletIds.length === 0;
 
+  const handleOpenEdit = () => {
+    if (vendor) {
+      setForm({
+        name: vendor.name || "",
+        code: vendor.code || "",
+        contactPerson: vendor.contactPerson || "",
+        email: vendor.email || "",
+        phone: vendor.phone || "",
+        address: vendor.address || "",
+        taxId: vendor.taxId || "",
+        paymentTerms: vendor.paymentTerms || "NET30",
+        status: vendor.status || "ACTIVE",
+        outletIds: vendor.outletIds || [],
+        notes: vendor.notes || "",
+      });
+    }
+    setShowEdit(true);
+  };
+
   return (
     <div
       className={`min-h-screen font-sans antialiased transition-colors duration-200 flex flex-col ${
@@ -467,7 +486,7 @@ export default function VendorDetailPage({
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
-              onClick={() => setShowEdit(true)}
+              onClick={handleOpenEdit}
               className="flex-1 sm:flex-none px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer text-center"
             >
               Edit Profile

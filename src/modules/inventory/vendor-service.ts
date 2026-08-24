@@ -154,33 +154,34 @@ export const VendorService = {
       notes: data.notes || null,
     };
 
+    let created: any;
     try {
-      return await db.vendor.create({ data: vendorPayload });
+      created = await db.vendor.create({ data: vendorPayload });
     } catch (err: any) {
       const freshDb = createPrismaClient() as any;
       (globalThis as any).prisma = freshDb;
       try {
-        return await freshDb.vendor.create({ data: vendorPayload });
+        created = await freshDb.vendor.create({ data: vendorPayload });
       } catch (retryErr: any) {
-        if (retryErr.message?.includes("outletIds")) {
-          delete vendorPayload.outletIds;
-          const created = await freshDb.vendor.create({ data: vendorPayload });
-          if (data.outletIds && data.outletIds.length > 0) {
-            try {
-              await freshDb.$executeRawUnsafe(
-                `UPDATE "inventory_vendors" SET "outlet_ids" = $1 WHERE "id" = $2`,
-                data.outletIds,
-                created.id
-              );
-            } catch {
-              // ignore
-            }
-          }
-          return created;
-        }
-        throw retryErr;
+        delete vendorPayload.outletIds;
+        created = await freshDb.vendor.create({ data: vendorPayload });
       }
     }
+
+    // Always guarantee outlet_ids is persisted in PostgreSQL
+    if (data.outletIds && data.outletIds.length > 0 && created?.id) {
+      const freshDb = createPrismaClient() as any;
+      const arraySql = `ARRAY[${data.outletIds.map((id) => `'${id.replace(/'/g, "''")}'`).join(",")}]::text[]`;
+      try {
+        await freshDb.$executeRawUnsafe(
+          `UPDATE "inventory_vendors" SET "outlet_ids" = ${arraySql} WHERE "id" = '${created.id}'`
+        );
+      } catch {
+        // ignore
+      }
+    }
+
+    return created;
   },
 
   async updateVendor(
@@ -209,8 +210,9 @@ export const VendorService = {
       outletIds: data.outletIds !== undefined ? data.outletIds : undefined,
     };
 
+    let updated: any;
     try {
-      return await db.vendor.update({
+      updated = await db.vendor.update({
         where: { id },
         data: updatePayload,
       });
@@ -218,33 +220,36 @@ export const VendorService = {
       const freshDb = createPrismaClient() as any;
       (globalThis as any).prisma = freshDb;
       try {
-        return await freshDb.vendor.update({
+        updated = await freshDb.vendor.update({
           where: { id },
           data: updatePayload,
         });
       } catch (retryErr: any) {
-        if (retryErr.message?.includes("outletIds")) {
-          delete updatePayload.outletIds;
-          const updated = await freshDb.vendor.update({
-            where: { id },
-            data: updatePayload,
-          });
-          if (data.outletIds !== undefined) {
-            try {
-              await freshDb.$executeRawUnsafe(
-                `UPDATE "inventory_vendors" SET "outlet_ids" = $1 WHERE "id" = $2`,
-                data.outletIds,
-                id
-              );
-            } catch {
-              // ignore
-            }
-          }
-          return updated;
-        }
-        throw retryErr;
+        delete updatePayload.outletIds;
+        updated = await freshDb.vendor.update({
+          where: { id },
+          data: updatePayload,
+        });
       }
     }
+
+    // Always guarantee outlet_ids is updated in PostgreSQL
+    if (data.outletIds !== undefined) {
+      const freshDb = createPrismaClient() as any;
+      const arraySql =
+        data.outletIds.length > 0
+          ? `ARRAY[${data.outletIds.map((item) => `'${item.replace(/'/g, "''")}'`).join(",")}]::text[]`
+          : `ARRAY[]::text[]`;
+      try {
+        await freshDb.$executeRawUnsafe(
+          `UPDATE "inventory_vendors" SET "outlet_ids" = ${arraySql} WHERE "id" = '${id}'`
+        );
+      } catch {
+        // ignore
+      }
+    }
+
+    return updated;
   },
 
   async archiveVendor(restaurantId: string, id: string) {
