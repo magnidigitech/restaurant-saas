@@ -233,9 +233,33 @@ export default function PurchaseOrdersDirectoryPage({
     };
   };
 
+  const availableOutlets = useMemo(() => {
+    if (!formVendorId) return outlets;
+    const selectedVendor = vendors.find((v) => v.id === formVendorId);
+    if (!selectedVendor || !selectedVendor.outletIds || selectedVendor.outletIds.length === 0) {
+      return outlets;
+    }
+    return outlets.filter((o) => selectedVendor.outletIds!.includes(o.id));
+  }, [formVendorId, vendors, outlets]);
+
   const handleVendorSelect = (selectedVendorId: string) => {
     setFormVendorId(selectedVendorId);
     setAutoFillMsg("");
+
+    const selectedVendor = vendors.find((v) => v.id === selectedVendorId);
+    const validOutlets =
+      !selectedVendor || !selectedVendor.outletIds || selectedVendor.outletIds.length === 0
+        ? outlets
+        : outlets.filter((o) => selectedVendor.outletIds!.includes(o.id));
+
+    let activeOutletId = formOutletId;
+    if (validOutlets.length > 0 && !validOutlets.some((o) => o.id === formOutletId)) {
+      activeOutletId = validOutlets[0].id;
+      setFormOutletId(activeOutletId);
+    } else if (validOutlets.length === 0) {
+      activeOutletId = "";
+      setFormOutletId("");
+    }
 
     if (!selectedVendorId) {
       setVendorItemsState({});
@@ -247,7 +271,7 @@ export default function PurchaseOrdersDirectoryPage({
 
     mappingsForVendor.forEach((m) => {
       const itemObj = inventoryItems.find((i) => i.id === m.itemId);
-      const metrics = getItemStockMetrics(m.itemId, formOutletId);
+      const metrics = getItemStockMetrics(m.itemId, activeOutletId);
       const cost = (m.unitCost ?? itemObj?.costPerUnit ?? 0).toString();
       const defaultQty = metrics.isLowStock && metrics.suggestedQty > 0 ? metrics.suggestedQty.toString() : "1";
 
@@ -1014,16 +1038,23 @@ export default function PurchaseOrdersDirectoryPage({
                   <select
                     value={formOutletId}
                     onChange={(e) => setFormOutletId(e.target.value)}
-                    className={`w-full px-3.5 py-2 text-xs rounded-xl border transition cursor-pointer ${
+                    disabled={availableOutlets.length === 0}
+                    className={`w-full px-3.5 py-2 text-xs rounded-xl border transition cursor-pointer disabled:opacity-50 ${
                       isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                     }`}
                   >
-                    <option value="">Select Branch...</option>
-                    {outlets.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name}
-                      </option>
-                    ))}
+                    {availableOutlets.length === 0 ? (
+                      <option value="">No locations available for this supplier</option>
+                    ) : (
+                      <>
+                        <option value="">Select Branch...</option>
+                        {availableOutlets.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.name}
+                          </option>
+                        ))}
+                      </>
+                    )}
                   </select>
                 </div>
 
