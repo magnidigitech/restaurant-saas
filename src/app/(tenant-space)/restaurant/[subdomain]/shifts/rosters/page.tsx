@@ -42,6 +42,7 @@ interface ShiftTemplate {
 
 interface ShiftAssignment {
   id: string;
+  rosterId?: string | null;
   employeeId: string;
   outletId: string;
   shiftDate: string;
@@ -761,12 +762,21 @@ export default function AppleShiftRostersPage() {
     }
   }
 
-  // Employee's personal shifts (Only shown to employee when roster is PUBLISHED)
+  // Employee's personal shifts (Filtered strictly to active shifts within this roster period)
   const myShifts = React.useMemo(() => {
     if (!myEmployeeId) return [];
     if (!isAdmin && !isRosterPublished) return [];
-    return assignments.filter((a) => a.employeeId === myEmployeeId);
-  }, [assignments, myEmployeeId, isAdmin, isRosterPublished]);
+    return assignments.filter((a) => {
+      if (a.employeeId !== myEmployeeId) return false;
+      if (a.status === "CANCELLED") return false;
+      const assignmentRosterId = a.roster?.id || a.rosterId;
+      if (selectedRosterId && assignmentRosterId && assignmentRosterId !== selectedRosterId) return false;
+      if (rosterDatesList.length > 0) {
+        return rosterDatesList.some((dStr) => matchesDate(a.shiftDate, dStr));
+      }
+      return true;
+    });
+  }, [assignments, myEmployeeId, isAdmin, isRosterPublished, selectedRosterId, rosterDatesList]);
 
   const myEmployeeRecord = React.useMemo(() => {
     return employees.find((e) => e.id === myEmployeeId);
