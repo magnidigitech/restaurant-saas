@@ -114,6 +114,7 @@ export default function AppleShiftRostersPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [overrideHoursLimit, setOverrideHoursLimit] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
@@ -453,29 +454,33 @@ export default function AppleShiftRostersPage() {
   };
 
   // Workflow Status Transition Handler
-  const handleUpdateRosterStatus = async (newStatus: ShiftRoster["status"]) => {
+  const handleUpdateRosterStatus = async (newStatus: string) => {
     if (!selectedRosterId) return;
-    openConfirm(
-      `Update Status to ${newStatus.replace("_", " ")}`,
-      `Are you sure you want to change this roster status to ${newStatus.replace("_", " ")}?`,
-      "Update Status",
-      "primary",
-      async () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Update Roster Workflow Stage",
+      message: `Are you sure you want to transition this roster stage to "${newStatus.replace(/_/g, " ")}"?`,
+      confirmText: "Update Stage",
+      confirmVariant: newStatus === "PUBLISHED" ? "primary" : "warning",
+      onConfirm: async () => {
         try {
           const res = await fetch(`/api/restaurant/shifts/rosters/${selectedRosterId}/status`, {
-            method: "PUT",
+            method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ status: newStatus }),
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "Failed to update roster status");
+          showToast(`✓ Roster stage updated to ${newStatus.replace(/_/g, " ")}`, "success");
           await fetchMasterData();
-          fetchRosterDetails(selectedRosterId);
+          await fetchRosterDetails(selectedRosterId);
+          await fetchMyAvailability(selectedRosterId);
         } catch (err: any) {
+          showToast(err.message || "Failed to update status", "error");
           setError(err.message || "Failed to update status");
         }
-      }
-    );
+      },
+    });
   };
 
   // 2 & 6. Employee Availability Submission
@@ -600,16 +605,18 @@ export default function AppleShiftRostersPage() {
   };
 
   // 8 & 9. Admin Assigns Shifts
-  const handleAssignShift = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAssignShift = async (e?: React.FormEvent, forceOverride: boolean = false) => {
+    if (e) e.preventDefault();
     if (selectedEmployeesForShift.length === 0 || !assignDate || !assignStartTime || !assignEndTime || !selectedOutlet) {
-      setError("Please select at least one employee and fill in all shift assignment details");
+      setModalError("Please select at least one employee and fill in all shift assignment details");
       return;
     }
 
     setActionLoading(true);
+    setModalError(null);
     setError(null);
     try {
+      const shouldOverride = forceOverride || overrideHoursLimit;
       const assignmentsPayload = selectedEmployeesForShift.map((empId) => ({
         rosterId: selectedRosterId,
         employeeId: empId,
@@ -619,6 +626,7 @@ export default function AppleShiftRostersPage() {
         endTime: assignEndTime,
         breakMinutes: Number(assignBreak),
         templateId: assignTemplateId || undefined,
+        overrideHoursLimit: shouldOverride,
       }));
 
       const res = await fetch("/api/restaurant/shifts/assignments", {
@@ -626,17 +634,21 @@ export default function AppleShiftRostersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           assignments: assignmentsPayload,
+          overrideHoursLimit: shouldOverride,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to assign shifts");
 
+      showToast(`✓ Shift successfully assigned to ${selectedEmployeesForShift.length} staff!`, "success");
       setAssignModalOpen(false);
       setSelectedEmployeesForShift([]);
-      fetchRosterDetails(selectedRosterId);
+      setOverrideHoursLimit(false);
+      await fetchRosterDetails(selectedRosterId);
+      await fetchMyAvailability(selectedRosterId);
     } catch (err: any) {
-      setError(err.message || "Failed to assign shift");
+      setModalError(err.message || "Failed to assign shift");
     } finally {
       setActionLoading(false);
     }
@@ -649,9 +661,11 @@ export default function AppleShiftRostersPage() {
         method: "DELETE",
       });
       if (res.ok && selectedRosterId) {
-        fetchRosterDetails(selectedRosterId);
+        showToast("✓ Shift assignment removed", "success");
+        await fetchRosterDetails(selectedRosterId);
       } else {
         const data = await res.json();
+        showToast(data.error || "Failed to delete shift assignment", "error");
         setError(data.error || "Failed to delete shift assignment");
       }
     } catch {
@@ -684,6 +698,11 @@ export default function AppleShiftRostersPage() {
   }
 
   const isRosterPublished = currentRoster?.status === "PUBLISHED";
+  const isAvailabilityLocked =
+    currentRoster?.status === "AVAILABILITY_LOCKED" ||
+    currentRoster?.status === "ASSIGNMENT_IN_PROGRESS" ||
+    currentRoster?.status === "PUBLISHED" ||
+    currentRoster?.status === "COMPLETED";
 
   function matchesDate(shiftDateStr: string, targetDateStr: string): boolean {
     if (!shiftDateStr || !targetDateStr) return false;
@@ -812,37 +831,19 @@ export default function AppleShiftRostersPage() {
             </div>
           )}
 
-          {/* Workflow Status Stepper (Only for Admins) */}
+          {/* Workflow Status Stepper (Interactive for Admins) */}
           {isAdmin && currentRoster && (
             <div className={`p-5 rounded-3xl border transition space-y-3 ${isDark ? "bg-[#121622]/40 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"}`}>
               <div className="flex justify-between items-center">
-                <span className={`text-xs font-semibold ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>Workflow Stage</span>
-                {/* Admin Status Transition Actions */}
-                <div className="flex gap-2">
-                  {currentRoster.status === "DRAFT" && (
-                    <button onClick={() => handleUpdateRosterStatus("AVAILABILITY_OPEN")} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition cursor-pointer">
-                      ▶ Open Availability Period
-                    </button>
-                  )}
-                  {currentRoster.status === "AVAILABILITY_OPEN" && (
-                    <button onClick={() => handleUpdateRosterStatus("AVAILABILITY_LOCKED")} className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition cursor-pointer">
-                      Lock Availability
-                    </button>
-                  )}
-                  {currentRoster.status === "AVAILABILITY_LOCKED" && (
-                    <button onClick={() => handleUpdateRosterStatus("ASSIGNMENT_IN_PROGRESS")} className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition cursor-pointer">
-                      Start Shift Assignment
-                    </button>
-                  )}
-                  {currentRoster.status === "ASSIGNMENT_IN_PROGRESS" && (
-                    <button onClick={() => handleUpdateRosterStatus("PUBLISHED")} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition cursor-pointer">
-                      Publish Final Roster
-                    </button>
-                  )}
+                <span className={`text-xs font-semibold ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Workflow Stage (Click stage to transition)
+                </span>
+                <div className="text-[11px] font-medium text-[#0071E3]">
+                  Current: <strong>{currentRoster.status.replace(/_/g, " ")}</strong>
                 </div>
               </div>
 
-              {/* Stepper Visual */}
+              {/* Stepper Visual / Interactive Buttons */}
               <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 pt-1">
                 {[
                   { key: "DRAFT", label: "1. Draft" },
@@ -851,20 +852,26 @@ export default function AppleShiftRostersPage() {
                   { key: "ASSIGNMENT_IN_PROGRESS", label: "4. Assigning Shifts" },
                   { key: "PUBLISHED", label: "5. Published" },
                   { key: "COMPLETED", label: "6. Completed" },
-                ].map((st, i) => {
+                ].map((st) => {
                   const isActive = currentRoster.status === st.key;
                   return (
-                    <div
+                    <button
                       key={st.key}
-                      className={`p-2.5 rounded-xl border text-center text-xs font-medium transition ${isActive
-                        ? "bg-[#0071E3] border-[#0071E3] text-white shadow-md font-semibold"
+                      type="button"
+                      onClick={() => {
+                        if (currentRoster.status !== st.key) {
+                          handleUpdateRosterStatus(st.key);
+                        }
+                      }}
+                      className={`p-2.5 rounded-xl border text-center text-xs font-medium transition cursor-pointer ${isActive
+                        ? "bg-[#0071E3] border-[#0071E3] text-white shadow-md font-bold ring-2 ring-[#0071E3]/20"
                         : isDark
-                          ? "bg-[#0A0C12] border-white/[0.06] text-[#8F95A3]"
-                          : "bg-slate-50 border-slate-200 text-slate-600"
+                          ? "bg-[#0A0C12] border-white/[0.06] text-[#8F95A3] hover:border-white/20 hover:text-white"
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                         }`}
                     >
                       {st.label}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -1461,17 +1468,26 @@ export default function AppleShiftRostersPage() {
                   <h2 className={`text-base sm:text-lg font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
                     Your Schedule & Availability
                   </h2>
-                  <span className={`px-3 py-1 text-xs font-bold rounded-xl border self-start sm:self-auto ${mySubmissionStatus === "SUBMITTED"
-                    ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                    : "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                  <span className={`px-3 py-1 text-xs font-bold rounded-xl border self-start sm:self-auto ${isAvailabilityLocked
+                    ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                    : mySubmissionStatus === "SUBMITTED"
+                      ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                      : "bg-blue-500/10 text-blue-500 border-blue-500/20"
                     }`}>
-                    Status: {mySubmissionStatus}
+                    {isAvailabilityLocked ? "Window Closed" : `Status: ${mySubmissionStatus}`}
                   </span>
                 </div>
                 <p className={`text-xs leading-relaxed ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                  Please update your available working days and times for this roster period. You are only providing your availability; the manager will assign your final shifts.
+                  {isAvailabilityLocked
+                    ? "Availability submission is closed for this roster period. Management is now drafting or has published final shifts."
+                    : "Please update your available working days and times for this roster period. You are only providing your availability; the manager will assign your final shifts."}
                 </p>
-                {currentRoster?.availabilityDeadline && (
+                {isAvailabilityLocked && (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs rounded-xl font-medium">
+                    Availability is locked ({currentRoster?.status?.replace(/_/g, " ")}). Changes require manager authorization.
+                  </div>
+                )}
+                {currentRoster?.availabilityDeadline && !isAvailabilityLocked && (
                   <p className="text-xs font-semibold text-amber-500">
                     Submission Deadline: {new Date(currentRoster.availabilityDeadline).toLocaleString()}
                   </p>
@@ -1487,7 +1503,8 @@ export default function AppleShiftRostersPage() {
                   </div>
                   <button
                     onClick={handleApplyRecurringAvailability}
-                    className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer text-center whitespace-nowrap shadow-xs"
+                    disabled={isAvailabilityLocked || actionLoading}
+                    className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer text-center whitespace-nowrap shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Auto-Apply Standard Pattern
                   </button>
@@ -1610,16 +1627,16 @@ export default function AppleShiftRostersPage() {
                 <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-slate-200 dark:border-white/[0.06] w-full">
                   <button
                     onClick={handleSaveEmployeeAvailability}
-                    disabled={actionLoading}
-                    className={`w-full sm:w-auto px-5 py-3 sm:py-2.5 text-xs font-semibold rounded-xl border transition cursor-pointer text-center ${isDark ? "bg-white/5 border-white/10 text-white hover:bg-white/10" : "bg-slate-100 border-slate-200 text-slate-800 hover:bg-slate-200"}`}
+                    disabled={isAvailabilityLocked || actionLoading}
+                    className={`w-full sm:w-auto px-5 py-3 sm:py-2.5 text-xs font-semibold rounded-xl border transition cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed ${isDark ? "bg-white/5 border-white/10 text-white hover:bg-white/10" : "bg-slate-100 border-slate-200 text-slate-800 hover:bg-slate-200"}`}
                   >
                     Save Draft
                   </button>
 
                   <button
                     onClick={() => setSubmitConfirmModalOpen(true)}
-                    disabled={actionLoading}
-                    className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition cursor-pointer text-center shadow-sm"
+                    disabled={isAvailabilityLocked || actionLoading}
+                    className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition cursor-pointer text-center shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Submit Availability
                   </button>
@@ -1721,10 +1738,35 @@ export default function AppleShiftRostersPage() {
                   <h2 className="text-base font-bold tracking-tight">Assign Shift with Smart Suggestions</h2>
                   <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>Shift assignments automatically validate availability & fair hour limits.</p>
                 </div>
-                <button onClick={() => setAssignModalOpen(false)} className="text-slate-400 hover:text-white text-base cursor-pointer">✕</button>
+                <button onClick={() => { setAssignModalOpen(false); setModalError(null); }} className="text-slate-400 hover:text-white text-base cursor-pointer">✕</button>
               </div>
 
-              <form onSubmit={handleAssignShift} className="space-y-4 text-xs">
+              {modalError && (
+                <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="leading-relaxed">{modalError}</span>
+                    <button type="button" onClick={() => setModalError(null)} className="font-bold text-rose-400 hover:text-rose-300 cursor-pointer">✕</button>
+                  </div>
+                  {modalError.includes("Weekly working hours limit exceeded") && (
+                    <div className="pt-2 border-t border-rose-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                      <span className="text-[11px] text-rose-400 font-medium">Allow admin override to schedule these extra hours?</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOverrideHoursLimit(true);
+                          setModalError(null);
+                          handleAssignShift(undefined, true);
+                        }}
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs whitespace-nowrap"
+                      >
+                        Override & Assign Shift
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <form onSubmit={(e) => handleAssignShift(e)} className="space-y-4 text-xs">
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block font-medium mb-1">Shift Date *</label>
@@ -1926,6 +1968,20 @@ export default function AppleShiftRostersPage() {
                   )}
                 </div>
 
+                {/* Admin Override Toggle */}
+                <div className={`p-3 rounded-2xl border flex items-center justify-between gap-3 ${overrideHoursLimit ? "bg-amber-500/10 border-amber-500/30" : isDark ? "bg-white/[0.02] border-white/[0.08]" : "bg-slate-50 border-slate-200"}`}>
+                  <div>
+                    <span className="font-semibold text-xs text-slate-800 dark:text-slate-200 block">Override Working Hours Limit</span>
+                    <span className={`text-[10px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>Allow scheduling beyond the employee's weekly contract or part-time hour limit.</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={overrideHoursLimit}
+                    onChange={(e) => setOverrideHoursLimit(e.target.checked)}
+                    className="w-4 h-4 rounded text-[#0071E3] focus:ring-[#0071E3] accent-[#0071E3] cursor-pointer"
+                  />
+                </div>
+
                 {assignOverrideWarning && (
                   <div className="p-3 bg-amber-50 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs font-medium rounded-xl flex items-center gap-2">
                     <span><strong>Admin Override Notice:</strong> {assignOverrideWarning}</span>
@@ -1933,7 +1989,7 @@ export default function AppleShiftRostersPage() {
                 )}
 
                 <div className="flex justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
-                  <button type="button" onClick={() => setAssignModalOpen(false)} className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white cursor-pointer">Cancel</button>
+                  <button type="button" onClick={() => { setAssignModalOpen(false); setModalError(null); }} className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white cursor-pointer">Cancel</button>
                   <button type="submit" disabled={actionLoading || selectedEmployeesForShift.length === 0} className="px-5 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-50 flex items-center gap-2">
                     {actionLoading ? (
                       <>

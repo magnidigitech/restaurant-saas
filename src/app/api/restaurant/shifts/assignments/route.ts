@@ -16,10 +16,12 @@ const createAssignmentSchema = z.object({
   breakMinutes: z.number().min(0).optional(),
   status: z.enum(["SCHEDULED", "COMPLETED", "CANCELLED", "NO_SHOW"]).optional(),
   notes: z.string().optional(),
+  overrideHoursLimit: z.boolean().optional(),
 });
 
 const bulkCreateSchema = z.object({
   assignments: z.array(createAssignmentSchema),
+  overrideHoursLimit: z.boolean().optional(),
 });
 
 const updateAssignmentSchema = z.object({
@@ -31,6 +33,7 @@ const updateAssignmentSchema = z.object({
   breakMinutes: z.number().min(0).optional(),
   status: z.enum(["SCHEDULED", "COMPLETED", "CANCELLED", "NO_SHOW"]).optional(),
   notes: z.string().nullable().optional(),
+  overrideHoursLimit: z.boolean().optional(),
 });
 
 export async function GET(req: NextRequest) {

@@ -66,7 +66,8 @@ async function validateShiftAssignmentConstraints(
   startTime: string,
   endTime: string,
   breakMinutes: number = 0,
-  excludeAssignmentId?: string
+  excludeAssignmentId?: string,
+  overrideHoursLimit: boolean = false
 ) {
   const targetDate = new Date(shiftDateInput);
   const startOfDay = new Date(targetDate);
@@ -117,7 +118,13 @@ async function validateShiftAssignmentConstraints(
     );
   }
 
-  // 3. Check Weekly Working Hours Limit (Max 48 hours / week)
+async function validateWeeklyHoursLimit(
+  restaurantId: string,
+  employeeId: string,
+  targetDate: Date,
+  newShiftHours: number,
+  excludeAssignmentId?: string
+) {
   const dayOfWeek = targetDate.getUTCDay();
   const diffToMonday = targetDate.getUTCDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
   const weekStart = new Date(targetDate);
@@ -183,6 +190,18 @@ async function validateShiftAssignmentConstraints(
       : employee?.workerType ? employee.workerType.replace("_", " ") : "Standard";
     throw new Error(
       `Weekly working hours limit exceeded: ${employee?.firstName || "Employee"} is set to max ${maxWeeklyHours.toFixed(1)} hrs/week (${workerLabel}), but this shift would schedule ${(existingWeeklyHours + newShiftHours).toFixed(1)} total hours this week`
+    );
+  }
+}
+
+  // 3. Check Weekly Working Hours Limit (Max 48 hours / week or Worker-Type Limit)
+  if (!overrideHoursLimit) {
+    await validateWeeklyHoursLimit(
+      restaurantId,
+      employeeId,
+      targetDate,
+      newShiftHours,
+      excludeAssignmentId
     );
   }
 }
@@ -452,6 +471,7 @@ export const ShiftService = {
       breakMinutes?: number;
       status?: ShiftAssignmentStatus;
       notes?: string;
+      overrideHoursLimit?: boolean;
     }
   ) {
     await prisma.employee.findFirstOrThrow({
@@ -468,7 +488,9 @@ export const ShiftService = {
       data.shiftDate,
       data.startTime,
       data.endTime,
-      data.breakMinutes ?? 0
+      data.breakMinutes ?? 0,
+      undefined,
+      data.overrideHoursLimit || false
     );
 
     return prisma.shiftAssignment.create({
@@ -506,6 +528,7 @@ export const ShiftService = {
       breakMinutes?: number;
       status?: ShiftAssignmentStatus;
       notes?: string;
+      overrideHoursLimit?: boolean;
     }>
   ) {
     for (const item of assignments) {
@@ -515,7 +538,9 @@ export const ShiftService = {
         item.shiftDate,
         item.startTime,
         item.endTime,
-        item.breakMinutes ?? 0
+        item.breakMinutes ?? 0,
+        undefined,
+        item.overrideHoursLimit || false
       );
     }
 
@@ -551,6 +576,7 @@ export const ShiftService = {
       breakMinutes?: number;
       status?: ShiftAssignmentStatus;
       notes?: string | null;
+      overrideHoursLimit?: boolean;
     }
   ) {
     const existing = await prisma.shiftAssignment.findFirstOrThrow({ where: { id, restaurantId } });
@@ -560,7 +586,7 @@ export const ShiftService = {
     const targetEnd = data.endTime || existing.endTime;
     const targetBreak = data.breakMinutes !== undefined ? data.breakMinutes : existing.breakMinutes;
 
-    if (data.startTime || data.endTime || data.shiftDate) {
+    if (data.startTime || data.endTime || data.shiftDate || data.breakMinutes !== undefined) {
       await validateShiftAssignmentConstraints(
         restaurantId,
         existing.employeeId,
@@ -568,15 +594,21 @@ export const ShiftService = {
         targetStart,
         targetEnd,
         targetBreak,
-        id
+        id,
+        data.overrideHoursLimit || false
       );
     }
 
     return prisma.shiftAssignment.update({
       where: { id },
       data: {
-        ...data,
+        templateId: data.templateId,
         shiftDate: data.shiftDate ? new Date(data.shiftDate) : undefined,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        breakMinutes: data.breakMinutes,
+        status: data.status,
+        notes: data.notes,
       },
       include: {
         employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
@@ -935,8 +967,8 @@ export const ShiftService = {
     }>
   ) {
     const roster = await getRosterRawHelper(restaurantId, rosterId);
-    if (roster.status === "AVAILABILITY_LOCKED" || roster.status === "COMPLETED") {
-      throw new Error("Availability modifications are locked for this roster period.");
+    if (roster.status === "AVAILABILITY_LOCKED" || roster.status === "ASSIGNMENT_IN_PROGRESS" || roster.status === "PUBLISHED" || roster.status === "COMPLETED") {
+      throw new Error(`Availability submissions are locked for this roster period (${roster.status.replace(/_/g, " ")}).`);
     }
 
     const validItems = (dateAvailabilities || []).filter(item => item.type && (item.type as string) !== "NOT_UPDATED");
@@ -1003,6 +1035,10 @@ export const ShiftService = {
 
   async applyRecurringAvailabilityToRoster(restaurantId: string, rosterId: string, employeeId: string) {
     const roster = await getRosterRawHelper(restaurantId, rosterId);
+    if (roster.status === "AVAILABILITY_LOCKED" || roster.status === "ASSIGNMENT_IN_PROGRESS" || roster.status === "PUBLISHED" || roster.status === "COMPLETED") {
+      throw new Error(`Availability submissions are locked for this roster period (${roster.status.replace(/_/g, " ")}).`);
+    }
+
     const recurring = await prisma.shiftAvailability.findMany({ where: { restaurantId, employeeId } });
 
     const startDate = new Date(roster.startDate);
@@ -1034,8 +1070,8 @@ export const ShiftService = {
 
   async submitEmployeeAvailability(restaurantId: string, rosterId: string, employeeId: string, notes?: string) {
     const roster = await getRosterRawHelper(restaurantId, rosterId);
-    if (roster.status === "AVAILABILITY_LOCKED" || roster.status === "COMPLETED") {
-      throw new Error("Availability for this roster period is locked and cannot be submitted.");
+    if (roster.status === "AVAILABILITY_LOCKED" || roster.status === "ASSIGNMENT_IN_PROGRESS" || roster.status === "PUBLISHED" || roster.status === "COMPLETED") {
+      throw new Error(`Availability submissions are closed for this roster period (${roster.status.replace(/_/g, " ")}).`);
     }
 
     try {
