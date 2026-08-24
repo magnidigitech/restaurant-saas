@@ -30,6 +30,7 @@ interface SearchableComboboxProps {
   onAddNew?: (name: string) => Promise<string | void>;
   emptyOptionLabel?: string;
   isDark: boolean;
+  dropDirection?: "up" | "down";
 }
 
 function SearchableCombobox({
@@ -40,6 +41,7 @@ function SearchableCombobox({
   onAddNew,
   emptyOptionLabel = "None",
   isDark,
+  dropDirection = "down",
 }: SearchableComboboxProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -135,17 +137,19 @@ function SearchableCombobox({
             onClick={() => setIsOpen((prev) => !prev)}
             className="cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-white"
           >
-            <svg className={`w-3.5 h-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className={`w-3.5 h-3.5 transition-transform ${isOpen ? (dropDirection === "up" ? "" : "rotate-180") : (dropDirection === "up" ? "rotate-180" : "")}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
         </div>
       </div>
 
-      {/* Floating Menu */}
+      {/* Floating Menu (Upward or Downward) */}
       {isOpen && (
         <div
-          className={`absolute left-0 right-0 top-full mt-1.5 z-50 max-h-56 overflow-y-auto rounded-2xl border shadow-xl p-1 text-xs space-y-0.5 ${
+          className={`absolute left-0 right-0 ${
+            dropDirection === "up" ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          } z-50 max-h-56 overflow-y-auto rounded-2xl border shadow-xl p-1 text-xs space-y-0.5 ${
             isDark
               ? "bg-[#121622] border-white/[0.1] text-white shadow-2xl shadow-black/80"
               : "bg-white border-slate-200 text-slate-900 shadow-xl shadow-slate-900/10"
@@ -961,6 +965,7 @@ export default function AppleEmployeeDirectoryPage() {
                       onChange={(val) => setFormData((f) => ({ ...f, departmentId: val }))}
                       onAddNew={handleAddNewDepartment}
                       emptyOptionLabel="None / General"
+                      dropDirection="up"
                       isDark={isDark}
                     />
                   </div>
@@ -973,6 +978,7 @@ export default function AppleEmployeeDirectoryPage() {
                       onChange={(val) => setFormData((f) => ({ ...f, designationId: val }))}
                       onAddNew={handleAddNewDesignation}
                       emptyOptionLabel="None / Staff"
+                      dropDirection="up"
                       isDark={isDark}
                     />
                   </div>
@@ -984,6 +990,7 @@ export default function AppleEmployeeDirectoryPage() {
                       options={outlets.map((o) => ({ id: o.id, name: o.name }))}
                       onChange={(val) => setFormData((f) => ({ ...f, primaryOutletId: val }))}
                       emptyOptionLabel="All Outlets"
+                      dropDirection="up"
                       isDark={isDark}
                     />
                   </div>
