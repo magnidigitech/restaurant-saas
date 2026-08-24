@@ -35,6 +35,7 @@ export default function AppleTenantDashboard() {
   const { isDark } = useTheme();
 
   const [modules, setModules] = useState<Module[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [branding, setBranding] = useState<Branding | null>(null);
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalEmployees: 0,
@@ -67,8 +68,12 @@ export default function AppleTenantDashboard() {
       const dataPayroll = resPayroll && resPayroll.ok ? await resPayroll.json() : null;
 
       if (resBranding.ok) setBranding(dataBranding);
-      if (resModules.ok) setModules(dataModules.modules || []);
-      else setError(dataModules.error || "Failed to load dashboard data");
+      if (resModules.ok) {
+        setModules(dataModules.modules || []);
+        setIsAdmin(!!dataModules.isAdmin);
+      } else {
+        setError(dataModules.error || "Failed to load dashboard data");
+      }
 
       const latestRun = dataPayroll?.runs?.[0];
 
@@ -593,96 +598,98 @@ export default function AppleTenantDashboard() {
           )}
         </div>
 
-        {/* Administration & Master Data Grid */}
-        <div className="space-y-4">
-          <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-            Administration, Master Data & Access Control
-          </span>
+        {/* Administration & Master Data Grid (Only for Admins) */}
+        {isAdmin && (
+          <div className="space-y-4">
+            <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Administration, Master Data & Access Control
+            </span>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                label: "Restaurant Profile",
-                desc: "Branding colors, application title, logos",
-                path: `/restaurant/${subdomain}/settings/profile`,
-                badge: "Branding",
-              },
-              {
-                label: "Outlets & Branches",
-                desc: "Physical locations, timezones, tax identifiers",
-                path: `/restaurant/${subdomain}/settings/outlets`,
-                badge: `${metrics.totalOutlets} Outlets`,
-              },
-              {
-                label: "Master Data",
-                desc: "Departments, designations",
-                path: `/restaurant/${subdomain}/settings/master-data`,
-                badge: "Structure",
-              },
-              {
-                label: "Employee Directory",
-                desc: "Staff profiles, worker types, code sequences",
-                path: `/restaurant/${subdomain}/workforce/employees`,
-                badge: `${metrics.totalEmployees} Active`,
-              },
-              {
-                label: "HR Onboarding",
-                desc: "Session approvals, checklist templates",
-                path: `/restaurant/${subdomain}/workforce/onboarding`,
-                badge: "Workflows",
-              },
-              {
-                label: "Users & Staff Logins",
-                desc: "Invite team members, credentials management",
-                path: `/restaurant/${subdomain}/workforce/users`,
-                badge: "Access",
-              },
-              {
-                label: "Roles & Permissions",
-                desc: "Custom roles, matrix permission rules",
-                path: `/restaurant/${subdomain}/settings/roles-permissions`,
-                badge: "Security",
-              },
-              {
-                label: "Access Grants",
-                desc: "Outlet and module scoped entitlements",
-                path: `/restaurant/${subdomain}/settings/access-grants`,
-                badge: "Enforcement",
-              },
-            ].map((item) => (
-              <div
-                key={item.path}
-                onClick={() => router.push(item.path)}
-                className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between space-y-3 ${isDark
-                  ? "bg-[#121622]/40 border-white/[0.06] hover:bg-[#121622]/80 hover:border-white/[0.12]"
-                  : "bg-white border-slate-200/80 shadow-sm hover:shadow-md hover:border-slate-300"
-                  }`}
-              >
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <h4 className={`text-xs font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
-                      {item.label}
-                    </h4>
-                    <span
-                      className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${isDark ? "bg-white/[0.04] text-[#8F95A3]" : "bg-slate-100 text-slate-600"
-                        }`}
-                    >
-                      {item.badge}
-                    </span>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                {
+                  label: "Restaurant Profile",
+                  desc: "Branding colors, application title, logos",
+                  path: `/restaurant/${subdomain}/settings/profile`,
+                  badge: "Branding",
+                },
+                {
+                  label: "Outlets & Branches",
+                  desc: "Physical locations, timezones, tax identifiers",
+                  path: `/restaurant/${subdomain}/settings/outlets`,
+                  badge: `${metrics.totalOutlets} Outlets`,
+                },
+                {
+                  label: "Master Data",
+                  desc: "Departments, designations",
+                  path: `/restaurant/${subdomain}/settings/master-data`,
+                  badge: "Structure",
+                },
+                {
+                  label: "Employee Directory",
+                  desc: "Staff profiles, worker types, code sequences",
+                  path: `/restaurant/${subdomain}/workforce/employees`,
+                  badge: `${metrics.totalEmployees} Active`,
+                },
+                {
+                  label: "HR Onboarding",
+                  desc: "Session approvals, checklist templates",
+                  path: `/restaurant/${subdomain}/workforce/onboarding`,
+                  badge: "Workflows",
+                },
+                {
+                  label: "Users & Staff Logins",
+                  desc: "Invite team members, credentials management",
+                  path: `/restaurant/${subdomain}/workforce/users`,
+                  badge: "Access",
+                },
+                {
+                  label: "Roles & Permissions",
+                  desc: "Custom roles, matrix permission rules",
+                  path: `/restaurant/${subdomain}/settings/roles-permissions`,
+                  badge: "Security",
+                },
+                {
+                  label: "Access Grants",
+                  desc: "Outlet and module scoped entitlements",
+                  path: `/restaurant/${subdomain}/settings/access-grants`,
+                  badge: "Enforcement",
+                },
+              ].map((item) => (
+                <div
+                  key={item.path}
+                  onClick={() => router.push(item.path)}
+                  className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between space-y-3 ${isDark
+                    ? "bg-[#121622]/40 border-white/[0.06] hover:bg-[#121622]/80 hover:border-white/[0.12]"
+                    : "bg-white border-slate-200/80 shadow-sm hover:shadow-md hover:border-slate-300"
+                    }`}
+                >
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <h4 className={`text-xs font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                        {item.label}
+                      </h4>
+                      <span
+                        className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${isDark ? "bg-white/[0.04] text-[#8F95A3]" : "bg-slate-100 text-slate-600"
+                          }`}
+                      >
+                        {item.badge}
+                      </span>
+                    </div>
+                    <p className={`text-[11px] leading-relaxed ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                      {item.desc}
+                    </p>
                   </div>
-                  <p className={`text-[11px] leading-relaxed ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                    {item.desc}
-                  </p>
-                </div>
 
-                <div className="flex items-center text-[11px] font-medium text-[#0071E3] pt-1">
-                  <span>Manage</span>
-                  <span className="ml-1">→</span>
+                  <div className="flex items-center text-[11px] font-medium text-[#0071E3] pt-1">
+                    <span>Manage</span>
+                    <span className="ml-1">→</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </main>
     </div>
   );
