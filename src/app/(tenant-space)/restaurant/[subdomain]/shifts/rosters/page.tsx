@@ -114,6 +114,14 @@ export default function AppleShiftRostersPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+
+  const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
+    setToastMessage({ message, type });
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
+  };
 
   // Modals state
   const [newRosterModalOpen, setNewRosterModalOpen] = useState(false);
@@ -518,8 +526,10 @@ export default function AppleShiftRostersPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to apply recurring availability");
+      showToast("✓ Recurring weekly availability applied to roster!", "success");
       await fetchMyAvailability(selectedRosterId);
     } catch (err: any) {
+      showToast(err.message || "Failed to apply recurring pattern", "error");
       setError(err.message || "Failed to apply recurring pattern");
     } finally {
       setActionLoading(false);
@@ -576,11 +586,13 @@ export default function AppleShiftRostersPage() {
       setMySubmissionStatus("SUBMITTED");
       setMySubmittedAt(new Date().toISOString());
       setSubmitConfirmModalOpen(false);
+      showToast("✓ Schedule availability submitted successfully to your manager!", "success");
       await fetchMyAvailability(selectedRosterId);
       if (activeTab === "ADMIN_AVAILABILITY") {
         await fetchRosterDetails(selectedRosterId);
       }
     } catch (err: any) {
+      showToast(err.message || "Failed to submit availability", "error");
       setModalError(err.message || "Failed to submit availability");
     } finally {
       setActionLoading(false);
@@ -939,7 +951,7 @@ export default function AppleShiftRostersPage() {
                     <span className={`text-xs font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>shifts</span>
                   </p>
                   <p className={`text-[11px] mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                    Across this roster week
+                    Scheduled for this period
                   </p>
                 </div>
 
@@ -1320,10 +1332,10 @@ export default function AppleShiftRostersPage() {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                   <h2 className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
-                    Admin Availability Overview
+                    Team Availability Overview
                   </h2>
                   <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                    Review employee availability responses across departments before assigning shifts.
+                    Review employee availability responses before assigning shifts.
                   </p>
                 </div>
 
@@ -1981,6 +1993,31 @@ export default function AppleShiftRostersPage() {
                   {confirmDialog.confirmText}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+        {/* TOAST NOTIFICATION */}
+        {toastMessage && (
+          <div className="fixed top-6 right-6 z-50 animate-in fade-in slide-in-from-top-4 duration-200">
+            <div
+              className={`px-4 py-3 rounded-2xl shadow-2xl border flex items-center gap-3 text-xs font-semibold backdrop-blur-xl ${
+                toastMessage.type === "success"
+                  ? isDark
+                    ? "bg-[#121622]/95 border-emerald-500/30 text-emerald-400 shadow-emerald-950/40"
+                    : "bg-white/95 border-emerald-300 text-emerald-700 shadow-emerald-100"
+                  : isDark
+                    ? "bg-[#121622]/95 border-rose-500/30 text-rose-400 shadow-rose-950/40"
+                    : "bg-white/95 border-rose-300 text-rose-700 shadow-rose-100"
+              }`}
+            >
+              <div className={`w-2 h-2 rounded-full ${toastMessage.type === "success" ? "bg-emerald-500" : "bg-rose-500"} animate-pulse`} />
+              <span>{toastMessage.message}</span>
+              <button
+                onClick={() => setToastMessage(null)}
+                className="ml-2 text-slate-400 hover:text-slate-200 cursor-pointer text-xs"
+              >
+                ✕
+              </button>
             </div>
           </div>
         )}
