@@ -541,6 +541,8 @@ export default function PurchaseOrdersDirectoryPage({
     );
   });
 
+  const tabIndex = activeTab === "UPCOMING" ? 0 : activeTab === "COMPLETED" ? 1 : 2;
+
   return (
     <ModuleAccessGuard moduleKey="purchase_management" moduleName="Purchase Management" activeSection="Purchase Orders">
       <div
@@ -657,90 +659,99 @@ export default function PurchaseOrdersDirectoryPage({
           </div>
         </div>
 
-        {/* Sub-Navigation Tabs: Single Line on All Screens */}
+        {/* Sub-Navigation Tabs: Apple Liquid Animated Segmented Slider */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className={`p-1 rounded-2xl border grid grid-cols-3 sm:flex items-center gap-1 w-full sm:w-auto ${
-            isDark ? "bg-[#121622]/80 border-white/[0.06]" : "bg-slate-100/90 border-slate-200"
+          <div className={`relative p-1 rounded-2xl border w-full sm:w-[500px] grid grid-cols-3 select-none transition-colors duration-200 ${
+            isDark ? "bg-[#121622]/90 border-white/[0.08]" : "bg-slate-200/70 border-slate-200/80 backdrop-blur-md"
           }`}>
+            {/* Liquid Flow Sliding Indicator */}
+            <div
+              className={`absolute top-1 bottom-1 w-[calc((100%-8px)/3)] rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none ${
+                isDark
+                  ? "bg-[#0071E3] shadow-md shadow-blue-500/20"
+                  : "bg-white text-slate-900 shadow-sm border border-slate-200/60"
+              }`}
+              style={{
+                left: `calc(4px + ${tabIndex} * ((100% - 8px) / 3))`,
+              }}
+            />
+
+            {/* Tab 1: UPCOMING */}
             <button
               type="button"
               onClick={() => {
                 setActiveTab("UPCOMING");
                 setStatusFilter("");
               }}
-              className={`px-2 sm:px-4 py-2 rounded-xl text-[11px] sm:text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
+              className={`relative z-10 px-2 sm:px-3 py-2 rounded-xl text-[11px] sm:text-xs font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 active:scale-[0.97] ${
                 activeTab === "UPCOMING"
-                  ? isDark
-                    ? "bg-[#0071E3] text-white shadow-md"
-                    : "bg-white text-slate-900 shadow-xs border border-slate-200/80 font-bold"
-                  : isDark
-                  ? "text-[#8F95A3] hover:text-white hover:bg-white/[0.04]"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                  ? isDark ? "text-white font-bold" : "text-slate-900 font-bold"
+                  : isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
               }`}
             >
               <span className="hidden sm:inline">Upcoming & In-Flight</span>
               <span className="inline sm:hidden">Upcoming</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] font-bold ${
+              <span className={`px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold transition-colors duration-200 ${
                 activeTab === "UPCOMING"
-                  ? "bg-white/20 text-white"
+                  ? isDark
+                    ? "bg-white/20 text-white"
+                    : "bg-blue-100 text-blue-800"
                   : isDark
                   ? "bg-amber-500/15 text-amber-300 border border-amber-500/25"
-                  : "bg-amber-100 text-amber-800 border border-amber-200"
+                  : "bg-amber-100/80 text-amber-800 border border-amber-200/80"
               }`}>
                 {upcomingPOs.length}
               </span>
             </button>
 
+            {/* Tab 2: COMPLETED */}
             <button
               type="button"
               onClick={() => {
                 setActiveTab("COMPLETED");
                 setStatusFilter("");
               }}
-              className={`px-2 sm:px-4 py-2 rounded-xl text-[11px] sm:text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
+              className={`relative z-10 px-2 sm:px-3 py-2 rounded-xl text-[11px] sm:text-xs font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 active:scale-[0.97] ${
                 activeTab === "COMPLETED"
-                  ? isDark
-                    ? "bg-[#0071E3] text-white shadow-md"
-                    : "bg-white text-slate-900 shadow-xs border border-slate-200/80 font-bold"
-                  : isDark
-                  ? "text-[#8F95A3] hover:text-white hover:bg-white/[0.04]"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                  ? isDark ? "text-white font-bold" : "text-slate-900 font-bold"
+                  : isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
               }`}
             >
               <span className="hidden sm:inline">Completed & Received</span>
               <span className="inline sm:hidden">Received</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] font-bold ${
+              <span className={`px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold transition-colors duration-200 ${
                 activeTab === "COMPLETED"
-                  ? "bg-white/20 text-white"
+                  ? isDark
+                    ? "bg-white/20 text-white"
+                    : "bg-emerald-100 text-emerald-800"
                   : isDark
                   ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/25"
-                  : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                  : "bg-emerald-100/80 text-emerald-800 border border-emerald-200/80"
               }`}>
                 {completedPOs.length}
               </span>
             </button>
 
+            {/* Tab 3: ALL */}
             <button
               type="button"
               onClick={() => setActiveTab("ALL")}
-              className={`px-2 sm:px-4 py-2 rounded-xl text-[11px] sm:text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
+              className={`relative z-10 px-2 sm:px-3 py-2 rounded-xl text-[11px] sm:text-xs font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 active:scale-[0.97] ${
                 activeTab === "ALL"
-                  ? isDark
-                    ? "bg-[#0071E3] text-white shadow-md"
-                    : "bg-white text-slate-900 shadow-xs border border-slate-200/80 font-bold"
-                  : isDark
-                  ? "text-[#8F95A3] hover:text-white hover:bg-white/[0.04]"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+                  ? isDark ? "text-white font-bold" : "text-slate-900 font-bold"
+                  : isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
               }`}
             >
               <span className="hidden sm:inline">All Orders</span>
               <span className="inline sm:hidden">All</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] font-bold ${
+              <span className={`px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold transition-colors duration-200 ${
                 activeTab === "ALL"
-                  ? "bg-white/20 text-white"
+                  ? isDark
+                    ? "bg-white/20 text-white"
+                    : "bg-slate-200 text-slate-900"
                   : isDark
                   ? "bg-white/[0.08] text-[#8F95A3]"
-                  : "bg-slate-200 text-slate-700"
+                  : "bg-slate-300/70 text-slate-700"
               }`}>
                 {purchaseOrders.length}
               </span>
