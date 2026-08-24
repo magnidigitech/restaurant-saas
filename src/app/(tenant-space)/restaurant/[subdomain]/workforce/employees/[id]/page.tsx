@@ -220,31 +220,37 @@ export default function AppleEmployeeDetailPage({
       <RestaurantNavbar activeSection="Employees" />
 
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Breadcrumb Navigation */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees`)}
+            className={`inline-flex items-center gap-2 text-xs font-medium transition cursor-pointer px-3.5 py-1.5 rounded-xl border ${
+              isDark
+                ? "bg-white/[0.04] text-[#8F95A3] hover:text-white border-white/[0.06] hover:bg-white/[0.08]"
+                : "bg-white text-slate-600 hover:text-slate-900 border-slate-200/80 hover:bg-slate-50 shadow-2xs"
+            }`}
+          >
+            <span>←</span>
+            <span>Back to Employee Directory</span>
+          </button>
+        </div>
+
         {/* Executive Profile Header Banner */}
         <div
-          className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+          className={`p-5 sm:p-7 rounded-3xl border transition flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${
             isDark
               ? "bg-[#121622]/60 border-white/[0.06]"
               : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
           }`}
         >
-          <div className="flex items-center gap-4 min-w-0">
-            <div className="w-14 h-14 rounded-2xl bg-[#0071E3]/15 text-[#0071E3] flex items-center justify-center font-bold text-xl flex-shrink-0">
+          <div className="flex items-start sm:items-center gap-4 min-w-0">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#0071E3]/15 text-[#0071E3] flex items-center justify-center font-bold text-xl sm:text-2xl flex-shrink-0">
               {employee.firstName.charAt(0)}
               {employee.lastName.charAt(0)}
             </div>
 
-            <div className="space-y-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees`)}
-                  className={`text-xs font-medium transition cursor-pointer ${
-                    isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
-                  }`}
-                >
-                  ← Workforce Directory
-                </button>
-                <span className={`text-xs ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
+            <div className="space-y-1.5 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-md border ${
                   isDark ? "bg-white/[0.04] text-[#8F95A3] border-white/[0.08]" : "bg-slate-100 text-slate-600 border-slate-200"
                 }`}>
@@ -261,32 +267,52 @@ export default function AppleEmployeeDetailPage({
                     ? `Custom (${employee.weeklyHoursLimit}h)`
                     : `${employee.workerType?.replace(/_/g, " ") || "FULL TIME"} (${effectiveHours}h)`}
                 </span>
-                {isArchived && (
+                {isArchived ? (
                   <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/25">
                     Archived
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                    Active
                   </span>
                 )}
               </div>
 
-              <h1 className={`text-2xl font-bold tracking-tight truncate ${isDark ? "text-white" : "text-slate-900"}`}>
+              <h1 className={`text-xl sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
                 {employee.firstName} {employee.lastName}
               </h1>
 
-              <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                Joined {new Date(employee.joiningDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                {currentRecord?.department && ` • ${currentRecord.department.name}`}
-                {currentRecord?.designation && ` • ${currentRecord.designation.name}`}
+              <p className={`text-xs flex flex-wrap items-center gap-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                <span>Joined {new Date(employee.joiningDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                {currentRecord?.department && (
+                  <>
+                    <span>•</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-300">{currentRecord.department.name}</span>
+                  </>
+                )}
+                {currentRecord?.designation && (
+                  <>
+                    <span>•</span>
+                    <span>{currentRecord.designation.name}</span>
+                  </>
+                )}
+                {currentRecord?.primaryOutlet && (
+                  <>
+                    <span>•</span>
+                    <span className="text-[#0071E3] font-medium">📍 {currentRecord.primaryOutlet.name}</span>
+                  </>
+                )}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 w-full md:w-auto">
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
             <button
               onClick={handleArchiveToggle}
-              className={`px-3.5 py-2 text-xs font-medium rounded-xl border transition cursor-pointer ${
+              className={`w-full sm:w-auto px-4 py-2 text-xs font-medium rounded-xl border transition cursor-pointer text-center ${
                 isArchived
                   ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25"
-                  : "bg-rose-500/10 border-rose-500/25 text-rose-400 hover:bg-rose-500/20"
+                  : "bg-rose-500/10 border-rose-500/25 text-rose-500 hover:bg-rose-500/20"
               }`}
             >
               {isArchived ? "Reactivate Staff" : "Archive Profile"}
