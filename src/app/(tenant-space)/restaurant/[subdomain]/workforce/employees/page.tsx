@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
@@ -19,6 +19,206 @@ interface Designation {
 interface Outlet {
   id: string;
   name: string;
+}
+
+interface SearchableComboboxProps {
+  label: string;
+  placeholder?: string;
+  value: string;
+  options: { id: string; name: string }[];
+  onChange: (value: string) => void;
+  onAddNew?: (name: string) => Promise<string | void>;
+  emptyOptionLabel?: string;
+  isDark: boolean;
+}
+
+function SearchableCombobox({
+  label,
+  value,
+  options,
+  onChange,
+  onAddNew,
+  emptyOptionLabel = "None",
+  isDark,
+}: SearchableComboboxProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const selectedItem = options.find((o) => o.id === value);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = query
+    ? options.filter((o) => o.name.toLowerCase().includes(query.toLowerCase()))
+    : options;
+
+  const exactMatch = options.some(
+    (o) => o.name.toLowerCase() === query.trim().toLowerCase()
+  );
+
+  const handleSelect = (id: string) => {
+    onChange(id);
+    setQuery("");
+    setIsOpen(false);
+  };
+
+  const handleCreateNew = async () => {
+    if (!query.trim() || !onAddNew) return;
+    setIsCreating(true);
+    try {
+      const newId = await onAddNew(query.trim());
+      if (newId) {
+        onChange(newId);
+      }
+      setQuery("");
+      setIsOpen(false);
+    } catch {
+      // ignore
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+        {label}
+      </label>
+
+      <div className="relative">
+        <input
+          type="text"
+          value={isOpen ? query : selectedItem ? selectedItem.name : ""}
+          placeholder={selectedItem ? selectedItem.name : emptyOptionLabel}
+          onFocus={() => {
+            setIsOpen(true);
+            setQuery("");
+          }}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (!isOpen) setIsOpen(true);
+          }}
+          className={`w-full pl-3 pr-8 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+            isDark
+              ? "bg-[#0A0C12] border-white/[0.08] text-white placeholder-[#8F95A3]"
+              : "bg-[#F5F5F7] border-slate-200 text-slate-900 placeholder-slate-400"
+          }`}
+        />
+
+        {/* Dropdown Chevron / Clear indicator */}
+        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 text-slate-400">
+          {value && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange("");
+                setQuery("");
+              }}
+              className="hover:text-slate-600 dark:hover:text-white p-0.5 cursor-pointer text-[10px]"
+            >
+              ✕
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsOpen((prev) => !prev)}
+            className="cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-white"
+          >
+            <svg className={`w-3.5 h-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Floating Menu */}
+      {isOpen && (
+        <div
+          className={`absolute left-0 right-0 top-full mt-1.5 z-50 max-h-56 overflow-y-auto rounded-2xl border shadow-xl p-1 text-xs space-y-0.5 ${
+            isDark
+              ? "bg-[#121622] border-white/[0.1] text-white shadow-2xl shadow-black/80"
+              : "bg-white border-slate-200 text-slate-900 shadow-xl shadow-slate-900/10"
+          }`}
+        >
+          {emptyOptionLabel && (
+            <button
+              type="button"
+              onClick={() => handleSelect("")}
+              className={`w-full text-left px-3 py-2 rounded-xl transition flex items-center justify-between cursor-pointer ${
+                !value
+                  ? isDark
+                    ? "bg-[#0071E3]/20 text-[#0071E3] font-semibold"
+                    : "bg-blue-50 text-[#0071E3] font-semibold"
+                  : isDark
+                  ? "hover:bg-white/[0.06] text-[#8F95A3]"
+                  : "hover:bg-slate-100 text-slate-600"
+              }`}
+            >
+              <span>{emptyOptionLabel}</span>
+              {!value && <span>✓</span>}
+            </button>
+          )}
+
+          {filteredOptions.map((opt) => {
+            const isSelected = opt.id === value;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => handleSelect(opt.id)}
+                className={`w-full text-left px-3 py-2 rounded-xl transition flex items-center justify-between cursor-pointer ${
+                  isSelected
+                    ? isDark
+                      ? "bg-[#0071E3] text-white font-semibold"
+                      : "bg-[#0071E3] text-white font-semibold"
+                    : isDark
+                    ? "hover:bg-white/[0.06] text-white"
+                    : "hover:bg-slate-100 text-slate-800"
+                }`}
+              >
+                <span className="truncate">{opt.name}</span>
+                {isSelected && <span>✓</span>}
+              </button>
+            );
+          })}
+
+          {filteredOptions.length === 0 && !query && (
+            <div className={`p-3 text-center text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+              No options available
+            </div>
+          )}
+
+          {/* Quick Create on Typing */}
+          {query.trim() && !exactMatch && onAddNew && (
+            <button
+              type="button"
+              disabled={isCreating}
+              onClick={handleCreateNew}
+              className={`w-full text-left px-3 py-2 rounded-xl transition flex items-center gap-2 cursor-pointer font-medium ${
+                isDark
+                  ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 border border-blue-500/30"
+                  : "bg-blue-50 text-[#0071E3] hover:bg-blue-100 border border-blue-200"
+              }`}
+            >
+              <span>+</span>
+              <span>{isCreating ? "Creating..." : `Create "${query.trim()}"`}</span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface Employee {
@@ -75,6 +275,51 @@ export default function AppleEmployeeDirectoryPage() {
     designationId: "",
     primaryOutletId: "",
   });
+
+  const workerTypeOptions = [
+    { id: "FULL_TIME", name: "Full-Time (48h)" },
+    { id: "PART_TIME", name: "Part-Time (20h)" },
+    { id: "INTERN", name: "Intern (20h)" },
+    { id: "TEMPORARY", name: "Temporary (25h)" },
+    { id: "CONTRACT", name: "Contractor (40h)" },
+    { id: "CUSTOM", name: "Custom Hours..." },
+  ];
+
+  const handleAddNewDepartment = async (name: string) => {
+    try {
+      const code = name.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6) || "DEPT";
+      const res = await fetch("/api/restaurant/departments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, code }),
+      });
+      const data = await res.json();
+      if (res.ok && data.department) {
+        setDepartments((prev) => [...prev, data.department]);
+        return data.department.id;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAddNewDesignation = async (name: string) => {
+    try {
+      const code = name.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6) || "DESIG";
+      const res = await fetch("/api/restaurant/designations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, code }),
+      });
+      const data = await res.json();
+      if (res.ok && data.designation) {
+        setDesignations((prev) => [...prev, data.designation]);
+        return data.designation.id;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchFilters = async () => {
     try {
@@ -609,30 +854,20 @@ export default function AppleEmployeeDirectoryPage() {
               {formData.workerType === "CUSTOM" ? (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                      Worker Type *
-                    </label>
-                    <select
+                    <SearchableCombobox
+                      label="Worker Type *"
                       value={formData.workerType}
-                      onChange={(e) => {
-                        const val = e.target.value;
+                      options={workerTypeOptions}
+                      onChange={(val) => {
                         setFormData((f) => ({
                           ...f,
                           workerType: val,
                           weeklyHoursLimit: val === "CUSTOM" ? f.weeklyHoursLimit || "10" : "",
                         }));
                       }}
-                      className={`w-full px-3.5 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
-                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                      }`}
-                    >
-                      <option value="FULL_TIME">Full-Time (48h)</option>
-                      <option value="PART_TIME">Part-Time (20h)</option>
-                      <option value="INTERN">Intern (20h)</option>
-                      <option value="TEMPORARY">Temporary (25h)</option>
-                      <option value="CONTRACT">Contractor (40h)</option>
-                      <option value="CUSTOM">Custom Hours...</option>
-                    </select>
+                      emptyOptionLabel="Select Type..."
+                      isDark={isDark}
+                    />
                   </div>
 
                   <div>
@@ -672,30 +907,20 @@ export default function AppleEmployeeDirectoryPage() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                      Worker Type *
-                    </label>
-                    <select
+                    <SearchableCombobox
+                      label="Worker Type *"
                       value={formData.workerType}
-                      onChange={(e) => {
-                        const val = e.target.value;
+                      options={workerTypeOptions}
+                      onChange={(val) => {
                         setFormData((f) => ({
                           ...f,
                           workerType: val,
                           weeklyHoursLimit: val === "CUSTOM" ? "10" : "",
                         }));
                       }}
-                      className={`w-full px-3.5 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
-                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                      }`}
-                    >
-                      <option value="FULL_TIME">Full-Time (48h)</option>
-                      <option value="PART_TIME">Part-Time (20h)</option>
-                      <option value="INTERN">Intern (20h)</option>
-                      <option value="TEMPORARY">Temporary (25h)</option>
-                      <option value="CONTRACT">Contractor (40h)</option>
-                      <option value="CUSTOM">Custom Hours...</option>
-                    </select>
+                      emptyOptionLabel="Select Type..."
+                      isDark={isDark}
+                    />
                   </div>
 
                   <div>
@@ -715,65 +940,40 @@ export default function AppleEmployeeDirectoryPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
-                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                    Department
-                  </label>
-                  <select
+                  <SearchableCombobox
+                    label="Department"
                     value={formData.departmentId}
-                    onChange={(e) => setFormData((f) => ({ ...f, departmentId: e.target.value }))}
-                    className={`w-full px-3 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
-                  >
-                    <option value="">None / General</option>
-                    {departments.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
+                    options={departments.map((d) => ({ id: d.id, name: d.name }))}
+                    onChange={(val) => setFormData((f) => ({ ...f, departmentId: val }))}
+                    onAddNew={handleAddNewDepartment}
+                    emptyOptionLabel="None / General"
+                    isDark={isDark}
+                  />
                 </div>
 
                 <div>
-                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                    Designation
-                  </label>
-                  <select
+                  <SearchableCombobox
+                    label="Designation"
                     value={formData.designationId}
-                    onChange={(e) => setFormData((f) => ({ ...f, designationId: e.target.value }))}
-                    className={`w-full px-3 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
-                  >
-                    <option value="">None / Staff</option>
-                    {designations.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
+                    options={designations.map((d) => ({ id: d.id, name: d.name }))}
+                    onChange={(val) => setFormData((f) => ({ ...f, designationId: val }))}
+                    onAddNew={handleAddNewDesignation}
+                    emptyOptionLabel="None / Staff"
+                    isDark={isDark}
+                  />
                 </div>
 
                 <div>
-                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                    Primary Outlet
-                  </label>
-                  <select
+                  <SearchableCombobox
+                    label="Primary Outlet"
                     value={formData.primaryOutletId}
-                    onChange={(e) => setFormData((f) => ({ ...f, primaryOutletId: e.target.value }))}
-                    className={`w-full px-3 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
-                  >
-                    <option value="">All Outlets</option>
-                    {outlets.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name}
-                      </option>
-                    ))}
-                  </select>
+                    options={outlets.map((o) => ({ id: o.id, name: o.name }))}
+                    onChange={(val) => setFormData((f) => ({ ...f, primaryOutletId: val }))}
+                    emptyOptionLabel="All Outlets"
+                    isDark={isDark}
+                  />
                 </div>
               </div>
 
