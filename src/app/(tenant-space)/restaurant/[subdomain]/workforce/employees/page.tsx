@@ -761,228 +761,244 @@ export default function AppleEmployeeDirectoryPage() {
         </div>
       </main>
 
-      {/* Add Employee Modal */}
+      {/* Add Employee Modal / Mobile Bottom Sheet */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 animate-in fade-in duration-200">
           <div
-            className={`w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150 ${
+            className={`w-full sm:max-w-xl max-h-[92vh] sm:max-h-[88vh] rounded-t-3xl sm:rounded-3xl border-t sm:border shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-200 sm:zoom-in-95 ${
               isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
             }`}
           >
-            <div className="flex justify-between items-center">
+            {/* Mobile Sheet Drag Indicator */}
+            <div className="pt-3 pb-1 block sm:hidden shrink-0">
+              <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-white/20 mx-auto" />
+            </div>
+
+            {/* Modal Header */}
+            <div className="px-5 sm:px-6 pt-3 sm:pt-6 pb-3 border-b border-black/[0.04] dark:border-white/[0.04] flex justify-between items-center shrink-0">
               <div>
-                <h2 className="text-base font-bold tracking-tight">Add New Employee</h2>
+                <h2 className="text-base sm:text-lg font-bold tracking-tight">Add New Employee</h2>
                 <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
                   Register staff member details and branch assignment.
                 </p>
               </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-base cursor-pointer"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer text-sm"
               >
                 ✕
               </button>
             </div>
 
-            {error && (
-              <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-xl">
-                {error}
-              </div>
-            )}
+            {/* Modal Form */}
+            <form onSubmit={handleCreate} className="flex flex-col flex-1 overflow-hidden">
+              <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-4 space-y-4">
+                {error && (
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-xl">
+                    {error}
+                  </div>
+                )}
 
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                    First Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.firstName}
-                    onChange={(e) => setFormData((f) => ({ ...f, firstName: e.target.value }))}
-                    className={`w-full px-3.5 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      First Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. John"
+                      value={formData.firstName}
+                      onChange={(e) => setFormData((f) => ({ ...f, firstName: e.target.value }))}
+                      className={`w-full px-3.5 py-2.5 sm:py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Last Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Doe"
+                      value={formData.lastName}
+                      onChange={(e) => setFormData((f) => ({ ...f, lastName: e.target.value }))}
+                      className={`w-full px-3.5 py-2.5 sm:py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                    Last Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.lastName}
-                    onChange={(e) => setFormData((f) => ({ ...f, lastName: e.target.value }))}
-                    className={`w-full px-3.5 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.personalEmail}
-                    onChange={(e) => setFormData((f) => ({ ...f, personalEmail: e.target.value }))}
-                    className={`w-full px-3.5 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="john.doe@example.com"
+                      value={formData.personalEmail}
+                      onChange={(e) => setFormData((f) => ({ ...f, personalEmail: e.target.value }))}
+                      className={`w-full px-3.5 py-2.5 sm:py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Phone Number
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="+1 (555) 000-0000"
+                      value={formData.phone}
+                      onChange={(e) => setFormData((f) => ({ ...f, phone: e.target.value }))}
+                      className={`w-full px-3.5 py-2.5 sm:py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData((f) => ({ ...f, phone: e.target.value }))}
-                    className={`w-full px-3.5 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
-                  />
-                </div>
-              </div>
 
-              {formData.workerType === "CUSTOM" ? (
+                {formData.workerType === "CUSTOM" ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <SearchableCombobox
+                        label="Worker Type *"
+                        value={formData.workerType}
+                        options={workerTypeOptions}
+                        onChange={(val) => {
+                          setFormData((f) => ({
+                            ...f,
+                            workerType: val,
+                            weeklyHoursLimit: val === "CUSTOM" ? f.weeklyHoursLimit || "10" : "",
+                          }));
+                        }}
+                        emptyOptionLabel="Select Type..."
+                        isDark={isDark}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                        Custom Max Hours *
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        max="100"
+                        step="0.5"
+                        placeholder="e.g. 10 or 35"
+                        value={formData.weeklyHoursLimit}
+                        onChange={(e) => setFormData((f) => ({ ...f, weeklyHoursLimit: e.target.value }))}
+                        className={`w-full px-3.5 py-2.5 sm:py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                          isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                        Joining Date *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.joiningDate}
+                        onChange={(e) => setFormData((f) => ({ ...f, joiningDate: e.target.value }))}
+                        className={`w-full px-3.5 py-2.5 sm:py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                          isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                        }`}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <SearchableCombobox
+                        label="Worker Type *"
+                        value={formData.workerType}
+                        options={workerTypeOptions}
+                        onChange={(val) => {
+                          setFormData((f) => ({
+                            ...f,
+                            workerType: val,
+                            weeklyHoursLimit: val === "CUSTOM" ? "10" : "",
+                          }));
+                        }}
+                        emptyOptionLabel="Select Type..."
+                        isDark={isDark}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                        Joining Date *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.joiningDate}
+                        onChange={(e) => setFormData((f) => ({ ...f, joiningDate: e.target.value }))}
+                        className={`w-full px-3.5 py-2.5 sm:py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                          isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                        }`}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <SearchableCombobox
-                      label="Worker Type *"
-                      value={formData.workerType}
-                      options={workerTypeOptions}
-                      onChange={(val) => {
-                        setFormData((f) => ({
-                          ...f,
-                          workerType: val,
-                          weeklyHoursLimit: val === "CUSTOM" ? f.weeklyHoursLimit || "10" : "",
-                        }));
-                      }}
-                      emptyOptionLabel="Select Type..."
+                      label="Department"
+                      value={formData.departmentId}
+                      options={departments.map((d) => ({ id: d.id, name: d.name }))}
+                      onChange={(val) => setFormData((f) => ({ ...f, departmentId: val }))}
+                      onAddNew={handleAddNewDepartment}
+                      emptyOptionLabel="None / General"
                       isDark={isDark}
                     />
                   </div>
 
-                  <div>
-                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                      Custom Max Hours *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      max="100"
-                      step="0.5"
-                      placeholder="e.g. 10 or 35"
-                      value={formData.weeklyHoursLimit}
-                      onChange={(e) => setFormData((f) => ({ ...f, weeklyHoursLimit: e.target.value }))}
-                      className={`w-full px-3.5 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                      Joining Date *
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      value={formData.joiningDate}
-                      onChange={(e) => setFormData((f) => ({ ...f, joiningDate: e.target.value }))}
-                      className={`w-full px-3.5 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                      }`}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <SearchableCombobox
-                      label="Worker Type *"
-                      value={formData.workerType}
-                      options={workerTypeOptions}
-                      onChange={(val) => {
-                        setFormData((f) => ({
-                          ...f,
-                          workerType: val,
-                          weeklyHoursLimit: val === "CUSTOM" ? "10" : "",
-                        }));
-                      }}
-                      emptyOptionLabel="Select Type..."
+                      label="Designation"
+                      value={formData.designationId}
+                      options={designations.map((d) => ({ id: d.id, name: d.name }))}
+                      onChange={(val) => setFormData((f) => ({ ...f, designationId: val }))}
+                      onAddNew={handleAddNewDesignation}
+                      emptyOptionLabel="None / Staff"
                       isDark={isDark}
                     />
                   </div>
 
                   <div>
-                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                      Joining Date *
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      value={formData.joiningDate}
-                      onChange={(e) => setFormData((f) => ({ ...f, joiningDate: e.target.value }))}
-                      className={`w-full px-3.5 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                      }`}
+                    <SearchableCombobox
+                      label="Primary Outlet"
+                      value={formData.primaryOutletId}
+                      options={outlets.map((o) => ({ id: o.id, name: o.name }))}
+                      onChange={(val) => setFormData((f) => ({ ...f, primaryOutletId: val }))}
+                      emptyOptionLabel="All Outlets"
+                      isDark={isDark}
                     />
                   </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div>
-                  <SearchableCombobox
-                    label="Department"
-                    value={formData.departmentId}
-                    options={departments.map((d) => ({ id: d.id, name: d.name }))}
-                    onChange={(val) => setFormData((f) => ({ ...f, departmentId: val }))}
-                    onAddNew={handleAddNewDepartment}
-                    emptyOptionLabel="None / General"
-                    isDark={isDark}
-                  />
-                </div>
-
-                <div>
-                  <SearchableCombobox
-                    label="Designation"
-                    value={formData.designationId}
-                    options={designations.map((d) => ({ id: d.id, name: d.name }))}
-                    onChange={(val) => setFormData((f) => ({ ...f, designationId: val }))}
-                    onAddNew={handleAddNewDesignation}
-                    emptyOptionLabel="None / Staff"
-                    isDark={isDark}
-                  />
-                </div>
-
-                <div>
-                  <SearchableCombobox
-                    label="Primary Outlet"
-                    value={formData.primaryOutletId}
-                    options={outlets.map((o) => ({ id: o.id, name: o.name }))}
-                    onChange={(val) => setFormData((f) => ({ ...f, primaryOutletId: val }))}
-                    emptyOptionLabel="All Outlets"
-                    isDark={isDark}
-                  />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+              {/* Sticky Action Footer */}
+              <div className="px-5 sm:px-6 py-3.5 border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-end gap-2.5 shrink-0 bg-inherit">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
-                    isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
+                  className={`flex-1 sm:flex-none px-4 py-2.5 sm:py-2 rounded-xl text-xs font-medium border transition cursor-pointer text-center ${
+                    isDark
+                      ? "border-white/[0.08] text-[#8F95A3] hover:text-white hover:bg-white/[0.04]"
+                      : "border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   }`}
                 >
                   Cancel
@@ -990,7 +1006,7 @@ export default function AppleEmployeeDirectoryPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
+                  className="flex-1 sm:flex-none px-6 py-2.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer disabled:opacity-50 text-center"
                 >
                   {saving ? "Adding..." : "Add Employee"}
                 </button>
