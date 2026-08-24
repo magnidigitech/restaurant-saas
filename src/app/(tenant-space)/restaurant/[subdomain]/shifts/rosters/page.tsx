@@ -738,11 +738,11 @@ export default function AppleShiftRostersPage() {
       <div className={`min-h-screen font-sans antialiased transition-colors duration-200 flex flex-col ${isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"}`}>
         <RestaurantNavbar activeSection="Shifts" />
 
-        <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <main className="flex-1 w-full max-w-[1400px] mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5 sm:space-y-6 min-w-0 overflow-x-hidden">
           {/* Executive Roster Header Banner */}
-          <div className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"}`}>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
+          <div className={`p-5 sm:p-7 rounded-3xl border transition flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 sm:gap-6 min-w-0 max-w-full ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"}`}>
+            <div className="space-y-2 w-full lg:w-auto min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button onClick={() => router.push(`/restaurant/${subdomain}/dashboard`)} className={`text-xs font-medium transition cursor-pointer ${isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"}`}>
                   ← Dashboard
                 </button>
@@ -753,14 +753,14 @@ export default function AppleShiftRostersPage() {
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+              <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+                <h1 className={`text-xl sm:text-2xl font-bold tracking-tight break-words ${isDark ? "text-white" : "text-slate-900"}`}>
                   {isAdmin
                     ? (currentRoster ? currentRoster.name : "Shift Rosters")
                     : (currentRoster ? `${currentRoster.name}` : "My Shift Schedule")}
                 </h1>
                 {currentRoster && (
-                  <span className={`px-2.5 py-1 text-[11px] font-bold rounded-lg uppercase tracking-wide border ${currentRoster.status === "PUBLISHED"
+                  <span className={`px-2.5 py-1 text-[10px] sm:text-[11px] font-bold rounded-lg uppercase tracking-wide border whitespace-nowrap ${currentRoster.status === "PUBLISHED"
                     ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
                     : currentRoster.status === "AVAILABILITY_OPEN"
                       ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
@@ -773,7 +773,7 @@ export default function AppleShiftRostersPage() {
                 )}
               </div>
 
-              <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              <p className={`text-xs leading-relaxed ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
                 {isAdmin
                   ? "Availability-First Roster Workflow: Employees submit schedule availability → Admin assigns shifts."
                   : "View your weekly scheduled working shifts and submit your schedule availability for upcoming roster periods."}
@@ -781,11 +781,11 @@ export default function AppleShiftRostersPage() {
             </div>
 
             {/* Roster Selection & Period Actions */}
-            <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full lg:w-auto min-w-0 max-w-full">
               <select
                 value={selectedRosterId}
                 onChange={(e) => setSelectedRosterId(e.target.value)}
-                className={`px-3.5 py-2 text-xs rounded-xl border font-medium focus:outline-none focus:border-[#0071E3] ${isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-slate-50 border-slate-200 text-slate-900"}`}
+                className={`w-full sm:w-auto max-w-full min-w-0 px-3.5 py-2.5 sm:py-2 text-xs rounded-xl border font-medium focus:outline-none focus:border-[#0071E3] truncate ${isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-slate-50 border-slate-200 text-slate-900"}`}
               >
                 {rosters.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -797,7 +797,7 @@ export default function AppleShiftRostersPage() {
               {isAdmin && (
                 <button
                   onClick={() => setNewRosterModalOpen(true)}
-                  className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer text-center whitespace-nowrap"
                 >
                   + Create Roster Period
                 </button>
@@ -872,12 +872,12 @@ export default function AppleShiftRostersPage() {
           )}
 
           {/* Navigation View Mode Tabs */}
-          <div className="flex border-b border-slate-200 dark:border-white/[0.08] gap-6">
+          <div className="flex border-b border-slate-200 dark:border-white/[0.08] gap-4 sm:gap-6 overflow-x-auto no-scrollbar min-w-0">
             {!isAdmin ? (
               <>
                 <button
                   onClick={() => setActiveTab("MY_SCHEDULE")}
-                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer ${activeTab === "MY_SCHEDULE"
+                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${activeTab === "MY_SCHEDULE"
                     ? "border-[#0071E3] text-[#0071E3]"
                     : isDark
                       ? "border-transparent text-[#8F95A3] hover:text-white"
@@ -889,7 +889,7 @@ export default function AppleShiftRostersPage() {
 
                 <button
                   onClick={() => setActiveTab("MY_AVAILABILITY")}
-                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer ${activeTab === "MY_AVAILABILITY"
+                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${activeTab === "MY_AVAILABILITY"
                     ? "border-[#0071E3] text-[#0071E3]"
                     : isDark
                       ? "border-transparent text-[#8F95A3] hover:text-white"
@@ -903,7 +903,7 @@ export default function AppleShiftRostersPage() {
               <>
                 <button
                   onClick={() => setActiveTab("ASSIGNMENTS")}
-                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer ${activeTab === "ASSIGNMENTS"
+                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${activeTab === "ASSIGNMENTS"
                     ? "border-[#0071E3] text-[#0071E3]"
                     : isDark
                       ? "border-transparent text-[#8F95A3] hover:text-white"
@@ -915,7 +915,7 @@ export default function AppleShiftRostersPage() {
 
                 <button
                   onClick={() => setActiveTab("ADMIN_AVAILABILITY")}
-                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer ${activeTab === "ADMIN_AVAILABILITY"
+                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${activeTab === "ADMIN_AVAILABILITY"
                     ? "border-[#0071E3] text-[#0071E3]"
                     : isDark
                       ? "border-transparent text-[#8F95A3] hover:text-white"
@@ -927,7 +927,7 @@ export default function AppleShiftRostersPage() {
 
                 <button
                   onClick={() => setActiveTab("MY_AVAILABILITY")}
-                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer ${activeTab === "MY_AVAILABILITY"
+                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${activeTab === "MY_AVAILABILITY"
                     ? "border-[#0071E3] text-[#0071E3]"
                     : isDark
                       ? "border-transparent text-[#8F95A3] hover:text-white"
@@ -1455,20 +1455,20 @@ export default function AppleShiftRostersPage() {
 
           {/* TAB 3: EMPLOYEE AVAILABILITY & SCHEDULE PORTAL (Requirement 2, 3, 4, 5, 6) */}
           {activeTab === "MY_AVAILABILITY" && (
-            <div className="space-y-6">
-              <div className="p-6 rounded-3xl border bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-transparent border-blue-500/20 space-y-2">
-                <div className="flex justify-between items-center">
-                  <h2 className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+            <div className="space-y-5 sm:space-y-6 min-w-0 max-w-full">
+              <div className="p-5 sm:p-6 rounded-3xl border bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-transparent border-blue-500/20 space-y-3 min-w-0">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2.5">
+                  <h2 className={`text-base sm:text-lg font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
                     Your Schedule & Availability
                   </h2>
-                  <span className={`px-3 py-1 text-xs font-bold rounded-xl border ${mySubmissionStatus === "SUBMITTED"
+                  <span className={`px-3 py-1 text-xs font-bold rounded-xl border self-start sm:self-auto ${mySubmissionStatus === "SUBMITTED"
                     ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
                     : "bg-amber-500/10 text-amber-500 border-amber-500/20"
                     }`}>
                     Status: {mySubmissionStatus}
                   </span>
                 </div>
-                <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                <p className={`text-xs leading-relaxed ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                   Please update your available working days and times for this roster period. You are only providing your availability; the manager will assign your final shifts.
                 </p>
                 {currentRoster?.availabilityDeadline && (
@@ -1479,15 +1479,15 @@ export default function AppleShiftRostersPage() {
               </div>
 
               {/* Recurring Pattern Controls */}
-              <div className={`p-6 rounded-3xl border transition space-y-4 ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"}`}>
-                <div className="flex justify-between items-center">
+              <div className={`p-5 sm:p-6 rounded-3xl border transition space-y-3 sm:space-y-4 min-w-0 ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"}`}>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                   <div>
                     <h3 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>Recurring Weekly Availability</h3>
                     <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>Set your standard weekly working preference.</p>
                   </div>
                   <button
                     onClick={handleApplyRecurringAvailability}
-                    className="px-3.5 py-1.5 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer"
+                    className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer text-center whitespace-nowrap shadow-xs"
                   >
                     Auto-Apply Standard Pattern
                   </button>
@@ -1607,11 +1607,11 @@ export default function AppleShiftRostersPage() {
                 </div>
 
                 {/* Save & Submit Availability Actions */}
-                <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-white/[0.06]">
+                <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-slate-200 dark:border-white/[0.06] w-full">
                   <button
                     onClick={handleSaveEmployeeAvailability}
                     disabled={actionLoading}
-                    className={`px-4 py-2 text-xs font-semibold rounded-xl border transition cursor-pointer ${isDark ? "bg-white/5 border-white/10 text-white hover:bg-white/10" : "bg-slate-100 border-slate-200 text-slate-800 hover:bg-slate-200"}`}
+                    className={`w-full sm:w-auto px-5 py-3 sm:py-2.5 text-xs font-semibold rounded-xl border transition cursor-pointer text-center ${isDark ? "bg-white/5 border-white/10 text-white hover:bg-white/10" : "bg-slate-100 border-slate-200 text-slate-800 hover:bg-slate-200"}`}
                   >
                     Save Draft
                   </button>
@@ -1619,7 +1619,7 @@ export default function AppleShiftRostersPage() {
                   <button
                     onClick={() => setSubmitConfirmModalOpen(true)}
                     disabled={actionLoading}
-                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition cursor-pointer shadow-sm"
+                    className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition cursor-pointer text-center shadow-sm"
                   >
                     Submit Availability
                   </button>
