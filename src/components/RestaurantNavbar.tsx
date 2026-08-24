@@ -43,6 +43,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
   };
 
   const [activeModules, setActiveModules] = useState<string[] | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [hoveredNav, setHoveredNav] = useState<string | null>(null);
   const [mobileExpanded, setMobileExpanded] = useState<Record<string, boolean>>({});
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -97,9 +98,12 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
     fetch("/api/restaurant/modules")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (isMounted && data?.modules) {
-          const keys = data.modules.map((m: any) => m.key.toLowerCase());
-          setActiveModules(keys);
+        if (isMounted && data) {
+          if (data.modules) {
+            const keys = data.modules.map((m: any) => m.key.toLowerCase());
+            setActiveModules(keys);
+          }
+          setIsAdmin(!!data.isAdmin);
         }
       })
       .catch(() => { });
@@ -509,76 +513,77 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
               </button>
             );
           })}
-
-          {/* Administration Dropdown Menu */}
-          <div className="relative" ref={adminDropdownRef}>
-            <button
-              onClick={() => setAdminDropdownOpen(!adminDropdownOpen)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${isAdminActive || adminDropdownOpen
-                ? isDark
-                  ? "bg-white/[0.08] text-white font-semibold"
-                  : "bg-slate-100 text-[#0071E3] font-semibold"
-                : isDark
-                  ? "text-[#8F95A3] hover:text-white hover:bg-white/[0.04]"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                }`}
-            >
-              <span>Administration</span>
-              <svg
-                className={`w-3.5 h-3.5 transition-transform duration-200 opacity-70 ${adminDropdownOpen ? "rotate-180" : ""
-                  }`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-
-            {adminDropdownOpen && (
-              <div
-                className={`absolute right-0 mt-2 w-72 p-2 rounded-2xl border shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 ${isDark
-                  ? "bg-[#121622] border-white/[0.08] text-white shadow-black/60"
-                  : "bg-white border-slate-200 text-slate-900 shadow-slate-900/15"
+          {/* Administration Dropdown Menu (Only for Admins) */}
+          {isAdmin && (
+            <div className="relative" ref={adminDropdownRef}>
+              <button
+                onClick={() => setAdminDropdownOpen(!adminDropdownOpen)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer flex items-center gap-1.5 ${isAdminActive || adminDropdownOpen
+                  ? isDark
+                    ? "bg-white/[0.08] text-white font-semibold"
+                    : "bg-slate-100 text-[#0071E3] font-semibold"
+                  : isDark
+                    ? "text-[#8F95A3] hover:text-white hover:bg-white/[0.04]"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   }`}
               >
-                <div className="px-3 py-1.5 mb-1 border-b border-black/[0.06] dark:border-white/[0.06]">
-                  <span className={`text-[10px] uppercase font-bold tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-                    System & Access Controls
-                  </span>
-                </div>
+                <span>Administration</span>
+                <svg
+                  className={`w-3.5 h-3.5 transition-transform duration-200 opacity-70 ${adminDropdownOpen ? "rotate-180" : ""
+                    }`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
 
-                <div className="space-y-0.5">
-                  {adminNavLinks.map((item) => {
-                    const isItemActive = pathname.startsWith(item.href);
-                    return (
-                      <button
-                        key={item.label}
-                        onClick={() => {
-                          setAdminDropdownOpen(false);
-                          router.push(item.href);
-                        }}
-                        className={`w-full p-2.5 rounded-xl text-left transition cursor-pointer flex flex-col ${isItemActive
-                          ? isDark
-                            ? "bg-[#0071E3]/20 text-[#64B5FF]"
-                            : "bg-blue-50 text-[#0071E3]"
-                          : isDark
-                            ? "hover:bg-white/[0.04] text-white"
-                            : "hover:bg-slate-50 text-slate-800"
-                          }`}
-                      >
-                        <span className="text-xs font-semibold">{item.label}</span>
-                        <span className={`text-[10px] leading-tight mt-0.5 truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                          {item.desc}
-                        </span>
-                      </button>
-                    );
-                  })}
+              {adminDropdownOpen && (
+                <div
+                  className={`absolute right-0 mt-2 w-72 p-2 rounded-2xl border shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 ${isDark
+                    ? "bg-[#121622] border-white/[0.08] text-white shadow-black/60"
+                    : "bg-white border-slate-200 text-slate-900 shadow-slate-900/15"
+                    }`}
+                >
+                  <div className="px-3 py-1.5 mb-1 border-b border-black/[0.06] dark:border-white/[0.06]">
+                    <span className={`text-[10px] uppercase font-bold tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                      System & Access Controls
+                    </span>
+                  </div>
+
+                  <div className="space-y-0.5">
+                    {adminNavLinks.map((item) => {
+                      const isItemActive = pathname.startsWith(item.href);
+                      return (
+                        <button
+                          key={item.label}
+                          onClick={() => {
+                            setAdminDropdownOpen(false);
+                            router.push(item.href);
+                          }}
+                          className={`w-full p-2.5 rounded-xl text-left transition cursor-pointer flex flex-col ${isItemActive
+                            ? isDark
+                              ? "bg-[#0071E3]/20 text-[#64B5FF]"
+                              : "bg-blue-50 text-[#0071E3]"
+                            : isDark
+                              ? "hover:bg-white/[0.04] text-white"
+                              : "hover:bg-slate-50 text-slate-800"
+                            }`}
+                        >
+                          <span className="text-xs font-semibold">{item.label}</span>
+                          <span className={`text-[11px] mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                            {item.desc}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </nav>
 
         {/* Right: Controls & Mobile Hamburger */}
@@ -734,37 +739,39 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
             </div>
           </div>
 
-          {/* Administration Section */}
-          <div className="pt-2 border-t border-black/[0.06] dark:border-white/[0.06]">
-            <span className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 px-1 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-              Administration & Access
-            </span>
-            <div className="grid grid-cols-1 gap-1">
-              {adminNavLinks.map((item) => {
-                const isActive = pathname.startsWith(item.href);
-                return (
-                  <button
-                    key={item.label}
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      router.push(item.href);
-                    }}
-                    className={`px-3 py-2 rounded-xl text-xs font-medium transition text-left cursor-pointer flex items-center justify-between ${isActive
-                      ? isDark
-                        ? "bg-[#0071E3]/20 text-[#64B5FF] font-semibold"
-                        : "bg-blue-50 text-[#0071E3] font-semibold"
-                      : isDark
-                        ? "text-[#8F95A3] hover:text-white hover:bg-white/[0.04]"
-                        : "text-slate-700 hover:text-slate-900 hover:bg-slate-50"
-                      }`}
-                  >
-                    <span>{item.label}</span>
-                    <span className="text-xs opacity-60">→</span>
-                  </button>
-                );
-              })}
+          {/* Administration Section (Only for Admins) */}
+          {isAdmin && (
+            <div className="pt-2 border-t border-black/[0.06] dark:border-white/[0.06]">
+              <span className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 px-1 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                Administration & Access
+              </span>
+              <div className="grid grid-cols-1 gap-1">
+                {adminNavLinks.map((item) => {
+                  const isActive = pathname.startsWith(item.href);
+                  return (
+                    <button
+                      key={item.label}
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        router.push(item.href);
+                      }}
+                      className={`px-3 py-2 rounded-xl text-xs font-medium transition text-left cursor-pointer flex items-center justify-between ${isActive
+                        ? isDark
+                          ? "bg-[#0071E3]/20 text-[#64B5FF] font-semibold"
+                          : "bg-blue-50 text-[#0071E3] font-semibold"
+                        : isDark
+                          ? "text-[#8F95A3] hover:text-white hover:bg-white/[0.04]"
+                          : "text-slate-700 hover:text-slate-900 hover:bg-slate-50"
+                        }`}
+                    >
+                      <span>{item.label}</span>
+                      <span className="text-xs opacity-60">→</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="pt-2 border-t border-black/[0.06] dark:border-white/[0.06] flex justify-between items-center px-1">
             <span className={`text-[11px] font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>

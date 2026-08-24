@@ -290,6 +290,37 @@ export default function AppleTenantDashboard() {
     return list;
   }, [modules, subdomain, metrics]);
 
+  const allowedKeys = useMemo(() => {
+    const set = new Set<string>();
+    modules.forEach((m) => {
+      const k = m.key.toLowerCase();
+      set.add(k);
+      if (k === "shifts" || k === "shift_management") {
+        set.add("shifts");
+        set.add("shift_management");
+      }
+      if (k === "inventory") {
+        set.add("inventory");
+        set.add("vendor_management");
+        set.add("purchase_management");
+      }
+      if (k === "attendance" || k === "leave_management") {
+        set.add("attendance");
+        set.add("leave_management");
+      }
+      if (k === "workforce" || k === "hr_onboarding") {
+        set.add("workforce");
+        set.add("hr_onboarding");
+      }
+    });
+    return set;
+  }, [modules]);
+
+  const hasShiftAccess = allowedKeys.has("shifts") || allowedKeys.has("shift_management");
+  const hasPayrollAccess = allowedKeys.has("payroll");
+  const hasWorkforceAccess = allowedKeys.has("workforce") || allowedKeys.has("hr_onboarding");
+  const hasInventoryAccess = allowedKeys.has("inventory");
+
   if (loading) {
     return (
       <main
@@ -335,33 +366,41 @@ export default function AppleTenantDashboard() {
             </p>
           </div>
 
-          {/* Quick Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => router.push(`/restaurant/${subdomain}/shifts/rosters`)}
-              className="px-3.5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-medium rounded-xl transition shadow-sm"
-            >
-              + Schedule Shift
-            </button>
-            <button
-              onClick={() => router.push(`/restaurant/${subdomain}/payroll/runs`)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition ${isDark
-                ? "bg-white/[0.06] text-white border-white/[0.08] hover:bg-white/[0.1]"
-                : "bg-slate-100 text-slate-800 border-slate-200 hover:bg-slate-200"
-                }`}
-            >
-              + Run Payroll
-            </button>
-            <button
-              onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees`)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition ${isDark
-                ? "bg-white/[0.03] text-[#8F95A3] border-white/[0.06] hover:text-white"
-                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                }`}
-            >
-              + Add Employee
-            </button>
-          </div>
+          {/* Quick Action Buttons (Only for Permitted Modules) */}
+          {(hasShiftAccess || hasPayrollAccess || hasWorkforceAccess) && (
+            <div className="flex flex-wrap items-center gap-2">
+              {hasShiftAccess && (
+                <button
+                  onClick={() => router.push(`/restaurant/${subdomain}/shifts/rosters`)}
+                  className="px-3.5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-medium rounded-xl transition shadow-sm"
+                >
+                  + Schedule Shift
+                </button>
+              )}
+              {hasPayrollAccess && (
+                <button
+                  onClick={() => router.push(`/restaurant/${subdomain}/payroll/runs`)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition ${isDark
+                    ? "bg-white/[0.06] text-white border-white/[0.08] hover:bg-white/[0.1]"
+                    : "bg-slate-100 text-slate-800 border-slate-200 hover:bg-slate-200"
+                    }`}
+                >
+                  + Run Payroll
+                </button>
+              )}
+              {hasWorkforceAccess && (
+                <button
+                  onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees`)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition ${isDark
+                    ? "bg-white/[0.03] text-[#8F95A3] border-white/[0.06] hover:text-white"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                    }`}
+                >
+                  + Add Employee
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {error && (
@@ -370,102 +409,112 @@ export default function AppleTenantDashboard() {
           </div>
         )}
 
-        {/* Executive KPI Live Summary Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div
-            onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees`)}
-            className={`p-5 rounded-2xl border transition cursor-pointer ${isDark
-              ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.12]"
-              : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300"
-              }`}
-          >
-            <div className="flex justify-between items-start">
-              <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                Total Workforce
-              </span>
-              <span className="text-xs text-[#0071E3]">Manage →</span>
-            </div>
-            <p className={`text-2xl font-bold tracking-tight mt-1.5 ${isDark ? "text-white" : "text-slate-900"}`}>
-              {metrics.totalEmployees}{" "}
-              <span className={`text-xs font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>Staff</span>
-            </p>
-            <p className={`text-[11px] mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Across {metrics.totalOutlets} {metrics.totalOutlets === 1 ? "branch" : "branches"}
-            </p>
-          </div>
+        {/* Executive KPI Live Summary Grid (Only for Permitted Modules) */}
+        {(hasWorkforceAccess || hasShiftAccess || hasPayrollAccess || hasInventoryAccess) && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {hasWorkforceAccess && (
+              <div
+                onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees`)}
+                className={`p-5 rounded-2xl border transition cursor-pointer ${isDark
+                  ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.12]"
+                  : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300"
+                  }`}
+              >
+                <div className="flex justify-between items-start">
+                  <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    Total Workforce
+                  </span>
+                  <span className="text-xs text-[#0071E3]">Manage →</span>
+                </div>
+                <p className={`text-2xl font-bold tracking-tight mt-1.5 ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {metrics.totalEmployees}{" "}
+                  <span className={`text-xs font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>Staff</span>
+                </p>
+                <p className={`text-[11px] mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Across {metrics.totalOutlets} {metrics.totalOutlets === 1 ? "branch" : "branches"}
+                </p>
+              </div>
+            )}
 
-          <div
-            onClick={() => router.push(`/restaurant/${subdomain}/shifts/rosters`)}
-            className={`p-5 rounded-2xl border transition cursor-pointer ${isDark
-              ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.12]"
-              : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300"
-              }`}
-          >
-            <div className="flex justify-between items-start">
-              <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                Shift Roster
-              </span>
-              <span className="text-xs text-[#0071E3]">Schedule →</span>
-            </div>
-            <p className={`text-2xl font-bold tracking-tight mt-1.5 ${isDark ? "text-white" : "text-slate-900"}`}>
-              Weekly Grid
-            </p>
-            <p className={`text-[11px] mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Published & Active
-            </p>
-          </div>
+            {hasShiftAccess && (
+              <div
+                onClick={() => router.push(`/restaurant/${subdomain}/shifts/rosters`)}
+                className={`p-5 rounded-2xl border transition cursor-pointer ${isDark
+                  ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.12]"
+                  : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300"
+                  }`}
+              >
+                <div className="flex justify-between items-start">
+                  <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    Shift Roster
+                  </span>
+                  <span className="text-xs text-[#0071E3]">Schedule →</span>
+                </div>
+                <p className={`text-2xl font-bold tracking-tight mt-1.5 ${isDark ? "text-white" : "text-slate-900"}`}>
+                  Weekly Grid
+                </p>
+                <p className={`text-[11px] mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Published & Active
+                </p>
+              </div>
+            )}
 
-          <div
-            onClick={() => router.push(`/restaurant/${subdomain}/payroll/runs`)}
-            className={`p-5 rounded-2xl border transition cursor-pointer ${isDark
-              ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.12]"
-              : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300"
-              }`}
-          >
-            <div className="flex justify-between items-start">
-              <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                Latest Payroll
-              </span>
-              <span className="text-xs text-[#0071E3]">Runs →</span>
-            </div>
-            <p className={`text-2xl font-bold tracking-tight mt-1.5 ${isDark ? "text-white" : "text-slate-900"}`}>
-              {metrics.latestPayrollNet !== null
-                ? `$${metrics.latestPayrollNet.toLocaleString()}`
-                : "Not Initiated"}
-            </p>
-            <p className={`text-[11px] mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              {metrics.latestPayrollStatus ? `Status: ${metrics.latestPayrollStatus}` : "Ready to compute"}
-            </p>
-          </div>
+            {hasPayrollAccess && (
+              <div
+                onClick={() => router.push(`/restaurant/${subdomain}/payroll/runs`)}
+                className={`p-5 rounded-2xl border transition cursor-pointer ${isDark
+                  ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.12]"
+                  : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300"
+                  }`}
+              >
+                <div className="flex justify-between items-start">
+                  <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    Latest Payroll
+                  </span>
+                  <span className="text-xs text-[#0071E3]">Runs →</span>
+                </div>
+                <p className={`text-2xl font-bold tracking-tight mt-1.5 ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {metrics.latestPayrollNet !== null
+                    ? `$${metrics.latestPayrollNet.toLocaleString()}`
+                    : "Not Initiated"}
+                </p>
+                <p className={`text-[11px] mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  {metrics.latestPayrollStatus ? `Status: ${metrics.latestPayrollStatus}` : "Ready to compute"}
+                </p>
+              </div>
+            )}
 
-          <div
-            onClick={() => router.push(`/restaurant/${subdomain}/inventory/alerts`)}
-            className={`p-5 rounded-2xl border transition cursor-pointer ${isDark
-              ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.12]"
-              : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300"
-              }`}
-          >
-            <div className="flex justify-between items-start">
-              <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                Inventory Health
-              </span>
-              <span className="text-xs text-[#0071E3]">Alerts →</span>
-            </div>
-            <p
-              className={`text-2xl font-bold tracking-tight mt-1.5 ${metrics.lowStockAlerts > 0
-                ? "text-amber-500"
-                : isDark
-                  ? "text-emerald-400"
-                  : "text-emerald-600"
-                }`}
-            >
-              {metrics.lowStockAlerts > 0 ? `${metrics.lowStockAlerts} Low Stock` : "Optimal"}
-            </p>
-            <p className={`text-[11px] mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              {metrics.lowStockAlerts > 0 ? "Requires reordering" : "All stock levels normal"}
-            </p>
+            {hasInventoryAccess && (
+              <div
+                onClick={() => router.push(`/restaurant/${subdomain}/inventory/alerts`)}
+                className={`p-5 rounded-2xl border transition cursor-pointer ${isDark
+                  ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.12]"
+                  : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300"
+                  }`}
+              >
+                <div className="flex justify-between items-start">
+                  <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    Inventory Health
+                  </span>
+                  <span className="text-xs text-[#0071E3]">Alerts →</span>
+                </div>
+                <p
+                  className={`text-2xl font-bold tracking-tight mt-1.5 ${metrics.lowStockAlerts > 0
+                    ? "text-amber-500"
+                    : isDark
+                      ? "text-emerald-400"
+                      : "text-emerald-600"
+                    }`}
+                >
+                  {metrics.lowStockAlerts > 0 ? `${metrics.lowStockAlerts} Deficits` : "Optimal"}
+                </p>
+                <p className={`text-[11px] mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  {metrics.lowStockAlerts > 0 ? "Reorder stock immediately" : "All stock levels normal"}
+                </p>
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
         {/* Operational Modules Command Center */}
         <div className="space-y-4">
