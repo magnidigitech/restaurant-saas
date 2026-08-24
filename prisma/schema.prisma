@@ -1016,6 +1016,7 @@ model Vendor {
   taxId         String?       @map("tax_id")
   paymentTerms  PaymentTerms  @default(NET30) @map("payment_terms")
   status        VendorStatus  @default(ACTIVE)
+  outletIds     String[]      @default([]) @map("outlet_ids")
   notes         String?
   archivedAt    DateTime?     @map("archived_at")
   createdAt     DateTime      @default(now()) @map("created_at")

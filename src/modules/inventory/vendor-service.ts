@@ -11,20 +11,36 @@ function getPrisma(): any {
 }
 
 export const VendorService = {
-  async getVendors(restaurantId: string, search?: string, status?: string) {
+  async getVendors(restaurantId: string, search?: string, status?: string, outletId?: string) {
     let db = getPrisma();
     const where: any = { restaurantId, archivedAt: null };
     if (status) {
       where.status = status;
     }
-    if (search) {
+    if (outletId) {
       where.OR = [
+        ...(where.OR || []),
+        { outletIds: { has: outletId } },
+        { outletIds: { isEmpty: true } },
+      ];
+    }
+    if (search) {
+      const searchConditions = [
         { name: { contains: search, mode: "insensitive" } },
         { code: { contains: search, mode: "insensitive" } },
         { contactPerson: { contains: search, mode: "insensitive" } },
         { email: { contains: search, mode: "insensitive" } },
         { phone: { contains: search, mode: "insensitive" } },
       ];
+      if (where.OR) {
+        where.AND = [
+          { OR: where.OR },
+          { OR: searchConditions }
+        ];
+        delete where.OR;
+      } else {
+        where.OR = searchConditions;
+      }
     }
 
     try {
@@ -102,6 +118,7 @@ export const VendorService = {
       taxId?: string;
       paymentTerms?: string;
       status?: string;
+      outletIds?: string[];
       notes?: string;
     }
   ) {
@@ -118,6 +135,7 @@ export const VendorService = {
         taxId: data.taxId || null,
         paymentTerms: (data.paymentTerms as any) || "NET30",
         status: (data.status as any) || "ACTIVE",
+        outletIds: data.outletIds || [],
         notes: data.notes || null,
       },
     });
@@ -136,6 +154,7 @@ export const VendorService = {
       taxId?: string;
       paymentTerms?: string;
       status?: string;
+      outletIds?: string[];
       notes?: string;
     }
   ) {
@@ -147,6 +166,7 @@ export const VendorService = {
         ...data,
         paymentTerms: data.paymentTerms ? (data.paymentTerms as any) : undefined,
         status: data.status ? (data.status as any) : undefined,
+        outletIds: data.outletIds !== undefined ? data.outletIds : undefined,
       },
     });
   },

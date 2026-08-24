@@ -14,6 +14,7 @@ const updateVendorSchema = z.object({
   taxId: z.string().optional().or(z.literal("")),
   paymentTerms: z.enum(["COD", "IMMEDIATE", "PREPAID", "NET7", "NET15", "NET30", "NET60"]).optional(),
   status: z.enum(["ACTIVE", "INACTIVE", "BLOCKED"]).optional(),
+  outletIds: z.array(z.string()).optional(),
   notes: z.string().optional().or(z.literal("")),
 });
 

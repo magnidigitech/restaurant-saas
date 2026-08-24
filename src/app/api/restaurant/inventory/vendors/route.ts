@@ -14,6 +14,7 @@ const createVendorSchema = z.object({
   taxId: z.string().optional().or(z.literal("")),
   paymentTerms: z.enum(["COD", "IMMEDIATE", "PREPAID", "NET7", "NET15", "NET30", "NET60"]).optional(),
   status: z.enum(["ACTIVE", "INACTIVE", "BLOCKED"]).optional(),
+  outletIds: z.array(z.string()).optional(),
   notes: z.string().optional().or(z.literal("")),
 });
 
@@ -27,8 +28,9 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search") || undefined;
     const status = searchParams.get("status") || undefined;
+    const outletId = searchParams.get("outletId") || undefined;
 
-    const vendors = await VendorService.getVendors(session.activeRestaurantId, search, status);
+    const vendors = await VendorService.getVendors(session.activeRestaurantId, search, status, outletId);
     return NextResponse.json({ vendors });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || "Failed to fetch vendors" }, { status: 500 });

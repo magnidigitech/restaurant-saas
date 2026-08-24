@@ -6,6 +6,11 @@ import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import { formatUnit } from "@/core/inventory/units";
 
+interface Outlet {
+  id: string;
+  name: string;
+}
+
 interface VendorItemMap {
   id: string;
   vendorId: string;
@@ -34,6 +39,7 @@ interface VendorDetail {
   taxId?: string;
   paymentTerms: string;
   status: "ACTIVE" | "INACTIVE" | "BLOCKED";
+  outletIds?: string[];
   notes?: string;
   createdAt: string;
   vendorItems?: VendorItemMap[];
@@ -70,6 +76,7 @@ export default function VendorDetailPage({
   const [vendorItems, setVendorItems] = useState<VendorItemMap[]>([]);
   const [allItems, setAllItems] = useState<InventoryItem[]>([]);
   const [allRestaurantVendorItems, setAllRestaurantVendorItems] = useState<VendorItemMap[]>([]);
+  const [outlets, setOutlets] = useState<Outlet[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -91,6 +98,7 @@ export default function VendorDetailPage({
     taxId: "",
     paymentTerms: "NET30",
     status: "ACTIVE",
+    outletIds: [] as string[],
     notes: "",
   });
 
@@ -111,17 +119,21 @@ export default function VendorDetailPage({
 
   const fetchVendorDetail = async () => {
     try {
-      const [resVendor, resVendorItems, resAllVendorItems, resAllItems] = await Promise.all([
+      const [resVendor, resVendorItems, resAllVendorItems, resAllItems, resOutlets] = await Promise.all([
         fetch(`/api/restaurant/inventory/vendors/${vendorId}`),
         fetch(`/api/restaurant/inventory/vendor-items?vendorId=${vendorId}`),
         fetch(`/api/restaurant/inventory/vendor-items`),
         fetch(`/api/restaurant/inventory/items`),
+        fetch("/api/restaurant/outlets"),
       ]);
 
       const dataVendor = await resVendor.json();
       const dataVItems = await resVendorItems.json();
       const dataAllVItems = await resAllVendorItems.json();
       const dataAllItems = await resAllItems.json();
+      const dataOutlets = await resOutlets.json();
+
+      if (resOutlets.ok) setOutlets(dataOutlets.outlets || []);
 
       if (resVendor.ok && dataVendor.vendor) {
         setVendor(dataVendor.vendor);
@@ -135,6 +147,7 @@ export default function VendorDetailPage({
           taxId: dataVendor.vendor.taxId || "",
           paymentTerms: dataVendor.vendor.paymentTerms || "NET30",
           status: dataVendor.vendor.status || "ACTIVE",
+          outletIds: dataVendor.vendor.outletIds || [],
           notes: dataVendor.vendor.notes || "",
         });
       } else {
@@ -154,6 +167,35 @@ export default function VendorDetailPage({
   useEffect(() => {
     if (vendorId) fetchVendorDetail();
   }, [vendorId]);
+
+  const toggleOutletSelection = (outletId: string) => {
+    setForm((prev) => {
+      const exists = prev.outletIds.includes(outletId);
+      if (exists) {
+        return { ...prev, outletIds: prev.outletIds.filter((id) => id !== outletId) };
+      } else {
+        return { ...prev, outletIds: [...prev.outletIds, outletId] };
+      }
+    });
+  };
+
+  const handleSelectAllOutlets = (selectAll: boolean) => {
+    if (selectAll) {
+      setForm((prev) => ({ ...prev, outletIds: outlets.map((o) => o.id) }));
+    } else {
+      setForm((prev) => ({ ...prev, outletIds: [] }));
+    }
+  };
+
+  const getOutletNames = (outletIds?: string[]) => {
+    if (!outletIds || outletIds.length === 0 || outletIds.length === outlets.length) {
+      return "All Locations (Global)";
+    }
+    const names = outletIds
+      .map((id) => outlets.find((o) => o.id === id)?.name)
+      .filter(Boolean);
+    return names.length > 0 ? names.join(", ") : "All Locations (Global)";
+  };
 
   const openMultiSelectModal = () => {
     const preferredMap: Record<string, string> = {};
@@ -366,6 +408,9 @@ export default function VendorDetailPage({
   const allFilteredSelected =
     filteredModalRows.length > 0 && filteredModalRows.every((r) => r.selected);
 
+  const locationText = getOutletNames(vendor?.outletIds);
+  const isAllLocations = !vendor?.outletIds || vendor?.outletIds.length === 0 || vendor?.outletIds.length === outlets.length;
+
   return (
     <div
       className={`min-h-screen font-sans antialiased transition-colors duration-200 flex flex-col ${
@@ -383,8 +428,8 @@ export default function VendorDetailPage({
               : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
           }`}
         >
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => router.push(`/restaurant/${subdomain}/inventory/vendors`)}
                 className={`text-xs font-medium transition cursor-pointer ${
@@ -400,6 +445,15 @@ export default function VendorDetailPage({
                   : isDark ? "bg-rose-500/15 text-rose-300 border-rose-500/25" : "bg-rose-100 text-rose-800 border-rose-200"
               }`}>
                 {vendor?.status}
+              </span>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  isAllLocations
+                    ? isDark ? "bg-blue-500/15 text-blue-300 border-blue-500/25" : "bg-blue-50 text-blue-700 border-blue-200"
+                    : isDark ? "bg-purple-500/15 text-purple-300 border-purple-500/25" : "bg-purple-50 text-purple-700 border-purple-200"
+                }`}
+              >
+                📍 {locationText}
               </span>
             </div>
 
@@ -620,7 +674,7 @@ export default function VendorDetailPage({
               Supplier Account &amp; Contact Details
             </h3>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3.5">
               <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
                   Payment Terms
@@ -659,12 +713,21 @@ export default function VendorDetailPage({
                 </p>
               </div>
 
-              <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs col-span-2 sm:col-span-1"}`}>
+              <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
                   Tax ID / GST
                 </span>
                 <p className={`text-xs font-mono font-semibold tracking-tight mt-1.5 ${isDark ? "text-white" : "text-slate-900"}`}>
                   {vendor?.taxId || "Not Registered"}
+                </p>
+              </div>
+
+              <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs col-span-2 sm:col-span-1"}`}>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Locations
+                </span>
+                <p className={`text-xs font-semibold tracking-tight mt-1.5 truncate ${isDark ? "text-[#58A6FF]" : "text-[#0071E3]"}`}>
+                  {locationText}
                 </p>
               </div>
             </div>
@@ -937,7 +1000,7 @@ export default function VendorDetailPage({
               <div>
                 <h2 className="text-base font-bold tracking-tight">Edit Supplier Details</h2>
                 <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                  Update commercial terms and contact details for {vendor?.name}.
+                  Update commercial terms, location coverage, and contacts.
                 </p>
               </div>
               <button
@@ -979,6 +1042,66 @@ export default function VendorDetailPage({
                   />
                 </div>
               </div>
+
+              {/* Multi-Location Selection */}
+              {outlets.length > 0 && (
+                <div className={`p-3.5 rounded-2xl border space-y-2.5 ${
+                  isDark ? "bg-[#090B10]/60 border-white/[0.06]" : "bg-slate-50 border-slate-200"
+                }`}>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <label className={`block text-xs font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                        Serviced Restaurant Locations
+                      </label>
+                      <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                        Select which branches this vendor delivers to.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAllOutlets(form.outletIds.length !== outlets.length)}
+                      className="text-[11px] text-[#0071E3] font-semibold hover:underline cursor-pointer"
+                    >
+                      {form.outletIds.length === outlets.length || form.outletIds.length === 0
+                        ? "Select All"
+                        : "Clear All"}
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {outlets.map((o) => {
+                      const isSelected = form.outletIds.length === 0 || form.outletIds.includes(o.id);
+
+                      return (
+                        <button
+                          key={o.id}
+                          type="button"
+                          onClick={() => toggleOutletSelection(o.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition cursor-pointer flex items-center gap-1.5 ${
+                            isSelected
+                              ? isDark
+                                ? "bg-[#0071E3]/20 border-[#0071E3] text-white font-semibold shadow-xs"
+                                : "bg-blue-50 border-[#0071E3] text-[#0071E3] font-semibold shadow-xs"
+                              : isDark
+                              ? "bg-white/[0.03] border-white/[0.08] text-[#8F95A3] hover:text-white"
+                              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          <span>{isSelected ? "✓" : "+"}</span>
+                          <span>{o.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className={`text-[10px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    {form.outletIds.length === 0 || form.outletIds.length === outlets.length
+                      ? "✨ Supplying to all restaurant locations."
+                      : `Delivering to ${form.outletIds.length} selected location(s).`}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1112,7 +1235,7 @@ export default function VendorDetailPage({
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer"
                 >
                   {submitting ? "Saving..." : "Save Changes"}
                 </button>

@@ -31,6 +31,7 @@ interface PurchaseOrder {
 interface Vendor {
   id: string;
   name: string;
+  outletIds?: string[];
 }
 
 interface Outlet {
