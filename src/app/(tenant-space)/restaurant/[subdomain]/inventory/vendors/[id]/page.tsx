@@ -188,13 +188,13 @@ export default function VendorDetailPage({
   };
 
   const getOutletNames = (outletIds?: string[]) => {
-    if (!outletIds || outletIds.length === 0 || outletIds.length === outlets.length) {
-      return "All Locations (Global)";
+    if (!outletIds || outletIds.length === 0) {
+      return "All Locations";
     }
     const names = outletIds
       .map((id) => outlets.find((o) => o.id === id)?.name)
       .filter(Boolean);
-    return names.length > 0 ? names.join(", ") : "All Locations (Global)";
+    return names.length > 0 ? names.join(", ") : "All Locations";
   };
 
   const openMultiSelectModal = () => {
@@ -409,7 +409,7 @@ export default function VendorDetailPage({
     filteredModalRows.length > 0 && filteredModalRows.every((r) => r.selected);
 
   const locationText = getOutletNames(vendor?.outletIds);
-  const isAllLocations = !vendor?.outletIds || vendor?.outletIds.length === 0 || vendor?.outletIds.length === outlets.length;
+  const isAllLocations = !vendor?.outletIds || vendor?.outletIds.length === 0;
 
   return (
     <div

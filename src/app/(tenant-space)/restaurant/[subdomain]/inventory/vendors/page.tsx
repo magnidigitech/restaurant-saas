@@ -165,7 +165,7 @@ export default function VendorDirectoryPage({
   };
 
   const getOutletNames = (outletIds?: string[]) => {
-    if (!outletIds || outletIds.length === 0 || outletIds.length === outlets.length) {
+    if (!outletIds || outletIds.length === 0) {
       return "All Locations";
     }
     const names = outletIds
@@ -313,7 +313,7 @@ export default function VendorDirectoryPage({
               <div className="block md:hidden space-y-3">
                 {vendors.map((v) => {
                   const locationText = getOutletNames(v.outletIds);
-                  const isAllLocations = !v.outletIds || v.outletIds.length === 0 || v.outletIds.length === outlets.length;
+                  const isAllLocations = !v.outletIds || v.outletIds.length === 0;
 
                   return (
                     <div
@@ -434,7 +434,7 @@ export default function VendorDirectoryPage({
                     <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04] text-xs">
                       {vendors.map((v) => {
                         const locationText = getOutletNames(v.outletIds);
-                        const isAllLocations = !v.outletIds || v.outletIds.length === 0 || v.outletIds.length === outlets.length;
+                        const isAllLocations = !v.outletIds || v.outletIds.length === 0;
 
                         return (
                           <tr
