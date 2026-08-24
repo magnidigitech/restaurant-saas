@@ -314,12 +314,12 @@ export default function AppleShiftRostersPage() {
     window.addEventListener("focus", onVisibilityOrFocus);
     document.addEventListener("visibilitychange", onVisibilityOrFocus);
 
-    // 2. Periodic background polling every 4.5 seconds for live sync
+    // 2. Periodic background polling every 12 seconds for live sync without server load
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") {
         refreshData();
       }
-    }, 4500);
+    }, 12000);
 
     return () => {
       window.removeEventListener("focus", onVisibilityOrFocus);
