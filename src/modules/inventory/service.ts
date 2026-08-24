@@ -185,12 +185,12 @@ export const InventoryService = {
   ) {
     const existingItems = await prisma.inventoryItem.findMany({
       where: { restaurantId, archivedAt: null },
-      select: { name: true, sku: true },
+      select: { id: true, name: true, sku: true, categoryId: true, description: true },
     });
 
-    const existingNameSet = new Set(existingItems.map((i) => i.name.trim().toLowerCase()));
-    const existingSkuSet = new Set(
-      existingItems.filter((i) => i.sku).map((i) => i.sku!.trim().toLowerCase())
+    const existingNameMap = new Map(existingItems.map((i) => [i.name.trim().toLowerCase(), i]));
+    const existingSkuMap = new Map(
+      existingItems.filter((i) => i.sku).map((i) => [i.sku!.trim().toLowerCase(), i])
     );
 
     const categories = await prisma.inventoryCategory.findMany({
@@ -231,26 +231,6 @@ export const InventoryService = {
       const nameLower = name.toLowerCase();
       const skuLower = sku.toLowerCase();
 
-      if (existingNameSet.has(nameLower)) {
-        skipped.push({
-          row: rowNum,
-          name,
-          sku: sku || undefined,
-          reason: `Item name '${name}' already exists in catalog`,
-        });
-        continue;
-      }
-
-      if (skuLower && existingSkuSet.has(skuLower)) {
-        skipped.push({
-          row: rowNum,
-          name,
-          sku,
-          reason: `SKU code '${sku}' is already assigned to another item`,
-        });
-        continue;
-      }
-
       // Parse numeric fields safely
       const costRaw = r.costPerUnit;
       const costPerUnit = costRaw !== undefined && costRaw !== "" && costRaw !== null ? Number(costRaw) : 0;
@@ -270,12 +250,24 @@ export const InventoryService = {
       let unitOfMeasure = "PIECES";
       if (validUoms.has(uomRaw)) {
         unitOfMeasure = uomRaw;
-      } else if (uomRaw.includes("KG") || uomRaw.includes("KILO")) unitOfMeasure = "KG";
-      else if (uomRaw.includes("GRAM") || uomRaw === "G") unitOfMeasure = "G";
-      else if (uomRaw.includes("LB") || uomRaw.includes("POUND")) unitOfMeasure = "LB";
-      else if (uomRaw.includes("OZ") || uomRaw.includes("OUNCE")) unitOfMeasure = "OZ";
-      else if (uomRaw.includes("LITER") || uomRaw === "L") unitOfMeasure = "L";
-      else if (uomRaw.includes("ML") || uomRaw.includes("MILLI")) unitOfMeasure = "ML";
+      } else if (uomRaw === "POUND" || uomRaw === "POUNDS" || uomRaw === "LBS" || uomRaw === "LB") unitOfMeasure = "LB";
+      else if (uomRaw === "OUNCE" || uomRaw === "OUNCES" || uomRaw === "OZ") unitOfMeasure = "OZ";
+      else if (uomRaw === "KILOGRAM" || uomRaw === "KILOGRAMS" || uomRaw === "KG" || uomRaw === "KGS") unitOfMeasure = "KG";
+      else if (uomRaw === "GRAM" || uomRaw === "GRAMS" || uomRaw === "G") unitOfMeasure = "G";
+      else if (uomRaw === "LITER" || uomRaw === "LITERS" || uomRaw === "L" || uomRaw === "LTR") unitOfMeasure = "L";
+      else if (uomRaw === "MILLILITER" || uomRaw === "MILLILITERS" || uomRaw === "ML") unitOfMeasure = "ML";
+      else if (uomRaw === "GALLON" || uomRaw === "GALLONS" || uomRaw === "GAL") unitOfMeasure = "GAL";
+      else if (uomRaw === "QUART" || uomRaw === "QUARTS" || uomRaw === "QT") unitOfMeasure = "QT";
+      else if (uomRaw === "PINT" || uomRaw === "PINTS" || uomRaw === "PT") unitOfMeasure = "PT";
+      else if (uomRaw === "CUP" || uomRaw === "CUPS") unitOfMeasure = "CUP";
+      else if (uomRaw === "TABLESPOON" || uomRaw === "TBSP") unitOfMeasure = "TBSP";
+      else if (uomRaw === "TEASPOON" || uomRaw === "TSP") unitOfMeasure = "TSP";
+      else if (uomRaw === "LADLE" || uomRaw === "SCOOP") unitOfMeasure = "LADLE";
+      else if (uomRaw === "DOZEN" || uomRaw === "DOZ") unitOfMeasure = "DOZEN";
+      else if (uomRaw === "PORTION" || uomRaw === "SERVING") unitOfMeasure = "PORTION";
+      else if (uomRaw === "BOX" || uomRaw === "BOXES") unitOfMeasure = "BOX";
+      else if (uomRaw === "PACKET" || uomRaw === "PACKETS" || uomRaw === "PKT") unitOfMeasure = "PACKET";
+      else if (uomRaw === "PIECES" || uomRaw === "PCS" || uomRaw === "PC" || uomRaw === "PIECE") unitOfMeasure = "PIECES";
 
       // Resolve Category ID
       let categoryId: string | undefined = undefined;
@@ -300,28 +292,54 @@ export const InventoryService = {
       }
 
       try {
-        await prisma.inventoryItem.create({
-          data: {
-            restaurantId,
+        const existingByName = existingNameMap.get(nameLower);
+        const existingBySku = skuLower ? existingSkuMap.get(skuLower) : null;
+        const existingItem = existingByName || existingBySku;
+
+        if (existingItem) {
+          await prisma.inventoryItem.update({
+            where: { id: existingItem.id },
+            data: {
+              name,
+              sku: sku || existingItem.sku,
+              description: description || existingItem.description,
+              categoryId: categoryId || existingItem.categoryId,
+              unitOfMeasure: unitOfMeasure as any,
+              costPerUnit,
+              reorderPoint,
+              parLevel,
+            },
+          });
+
+          added.push({
+            row: rowNum,
+            name: `${name} (Updated)`,
+            sku: sku || undefined,
+          });
+        } else {
+          const newItem = await prisma.inventoryItem.create({
+            data: {
+              restaurantId,
+              name,
+              sku: sku || null,
+              description: description || null,
+              categoryId: categoryId || null,
+              unitOfMeasure: unitOfMeasure as any,
+              costPerUnit,
+              reorderPoint,
+              parLevel,
+            },
+          });
+
+          existingNameMap.set(nameLower, newItem as any);
+          if (skuLower) existingSkuMap.set(skuLower, newItem as any);
+
+          added.push({
+            row: rowNum,
             name,
-            sku: sku || null,
-            description: description || null,
-            categoryId: categoryId || null,
-            unitOfMeasure: unitOfMeasure as any,
-            costPerUnit,
-            reorderPoint,
-            parLevel,
-          },
-        });
-
-        existingNameSet.add(nameLower);
-        if (skuLower) existingSkuSet.add(skuLower);
-
-        added.push({
-          row: rowNum,
-          name,
-          sku: sku || undefined,
-        });
+            sku: sku || undefined,
+          });
+        }
       } catch (err: any) {
         failed.push({
           row: rowNum,

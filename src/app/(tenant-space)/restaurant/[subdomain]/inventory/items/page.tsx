@@ -98,14 +98,23 @@ function parseCSV(text: string) {
     const rowObj: any = { rowNumber: i + 1 };
     headers.forEach((h, colIdx) => {
       const val = rawCells[colIdx] || "";
-      if (h.includes("name") || h === "item") rowObj.name = val;
-      else if (h.includes("sku") || h.includes("code")) rowObj.sku = val;
-      else if (h.includes("cat") || h.includes("group")) rowObj.category = val;
-      else if (h.includes("uom") || h.includes("unit")) rowObj.unitOfMeasure = val;
-      else if (h.includes("cost") || h.includes("price")) rowObj.costPerUnit = val;
-      else if (h.includes("reorder") || h.includes("min")) rowObj.reorderPoint = val;
-      else if (h.includes("par") || h.includes("max")) rowObj.parLevel = val;
-      else if (h.includes("desc") || h.includes("note")) rowObj.description = val;
+      if (h === "itemname" || h === "name" || h === "item" || (h.includes("name") && !h.includes("category"))) {
+        rowObj.name = val;
+      } else if (h === "skucode" || h === "sku" || h === "code" || h.includes("sku")) {
+        rowObj.sku = val;
+      } else if (h === "category" || h === "cat" || h.includes("category") || h.includes("group")) {
+        rowObj.category = val;
+      } else if (h.includes("cost") || h.includes("price") || h === "costperunit" || h === "unitcost") {
+        rowObj.costPerUnit = val;
+      } else if (h.includes("reorder") || h.includes("minstock") || h === "reorderpoint") {
+        rowObj.reorderPoint = val;
+      } else if (h.includes("par") || h.includes("maxstock") || h === "parlevel") {
+        rowObj.parLevel = val;
+      } else if (h.includes("unitofmeasure") || h === "uom" || h === "unit" || h.includes("measure") || h.includes("unitof")) {
+        rowObj.unitOfMeasure = val;
+      } else if (h.includes("desc") || h.includes("note")) {
+        rowObj.description = val;
+      }
     });
 
     if (rowObj.name || rowObj.sku) {
