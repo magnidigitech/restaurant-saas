@@ -698,6 +698,7 @@ export default function VendorDetailPage({
               </button>
             </div>
 
+            {/* Search and Select All Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <input
                 placeholder="Search catalog items..."
@@ -707,94 +708,201 @@ export default function VendorDetailPage({
                   isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                 }`}
               />
-              <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer select-none">
+              <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer select-none self-end sm:self-auto py-1">
                 <input
                   type="checkbox"
                   checked={allFilteredSelected}
                   onChange={(e) => handleToggleSelectAll(e.target.checked)}
-                  className="accent-[#0071E3]"
+                  className="w-4 h-4 rounded text-[#0071E3] accent-[#0071E3] cursor-pointer"
                 />
-                <span>Select All Filtered</span>
+                <span>Select All ({filteredModalRows.length})</span>
               </label>
             </div>
 
-            {/* Catalog Mapping Rows */}
-            <div className="overflow-x-auto max-h-80 border rounded-2xl">
-              <table className="w-full text-left text-xs whitespace-nowrap">
-                <thead className="sticky top-0 z-10">
-                  <tr className={`border-b text-[10px] font-bold uppercase tracking-wider ${
-                    isDark ? "bg-[#0A0C12] border-white/[0.06] text-[#8F95A3]" : "bg-slate-50 border-slate-200 text-slate-600"
-                  }`}>
-                    <th className="py-2.5 px-3 w-8">Select</th>
-                    <th className="py-2.5 px-3">Item Name</th>
-                    <th className="py-2.5 px-3">Unit</th>
-                    <th className="py-2.5 px-3">Unit Cost ($)</th>
-                    <th className="py-2.5 px-3">Vendor SKU</th>
-                    <th className="py-2.5 px-3 text-center">Preferred</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
+            {/* Catalog Mapping List: Mobile Cards + Desktop Table */}
+            {filteredModalRows.length === 0 ? (
+              <div className={`p-8 text-center text-xs rounded-2xl border ${
+                isDark ? "bg-[#0A0C12]/40 border-white/[0.06] text-[#8F95A3]" : "bg-slate-50 border-slate-200 text-slate-500"
+              }`}>
+                No items matching "{modalSearch}"
+              </div>
+            ) : (
+              <div className="max-h-[50vh] sm:max-h-[55vh] overflow-y-auto space-y-2.5 pr-0.5">
+                {/* MOBILE CARDS VIEW (block md:hidden) */}
+                <div className="block md:hidden space-y-2.5">
                   {filteredModalRows.map((row) => (
-                    <tr key={row.itemId} className={row.selected ? (isDark ? "bg-[#0071E3]/10" : "bg-blue-50/50") : ""}>
-                      <td className="py-2.5 px-3">
-                        <input
-                          type="checkbox"
-                          checked={row.selected}
-                          onChange={(e) => handleRowChange(row.itemId, "selected", e.target.checked)}
-                          className="accent-[#0071E3]"
-                        />
-                      </td>
-                      <td className="py-2.5 px-3 font-semibold">
-                        {row.name}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-[11px] opacity-75">
-                        {formatUnit(row.unitOfMeasure as any)}
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={row.unitCost}
-                          onChange={(e) => handleRowChange(row.itemId, "unitCost", e.target.value)}
-                          className={`w-24 px-2 py-1 text-xs rounded-lg border font-mono ${
-                            isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
-                          }`}
-                        />
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <input
-                          type="text"
-                          value={row.vendorSku}
-                          placeholder="SKU"
-                          onChange={(e) => handleRowChange(row.itemId, "vendorSku", e.target.value)}
-                          className={`w-28 px-2 py-1 text-xs rounded-lg border font-mono ${
-                            isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
-                          }`}
-                        />
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={row.isPreferred}
-                          onChange={(e) => handleRowChange(row.itemId, "isPreferred", e.target.checked)}
-                          className="accent-[#0071E3]"
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                    <div
+                      key={row.itemId}
+                      className={`p-3.5 rounded-2xl border transition space-y-3 ${
+                        row.selected
+                          ? isDark
+                            ? "bg-[#0071E3]/15 border-[#0071E3]/60 shadow-xs"
+                            : "bg-blue-50/80 border-[#0071E3]/50 shadow-xs"
+                          : isDark
+                          ? "bg-[#090B10]/80 border-white/[0.06]"
+                          : "bg-slate-50/70 border-slate-200"
+                      }`}
+                    >
+                      {/* Card Header: Checkbox + Item Name + Preferred Toggle */}
+                      <div className="flex items-start justify-between gap-2">
+                        <label className="flex items-start gap-2.5 cursor-pointer min-w-0 flex-1 select-none">
+                          <input
+                            type="checkbox"
+                            checked={row.selected}
+                            onChange={(e) => handleRowChange(row.itemId, "selected", e.target.checked)}
+                            className="w-4 h-4 rounded text-[#0071E3] accent-[#0071E3] cursor-pointer mt-0.5 shrink-0"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <span className={`font-bold text-xs block truncate ${
+                              row.selected ? (isDark ? "text-white" : "text-blue-950") : (isDark ? "text-slate-200" : "text-slate-900")
+                            }`}>
+                              {row.name}
+                            </span>
+                            <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-blue-500/10 text-[#0071E3] dark:text-[#64B5FF] inline-block mt-0.5">
+                              Unit: {formatUnit(row.unitOfMeasure as any)}
+                            </span>
+                          </div>
+                        </label>
 
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-between items-stretch sm:items-center gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
-              <span className={`text-xs text-center sm:text-left ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                {selectedCount} item(s) selected
+                        {/* Preferred Supplier Toggle */}
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none shrink-0 pt-0.5">
+                          <input
+                            type="checkbox"
+                            checked={row.isPreferred}
+                            onChange={(e) => handleRowChange(row.itemId, "isPreferred", e.target.checked)}
+                            className="w-3.5 h-3.5 rounded text-[#0071E3] accent-[#0071E3] cursor-pointer"
+                          />
+                          <span className={`text-[10px] font-bold ${
+                            row.isPreferred
+                              ? "text-emerald-500"
+                              : isDark ? "text-[#8F95A3]" : "text-slate-400"
+                          }`}>
+                            Preferred
+                          </span>
+                        </label>
+                      </div>
+
+                      {/* Card Inputs Grid */}
+                      <div className="grid grid-cols-2 gap-2.5 pt-1">
+                        <div>
+                          <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${
+                            isDark ? "text-[#8F95A3]" : "text-slate-500"
+                          }`}>
+                            Unit Cost ($)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={row.unitCost}
+                            onChange={(e) => handleRowChange(row.itemId, "unitCost", e.target.value)}
+                            className={`w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                              isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                            }`}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${
+                            isDark ? "text-[#8F95A3]" : "text-slate-500"
+                          }`}>
+                            Vendor SKU
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. SKU-101"
+                            value={row.vendorSku}
+                            onChange={(e) => handleRowChange(row.itemId, "vendorSku", e.target.value)}
+                            className={`w-full px-3 py-2 text-xs font-mono rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                              isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* DESKTOP TABLE VIEW (hidden md:block) */}
+                <div className="hidden md:block border rounded-2xl overflow-hidden">
+                  <table className="w-full text-left text-xs whitespace-nowrap">
+                    <thead className="sticky top-0 z-10">
+                      <tr className={`border-b text-[10px] font-bold uppercase tracking-wider ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.06] text-[#8F95A3]" : "bg-slate-50 border-slate-200 text-slate-600"
+                      }`}>
+                        <th className="py-2.5 px-3 w-8 text-center">Select</th>
+                        <th className="py-2.5 px-3">Item Name</th>
+                        <th className="py-2.5 px-3">Unit</th>
+                        <th className="py-2.5 px-3">Unit Cost ($)</th>
+                        <th className="py-2.5 px-3">Vendor SKU</th>
+                        <th className="py-2.5 px-3 text-center">Preferred</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
+                      {filteredModalRows.map((row) => (
+                        <tr key={row.itemId} className={row.selected ? (isDark ? "bg-[#0071E3]/10" : "bg-blue-50/50") : ""}>
+                          <td className="py-2.5 px-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={row.selected}
+                              onChange={(e) => handleRowChange(row.itemId, "selected", e.target.checked)}
+                              className="accent-[#0071E3] cursor-pointer"
+                            />
+                          </td>
+                          <td className="py-2.5 px-3 font-semibold">
+                            {row.name}
+                          </td>
+                          <td className="py-2.5 px-3 font-mono text-[11px] opacity-75">
+                            {formatUnit(row.unitOfMeasure as any)}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={row.unitCost}
+                              onChange={(e) => handleRowChange(row.itemId, "unitCost", e.target.value)}
+                              className={`w-28 px-2.5 py-1.5 text-xs rounded-lg border font-mono font-semibold ${
+                                isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                              }`}
+                            />
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <input
+                              type="text"
+                              value={row.vendorSku}
+                              placeholder="SKU"
+                              onChange={(e) => handleRowChange(row.itemId, "vendorSku", e.target.value)}
+                              className={`w-28 px-2.5 py-1.5 text-xs rounded-lg border font-mono ${
+                                isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                              }`}
+                            />
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={row.isPreferred}
+                              onChange={(e) => handleRowChange(row.itemId, "isPreferred", e.target.checked)}
+                              className="accent-[#0071E3] cursor-pointer"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Modal Bottom Bar */}
+            <div className="flex justify-between items-center gap-3 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+              <span className={`text-xs font-semibold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                <span className="text-[#0071E3]">{selectedCount}</span> item(s) selected
               </span>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setShowLinkModal(false)}
-                  className={`flex-1 sm:flex-none px-4 py-2.5 sm:py-2 rounded-xl text-xs font-medium transition cursor-pointer text-center ${
+                  className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
                     isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
@@ -804,7 +912,7 @@ export default function VendorDetailPage({
                   type="button"
                   onClick={handleBulkLinkItems}
                   disabled={submitting}
-                  className="flex-1 sm:flex-none px-5 py-2.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer text-center"
+                  className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer transition shadow-sm"
                 >
                   {submitting ? "Saving..." : "Save Mappings"}
                 </button>
