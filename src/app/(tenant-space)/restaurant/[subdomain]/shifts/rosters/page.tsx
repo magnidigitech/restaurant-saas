@@ -469,8 +469,13 @@ export default function AppleShiftRostersPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ status: newStatus }),
           });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Failed to update roster status");
+          let data: any = {};
+          try {
+            data = await res.json();
+          } catch {
+            data = {};
+          }
+          if (!res.ok) throw new Error(data.error || `Failed to update roster status (HTTP ${res.status})`);
           showToast(`✓ Roster stage updated to ${newStatus.replace(/_/g, " ")}`, "success");
           await fetchMasterData();
           await fetchRosterDetails(selectedRosterId);

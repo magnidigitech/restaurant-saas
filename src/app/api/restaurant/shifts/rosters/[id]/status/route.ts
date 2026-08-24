@@ -21,6 +21,20 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  return handleUpdateStatus(req, params);
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  return handleUpdateStatus(req, params);
+}
+
+async function handleUpdateStatus(
+  req: NextRequest,
+  params: Promise<{ id: string }>
+) {
   try {
     const { id: rosterId } = await params;
     const session = await getTenantSession();
@@ -50,7 +64,7 @@ export async function PUT(
 
     return NextResponse.json({ success: true, roster });
   } catch (error: any) {
-    console.error("PUT Roster Status Error:", error);
+    console.error("Update Roster Status Error:", error);
     return NextResponse.json({ error: error.message || "Internal server error" }, { status: 400 });
   }
 }
