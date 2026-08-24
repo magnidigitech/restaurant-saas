@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantSession } from "@/core/auth/session";
 import { verifyAccess } from "@/core/permissions/check";
+import { prisma } from "@/core/database/client";
 import { ShiftService } from "@/modules/shifts/service";
 import { z } from "zod";
 
@@ -45,6 +46,39 @@ export async function GET(req: NextRequest) {
     const employeeId = searchParams.get("employeeId") || undefined;
     const startDate = searchParams.get("startDate") || undefined;
     const endDate = searchParams.get("endDate") || undefined;
+
+    // Check if requester is admin/manager or staff
+    const membership = await prisma.restaurantMembership.findUnique({
+      where: {
+        restaurantId_userId: {
+          restaurantId: session.activeRestaurantId,
+          userId: session.userId,
+        },
+      },
+      include: {
+        accessGrants: {
+          where: { status: "ACTIVE" },
+          include: { role: true },
+        },
+      },
+    });
+
+    const isUserAdmin =
+      session.role === "PLATFORM_ADMIN" ||
+      (membership?.accessGrants?.some((g: any) =>
+        ["Restaurant Owner", "Admin", "Owner", "Super Admin", "General Manager"].includes(g.role?.name || "")
+      ) ?? false) ||
+      (!membership?.employeeId && (membership?.accessGrants?.length || 0) === 0);
+
+    // If staff user and roster is specified, verify roster is published before returning shifts
+    if (!isUserAdmin && rosterId) {
+      const roster = await prisma.shiftRoster.findFirst({
+        where: { id: rosterId, restaurantId: session.activeRestaurantId },
+      });
+      if (roster && roster.status !== "PUBLISHED") {
+        return NextResponse.json({ assignments: [] });
+      }
+    }
 
     const assignments = await ShiftService.getAssignments(session.activeRestaurantId, {
       rosterId,

@@ -683,17 +683,33 @@ export default function AppleShiftRostersPage() {
     }
   }
 
-  // Employee's personal shifts
+  const isRosterPublished = currentRoster?.status === "PUBLISHED";
+
+  function matchesDate(shiftDateStr: string, targetDateStr: string): boolean {
+    if (!shiftDateStr || !targetDateStr) return false;
+    try {
+      if (shiftDateStr.startsWith(targetDateStr)) return true;
+      const aDateStr = new Date(shiftDateStr).toISOString().split("T")[0];
+      const localDate = new Date(shiftDateStr).toLocaleDateString("en-CA");
+      return aDateStr === targetDateStr || localDate === targetDateStr;
+    } catch {
+      return false;
+    }
+  }
+
+  // Employee's personal shifts (Only shown to employee when roster is PUBLISHED)
   const myShifts = React.useMemo(() => {
-    if (!myEmployeeId) return assignments;
+    if (!myEmployeeId) return [];
+    if (!isAdmin && !isRosterPublished) return [];
     return assignments.filter((a) => a.employeeId === myEmployeeId);
-  }, [assignments, myEmployeeId]);
+  }, [assignments, myEmployeeId, isAdmin, isRosterPublished]);
 
   const myEmployeeRecord = React.useMemo(() => {
     return employees.find((e) => e.id === myEmployeeId);
   }, [employees, myEmployeeId]);
 
   const myTotalHours = React.useMemo(() => {
+    if (!isAdmin && !isRosterPublished) return 0;
     let total = 0;
     for (const s of myShifts) {
       if (s.startTime && s.endTime) {
@@ -706,7 +722,7 @@ export default function AppleShiftRostersPage() {
       }
     }
     return Math.round(total * 10) / 10;
-  }, [myShifts]);
+  }, [myShifts, isAdmin, isRosterPublished]);
 
   if (loading) {
     return (
@@ -868,7 +884,7 @@ export default function AppleShiftRostersPage() {
                       : "border-transparent text-slate-500 hover:text-slate-900"
                     }`}
                 >
-                  My Shifts & Schedule ({myShifts.length})
+                  My Shifts & Schedule {isRosterPublished ? `(${myShifts.length})` : ""}
                 </button>
 
                 <button
@@ -934,11 +950,11 @@ export default function AppleShiftRostersPage() {
                     Scheduled Hours
                   </span>
                   <p className={`text-2xl font-bold tracking-tight mt-1.5 ${isDark ? "text-white" : "text-slate-900"}`}>
-                    {myTotalHours}{" "}
+                    {isRosterPublished ? `${myTotalHours}` : "0"}{" "}
                     <span className={`text-xs font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>hrs</span>
                   </p>
                   <p className={`text-[11px] mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                    Weekly Target: {myEmployeeRecord?.weeklyHoursLimit || 40}h
+                    {isRosterPublished ? `Weekly Target: ${myEmployeeRecord?.weeklyHoursLimit || 40}h` : "Pending final publication"}
                   </p>
                 </div>
 
@@ -947,11 +963,11 @@ export default function AppleShiftRostersPage() {
                     Shifts Assigned
                   </span>
                   <p className={`text-2xl font-bold tracking-tight mt-1.5 ${isDark ? "text-white" : "text-slate-900"}`}>
-                    {myShifts.length}{" "}
+                    {isRosterPublished ? `${myShifts.length}` : "0"}{" "}
                     <span className={`text-xs font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>shifts</span>
                   </p>
                   <p className={`text-[11px] mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                    Scheduled for this period
+                    {isRosterPublished ? "Scheduled for this period" : "Awaiting manager publish"}
                   </p>
                 </div>
 
@@ -959,11 +975,11 @@ export default function AppleShiftRostersPage() {
                   <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
                     Roster Status
                   </span>
-                  <p className={`text-lg font-bold tracking-tight mt-2 ${currentRoster?.status === "PUBLISHED" ? "text-emerald-500" : "text-amber-500"}`}>
-                    {currentRoster?.status ? currentRoster.status.replace(/_/g, " ") : "Ready"}
+                  <p className={`text-lg font-bold tracking-tight mt-2 ${isRosterPublished ? "text-emerald-500" : "text-amber-500"}`}>
+                    {currentRoster?.status ? currentRoster.status.replace(/_/g, " ") : "Draft"}
                   </p>
                   <p className={`text-[11px] mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                    {currentRoster?.status === "PUBLISHED" ? "Live and finalized" : "Shift assignment in progress"}
+                    {isRosterPublished ? "Live and finalized" : "Shift assignment in progress"}
                   </p>
                 </div>
 
@@ -985,100 +1001,124 @@ export default function AppleShiftRostersPage() {
                 </div>
               </div>
 
-              {/* Day-by-Day Shift Cards */}
-              <div className="space-y-4">
-                <h3 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
-                  Daily Shift Breakdown ({currentRoster?.name})
-                </h3>
-
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {rosterDatesList.map((dStr) => {
-                    const dateObj = new Date(dStr);
-                    const dayShifts = myShifts.filter((s) => s.shiftDate.startsWith(dStr));
-                    const isToday = new Date().toISOString().split("T")[0] === dStr;
-
-                    return (
-                      <div
-                        key={dStr}
-                        className={`p-5 rounded-3xl border transition flex flex-col justify-between space-y-4 ${dayShifts.length > 0
-                          ? isDark
-                            ? "bg-[#121622]/90 border-blue-500/30 shadow-md"
-                            : "bg-white border-blue-200 shadow-sm"
-                          : isDark
-                            ? "bg-[#0A0C12]/50 border-white/[0.06]"
-                            : "bg-slate-50/70 border-slate-200/70"
-                          }`}
-                      >
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
-                                {dateObj.toLocaleDateString(undefined, { weekday: "long" })}
-                              </span>
-                              {isToday && (
-                                <span className="px-1.5 py-0.5 text-[9px] font-bold bg-[#0071E3] text-white rounded-md">
-                                  TODAY
-                                </span>
-                              )}
-                            </div>
-                            <span className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                              {dateObj.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                            </span>
-                          </div>
-
-                          {dayShifts.length > 0 ? (
-                            <div className="space-y-2">
-                              {dayShifts.map((shift) => (
-                                <div
-                                  key={shift.id}
-                                  className={`p-3.5 rounded-2xl border ${isDark
-                                    ? "bg-blue-500/10 border-blue-500/20 text-white"
-                                    : "bg-blue-50 border-blue-100 text-slate-900"
-                                    }`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-[#0071E3]">
-                                      {shift.startTime} – {shift.endTime}
-                                    </span>
-                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                                      Confirmed
-                                    </span>
-                                  </div>
-
-                                  {shift.template && (
-                                    <div className="text-xs font-medium mt-1">
-                                      {shift.template.name}
-                                    </div>
-                                  )}
-
-                                  <div className={`text-[11px] mt-1.5 flex items-center justify-between ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                                    <span>{shift.breakMinutes}m break</span>
-                                    <span>{outlets.find((o) => o.id === shift.outletId)?.name || "Branch"}</span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="py-6 text-center space-y-1.5">
-                              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/[0.05] flex items-center justify-center mx-auto text-slate-400">
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                                </svg>
-                              </div>
-                              <p className={`text-xs font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                                Rest Day / Day Off
-                              </p>
-                              <p className={`text-[10px] ${isDark ? "text-[#484E5E]" : "text-slate-400"}`}>
-                                No shift scheduled
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+              {/* Day-by-Day Shift Cards or Unpublished Notice */}
+              {!isRosterPublished ? (
+                <div className={`p-8 rounded-3xl border text-center space-y-3 ${isDark ? "bg-[#121622]/40 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h4 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                    Roster In Progress
+                  </h4>
+                  <p className={`text-xs max-w-md mx-auto leading-relaxed ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    Management is currently preparing the schedule for this period ({currentRoster?.name || "Upcoming Week"}). Your assigned shifts and timings will appear here once published.
+                  </p>
+                  <div className="pt-2">
+                    <button
+                      onClick={() => setActiveTab("MY_AVAILABILITY")}
+                      className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer"
+                    >
+                      Submit / Update Your Availability →
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-4">
+                  <h3 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                    Daily Shift Breakdown ({currentRoster?.name})
+                  </h3>
+
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {rosterDatesList.map((dStr) => {
+                      const dateObj = new Date(dStr);
+                      const dayShifts = myShifts.filter((s) => matchesDate(s.shiftDate, dStr));
+                      const isToday = new Date().toISOString().split("T")[0] === dStr;
+
+                      return (
+                        <div
+                          key={dStr}
+                          className={`p-5 rounded-3xl border transition flex flex-col justify-between space-y-4 ${dayShifts.length > 0
+                            ? isDark
+                              ? "bg-[#121622]/90 border-blue-500/30 shadow-md"
+                              : "bg-white border-blue-200 shadow-sm"
+                            : isDark
+                              ? "bg-[#0A0C12]/50 border-white/[0.06]"
+                              : "bg-slate-50/70 border-slate-200/70"
+                            }`}
+                        >
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                                  {dateObj.toLocaleDateString(undefined, { weekday: "long" })}
+                                </span>
+                                {isToday && (
+                                  <span className="px-1.5 py-0.5 text-[9px] font-bold bg-[#0071E3] text-white rounded-md">
+                                    TODAY
+                                  </span>
+                                )}
+                              </div>
+                              <span className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                                {dateObj.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                              </span>
+                            </div>
+
+                            {dayShifts.length > 0 ? (
+                              <div className="space-y-2">
+                                {dayShifts.map((shift) => (
+                                  <div
+                                    key={shift.id}
+                                    className={`p-3.5 rounded-2xl border ${isDark
+                                      ? "bg-blue-500/10 border-blue-500/20 text-white"
+                                      : "bg-blue-50 border-blue-100 text-slate-900"
+                                      }`}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs font-bold text-[#0071E3]">
+                                        {shift.startTime} – {shift.endTime}
+                                      </span>
+                                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                        Confirmed
+                                      </span>
+                                    </div>
+
+                                    {shift.template && (
+                                      <div className="text-xs font-medium mt-1">
+                                        {shift.template.name}
+                                      </div>
+                                    )}
+
+                                    <div className={`text-[11px] mt-1.5 flex items-center justify-between ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                                      <span>{shift.breakMinutes}m break</span>
+                                      <span>{outlets.find((o) => o.id === shift.outletId)?.name || "Branch"}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="py-6 text-center space-y-1.5">
+                                <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/[0.05] flex items-center justify-center mx-auto text-slate-400">
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                                  </svg>
+                                </div>
+                                <p className={`text-xs font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                                  Rest Day / Day Off
+                                </p>
+                                <p className={`text-[10px] ${isDark ? "text-[#484E5E]" : "text-slate-400"}`}>
+                                  No shift scheduled
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
