@@ -232,7 +232,7 @@ export default function VendorDirectoryPage({
 
             <button
               onClick={() => setShowCreate(true)}
-              className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer shrink-0"
+              className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer shrink-0 text-center"
             >
               + Add Vendor
             </button>
