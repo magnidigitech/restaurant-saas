@@ -584,10 +584,10 @@ export default function PurchaseOrdersDirectoryPage({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full md:w-auto">
             <button
               onClick={() => fetchPOs()}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+              className={`flex-1 md:flex-none px-4 py-2.5 sm:py-2 rounded-xl text-xs font-semibold border transition cursor-pointer text-center justify-center ${
                 isDark
                   ? "bg-white/[0.04] text-white border-white/[0.08] hover:bg-white/[0.08]"
                   : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50 shadow-xs"
@@ -604,7 +604,7 @@ export default function PurchaseOrdersDirectoryPage({
                 setAutoFillMsg("");
                 setError("");
               }}
-              className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer flex items-center gap-1.5"
+              className="flex-1 md:flex-none px-4 py-2.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer flex items-center justify-center gap-1.5 text-center"
             >
               <span>+</span>
               <span>Create PO</span>
@@ -618,40 +618,40 @@ export default function PurchaseOrdersDirectoryPage({
           </div>
         )}
 
-        {/* Overview Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-          <div className={`p-5 rounded-3xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Upcoming & Active POs
+        {/* Overview Stats Cards: 4 columns single row */}
+        <div className="grid grid-cols-4 gap-2 sm:gap-4">
+          <div className={`p-3 sm:p-5 rounded-2xl sm:rounded-3xl border flex flex-col justify-between ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
+            <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-tight sm:tracking-wider line-clamp-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Active POs
             </span>
-            <p className="text-2xl font-bold font-mono tracking-tight mt-1 text-amber-500">
+            <p className="text-base sm:text-2xl font-bold font-mono tracking-tight mt-1 text-amber-500">
               {upcomingPOs.length}
             </p>
           </div>
 
-          <div className={`p-5 rounded-3xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Completed / Received
+          <div className={`p-3 sm:p-5 rounded-2xl sm:rounded-3xl border flex flex-col justify-between ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
+            <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-tight sm:tracking-wider line-clamp-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Received
             </span>
-            <p className="text-2xl font-bold font-mono tracking-tight mt-1 text-emerald-500">
+            <p className="text-base sm:text-2xl font-bold font-mono tracking-tight mt-1 text-emerald-500">
               {completedPOs.length}
             </p>
           </div>
 
-          <div className={`p-5 rounded-3xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Total Purchase Orders
+          <div className={`p-3 sm:p-5 rounded-2xl sm:rounded-3xl border flex flex-col justify-between ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
+            <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-tight sm:tracking-wider line-clamp-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Total POs
             </span>
-            <p className={`text-2xl font-bold font-mono tracking-tight mt-1 ${isDark ? "text-white" : "text-slate-900"}`}>
+            <p className={`text-base sm:text-2xl font-bold font-mono tracking-tight mt-1 ${isDark ? "text-white" : "text-slate-900"}`}>
               {purchaseOrders.length}
             </p>
           </div>
 
-          <div className={`p-5 rounded-3xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Total Committed Spend
+          <div className={`p-3 sm:p-5 rounded-2xl sm:rounded-3xl border flex flex-col justify-between ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
+            <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-tight sm:tracking-wider line-clamp-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Total Spend
             </span>
-            <p className="text-2xl font-bold font-mono tracking-tight mt-1 text-[#0071E3]">
+            <p className="text-xs sm:text-2xl font-bold font-mono tracking-tight mt-1 text-[#0071E3] truncate">
               ${totalSpend.toFixed(2)}
             </p>
           </div>
