@@ -868,7 +868,7 @@ export default function AppleShiftRostersPage() {
                       : "border-transparent text-slate-500 hover:text-slate-900"
                     }`}
                 >
-                  📅 My Shifts & Schedule ({myShifts.length})
+                  My Shifts & Schedule ({myShifts.length})
                 </button>
 
                 <button
@@ -880,7 +880,7 @@ export default function AppleShiftRostersPage() {
                       : "border-transparent text-slate-500 hover:text-slate-900"
                     }`}
                 >
-                  📝 Submit My Availability
+                  Submit My Availability
                 </button>
               </>
             ) : (
@@ -894,7 +894,7 @@ export default function AppleShiftRostersPage() {
                       : "border-transparent text-slate-500 hover:text-slate-900"
                     }`}
                 >
-                  📅 Shift Planner (Weekly Grid) ({assignments.length})
+                  Shift Planner (Weekly Grid) ({assignments.length})
                 </button>
 
                 <button
@@ -906,7 +906,7 @@ export default function AppleShiftRostersPage() {
                       : "border-transparent text-slate-500 hover:text-slate-900"
                     }`}
                 >
-                  👥 Staff Availability Matrix
+                  Staff Availability Matrix
                 </button>
 
                 <button
@@ -918,7 +918,7 @@ export default function AppleShiftRostersPage() {
                       : "border-transparent text-slate-500 hover:text-slate-900"
                     }`}
                 >
-                  👤 Staff Self-Service Preview
+                  Staff Self-Service Preview
                 </button>
               </>
             )}
@@ -973,7 +973,7 @@ export default function AppleShiftRostersPage() {
                       Availability
                     </span>
                     <p className={`text-xs font-semibold mt-1.5 ${mySubmissionStatus === "SUBMITTED" ? "text-emerald-500" : "text-amber-500"}`}>
-                      {mySubmissionStatus === "SUBMITTED" ? "✓ Submitted" : "Pending Submission"}
+                      {mySubmissionStatus === "SUBMITTED" ? "Submitted" : "Pending Submission"}
                     </p>
                   </div>
                   <button
@@ -1038,7 +1038,7 @@ export default function AppleShiftRostersPage() {
                                 >
                                   <div className="flex items-center justify-between">
                                     <span className="text-xs font-bold text-[#0071E3]">
-                                      ⏰ {shift.startTime} – {shift.endTime}
+                                      {shift.startTime} – {shift.endTime}
                                     </span>
                                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                                       Confirmed
@@ -1052,15 +1052,19 @@ export default function AppleShiftRostersPage() {
                                   )}
 
                                   <div className={`text-[11px] mt-1.5 flex items-center justify-between ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                                    <span>☕ {shift.breakMinutes}m break</span>
-                                    <span>📍 {outlets.find((o) => o.id === shift.outletId)?.name || "Branch"}</span>
+                                    <span>{shift.breakMinutes}m break</span>
+                                    <span>{outlets.find((o) => o.id === shift.outletId)?.name || "Branch"}</span>
                                   </div>
                                 </div>
                               ))}
                             </div>
                           ) : (
-                            <div className="py-6 text-center space-y-1">
-                              <span className="text-xl">🌴</span>
+                            <div className="py-6 text-center space-y-1.5">
+                              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/[0.05] flex items-center justify-center mx-auto text-slate-400">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                                </svg>
+                              </div>
                               <p className={`text-xs font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
                                 Rest Day / Day Off
                               </p>
@@ -1103,7 +1107,7 @@ export default function AppleShiftRostersPage() {
                           : "text-slate-600 hover:text-slate-900"
                         }`}
                     >
-                      📅 Calendar View
+                      Calendar View
                     </button>
                     <button
                       onClick={() => setAssignmentsViewMode("LIST")}
@@ -1206,8 +1210,8 @@ export default function AppleShiftRostersPage() {
                                         </div>
                                         <div className="flex items-center justify-between text-[9px] text-slate-500 dark:text-slate-400 pt-0.5">
                                           <span>{empShift.breakMinutes}m break</span>
-                                          {availType === "AVAILABLE" && <span className="font-bold text-emerald-600 dark:text-emerald-400">✓ Avail</span>}
-                                          {availType === "NOT_UPDATED" && <span className="font-medium text-amber-600 dark:text-amber-400">⚠️ Pending</span>}
+                                          {availType === "AVAILABLE" && <span className="font-bold text-emerald-600 dark:text-emerald-400">Available</span>}
+                                          {availType === "NOT_UPDATED" && <span className="font-medium text-amber-600 dark:text-amber-400">Pending</span>}
                                         </div>
                                       </div>
                                     ) : (
@@ -1226,27 +1230,27 @@ export default function AppleShiftRostersPage() {
                                         {/* Availability Indicator Tag */}
                                         {availType === "AVAILABLE" && (
                                           <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                                            🟢 Available
+                                            Available
                                           </span>
                                         )}
                                         {availType === "SPECIFIC_TIME" && (
                                           <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                                            ⏰ {dayAvail?.availableFrom || ""}-{dayAvail?.availableUntil || ""}
+                                            {dayAvail?.availableFrom || ""}-{dayAvail?.availableUntil || ""}
                                           </span>
                                         )}
                                         {availType === "NOT_AVAILABLE" && (
                                           <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/20">
-                                            🔴 Not Available
+                                            Not Available
                                           </span>
                                         )}
                                         {availType === "LEAVE" && (
                                           <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/20">
-                                            🏖️ Leave
+                                            Leave
                                           </span>
                                         )}
                                         {availType === "NOT_UPDATED" && (
                                           <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/20">
-                                            🟡 Pending
+                                            Pending
                                           </span>
                                         )}
 
@@ -1429,7 +1433,7 @@ export default function AppleShiftRostersPage() {
                 </p>
                 {currentRoster?.availabilityDeadline && (
                   <p className="text-xs font-semibold text-amber-500">
-                    ⏰ Submission Deadline: {new Date(currentRoster.availabilityDeadline).toLocaleString()}
+                    Submission Deadline: {new Date(currentRoster.availabilityDeadline).toLocaleString()}
                   </p>
                 )}
               </div>
@@ -1445,7 +1449,7 @@ export default function AppleShiftRostersPage() {
                     onClick={handleApplyRecurringAvailability}
                     className="px-3.5 py-1.5 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer"
                   >
-                    ⚡ Auto-Apply Pattern to Roster
+                    Auto-Apply Standard Pattern
                   </button>
                 </div>
               </div>
@@ -1716,7 +1720,7 @@ export default function AppleShiftRostersPage() {
                   </div>
                 </div>
 
-                {/* Smart Staff Suggestions Section (Requirement 10 & 11) */}
+                {/* Smart Staff Suggestions Section */}
                 <div className="space-y-3 pt-2">
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="font-bold text-xs uppercase tracking-wider text-[#0071E3]">
@@ -1732,7 +1736,7 @@ export default function AppleShiftRostersPage() {
                           }}
                           className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer flex items-center gap-1"
                         >
-                          <span>✓ Select All Recommended ({smartSuggestions.recommended.length})</span>
+                          <span>Select All Recommended ({smartSuggestions.recommended.length})</span>
                         </button>
                       )}
                       {selectedEmployeesForShift.length > 0 && (
@@ -1757,7 +1761,6 @@ export default function AppleShiftRostersPage() {
                       {/* Recommended (Fully Available + Fairly Distributed) */}
                       <div>
                         <h4 className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mb-1.5 flex items-center gap-1">
-                          <span>🌟</span>
                           <span>Recommended Employees (Fair Hours First)</span>
                         </h4>
                         {smartSuggestions.recommended.length === 0 ? (
@@ -1816,7 +1819,6 @@ export default function AppleShiftRostersPage() {
                       {smartSuggestions.partiallyAvailable.length > 0 && (
                         <div>
                           <h4 className="text-[11px] font-bold text-amber-600 dark:text-amber-400 mb-1.5 flex items-center gap-1">
-                            <span>⚠️</span>
                             <span>Partially Available / Not Updated</span>
                           </h4>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1865,7 +1867,6 @@ export default function AppleShiftRostersPage() {
                       {smartSuggestions.unavailable.length > 0 && (
                         <div>
                           <h4 className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mb-1.5 flex items-center gap-1">
-                            <span>⛔</span>
                             <span>Unavailable / Leave / Conflict</span>
                           </h4>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1887,7 +1888,6 @@ export default function AppleShiftRostersPage() {
 
                 {assignOverrideWarning && (
                   <div className="p-3 bg-amber-50 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs font-medium rounded-xl flex items-center gap-2">
-                    <span className="text-sm">⚠️</span>
                     <span><strong>Admin Override Notice:</strong> {assignOverrideWarning}</span>
                   </div>
                 )}
@@ -1921,7 +1921,7 @@ export default function AppleShiftRostersPage() {
 
               {modalError && (
                 <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-xl flex items-center justify-between">
-                  <span>⚠️ {modalError}</span>
+                  <span>{modalError}</span>
                   <button onClick={() => setModalError(null)} className="font-bold text-rose-400 cursor-pointer">✕</button>
                 </div>
               )}
