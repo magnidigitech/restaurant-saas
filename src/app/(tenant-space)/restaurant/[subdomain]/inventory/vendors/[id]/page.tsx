@@ -4,6 +4,7 @@ import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
+import { formatUnit } from "@/core/inventory/units";
 
 interface VendorItemMap {
   id: string;
@@ -253,10 +254,6 @@ export default function VendorDetailPage({
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name) {
-      setError("Vendor name is required");
-      return;
-    }
     setSubmitting(true);
     setError("");
     try {
@@ -267,48 +264,60 @@ export default function VendorDetailPage({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+
       setShowEdit(false);
       fetchVendorDetail();
     } catch (e: any) {
-      setError(e.message || "Failed to update vendor");
+      setError(e.message || "Failed to update vendor details");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleUnlinkItem = async (itemId: string) => {
+  const handleUnlinkItem = (itemId: string) => {
+    const itemMap = vendorItems.find((vi) => vi.itemId === itemId);
+    const itemName = itemMap?.item?.name || "this item";
+
     setConfirmDialog({
       show: true,
-      title: "Unlink Product Mapping",
-      message: "Are you sure you want to remove this product price mapping for this vendor?",
-      confirmText: "Unlink Product",
+      title: "Unlink Catalog Item",
+      message: `Are you sure you want to unlink "${itemName}" from ${vendor?.name}? This will remove negotiated pricing and supplier mapping.`,
+      confirmText: "Unlink Item",
       onConfirm: async () => {
         try {
           const res = await fetch(`/api/restaurant/inventory/vendor-items?vendorId=${vendorId}&itemId=${itemId}`, {
             method: "DELETE",
           });
-          if (res.ok) fetchVendorDetail();
-        } catch {
-          setError("Failed to unlink item");
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error);
+          }
+          fetchVendorDetail();
+        } catch (e: any) {
+          setError(e.message || "Failed to unlink item");
         }
       },
     });
   };
 
-  const handleArchive = async () => {
+  const handleArchive = () => {
     setConfirmDialog({
       show: true,
       title: "Archive Supplier Profile",
-      message: `Are you sure you want to archive vendor "${vendor?.name}"? All associated item mappings will be deactivated.`,
-      confirmText: "Archive Vendor",
+      message: `Are you sure you want to archive "${vendor?.name}"? You will not be able to raise new purchase orders for this supplier.`,
+      confirmText: "Archive Supplier",
       onConfirm: async () => {
         try {
           const res = await fetch(`/api/restaurant/inventory/vendors/${vendorId}`, {
             method: "DELETE",
           });
-          if (res.ok) router.push(`/restaurant/${subdomain}/inventory/vendors`);
-        } catch {
-          setError("Failed to archive vendor");
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error);
+          }
+          router.push(`/restaurant/${subdomain}/inventory/vendors`);
+        } catch (e: any) {
+          setError(e.message || "Failed to archive vendor");
         }
       },
     });
@@ -365,10 +374,10 @@ export default function VendorDetailPage({
     >
       <RestaurantNavbar activeSection="Vendor Details" />
 
-      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Executive Header Banner */}
         <div
-          className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+          className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${
             isDark
               ? "bg-[#121622]/60 border-white/[0.06]"
               : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
@@ -402,16 +411,16 @@ export default function VendorDetailPage({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => setShowEdit(true)}
-              className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
+              className="flex-1 sm:flex-none px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer text-center"
             >
               Edit Profile
             </button>
             <button
               onClick={handleArchive}
-              className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition cursor-pointer flex items-center justify-center gap-1.5 ${
                 isDark
                   ? "bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20"
                   : "bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100"
@@ -431,145 +440,249 @@ export default function VendorDetailPage({
           </div>
         )}
 
-        {/* Vendor Contact & Payment Details Card */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5">
-          <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Payment Terms
-            </span>
-            <p className={`text-base font-bold font-mono tracking-tight mt-1 ${isDark ? "text-white" : "text-slate-900"}`}>
-              {vendor?.paymentTerms}
-            </p>
-          </div>
+        {/* Dynamic Container: Catalog on TOP for mobile (order-1), Details BELOW for mobile (order-2) */}
+        <div className="flex flex-col space-y-6">
 
-          <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Representative
-            </span>
-            <p className={`text-sm font-bold tracking-tight mt-1 truncate ${isDark ? "text-white" : "text-slate-900"}`}>
-              {vendor?.contactPerson || "Direct Line"}
-            </p>
-          </div>
-
-          <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Phone / WhatsApp
-            </span>
-            <p className={`text-xs font-mono font-bold tracking-tight mt-1.5 truncate ${
-              vendor?.phone ? (isDark ? "text-[#25D366]" : "text-emerald-600") : (isDark ? "text-[#8F95A3]" : "text-slate-400")
-            }`}>
-              {vendor?.phone || "—"}
-            </p>
-          </div>
-
-          <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Email Address
-            </span>
-            <p className={`text-xs font-mono font-medium tracking-tight mt-1.5 truncate ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
-              {vendor?.email || "—"}
-            </p>
-          </div>
-
-          <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Tax ID / GST
-            </span>
-            <p className={`text-xs font-mono font-semibold tracking-tight mt-1.5 ${isDark ? "text-white" : "text-slate-900"}`}>
-              {vendor?.taxId || "Not Registered"}
-            </p>
-          </div>
-        </div>
-
-        {/* Product Price Catalog */}
-        <div
-          className={`p-6 rounded-3xl border transition space-y-4 ${
-            isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
-          }`}
-        >
-          <div className="flex justify-between items-center">
-            <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
-              Product Catalog & Contract Pricing ({vendorItems.length})
-            </h2>
-            <button
-              onClick={openMultiSelectModal}
-              className="px-3.5 py-1.5 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer shadow-xs"
-            >
-              + Map Catalog Items
-            </button>
-          </div>
-
-          {vendorItems.length === 0 ? (
-            <div className={`p-10 text-center text-xs space-y-2 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-              <p className="font-semibold text-sm">No items mapped to this vendor</p>
-              <p className="opacity-75">Click &quot;+ Map Catalog Items&quot; to link inventory ingredients with supplier pricing.</p>
+          {/* Product Price Catalog (Order 1 on Mobile, Order 2 on Desktop) */}
+          <div
+            className={`order-1 md:order-2 p-5 sm:p-6 rounded-3xl border transition space-y-4 shadow-2xs ${
+              isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80"
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+              <div>
+                <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+                  Product Catalog &amp; Contract Pricing ({vendorItems.length})
+                </h2>
+                <p className={`text-xs mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Items supplied by {vendor?.name} with contract price rates.
+                </p>
+              </div>
+              <button
+                onClick={openMultiSelectModal}
+                className="w-full sm:w-auto px-3.5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer shadow-xs text-center shrink-0 flex items-center justify-center gap-1.5"
+              >
+                <span>+ Map Catalog Items</span>
+              </button>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className={`border-b text-[11px] font-semibold uppercase tracking-wider ${
-                    isDark ? "border-white/[0.06] text-[#8F95A3]" : "border-slate-200 text-slate-500"
-                  }`}>
-                    <th className="pb-3 px-3">Item Name</th>
-                    <th className="pb-3 px-3">Vendor SKU</th>
-                    <th className="pb-3 px-3 text-right">Negotiated Cost</th>
-                    <th className="pb-3 px-3 text-center">Preference</th>
-                    <th className="pb-3 px-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
+
+            {vendorItems.length === 0 ? (
+              <div className={`p-10 text-center text-xs space-y-2 rounded-2xl border ${isDark ? "border-white/[0.04] text-[#8F95A3] bg-[#090B10]/40" : "border-slate-100 text-slate-400 bg-slate-50/50"}`}>
+                <p className="font-semibold text-sm">No items mapped to this vendor</p>
+                <p className="opacity-75">Click "+ Map Catalog Items" to link inventory ingredients with supplier pricing.</p>
+              </div>
+            ) : (
+              <>
+                {/* MOBILE CARDS VIEW FOR CATALOG ITEMS (block md:hidden) */}
+                <div className="block md:hidden space-y-3">
                   {vendorItems.map((vi) => (
-                    <tr key={vi.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition">
-                      <td className={`py-3.5 px-3 font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
-                        {vi.item?.name} <span className="text-[10px] opacity-75 font-normal">({vi.item?.unitOfMeasure})</span>
-                      </td>
-                      <td className={`py-3.5 px-3 font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                        {vi.vendorSku || "—"}
-                      </td>
-                      <td className={`py-3.5 px-3 text-right font-mono font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
-                        ${Number(vi.unitCost ?? vi.item?.costPerUnit ?? 0).toFixed(2)}
-                      </td>
-                      <td className="py-3.5 px-3 text-center">
-                        {vi.isPreferred ? (
-                          <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 rounded-full">
-                            Preferred Supplier
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-slate-400">Secondary</span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-3 text-right space-x-2">
+                    <div
+                      key={vi.id}
+                      className={`p-3.5 rounded-2xl border space-y-3 transition ${
+                        isDark ? "bg-[#090B10] border-white/[0.06]" : "bg-slate-50/80 border-slate-200"
+                      }`}
+                    >
+                      {/* Card Top: Item Name, Unit, Preference Badge */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                            {vi.item?.name}
+                          </h4>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-blue-500/10 text-[#0071E3] dark:text-[#64B5FF]">
+                              Unit: {formatUnit((vi.item?.unitOfMeasure || "PIECES") as any)}
+                            </span>
+                            {vi.vendorSku && (
+                              <span className="font-mono text-[10px] opacity-60">
+                                SKU: {vi.vendorSku}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="shrink-0">
+                          {vi.isPreferred ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 rounded-full whitespace-nowrap">
+                              Preferred
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-medium px-2 py-0.5 bg-slate-200 dark:bg-white/[0.06] text-slate-600 dark:text-slate-400 rounded-full whitespace-nowrap">
+                              Secondary
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Card Middle: Contract Cost */}
+                      <div
+                        className={`p-2 rounded-xl border flex items-center justify-between text-xs ${
+                          isDark ? "bg-[#121622] border-white/[0.04]" : "bg-white border-slate-200"
+                        }`}
+                      >
+                        <span className={`text-[10px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                          Negotiated Cost
+                        </span>
+                        <span className={`font-mono text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                          ${Number(vi.unitCost ?? vi.item?.costPerUnit ?? 0).toFixed(2)}
+                        </span>
+                      </div>
+
+                      {/* Card Bottom: Action Buttons */}
+                      <div className="flex items-center justify-end gap-2 pt-1 border-t border-black/[0.04] dark:border-white/[0.04]">
                         <button
+                          type="button"
                           onClick={openMultiSelectModal}
-                          className="text-xs text-[#0071E3] hover:underline cursor-pointer font-medium"
+                          className={`px-3 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                            isDark
+                              ? "bg-white/[0.04] border-white/[0.08] hover:bg-white/[0.08] text-slate-200"
+                              : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-2xs"
+                          }`}
                         >
-                          Edit
+                          Edit Rate
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleUnlinkItem(vi.itemId)}
-                          className="text-xs text-rose-500 hover:underline cursor-pointer font-medium"
+                          className="px-3 py-1 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 rounded-lg transition cursor-pointer"
                         >
                           Unlink
                         </button>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+
+                {/* DESKTOP TABLE VIEW FOR CATALOG ITEMS (hidden md:block) */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left text-xs whitespace-nowrap">
+                    <thead>
+                      <tr className={`border-b text-[11px] font-semibold uppercase tracking-wider ${
+                        isDark ? "border-white/[0.06] text-[#8F95A3]" : "border-slate-200 text-slate-500"
+                      }`}>
+                        <th className="pb-3 px-3">Item Name</th>
+                        <th className="pb-3 px-3">Unit</th>
+                        <th className="pb-3 px-3">Vendor SKU</th>
+                        <th className="pb-3 px-3 text-right">Negotiated Cost</th>
+                        <th className="pb-3 px-3 text-center">Preference</th>
+                        <th className="pb-3 px-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
+                      {vendorItems.map((vi) => (
+                        <tr key={vi.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition">
+                          <td className={`py-3.5 px-3 font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                            {vi.item?.name}
+                          </td>
+                          <td className="py-3.5 px-3 font-mono text-[11px]">
+                            {formatUnit((vi.item?.unitOfMeasure || "PIECES") as any)}
+                          </td>
+                          <td className={`py-3.5 px-3 font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                            {vi.vendorSku || "—"}
+                          </td>
+                          <td className={`py-3.5 px-3 text-right font-mono font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                            ${Number(vi.unitCost ?? vi.item?.costPerUnit ?? 0).toFixed(2)}
+                          </td>
+                          <td className="py-3.5 px-3 text-center">
+                            {vi.isPreferred ? (
+                              <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 rounded-full">
+                                Preferred Supplier
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-400">Secondary</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-3 text-right space-x-2">
+                            <button
+                              onClick={openMultiSelectModal}
+                              className="text-xs text-[#0071E3] hover:underline cursor-pointer font-medium"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleUnlinkItem(vi.itemId)}
+                              className="text-xs text-rose-500 hover:underline cursor-pointer font-medium"
+                            >
+                              Unlink
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Vendor Contact & Payment Details Cards (Order 2 on Mobile, Order 1 on Desktop) */}
+          <div className="order-2 md:order-1 space-y-2">
+            <h3 className={`text-xs font-bold uppercase tracking-wider px-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Supplier Account &amp; Contact Details
+            </h3>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5">
+              <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Payment Terms
+                </span>
+                <p className={`text-base font-bold font-mono tracking-tight mt-1 ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {vendor?.paymentTerms}
+                </p>
+              </div>
+
+              <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Representative
+                </span>
+                <p className={`text-sm font-bold tracking-tight mt-1 truncate ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {vendor?.contactPerson || "Direct Line"}
+                </p>
+              </div>
+
+              <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Phone / WhatsApp
+                </span>
+                <p className={`text-xs font-mono font-bold tracking-tight mt-1.5 truncate ${
+                  vendor?.phone ? (isDark ? "text-[#25D366]" : "text-emerald-600") : (isDark ? "text-[#8F95A3]" : "text-slate-400")
+                }`}>
+                  {vendor?.phone || "—"}
+                </p>
+              </div>
+
+              <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Email Address
+                </span>
+                <p className={`text-xs font-mono font-medium tracking-tight mt-1.5 truncate ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+                  {vendor?.email || "—"}
+                </p>
+              </div>
+
+              <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs col-span-2 sm:col-span-1"}`}>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Tax ID / GST
+                </span>
+                <p className={`text-xs font-mono font-semibold tracking-tight mt-1.5 ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {vendor?.taxId || "Not Registered"}
+                </p>
+              </div>
             </div>
-          )}
+          </div>
         </div>
       </main>
 
-      {/* Multi-Select Link Items Modal */}
+      {/* Multi-Select Link Items Modal (Bottom Sheet on Mobile, Centered Modal on Desktop) */}
       {showLinkModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end md:items-center justify-center z-50 p-0 md:p-4 animate-in fade-in duration-150">
           <div
-            className={`w-full max-w-4xl max-h-[85vh] overflow-y-auto p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
-              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            className={`w-full max-w-4xl max-h-[88vh] md:max-h-[85vh] overflow-y-auto p-6 sm:p-8 rounded-t-[32px] md:rounded-3xl border-t md:border shadow-2xl space-y-4 animate-in slide-in-from-bottom-8 md:zoom-in-95 duration-200 ${
+              isDark ? "bg-[#121622] border-white/[0.1] text-white" : "bg-white border-slate-200 text-slate-900"
             }`}
           >
+            {/* Mobile Drag Indicator */}
+            <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-white/20 mx-auto mb-1 md:hidden" />
+
             <div className="flex justify-between items-center">
               <div>
                 <h2 className="text-base font-bold tracking-tight">Map Catalog Products</h2>
@@ -577,17 +690,20 @@ export default function VendorDetailPage({
                   Select items provided by {vendor?.name} and configure negotiated unit costs.
                 </p>
               </div>
-              <button onClick={() => setShowLinkModal(false)} className="text-slate-400 hover:text-white cursor-pointer">
+              <button
+                onClick={() => setShowLinkModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-base cursor-pointer p-1"
+              >
                 ✕
               </button>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <input
                 placeholder="Search catalog items..."
                 value={modalSearch}
                 onChange={(e) => setModalSearch(e.target.value)}
-                className={`flex-1 px-3.5 py-2 text-xs rounded-xl border transition ${
+                className={`flex-1 px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
                   isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                 }`}
               />
@@ -602,14 +718,16 @@ export default function VendorDetailPage({
               </label>
             </div>
 
-            <div className="overflow-x-auto max-h-96 border rounded-2xl">
-              <table className="w-full text-left text-xs">
-                <thead>
+            {/* Catalog Mapping Rows */}
+            <div className="overflow-x-auto max-h-80 border rounded-2xl">
+              <table className="w-full text-left text-xs whitespace-nowrap">
+                <thead className="sticky top-0 z-10">
                   <tr className={`border-b text-[10px] font-bold uppercase tracking-wider ${
                     isDark ? "bg-[#0A0C12] border-white/[0.06] text-[#8F95A3]" : "bg-slate-50 border-slate-200 text-slate-600"
                   }`}>
                     <th className="py-2.5 px-3 w-8">Select</th>
                     <th className="py-2.5 px-3">Item Name</th>
+                    <th className="py-2.5 px-3">Unit</th>
                     <th className="py-2.5 px-3">Unit Cost ($)</th>
                     <th className="py-2.5 px-3">Vendor SKU</th>
                     <th className="py-2.5 px-3 text-center">Preferred</th>
@@ -627,7 +745,10 @@ export default function VendorDetailPage({
                         />
                       </td>
                       <td className="py-2.5 px-3 font-semibold">
-                        {row.name} <span className="text-[10px] opacity-75 font-normal">({row.unitOfMeasure})</span>
+                        {row.name}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-[11px] opacity-75">
+                        {formatUnit(row.unitOfMeasure as any)}
                       </td>
                       <td className="py-2.5 px-3">
                         <input
@@ -665,15 +786,15 @@ export default function VendorDetailPage({
               </table>
             </div>
 
-            <div className="flex justify-between items-center pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
-              <span className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-between items-stretch sm:items-center gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+              <span className={`text-xs text-center sm:text-left ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
                 {selectedCount} item(s) selected
               </span>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setShowLinkModal(false)}
-                  className={`px-4 py-2 rounded-xl text-xs font-medium ${
+                  className={`flex-1 sm:flex-none px-4 py-2.5 sm:py-2 rounded-xl text-xs font-medium transition cursor-pointer text-center ${
                     isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
@@ -683,9 +804,9 @@ export default function VendorDetailPage({
                   type="button"
                   onClick={handleBulkLinkItems}
                   disabled={submitting}
-                  className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer"
+                  className="flex-1 sm:flex-none px-5 py-2.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer text-center"
                 >
-                  {submitting ? "Saving..." : "Save Catalog Mappings"}
+                  {submitting ? "Saving..." : "Save Mappings"}
                 </button>
               </div>
             </div>
@@ -693,17 +814,28 @@ export default function VendorDetailPage({
         </div>
       )}
 
-      {/* Edit Vendor Modal */}
+      {/* Edit Vendor Modal (Bottom Sheet on Mobile, Centered Modal on Desktop) */}
       {showEdit && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end md:items-center justify-center z-50 p-0 md:p-4 animate-in fade-in duration-150">
           <div
-            className={`w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
-              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            className={`w-full max-w-lg p-6 sm:p-8 rounded-t-[32px] md:rounded-3xl border-t md:border shadow-2xl space-y-4 max-h-[88vh] md:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 md:zoom-in-95 duration-200 ${
+              isDark ? "bg-[#121622] border-white/[0.1] text-white" : "bg-white border-slate-200 text-slate-900"
             }`}
           >
+            {/* Mobile Drag Indicator */}
+            <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-white/20 mx-auto mb-1 md:hidden" />
+
             <div className="flex justify-between items-center">
-              <h2 className="text-base font-bold tracking-tight">Edit Supplier Details</h2>
-              <button onClick={() => setShowEdit(false)} className="text-slate-400 hover:text-white cursor-pointer">
+              <div>
+                <h2 className="text-base font-bold tracking-tight">Edit Supplier Details</h2>
+                <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Update commercial terms and contact details for {vendor?.name}.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowEdit(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-base cursor-pointer p-1"
+              >
                 ✕
               </button>
             </div>
@@ -711,7 +843,7 @@ export default function VendorDetailPage({
             <form onSubmit={handleUpdate} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                     Vendor Name *
                   </label>
                   <input
@@ -719,21 +851,21 @@ export default function VendorDetailPage({
                     required
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition ${
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
                       isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                     }`}
                   />
                 </div>
 
                 <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                     Code
                   </label>
                   <input
                     type="text"
                     value={form.code}
                     onChange={(e) => setForm({ ...form, code: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs font-mono rounded-xl border transition ${
+                    className={`w-full px-3.5 py-2.5 text-xs font-mono rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
                       isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                     }`}
                   />
@@ -742,7 +874,7 @@ export default function VendorDetailPage({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                     Representative
                   </label>
                   <input
@@ -750,22 +882,22 @@ export default function VendorDetailPage({
                     placeholder="Contact person"
                     value={form.contactPerson}
                     onChange={(e) => setForm({ ...form, contactPerson: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition ${
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
                       isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                     }`}
                   />
                 </div>
 
                 <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                    Phone / Mobile (WhatsApp)
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Phone / WhatsApp
                   </label>
                   <input
                     type="tel"
-                    placeholder="e.g. +91 98765 43210"
+                    placeholder="e.g. +1 555-0100"
                     value={form.phone}
                     onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs font-mono rounded-xl border transition ${
+                    className={`w-full px-3.5 py-2.5 text-xs font-mono rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
                       isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                     }`}
                   />
@@ -774,7 +906,7 @@ export default function VendorDetailPage({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                     Email Address
                   </label>
                   <input
@@ -782,14 +914,14 @@ export default function VendorDetailPage({
                     placeholder="orders@vendor.com"
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs font-mono rounded-xl border transition ${
+                    className={`w-full px-3.5 py-2.5 text-xs font-mono rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
                       isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                     }`}
                   />
                 </div>
 
                 <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                     Tax ID / GST
                   </label>
                   <input
@@ -797,7 +929,7 @@ export default function VendorDetailPage({
                     placeholder="Tax registration ID"
                     value={form.taxId}
                     onChange={(e) => setForm({ ...form, taxId: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs font-mono rounded-xl border transition ${
+                    className={`w-full px-3.5 py-2.5 text-xs font-mono rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
                       isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                     }`}
                   />
@@ -806,13 +938,13 @@ export default function VendorDetailPage({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                     Payment Terms
                   </label>
                   <select
                     value={form.paymentTerms}
                     onChange={(e) => setForm({ ...form, paymentTerms: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition cursor-pointer ${
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition cursor-pointer focus:outline-none focus:border-[#0071E3] ${
                       isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                     }`}
                   >
@@ -826,13 +958,13 @@ export default function VendorDetailPage({
                 </div>
 
                 <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                     Status
                   </label>
                   <select
                     value={form.status}
                     onChange={(e) => setForm({ ...form, status: e.target.value as any })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition cursor-pointer ${
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition cursor-pointer focus:outline-none focus:border-[#0071E3] ${
                       isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                     }`}
                   >
@@ -844,7 +976,7 @@ export default function VendorDetailPage({
               </div>
 
               <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                   Address / Warehouse Location
                 </label>
                 <input
@@ -852,7 +984,7 @@ export default function VendorDetailPage({
                   placeholder="Street, City, Postal Code"
                   value={form.address}
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition ${
+                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
                     isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                   }`}
                 />
@@ -862,7 +994,7 @@ export default function VendorDetailPage({
                 <button
                   type="button"
                   onClick={() => setShowEdit(false)}
-                  className={`px-4 py-2 rounded-xl text-xs font-medium ${
+                  className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
                     isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
@@ -871,7 +1003,7 @@ export default function VendorDetailPage({
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer"
+                  className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
                 >
                   {submitting ? "Saving..." : "Save Changes"}
                 </button>

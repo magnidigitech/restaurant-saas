@@ -243,14 +243,17 @@ export default function InventoryCategoriesPage({
         </div>
       </main>
 
-      {/* New Category Modal */}
+      {/* New Category Modal (Bottom Sheet on Mobile, Centered Modal on Desktop) */}
       {showCreate && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end md:items-center justify-center z-50 p-0 md:p-4 animate-in fade-in duration-150">
           <div
-            className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
-              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            className={`w-full max-w-md p-6 sm:p-8 rounded-t-[32px] md:rounded-3xl border-t md:border shadow-2xl space-y-4 max-h-[88vh] md:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 md:zoom-in-95 duration-200 ${
+              isDark ? "bg-[#121622] border-white/[0.1] text-white" : "bg-white border-slate-200 text-slate-900"
             }`}
           >
+            {/* Mobile Drag Indicator */}
+            <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-white/20 mx-auto mb-1 md:hidden" />
+
             <div className="flex justify-between items-center">
               <div>
                 <h2 className="text-base font-bold tracking-tight">Create Inventory Category</h2>
@@ -258,7 +261,7 @@ export default function InventoryCategoriesPage({
                   Add a top-level classification or nested subcategory.
                 </p>
               </div>
-              <button onClick={() => setShowCreate(false)} className="text-slate-400 hover:text-white cursor-pointer">
+              <button onClick={() => setShowCreate(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-base cursor-pointer p-1">
                 ✕
               </button>
             </div>

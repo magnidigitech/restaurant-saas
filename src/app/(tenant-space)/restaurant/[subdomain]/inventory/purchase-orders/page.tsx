@@ -748,120 +748,210 @@ export default function PurchaseOrdersDirectoryPage({
           </div>
         </div>
 
-        {/* PO Directory Table */}
-        <div
-          className={`p-6 rounded-3xl border transition space-y-4 ${
-            isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
-          }`}
-        >
-          {displayedPOs.length === 0 ? (
-            <div className={`p-12 text-center text-xs space-y-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-              <p className="font-semibold text-sm">
-                {activeTab === "UPCOMING"
-                  ? "No upcoming purchase orders pending delivery"
-                  : activeTab === "COMPLETED"
-                  ? "No completed purchase orders yet"
-                  : "No purchase orders found"}
-              </p>
-              <p className="opacity-75">
-                {activeTab === "UPCOMING"
-                  ? "All procurement requisitions have been fulfilled and stock ledgers updated."
-                  : "Click '+ Create PO' to draft a new procurement requisition."}
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className={`border-b text-[11px] font-semibold uppercase tracking-wider ${
-                    isDark ? "border-white/[0.06] text-[#8F95A3]" : "border-slate-200 text-slate-500"
-                  }`}>
-                    <th className="pb-3 px-3">PO Number</th>
-                    <th className="pb-3 px-3">Supplier Vendor</th>
-                    <th className="pb-3 px-3">Delivery Branch</th>
-                    <th className="pb-3 px-3">Items & Delivery</th>
-                    <th className="pb-3 px-3">Grand Total</th>
-                    <th className="pb-3 px-3">Status</th>
-                    <th className="pb-3 px-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
-                  {displayedPOs.map((po) => {
-                    const totalQty = po.items?.reduce((a, b) => a + Number(b.orderedQuantity || 0), 0) || 0;
-                    const recQty = po.items?.reduce((a, b) => a + Number(b.receivedQuantity || 0), 0) || 0;
+        {/* PO Directory Display: Cards on Mobile, Table on Desktop */}
+        {displayedPOs.length === 0 ? (
+          <div className={`p-12 rounded-3xl border text-center space-y-1.5 ${isDark ? "bg-[#121622]/60 border-white/[0.06] text-[#8F95A3]" : "bg-white border-slate-200 text-slate-400"}`}>
+            <p className="font-semibold text-sm">
+              {activeTab === "UPCOMING"
+                ? "No upcoming purchase orders pending delivery"
+                : activeTab === "COMPLETED"
+                ? "No completed purchase orders yet"
+                : "No purchase orders found"}
+            </p>
+            <p className="opacity-75 text-xs">
+              {activeTab === "UPCOMING"
+                ? "All procurement requisitions have been fulfilled and stock ledgers updated."
+                : "Click '+ Create PO' to draft a new procurement requisition."}
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* MOBILE CARDS VIEW (block md:hidden) */}
+            <div className="block md:hidden space-y-3">
+              {displayedPOs.map((po) => {
+                const totalQty = po.items?.reduce((a, b) => a + Number(b.orderedQuantity || 0), 0) || 0;
+                const recQty = po.items?.reduce((a, b) => a + Number(b.receivedQuantity || 0), 0) || 0;
 
-                    return (
-                      <tr
-                        key={po.id}
-                        onClick={() => router.push(`/restaurant/${subdomain}/inventory/purchase-orders/${po.id}`)}
-                        className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition cursor-pointer group"
-                      >
-                        <td className="py-3.5 px-3">
-                          <div className="font-mono font-bold text-[#0071E3]">
-                            {po.poNumber}
-                          </div>
-                          <div className={`text-[10px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-                            {new Date(po.createdAt).toLocaleDateString()}
-                          </div>
-                        </td>
-                        <td className={`py-3.5 px-3 font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                return (
+                  <div
+                    key={po.id}
+                    onClick={() => router.push(`/restaurant/${subdomain}/inventory/purchase-orders/${po.id}`)}
+                    className={`p-4 rounded-2xl border shadow-2xs space-y-3 transition cursor-pointer active:scale-[0.99] ${
+                      isDark ? "bg-[#121622] border-white/[0.08] hover:border-[#0071E3]/40" : "bg-white border-slate-200 hover:border-[#0071E3]/40"
+                    }`}
+                  >
+                    {/* Card Top: PO Number, Date, Status */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <div className="font-mono font-bold text-[#0071E3] text-sm">
+                          {po.poNumber}
+                        </div>
+                        <div className="font-bold text-xs text-slate-900 dark:text-white truncate">
                           {po.vendor?.name || "Vendor"}
-                        </td>
-                        <td className={`py-3.5 px-3 ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
-                          {po.outlet?.name || "Branch"}
-                        </td>
-                        <td className="py-3.5 px-3">
-                          <div className={`text-xs ${isDark ? "text-white" : "text-slate-900"}`}>
-                            {po.items?.length || 0} item{(po.items?.length || 0) !== 1 ? "s" : ""}
-                            <span className={`text-[10px] ml-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-                              ({recQty}/{totalQty} units received)
-                            </span>
-                          </div>
-                          {po.expectedDeliveryDate && (
-                            <div className="text-[10px] text-amber-500 font-medium mt-0.5">
-                              Due: {new Date(po.expectedDeliveryDate).toLocaleDateString()}
-                            </div>
-                          )}
-                        </td>
-                        <td className={`py-3.5 px-3 font-mono font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                        </div>
+                        <div className={`text-[10px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                          Branch: {po.outlet?.name || "Global"} • {new Date(po.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+
+                      <span
+                        className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border shrink-0 ${
+                          po.status === "RECEIVED"
+                            ? isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-100 text-emerald-800 border-emerald-200"
+                            : po.status === "SENT" || po.status === "PARTIALLY_RECEIVED"
+                            ? isDark ? "bg-amber-500/15 text-amber-300 border-amber-500/25" : "bg-amber-100 text-amber-800 border-amber-200"
+                            : po.status === "CANCELLED"
+                            ? isDark ? "bg-rose-500/15 text-rose-300 border-rose-500/25" : "bg-rose-100 text-rose-800 border-rose-200"
+                            : isDark ? "bg-white/[0.04] text-[#BAC0CD] border-white/[0.08]" : "bg-slate-100 text-slate-700 border-slate-200"
+                        }`}
+                      >
+                        {po.status.replace(/_/g, " ")}
+                      </span>
+                    </div>
+
+                    {/* Card Metrics Grid */}
+                    <div
+                      className={`grid grid-cols-2 gap-2 p-2.5 rounded-xl border text-xs ${
+                        isDark ? "bg-[#090B10]/60 border-white/[0.04]" : "bg-slate-50/80 border-slate-100"
+                      }`}
+                    >
+                      <div>
+                        <div className="text-[10px] font-medium opacity-50 uppercase">Items / Fulfillment</div>
+                        <div className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                          {po.items?.length || 0} line items
+                        </div>
+                        <div className={`text-[10px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                          {recQty}/{totalQty} units received
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-[10px] font-medium opacity-50 uppercase">Grand Total</div>
+                        <div className="font-mono text-sm font-bold text-slate-900 dark:text-white mt-0.5">
                           ${Number(po.grandTotal || (po as any).totalAmount || 0).toFixed(2)}
-                        </td>
-                        <td className="py-3.5 px-3">
-                          <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full border ${
-                            po.status === "RECEIVED"
-                              ? isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-100 text-emerald-800 border-emerald-200"
-                              : po.status === "SENT" || po.status === "PARTIALLY_RECEIVED"
-                              ? isDark ? "bg-amber-500/15 text-amber-300 border-amber-500/25" : "bg-amber-100 text-amber-800 border-amber-200"
-                              : po.status === "CANCELLED"
-                              ? isDark ? "bg-rose-500/15 text-rose-300 border-rose-500/25" : "bg-rose-100 text-rose-800 border-rose-200"
-                              : isDark ? "bg-white/[0.04] text-[#BAC0CD] border-white/[0.08]" : "bg-slate-100 text-slate-700 border-slate-200"
-                          }`}>
-                            {po.status.replace(/_/g, " ")}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-3 text-right">
-                          <span className="text-[#0071E3] font-semibold group-hover:underline text-xs">
-                            {["SENT", "PARTIALLY_RECEIVED"].includes(po.status) ? "Receive Stock →" : "Inspect →"}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        </div>
+                        {po.expectedDeliveryDate && (
+                          <div className="text-[10px] text-amber-500 font-medium truncate">
+                            Due: {new Date(po.expectedDeliveryDate).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Card Action Link */}
+                    <div className="flex items-center justify-end pt-1 text-xs">
+                      <span className="text-[#0071E3] font-semibold flex items-center gap-1">
+                        <span>{["SENT", "PARTIALLY_RECEIVED"].includes(po.status) ? "Receive Stock" : "Inspect Order"}</span>
+                        <span>→</span>
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          )}
-        </div>
+
+            {/* DESKTOP TABLE VIEW (hidden md:block) */}
+            <div
+              className={`hidden md:block p-6 rounded-3xl border transition space-y-4 ${
+                isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+              }`}
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs whitespace-nowrap">
+                  <thead>
+                    <tr className={`border-b text-[11px] font-semibold uppercase tracking-wider ${
+                      isDark ? "border-white/[0.06] text-[#8F95A3]" : "border-slate-200 text-slate-500"
+                    }`}>
+                      <th className="pb-3 px-3">PO Number</th>
+                      <th className="pb-3 px-3">Supplier Vendor</th>
+                      <th className="pb-3 px-3">Delivery Branch</th>
+                      <th className="pb-3 px-3">Items &amp; Delivery</th>
+                      <th className="pb-3 px-3">Grand Total</th>
+                      <th className="pb-3 px-3">Status</th>
+                      <th className="pb-3 px-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
+                    {displayedPOs.map((po) => {
+                      const totalQty = po.items?.reduce((a, b) => a + Number(b.orderedQuantity || 0), 0) || 0;
+                      const recQty = po.items?.reduce((a, b) => a + Number(b.receivedQuantity || 0), 0) || 0;
+
+                      return (
+                        <tr
+                          key={po.id}
+                          onClick={() => router.push(`/restaurant/${subdomain}/inventory/purchase-orders/${po.id}`)}
+                          className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition cursor-pointer group"
+                        >
+                          <td className="py-3.5 px-3">
+                            <div className="font-mono font-bold text-[#0071E3]">
+                              {po.poNumber}
+                            </div>
+                            <div className={`text-[10px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                              {new Date(po.createdAt).toLocaleDateString()}
+                            </div>
+                          </td>
+                          <td className={`py-3.5 px-3 font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                            {po.vendor?.name || "Vendor"}
+                          </td>
+                          <td className={`py-3.5 px-3 ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+                            {po.outlet?.name || "Branch"}
+                          </td>
+                          <td className="py-3.5 px-3">
+                            <div className={`text-xs ${isDark ? "text-white" : "text-slate-900"}`}>
+                              {po.items?.length || 0} item{(po.items?.length || 0) !== 1 ? "s" : ""}
+                              <span className={`text-[10px] ml-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                                ({recQty}/{totalQty} units received)
+                              </span>
+                            </div>
+                            {po.expectedDeliveryDate && (
+                              <div className="text-[10px] text-amber-500 font-medium mt-0.5">
+                                Due: {new Date(po.expectedDeliveryDate).toLocaleDateString()}
+                              </div>
+                            )}
+                          </td>
+                          <td className={`py-3.5 px-3 font-mono font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                            ${Number(po.grandTotal || (po as any).totalAmount || 0).toFixed(2)}
+                          </td>
+                          <td className="py-3.5 px-3">
+                            <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full border ${
+                              po.status === "RECEIVED"
+                                ? isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                : po.status === "SENT" || po.status === "PARTIALLY_RECEIVED"
+                                ? isDark ? "bg-amber-500/15 text-amber-300 border-amber-500/25" : "bg-amber-100 text-amber-800 border-amber-200"
+                                : po.status === "CANCELLED"
+                                ? isDark ? "bg-rose-500/15 text-rose-300 border-rose-500/25" : "bg-rose-100 text-rose-800 border-rose-200"
+                                : isDark ? "bg-white/[0.04] text-[#BAC0CD] border-white/[0.08]" : "bg-slate-100 text-slate-700 border-slate-200"
+                            }`}>
+                              {po.status.replace(/_/g, " ")}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-3 text-right">
+                            <span className="text-[#0071E3] font-semibold group-hover:underline text-xs">
+                              {["SENT", "PARTIALLY_RECEIVED"].includes(po.status) ? "Receive Stock →" : "Inspect →"}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
       </main>
 
-      {/* Create Purchase Order Modal */}
+      {/* Create Purchase Order Modal (Bottom Sheet on Mobile, Centered Modal on Desktop) */}
       {showCreate && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end md:items-center justify-center z-50 p-0 md:p-4 animate-in fade-in duration-150">
           <div
-            className={`w-full max-w-3xl max-h-[88vh] overflow-y-auto p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
-              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            className={`w-full max-w-3xl max-h-[88vh] md:max-h-[88vh] overflow-y-auto p-6 sm:p-8 rounded-t-[32px] md:rounded-3xl border-t md:border shadow-2xl space-y-4 animate-in slide-in-from-bottom-8 md:zoom-in-95 duration-200 ${
+              isDark ? "bg-[#121622] border-white/[0.1] text-white" : "bg-white border-slate-200 text-slate-900"
             }`}
           >
+            {/* Mobile Drag Indicator */}
+            <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-white/20 mx-auto mb-1 md:hidden" />
+
             <div className="flex justify-between items-center">
               <div>
                 <h2 className="text-base font-bold tracking-tight">Draft Purchase Order</h2>
@@ -875,7 +965,7 @@ export default function PurchaseOrdersDirectoryPage({
                   setError("");
                   setAutoFillMsg("");
                 }}
-                className="text-slate-400 hover:text-white cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-base cursor-pointer p-1"
               >
                 ✕
               </button>
@@ -990,31 +1080,34 @@ export default function PurchaseOrdersDirectoryPage({
                       <button
                         type="button"
                         onClick={handleAutofillLowStock}
-                        className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-md shadow-amber-500/20 flex items-center gap-1.5 active:scale-95"
+                        className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-md shadow-amber-500/20 flex items-center gap-1.5 active:scale-95"
                       >
-                        <span>⚡ Autofill Low Stock</span>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <span>Autofill Low Stock</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => handleSelectAll(true)}
-                        className={`px-3 py-2 rounded-xl text-xs font-medium border transition cursor-pointer ${
+                        className={`px-3 py-2 rounded-xl text-xs font-medium border transition cursor-pointer flex items-center gap-1 ${
                           isDark
                             ? "bg-white/[0.04] border-white/[0.08] text-slate-200 hover:bg-white/[0.08]"
                             : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100 shadow-xs"
                         }`}
                       >
-                        ✓ Select All
+                        <span>Select All</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => handleSelectAll(false)}
-                        className={`px-3 py-2 rounded-xl text-xs font-medium border transition cursor-pointer ${
+                        className={`px-3 py-2 rounded-xl text-xs font-medium border transition cursor-pointer flex items-center gap-1 ${
                           isDark
                             ? "bg-white/[0.04] border-white/[0.08] text-slate-400 hover:bg-white/[0.08]"
                             : "bg-white border-slate-200 text-slate-500 hover:bg-slate-100 shadow-xs"
                         }`}
                       >
-                        ✕ Clear All
+                        <span>Clear All</span>
                       </button>
                     </div>
                   </div>
@@ -1028,7 +1121,7 @@ export default function PurchaseOrdersDirectoryPage({
                       isDark ? "bg-white/[0.03] border-white/[0.06] text-[#8F95A3]" : "bg-slate-50 border-slate-200 text-slate-500"
                     }`}>
                       <div className="col-span-6 flex items-center gap-3">
-                        <span>Item & Stock Status</span>
+                        <span>Item &amp; Stock Status</span>
                       </div>
                       <div className="col-span-2 text-center">Order Qty</div>
                       <div className="col-span-2 text-center">Unit Cost ($)</div>
@@ -1080,7 +1173,7 @@ export default function PurchaseOrdersDirectoryPage({
                                   </span>
                                   {item.isPreferred ? (
                                     <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-blue-500/15 text-[#0071E3] dark:text-blue-400 border border-blue-500/30">
-                                      ⭐ Primary
+                                      Primary
                                     </span>
                                   ) : (
                                     <span className="text-[9px] font-medium px-1.5 py-0.2 rounded-full bg-slate-500/15 text-slate-600 dark:text-slate-400 border border-slate-500/20">
@@ -1093,7 +1186,7 @@ export default function PurchaseOrdersDirectoryPage({
                                   {isLow ? (
                                     <>
                                       <span className="px-1.5 py-0.2 rounded-md font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                                        ⚠️ Reorder
+                                        Reorder Needed
                                       </span>
                                       <span className={isDark ? "text-[#8F95A3]" : "text-slate-600"}>
                                         Stock: <strong>{item.currentStock}</strong> {item.reorderPoint > 0 && `| Min: ${item.reorderPoint}`} | Par: {item.parLevel}
@@ -1104,7 +1197,7 @@ export default function PurchaseOrdersDirectoryPage({
                                     </>
                                   ) : (
                                     <span className="px-1.5 py-0.2 rounded-md font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                                      ✅ In Stock: <strong>{item.currentStock}</strong> {item.parLevel > 0 && `(Par: ${item.parLevel})`}
+                                      In Stock: <strong>{item.currentStock}</strong> {item.parLevel > 0 && `(Par: ${item.parLevel})`}
                                     </span>
                                   )}
                                 </div>
