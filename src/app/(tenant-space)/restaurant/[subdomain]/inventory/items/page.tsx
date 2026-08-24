@@ -506,7 +506,7 @@ export default function InventoryItemsPage({
             </select>
           </div>
 
-          {/* Items Table */}
+          {/* Items Display: Cards on Mobile, Table on Desktop */}
           {loading ? (
             <div className="py-20 text-center text-xs opacity-50">Loading inventory catalog...</div>
           ) : items.length === 0 ? (
@@ -526,107 +526,217 @@ export default function InventoryItemsPage({
               </p>
             </div>
           ) : (
-            <div
-              className={`rounded-3xl border overflow-hidden shadow-sm ${
-                isDark ? "bg-[#121622] border-white/[0.08]" : "bg-white border-slate-200"
-              }`}
-            >
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className={`border-b text-[11px] font-semibold uppercase tracking-wider ${isDark ? "border-white/[0.08] text-[#8F95A3]" : "border-slate-200 text-slate-500 bg-slate-50/50"}`}>
-                      <th className="py-3.5 px-4">Item &amp; SKU</th>
-                      <th className="py-3.5 px-4">Category</th>
-                      <th className="py-3.5 px-4">Unit of Measure</th>
-                      <th className="py-3.5 px-4 text-right">Cost Per Unit</th>
-                      <th className="py-3.5 px-4 text-right">Current Stock</th>
-                      <th className="py-3.5 px-4 text-right">Par Level</th>
-                      <th className="py-3.5 px-4 text-center">Status</th>
-                      <th className="py-3.5 px-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04] text-xs">
-                    {items.map((item) => {
-                      const stock = Number(item.currentStock ?? 0);
-                      const reorder = Number(item.reorderPoint ?? 0);
-                      const isOutOfStock = stock <= 0;
-                      const isLowStock = stock > 0 && stock <= reorder;
+            <>
+              {/* MOBILE CARDS VIEW (block md:hidden) */}
+              <div className="block md:hidden space-y-3">
+                {items.map((item) => {
+                  const stock = Number(item.currentStock ?? 0);
+                  const reorder = Number(item.reorderPoint ?? 0);
+                  const isOutOfStock = stock <= 0;
+                  const isLowStock = stock > 0 && stock <= reorder;
 
-                      return (
-                        <tr key={item.id} className={`transition ${isDark ? "hover:bg-white/[0.02]" : "hover:bg-slate-50/80"}`}>
-                          <td className="py-3.5 px-4">
-                            <div className="font-semibold">{item.name}</div>
-                            {item.sku && <div className="text-[10px] font-mono opacity-50">SKU: {item.sku}</div>}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            {item.category ? (
-                              <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-[#0071E3] dark:text-[#64B5FF] text-[11px] font-medium">
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-4 rounded-2xl border shadow-2xs space-y-3 transition ${
+                        isDark ? "bg-[#121622] border-white/[0.08]" : "bg-white border-slate-200"
+                      }`}
+                    >
+                      {/* Card Top: Title, SKU, Category, Status Badge */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <h3 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                            {item.name}
+                          </h3>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {item.sku && (
+                              <span className="font-mono text-[11px] opacity-60">
+                                SKU: {item.sku}
+                              </span>
+                            )}
+                            {item.category && (
+                              <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-[#0071E3] dark:text-[#64B5FF] text-[10px] font-semibold whitespace-nowrap">
                                 {item.category.name}
                               </span>
-                            ) : (
-                              <span className="opacity-40 text-[11px]">—</span>
                             )}
-                          </td>
-                          <td className="py-3.5 px-4 font-mono text-[11px]">
-                            {formatUnit(item.unitOfMeasure as any)}
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-mono font-medium">
-                            ${Number(item.costPerUnit).toFixed(2)}
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-mono font-bold">
-                            <span className={isOutOfStock ? "text-rose-500" : isLowStock ? "text-amber-500" : ""}>
-                              {stock}
+                          </div>
+                        </div>
+
+                        <div className="shrink-0">
+                          {isOutOfStock ? (
+                            <span className="px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 text-[10px] font-bold whitespace-nowrap">
+                              Out of Stock
                             </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-mono opacity-60">
+                          ) : isLowStock ? (
+                            <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[10px] font-bold whitespace-nowrap">
+                              Low Stock
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px] font-bold whitespace-nowrap">
+                              In Stock
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Card Metrics Grid: UOM, Cost, Current Stock, Par Level */}
+                      <div
+                        className={`grid grid-cols-4 gap-2 p-2.5 rounded-xl border text-center ${
+                          isDark ? "bg-[#090B10]/60 border-white/[0.04]" : "bg-slate-50/80 border-slate-100"
+                        }`}
+                      >
+                        <div>
+                          <div className="text-[10px] font-medium opacity-50 uppercase tracking-wider">UOM</div>
+                          <div className="font-mono text-xs font-semibold mt-0.5">
+                            {formatUnit(item.unitOfMeasure as any)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-medium opacity-50 uppercase tracking-wider">Cost</div>
+                          <div className="font-mono text-xs font-semibold mt-0.5">
+                            ${Number(item.costPerUnit).toFixed(2)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-medium opacity-50 uppercase tracking-wider">Stock</div>
+                          <div className={`font-mono text-xs font-bold mt-0.5 ${isOutOfStock ? "text-rose-500" : isLowStock ? "text-amber-500" : ""}`}>
+                            {stock}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-medium opacity-50 uppercase tracking-wider">Par</div>
+                          <div className="font-mono text-xs font-semibold mt-0.5 opacity-70">
                             {item.parLevel}
-                          </td>
-                          <td className="py-3.5 px-4 text-center">
-                            {isOutOfStock ? (
-                              <span className="px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 text-[10px] font-bold">
-                                Out of Stock
-                              </span>
-                            ) : isLowStock ? (
-                              <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[10px] font-bold">
-                                Low Stock
-                              </span>
-                            ) : (
-                              <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px] font-bold">
-                                In Stock
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEdit(item)}
-                              className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition cursor-pointer ${
-                                isDark
-                                  ? "bg-white/[0.04] border-white/[0.08] hover:bg-white/[0.1] text-slate-200"
-                                  : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700 shadow-2xs"
-                              }`}
-                            >
-                              Edit
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card Action Button: Full Width Edit Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(item)}
+                        className={`w-full py-2 text-xs font-semibold rounded-xl border transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                          isDark
+                            ? "bg-white/[0.04] border-white/[0.08] hover:bg-white/[0.1] text-slate-200"
+                            : "bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700 shadow-2xs"
+                        }`}
+                      >
+                        <svg className="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        <span>Edit Item</span>
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+
+              {/* DESKTOP TABLE VIEW (hidden md:block) */}
+              <div
+                className={`hidden md:block rounded-3xl border overflow-hidden shadow-sm ${
+                  isDark ? "bg-[#121622] border-white/[0.08]" : "bg-white border-slate-200"
+                }`}
+              >
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className={`border-b text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap ${isDark ? "border-white/[0.08] text-[#8F95A3]" : "border-slate-200 text-slate-500 bg-slate-50/50"}`}>
+                        <th className="py-3.5 px-4">Item &amp; SKU</th>
+                        <th className="py-3.5 px-4">Category</th>
+                        <th className="py-3.5 px-4">Unit of Measure</th>
+                        <th className="py-3.5 px-4 text-right">Cost Per Unit</th>
+                        <th className="py-3.5 px-4 text-right">Current Stock</th>
+                        <th className="py-3.5 px-4 text-right">Par Level</th>
+                        <th className="py-3.5 px-4 text-center">Status</th>
+                        <th className="py-3.5 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04] text-xs whitespace-nowrap">
+                      {items.map((item) => {
+                        const stock = Number(item.currentStock ?? 0);
+                        const reorder = Number(item.reorderPoint ?? 0);
+                        const isOutOfStock = stock <= 0;
+                        const isLowStock = stock > 0 && stock <= reorder;
+
+                        return (
+                          <tr key={item.id} className={`transition ${isDark ? "hover:bg-white/[0.02]" : "hover:bg-slate-50/80"}`}>
+                            <td className="py-3.5 px-4">
+                              <div className="font-semibold">{item.name}</div>
+                              {item.sku && <div className="text-[10px] font-mono opacity-50">SKU: {item.sku}</div>}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              {item.category ? (
+                                <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-[#0071E3] dark:text-[#64B5FF] text-[11px] font-medium">
+                                  {item.category.name}
+                                </span>
+                              ) : (
+                                <span className="opacity-40 text-[11px]">—</span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 font-mono text-[11px]">
+                              {formatUnit(item.unitOfMeasure as any)}
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-mono font-medium">
+                              ${Number(item.costPerUnit).toFixed(2)}
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-mono font-bold">
+                              <span className={isOutOfStock ? "text-rose-500" : isLowStock ? "text-amber-500" : ""}>
+                                {stock}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-mono opacity-60">
+                              {item.parLevel}
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              {isOutOfStock ? (
+                                <span className="px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 text-[10px] font-bold">
+                                  Out of Stock
+                                </span>
+                              ) : isLowStock ? (
+                                <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[10px] font-bold">
+                                  Low Stock
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px] font-bold">
+                                  In Stock
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEdit(item)}
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition cursor-pointer ${
+                                  isDark
+                                    ? "bg-white/[0.04] border-white/[0.08] hover:bg-white/[0.1] text-slate-200"
+                                    : "bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700 shadow-2xs"
+                                }`}
+                              >
+                                Edit
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
           )}
         </main>
 
-        {/* EDIT ITEM MODAL */}
+        {/* EDIT ITEM MODAL / BOTTOM SHEET */}
         {editingItem && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end md:items-center justify-center z-50 p-0 md:p-4 animate-in fade-in duration-150">
             <div
-              className={`w-full max-w-lg p-6 sm:p-8 rounded-3xl border shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150 ${
-                isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+              className={`w-full max-w-lg p-6 sm:p-8 rounded-t-[32px] md:rounded-3xl border-t md:border shadow-2xl space-y-4 max-h-[88vh] md:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 md:zoom-in-95 duration-200 ${
+                isDark ? "bg-[#121622] border-white/[0.1] text-white" : "bg-white border-slate-200 text-slate-900"
               }`}
             >
+              {/* Mobile Drag Indicator */}
+              <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-white/20 mx-auto mb-1 md:hidden" />
+
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-base font-bold tracking-tight">Edit Inventory Item</h2>
@@ -636,7 +746,7 @@ export default function InventoryItemsPage({
                 </div>
                 <button
                   onClick={() => setEditingItem(null)}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-base cursor-pointer"
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-base cursor-pointer p-1"
                 >
                   ✕
                 </button>
@@ -818,14 +928,17 @@ export default function InventoryItemsPage({
           </div>
         )}
 
-        {/* BULK IMPORT VIA EXCEL / CSV MODAL */}
+        {/* BULK IMPORT VIA EXCEL / CSV MODAL (Bottom Sheet on Mobile, Centered Modal on Desktop) */}
         {showBulkModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end md:items-center justify-center z-50 p-0 md:p-4 animate-in fade-in duration-150">
             <div
-              className={`w-full max-w-2xl p-6 sm:p-8 rounded-3xl border shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150 ${
-                isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+              className={`w-full max-w-2xl p-6 sm:p-8 rounded-t-[32px] md:rounded-3xl border-t md:border shadow-2xl space-y-6 max-h-[88vh] md:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 md:zoom-in-95 duration-200 ${
+                isDark ? "bg-[#121622] border-white/[0.1] text-white" : "bg-white border-slate-200 text-slate-900"
               }`}
             >
+              {/* Mobile Drag Indicator */}
+              <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-white/20 mx-auto mb-1 md:hidden" />
+
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-lg font-bold tracking-tight">
@@ -845,7 +958,7 @@ export default function InventoryItemsPage({
                     setPreviewFile(null);
                     setParsedRows([]);
                   }}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-base cursor-pointer"
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-base cursor-pointer p-1"
                 >
                   ✕
                 </button>
@@ -1135,14 +1248,17 @@ export default function InventoryItemsPage({
           </div>
         )}
 
-        {/* CREATE SINGLE ITEM MODAL */}
+        {/* CREATE SINGLE ITEM MODAL / BOTTOM SHEET */}
         {showCreate && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end md:items-center justify-center z-50 p-0 md:p-4 animate-in fade-in duration-150">
             <div
-              className={`w-full max-w-lg p-6 sm:p-8 rounded-3xl border shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150 ${
-                isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+              className={`w-full max-w-lg p-6 sm:p-8 rounded-t-[32px] md:rounded-3xl border-t md:border shadow-2xl space-y-4 max-h-[88vh] md:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 md:zoom-in-95 duration-200 ${
+                isDark ? "bg-[#121622] border-white/[0.1] text-white" : "bg-white border-slate-200 text-slate-900"
               }`}
             >
+              {/* Mobile Drag Indicator */}
+              <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-white/20 mx-auto mb-1 md:hidden" />
+
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-base font-bold tracking-tight">Add New Inventory Item</h2>
@@ -1152,7 +1268,7 @@ export default function InventoryItemsPage({
                 </div>
                 <button
                   onClick={() => setShowCreate(false)}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-base cursor-pointer"
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-base cursor-pointer p-1"
                 >
                   ✕
                 </button>
