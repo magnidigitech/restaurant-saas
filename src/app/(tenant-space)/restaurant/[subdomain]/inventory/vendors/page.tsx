@@ -569,7 +569,7 @@ export default function VendorDirectoryPage({
                   <div className={`p-3.5 rounded-2xl border space-y-2.5 ${
                     isDark ? "bg-[#090B10]/60 border-white/[0.06]" : "bg-slate-50 border-slate-200"
                   }`}>
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div>
                         <label className={`block text-xs font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
                           Serviced Restaurant Locations
@@ -579,34 +579,56 @@ export default function VendorDirectoryPage({
                         </p>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleSelectAllOutlets(form.outletIds.length !== outlets.length)}
-                        className="text-[11px] text-[#0071E3] font-semibold hover:underline cursor-pointer"
-                      >
-                        {form.outletIds.length === outlets.length || form.outletIds.length === 0
-                          ? "Select All"
-                          : "Clear All"}
-                      </button>
+                      {/* Clean Select All / Clear All Buttons */}
+                      <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-auto">
+                        <button
+                          type="button"
+                          onClick={() => setForm((prev) => ({ ...prev, outletIds: outlets.map((o) => o.id) }))}
+                          className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg border transition cursor-pointer ${
+                            form.outletIds.length === outlets.length
+                              ? "bg-[#0071E3] text-white border-[#0071E3]"
+                              : isDark
+                              ? "bg-white/[0.04] border-white/[0.08] text-[#8F95A3] hover:text-white"
+                              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          Select All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm((prev) => ({ ...prev, outletIds: [] }))}
+                          className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg border transition cursor-pointer ${
+                            form.outletIds.length === 0
+                              ? isDark
+                                ? "bg-white/[0.08] text-white border-white/[0.15]"
+                                : "bg-slate-200 text-slate-800 border-slate-300"
+                              : isDark
+                              ? "bg-white/[0.04] border-white/[0.08] text-[#8F95A3] hover:text-white"
+                              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          Clear All
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap gap-2 pt-1">
                       {outlets.map((o) => {
-                        const isSelected = form.outletIds.length === 0 || form.outletIds.includes(o.id);
+                        const isSelected = form.outletIds.includes(o.id);
 
                         return (
                           <button
                             key={o.id}
                             type="button"
                             onClick={() => toggleOutletSelection(o.id)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition cursor-pointer flex items-center gap-1.5 ${
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer flex items-center gap-1.5 ${
                               isSelected
                                 ? isDark
-                                  ? "bg-[#0071E3]/20 border-[#0071E3] text-white font-semibold shadow-xs"
-                                  : "bg-blue-50 border-[#0071E3] text-[#0071E3] font-semibold shadow-xs"
+                                  ? "bg-[#0071E3] border-[#0071E3] text-white shadow-xs"
+                                  : "bg-[#0071E3] border-[#0071E3] text-white shadow-xs"
                                 : isDark
-                                ? "bg-white/[0.03] border-white/[0.08] text-[#8F95A3] hover:text-white"
-                                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                                ? "bg-[#0A0C12] border-white/[0.08] text-[#8F95A3] hover:text-white hover:border-white/[0.15]"
+                                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
                             }`}
                           >
                             <span>{isSelected ? "✓" : "+"}</span>
@@ -616,10 +638,12 @@ export default function VendorDirectoryPage({
                       })}
                     </div>
 
-                    <div className={`text-[10px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                      {form.outletIds.length === 0 || form.outletIds.length === outlets.length
+                    <div className={`text-[11px] font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                      {form.outletIds.length === 0
+                        ? "No locations selected. Click locations to assign."
+                        : form.outletIds.length === outlets.length
                         ? "✨ Supplying to all restaurant locations."
-                        : `Delivering to ${form.outletIds.length} selected location(s).`}
+                        : `Delivering to ${form.outletIds.length} of ${outlets.length} selected location(s).`}
                     </div>
                   </div>
                 )}
