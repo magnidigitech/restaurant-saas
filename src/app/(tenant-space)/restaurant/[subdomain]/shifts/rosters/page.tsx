@@ -223,11 +223,11 @@ export default function AppleShiftRostersPage() {
   }>({ recommended: [], partiallyAvailable: [], unavailable: [] });
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
-  // Load Initial Master Data
-  const fetchMasterData = async () => {
-    setLoading(true);
-    setError(null);
+  // Fetch Outlets, Employees, Templates, and Active Rosters
+  const fetchMasterData = async (isBackground: boolean = false) => {
     try {
+      if (!isBackground) setLoading(true);
+      setError(null);
       const [resModules, resOutlets, resEmps, resTmpls, resRosters] = await Promise.all([
         fetch("/api/restaurant/modules"),
         fetch("/api/restaurant/outlets"),
@@ -282,13 +282,49 @@ export default function AppleShiftRostersPage() {
     } catch (err: any) {
       setError("Failed to load initial shift roster data");
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchMasterData();
   }, []);
+
+  // Real-time Background AJAX Polling & Window Focus Auto-Sync
+  useEffect(() => {
+    if (!selectedRosterId) return;
+
+    const refreshData = () => {
+      if (!actionLoading) {
+        fetchMasterData(true);
+        fetchRosterDetails(selectedRosterId);
+        fetchMyAvailability(selectedRosterId);
+      }
+    };
+
+    // 1. Sync immediately on window focus or tab visibility change
+    const onVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible") {
+        refreshData();
+      }
+    };
+
+    window.addEventListener("focus", onVisibilityOrFocus);
+    document.addEventListener("visibilitychange", onVisibilityOrFocus);
+
+    // 2. Periodic background polling every 4 seconds for live sync
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        refreshData();
+      }
+    }, 4000);
+
+    return () => {
+      window.removeEventListener("focus", onVisibilityOrFocus);
+      document.removeEventListener("visibilitychange", onVisibilityOrFocus);
+      clearInterval(timer);
+    };
+  }, [selectedRosterId, actionLoading]);
 
   // Fetch Assignments & Availability when selected roster changes
   const fetchRosterDetails = async (rosterId: string) => {
@@ -1569,7 +1605,9 @@ export default function AppleShiftRostersPage() {
                             <button
                               key={opt.key}
                               type="button"
+                              disabled={isAvailabilityLocked || actionLoading}
                               onClick={() => {
+                                if (isAvailabilityLocked) return;
                                 setMyDateAvailabilities((prev) => ({
                                   ...prev,
                                   [dStr]: {
@@ -1578,7 +1616,9 @@ export default function AppleShiftRostersPage() {
                                   },
                                 }));
                               }}
-                              className={`py-1.5 px-2 text-[11px] font-semibold rounded-lg border transition cursor-pointer ${currentVal.type === opt.key
+                              className={`py-1.5 px-2 text-[11px] font-semibold rounded-lg border transition ${
+                                isAvailabilityLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                              } ${currentVal.type === opt.key
                                 ? "bg-[#0071E3] border-[#0071E3] text-white"
                                 : isDark
                                   ? "bg-white/5 border-white/10 text-[#8F95A3] hover:text-white"
@@ -1597,28 +1637,32 @@ export default function AppleShiftRostersPage() {
                               <label className={`block text-[10px] font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>From</label>
                               <input
                                 type="time"
+                                disabled={isAvailabilityLocked || actionLoading}
                                 value={currentVal.availableFrom || "09:00"}
                                 onChange={(e) => {
+                                  if (isAvailabilityLocked) return;
                                   setMyDateAvailabilities((prev) => ({
                                     ...prev,
                                     [dStr]: { ...currentVal, availableFrom: e.target.value },
                                   }));
                                 }}
-                                className={`w-full px-2 py-1 rounded-lg border text-xs ${isDark ? "bg-[#121622] border-white/10 text-white" : "bg-white border-slate-200"}`}
+                                className={`w-full px-2 py-1 rounded-lg border text-xs ${isAvailabilityLocked ? "opacity-60 cursor-not-allowed" : ""} ${isDark ? "bg-[#121622] border-white/10 text-white" : "bg-white border-slate-200"}`}
                               />
                             </div>
                             <div>
                               <label className={`block text-[10px] font-medium mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>Until</label>
                               <input
                                 type="time"
+                                disabled={isAvailabilityLocked || actionLoading}
                                 value={currentVal.availableUntil || "17:00"}
                                 onChange={(e) => {
+                                  if (isAvailabilityLocked) return;
                                   setMyDateAvailabilities((prev) => ({
                                     ...prev,
                                     [dStr]: { ...currentVal, availableUntil: e.target.value },
                                   }));
                                 }}
-                                className={`w-full px-2 py-1 rounded-lg border text-xs ${isDark ? "bg-[#121622] border-white/10 text-white" : "bg-white border-slate-200"}`}
+                                className={`w-full px-2 py-1 rounded-lg border text-xs ${isAvailabilityLocked ? "opacity-60 cursor-not-allowed" : ""} ${isDark ? "bg-[#121622] border-white/10 text-white" : "bg-white border-slate-200"}`}
                               />
                             </div>
                           </div>
