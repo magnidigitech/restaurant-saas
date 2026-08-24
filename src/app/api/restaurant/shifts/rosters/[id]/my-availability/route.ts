@@ -28,6 +28,37 @@ export async function GET(
       employeeId: employee.id,
     });
 
+    if (data.roster?.status === "DRAFT") {
+      const membership = await prisma.restaurantMembership.findUnique({
+        where: {
+          restaurantId_userId: {
+            restaurantId: session.activeRestaurantId,
+            userId: session.userId,
+          },
+        },
+        include: {
+          accessGrants: {
+            where: { status: "ACTIVE" },
+            include: { role: true },
+          },
+        },
+      });
+
+      const isUserAdmin =
+        session.role === "PLATFORM_ADMIN" ||
+        (membership?.accessGrants?.some((g: any) =>
+          ["Restaurant Owner", "Admin", "Owner", "Super Admin", "General Manager"].includes(g.role?.name || "")
+        ) ?? false) ||
+        (!membership?.employeeId && (membership?.accessGrants?.length || 0) === 0);
+
+      if (!isUserAdmin) {
+        return NextResponse.json(
+          { error: "This roster period is currently in draft mode and is not yet open for employee availability." },
+          { status: 403 }
+        );
+      }
+    }
+
     const recurring = await prisma.shiftAvailability.findMany({
       where: { restaurantId: session.activeRestaurantId, employeeId: employee.id },
       orderBy: { dayOfWeek: "asc" },

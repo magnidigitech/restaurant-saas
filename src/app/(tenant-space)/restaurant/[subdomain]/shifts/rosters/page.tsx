@@ -278,8 +278,13 @@ export default function AppleShiftRostersPage() {
 
       if (resRosters.ok && Array.isArray(dataRosters.rosters)) {
         setRosters(dataRosters.rosters);
-        if (dataRosters.rosters.length > 0 && !selectedRosterId) {
-          setSelectedRosterId(dataRosters.rosters[0].id);
+        const filtered = isUserAdmin
+          ? dataRosters.rosters
+          : dataRosters.rosters.filter((r: any) => r.status !== "DRAFT" && r.status !== "ARCHIVED");
+        if (filtered.length > 0) {
+          setSelectedRosterId((prev) => (filtered.some((r: any) => r.id === prev) ? prev : filtered[0].id));
+        } else {
+          setSelectedRosterId("");
         }
       }
     } catch (err: any) {
@@ -450,7 +455,11 @@ export default function AppleShiftRostersPage() {
     });
   };
 
-  const currentRoster = rosters.find((r) => r.id === selectedRosterId);
+  const visibleRosters = React.useMemo(() => {
+    return isAdmin ? rosters : rosters.filter((r) => r.status !== "DRAFT" && r.status !== "ARCHIVED");
+  }, [rosters, isAdmin]);
+
+  const currentRoster = visibleRosters.find((r) => r.id === selectedRosterId) || (visibleRosters.length > 0 ? visibleRosters[0] : undefined);
 
   // 1. Create New Roster Period
   const handleCreateRoster = async (e: React.FormEvent) => {
@@ -859,13 +868,18 @@ export default function AppleShiftRostersPage() {
               <select
                 value={selectedRosterId}
                 onChange={(e) => setSelectedRosterId(e.target.value)}
+                disabled={visibleRosters.length === 0}
                 className={`w-full sm:w-auto max-w-full min-w-0 px-3.5 py-2.5 sm:py-2 text-xs rounded-xl border font-medium focus:outline-none focus:border-[#0071E3] truncate ${isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-slate-50 border-slate-200 text-slate-900"}`}
               >
-                {rosters.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name} ({new Date(r.startDate).toLocaleDateString()} - {new Date(r.endDate).toLocaleDateString()})
-                  </option>
-                ))}
+                {visibleRosters.length === 0 ? (
+                  <option value="">No Active Rosters Open</option>
+                ) : (
+                  visibleRosters.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} ({new Date(r.startDate).toLocaleDateString()} - {new Date(r.endDate).toLocaleDateString()})
+                    </option>
+                  ))
+                )}
               </select>
 
               {isAdmin && (
@@ -933,74 +947,93 @@ export default function AppleShiftRostersPage() {
             </div>
           )}
 
-          {/* Navigation View Mode Tabs */}
-          <div className="flex border-b border-slate-200 dark:border-white/[0.08] gap-4 sm:gap-6 overflow-x-auto no-scrollbar min-w-0">
-            {!isAdmin ? (
-              <>
-                <button
-                  onClick={() => setActiveTab("MY_SCHEDULE")}
-                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${activeTab === "MY_SCHEDULE"
-                    ? "border-[#0071E3] text-[#0071E3]"
-                    : isDark
-                      ? "border-transparent text-[#8F95A3] hover:text-white"
-                      : "border-transparent text-slate-500 hover:text-slate-900"
-                    }`}
-                >
-                  My Shifts & Schedule {isRosterPublished ? `(${myShifts.length})` : ""}
-                </button>
+          {/* Empty state for employees when no rosters are open */}
+          {!isAdmin && visibleRosters.length === 0 && (
+            <div className={`p-10 sm:p-16 rounded-3xl border text-center space-y-4 ${isDark ? "bg-[#121622]/40 border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
+              <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className={`text-base font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                No Active Rosters Open
+              </h3>
+              <p className={`text-xs max-w-md mx-auto leading-relaxed ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                There are currently no roster periods open for availability submission or published for viewing. Please check back when management opens a new scheduling period.
+              </p>
+            </div>
+          )}
 
-                <button
-                  onClick={() => setActiveTab("MY_AVAILABILITY")}
-                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${activeTab === "MY_AVAILABILITY"
-                    ? "border-[#0071E3] text-[#0071E3]"
-                    : isDark
-                      ? "border-transparent text-[#8F95A3] hover:text-white"
-                      : "border-transparent text-slate-500 hover:text-slate-900"
-                    }`}
-                >
-                  Submit My Availability
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => setActiveTab("ASSIGNMENTS")}
-                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${activeTab === "ASSIGNMENTS"
-                    ? "border-[#0071E3] text-[#0071E3]"
-                    : isDark
-                      ? "border-transparent text-[#8F95A3] hover:text-white"
-                      : "border-transparent text-slate-500 hover:text-slate-900"
-                    }`}
-                >
-                  Shift Planner (Weekly Grid) ({assignments.length})
-                </button>
+          {/* Navigation View Mode Tabs (Only when rosters are visible) */}
+          {(isAdmin || visibleRosters.length > 0) && (
+            <div className="flex border-b border-slate-200 dark:border-white/[0.08] gap-4 sm:gap-6 overflow-x-auto no-scrollbar min-w-0">
+              {!isAdmin ? (
+                <>
+                  <button
+                    onClick={() => setActiveTab("MY_SCHEDULE")}
+                    className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${activeTab === "MY_SCHEDULE"
+                      ? "border-[#0071E3] text-[#0071E3]"
+                      : isDark
+                        ? "border-transparent text-[#8F95A3] hover:text-white"
+                        : "border-transparent text-slate-500 hover:text-slate-900"
+                      }`}
+                  >
+                    My Shifts & Schedule {isRosterPublished ? `(${myShifts.length})` : ""}
+                  </button>
 
-                <button
-                  onClick={() => setActiveTab("ADMIN_AVAILABILITY")}
-                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${activeTab === "ADMIN_AVAILABILITY"
-                    ? "border-[#0071E3] text-[#0071E3]"
-                    : isDark
-                      ? "border-transparent text-[#8F95A3] hover:text-white"
-                      : "border-transparent text-slate-500 hover:text-slate-900"
-                    }`}
-                >
-                  Staff Availability Matrix
-                </button>
+                  <button
+                    onClick={() => setActiveTab("MY_AVAILABILITY")}
+                    className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${activeTab === "MY_AVAILABILITY"
+                      ? "border-[#0071E3] text-[#0071E3]"
+                      : isDark
+                        ? "border-transparent text-[#8F95A3] hover:text-white"
+                        : "border-transparent text-slate-500 hover:text-slate-900"
+                      }`}
+                  >
+                    Submit My Availability
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setActiveTab("ASSIGNMENTS")}
+                    className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${activeTab === "ASSIGNMENTS"
+                      ? "border-[#0071E3] text-[#0071E3]"
+                      : isDark
+                        ? "border-transparent text-[#8F95A3] hover:text-white"
+                        : "border-transparent text-slate-500 hover:text-slate-900"
+                      }`}
+                  >
+                    Shift Planner (Weekly Grid) ({assignments.length})
+                  </button>
 
-                <button
-                  onClick={() => setActiveTab("MY_AVAILABILITY")}
-                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${activeTab === "MY_AVAILABILITY"
-                    ? "border-[#0071E3] text-[#0071E3]"
-                    : isDark
-                      ? "border-transparent text-[#8F95A3] hover:text-white"
-                      : "border-transparent text-slate-500 hover:text-slate-900"
-                    }`}
-                >
-                  Staff Self-Service Preview
-                </button>
-              </>
-            )}
-          </div>
+                  <button
+                    onClick={() => setActiveTab("ADMIN_AVAILABILITY")}
+                    className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${activeTab === "ADMIN_AVAILABILITY"
+                      ? "border-[#0071E3] text-[#0071E3]"
+                      : isDark
+                        ? "border-transparent text-[#8F95A3] hover:text-white"
+                        : "border-transparent text-slate-500 hover:text-slate-900"
+                      }`}
+                  >
+                    Staff Availability Matrix
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab("MY_AVAILABILITY")}
+                    className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${activeTab === "MY_AVAILABILITY"
+                      ? "border-[#0071E3] text-[#0071E3]"
+                      : isDark
+                        ? "border-transparent text-[#8F95A3] hover:text-white"
+                        : "border-transparent text-slate-500 hover:text-slate-900"
+                      }`}
+                  >
+                    Staff Self-Service Preview
+                  </button>
+                </>
+              )}
+            </div>
+          )}
 
           {/* TAB: EMPLOYEE PERSONAL SCHEDULE VIEW */}
           {activeTab === "MY_SCHEDULE" && (
