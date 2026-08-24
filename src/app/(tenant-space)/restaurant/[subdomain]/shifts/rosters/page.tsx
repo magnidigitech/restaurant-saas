@@ -263,10 +263,12 @@ export default function AppleShiftRostersPage() {
         setMyEmployeeId(dataEmps.employees[0].id);
       }
 
-      if (!isUserAdmin) {
-        setActiveTab("MY_SCHEDULE");
-      } else {
-        setActiveTab("ASSIGNMENTS");
+      if (!isBackground) {
+        if (!isUserAdmin) {
+          setActiveTab("MY_SCHEDULE");
+        } else {
+          setActiveTab("ASSIGNMENTS");
+        }
       }
 
       if (resTmpls.ok && Array.isArray(dataTmpls.templates)) {
@@ -280,7 +282,7 @@ export default function AppleShiftRostersPage() {
         }
       }
     } catch (err: any) {
-      setError("Failed to load initial shift roster data");
+      if (!isBackground) setError("Failed to load initial shift roster data");
     } finally {
       if (!isBackground) setLoading(false);
     }
@@ -298,7 +300,7 @@ export default function AppleShiftRostersPage() {
       if (!actionLoading) {
         fetchMasterData(true);
         fetchRosterDetails(selectedRosterId);
-        fetchMyAvailability(selectedRosterId);
+        fetchMyAvailability(selectedRosterId, true);
       }
     };
 
@@ -312,12 +314,12 @@ export default function AppleShiftRostersPage() {
     window.addEventListener("focus", onVisibilityOrFocus);
     document.addEventListener("visibilitychange", onVisibilityOrFocus);
 
-    // 2. Periodic background polling every 4 seconds for live sync
+    // 2. Periodic background polling every 4.5 seconds for live sync
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") {
         refreshData();
       }
-    }, 4000);
+    }, 4500);
 
     return () => {
       window.removeEventListener("focus", onVisibilityOrFocus);
@@ -351,7 +353,7 @@ export default function AppleShiftRostersPage() {
   };
 
   // Fetch Employee's Personal Availability Portal Data
-  const fetchMyAvailability = async (rosterId: string) => {
+  const fetchMyAvailability = async (rosterId: string, isBackground: boolean = false) => {
     if (!rosterId) return;
     try {
       const res = await fetch(`/api/restaurant/shifts/rosters/${rosterId}/my-availability`);
@@ -362,19 +364,21 @@ export default function AppleShiftRostersPage() {
           setMySubmissionStatus(data.myAvailability.submissionStatus || "DRAFT");
           setMySubmittedAt(data.myAvailability.submittedAt || null);
 
-          // Populate daily map
-          const dailyMap: Record<string, any> = {};
-          if (data.myAvailability.days) {
-            Object.entries(data.myAvailability.days).forEach(([dStr, val]: [string, any]) => {
-              dailyMap[dStr] = {
-                type: val.type || "NOT_UPDATED",
-                availableFrom: val.availableFrom || "09:00",
-                availableUntil: val.availableUntil || "17:00",
-                notes: val.notes || "",
-              };
-            });
+          // Populate daily map on initial load (don't overwrite active user edits during background polling)
+          if (!isBackground || Object.keys(myDateAvailabilities).length === 0) {
+            const dailyMap: Record<string, any> = {};
+            if (data.myAvailability.days) {
+              Object.entries(data.myAvailability.days).forEach(([dStr, val]: [string, any]) => {
+                dailyMap[dStr] = {
+                  type: val.type || "NOT_UPDATED",
+                  availableFrom: val.availableFrom || "09:00",
+                  availableUntil: val.availableUntil || "17:00",
+                  notes: val.notes || "",
+                };
+              });
+            }
+            setMyDateAvailabilities(dailyMap);
           }
-          setMyDateAvailabilities(dailyMap);
         }
       }
     } catch {
