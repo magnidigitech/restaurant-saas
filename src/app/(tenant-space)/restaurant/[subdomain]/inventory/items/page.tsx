@@ -586,7 +586,7 @@ export default function InventoryItemsPage({
                         }`}
                       >
                         <div>
-                          <div className="text-[10px] font-medium opacity-50 uppercase tracking-wider">UOM</div>
+                          <div className="text-[10px] font-medium opacity-50 uppercase tracking-wider">UNIT</div>
                           <div className="font-mono text-xs font-semibold mt-0.5">
                             {formatUnit(item.unitOfMeasure as any)}
                           </div>
@@ -643,7 +643,7 @@ export default function InventoryItemsPage({
                       <tr className={`border-b text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap ${isDark ? "border-white/[0.08] text-[#8F95A3]" : "border-slate-200 text-slate-500 bg-slate-50/50"}`}>
                         <th className="py-3.5 px-4">Item &amp; SKU</th>
                         <th className="py-3.5 px-4">Category</th>
-                        <th className="py-3.5 px-4">Unit of Measure</th>
+                        <th className="py-3.5 px-4">Unit</th>
                         <th className="py-3.5 px-4 text-right">Cost Per Unit</th>
                         <th className="py-3.5 px-4 text-right">Current Stock</th>
                         <th className="py-3.5 px-4 text-right">Par Level</th>
@@ -809,7 +809,7 @@ export default function InventoryItemsPage({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                      Unit of Measure
+                      Unit
                     </label>
                     <select
                       value={editForm.unitOfMeasure}
@@ -1057,7 +1057,7 @@ export default function InventoryItemsPage({
                           <th className="py-2.5 px-3">Item Name</th>
                           <th className="py-2.5 px-3">SKU</th>
                           <th className="py-2.5 px-3">Category</th>
-                          <th className="py-2.5 px-3">UOM</th>
+                          <th className="py-2.5 px-3">Unit</th>
                           <th className="py-2.5 px-3 text-right">Cost</th>
                           <th className="py-2.5 px-3 text-right">Par Level</th>
                         </tr>
@@ -1331,7 +1331,7 @@ export default function InventoryItemsPage({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                      Unit of Measure
+                      Unit
                     </label>
                     <select
                       value={form.unitOfMeasure}
