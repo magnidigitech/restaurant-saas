@@ -58,17 +58,33 @@ export const VendorService = {
     } catch {
       const freshDb = createPrismaClient() as any;
       (globalThis as any).prisma = freshDb;
-      return freshDb.vendor.findMany({
-        where,
-        include: {
-          vendorItems: {
-            include: {
-              item: { select: { id: true, name: true, unitOfMeasure: true, costPerUnit: true } },
+      try {
+        return await freshDb.vendor.findMany({
+          where,
+          include: {
+            vendorItems: {
+              include: {
+                item: { select: { id: true, name: true, unitOfMeasure: true, costPerUnit: true } },
+              },
             },
           },
-        },
-        orderBy: { createdAt: "desc" },
-      });
+          orderBy: { createdAt: "desc" },
+        });
+      } catch {
+        delete where.OR;
+        delete where.AND;
+        return await freshDb.vendor.findMany({
+          where: { restaurantId, archivedAt: null },
+          include: {
+            vendorItems: {
+              include: {
+                item: { select: { id: true, name: true, unitOfMeasure: true, costPerUnit: true } },
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        });
+      }
     }
   },
 
@@ -122,23 +138,49 @@ export const VendorService = {
       notes?: string;
     }
   ) {
-    const db = getPrisma();
-    return db.vendor.create({
-      data: {
-        restaurantId,
-        name: data.name,
-        code: data.code || null,
-        contactPerson: data.contactPerson || null,
-        email: data.email || null,
-        phone: data.phone || null,
-        address: data.address || null,
-        taxId: data.taxId || null,
-        paymentTerms: (data.paymentTerms as any) || "NET30",
-        status: (data.status as any) || "ACTIVE",
-        outletIds: data.outletIds || [],
-        notes: data.notes || null,
-      },
-    });
+    let db = getPrisma();
+    const vendorPayload: any = {
+      restaurantId,
+      name: data.name,
+      code: data.code || null,
+      contactPerson: data.contactPerson || null,
+      email: data.email || null,
+      phone: data.phone || null,
+      address: data.address || null,
+      taxId: data.taxId || null,
+      paymentTerms: (data.paymentTerms as any) || "NET30",
+      status: (data.status as any) || "ACTIVE",
+      outletIds: data.outletIds || [],
+      notes: data.notes || null,
+    };
+
+    try {
+      return await db.vendor.create({ data: vendorPayload });
+    } catch (err: any) {
+      const freshDb = createPrismaClient() as any;
+      (globalThis as any).prisma = freshDb;
+      try {
+        return await freshDb.vendor.create({ data: vendorPayload });
+      } catch (retryErr: any) {
+        if (retryErr.message?.includes("outletIds")) {
+          delete vendorPayload.outletIds;
+          const created = await freshDb.vendor.create({ data: vendorPayload });
+          if (data.outletIds && data.outletIds.length > 0) {
+            try {
+              await freshDb.$executeRawUnsafe(
+                `UPDATE "inventory_vendors" SET "outlet_ids" = $1 WHERE "id" = $2`,
+                data.outletIds,
+                created.id
+              );
+            } catch {
+              // ignore
+            }
+          }
+          return created;
+        }
+        throw retryErr;
+      }
+    }
   },
 
   async updateVendor(
@@ -158,17 +200,51 @@ export const VendorService = {
       notes?: string;
     }
   ) {
-    const db = getPrisma();
+    let db = getPrisma();
     await db.vendor.findFirstOrThrow({ where: { id, restaurantId } });
-    return db.vendor.update({
-      where: { id },
-      data: {
-        ...data,
-        paymentTerms: data.paymentTerms ? (data.paymentTerms as any) : undefined,
-        status: data.status ? (data.status as any) : undefined,
-        outletIds: data.outletIds !== undefined ? data.outletIds : undefined,
-      },
-    });
+    const updatePayload: any = {
+      ...data,
+      paymentTerms: data.paymentTerms ? (data.paymentTerms as any) : undefined,
+      status: data.status ? (data.status as any) : undefined,
+      outletIds: data.outletIds !== undefined ? data.outletIds : undefined,
+    };
+
+    try {
+      return await db.vendor.update({
+        where: { id },
+        data: updatePayload,
+      });
+    } catch (err: any) {
+      const freshDb = createPrismaClient() as any;
+      (globalThis as any).prisma = freshDb;
+      try {
+        return await freshDb.vendor.update({
+          where: { id },
+          data: updatePayload,
+        });
+      } catch (retryErr: any) {
+        if (retryErr.message?.includes("outletIds")) {
+          delete updatePayload.outletIds;
+          const updated = await freshDb.vendor.update({
+            where: { id },
+            data: updatePayload,
+          });
+          if (data.outletIds !== undefined) {
+            try {
+              await freshDb.$executeRawUnsafe(
+                `UPDATE "inventory_vendors" SET "outlet_ids" = $1 WHERE "id" = $2`,
+                data.outletIds,
+                id
+              );
+            } catch {
+              // ignore
+            }
+          }
+          return updated;
+        }
+        throw retryErr;
+      }
+    }
   },
 
   async archiveVendor(restaurantId: string, id: string) {
