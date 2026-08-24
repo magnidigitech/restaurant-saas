@@ -107,7 +107,8 @@ export default function AppleShiftRostersPage() {
 
   const [selectedOutlet, setSelectedOutlet] = useState<string>("");
   const [selectedRosterId, setSelectedRosterId] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<"ASSIGNMENTS" | "ADMIN_AVAILABILITY" | "MY_AVAILABILITY">("ASSIGNMENTS");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [activeTab, setActiveTab] = useState<"MY_SCHEDULE" | "ASSIGNMENTS" | "ADMIN_AVAILABILITY" | "MY_AVAILABILITY">("ASSIGNMENTS");
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -218,12 +219,17 @@ export default function AppleShiftRostersPage() {
     setLoading(true);
     setError(null);
     try {
-      const [resOutlets, resEmps, resTmpls, resRosters] = await Promise.all([
+      const [resModules, resOutlets, resEmps, resTmpls, resRosters] = await Promise.all([
+        fetch("/api/restaurant/modules"),
         fetch("/api/restaurant/outlets"),
         fetch("/api/restaurant/employees"),
         fetch("/api/restaurant/shifts/templates"),
         fetch("/api/restaurant/shifts/rosters"),
       ]);
+
+      const dataModules = await resModules.json();
+      const isUserAdmin = Boolean(dataModules?.isAdmin);
+      setIsAdmin(isUserAdmin);
 
       const dataOutlets = await resOutlets.json();
       const dataEmps = await resEmps.json();
@@ -240,9 +246,18 @@ export default function AppleShiftRostersPage() {
 
       if (resEmps.ok && Array.isArray(dataEmps.employees)) {
         setEmployees(dataEmps.employees);
-        if (dataEmps.employees.length > 0) {
-          setMyEmployeeId(dataEmps.employees[0].id);
-        }
+      }
+
+      if (dataModules?.employeeId) {
+        setMyEmployeeId(dataModules.employeeId);
+      } else if (resEmps.ok && Array.isArray(dataEmps.employees) && dataEmps.employees.length > 0) {
+        setMyEmployeeId(dataEmps.employees[0].id);
+      }
+
+      if (!isUserAdmin) {
+        setActiveTab("MY_SCHEDULE");
+      } else {
+        setActiveTab("ASSIGNMENTS");
       }
 
       if (resTmpls.ok && Array.isArray(dataTmpls.templates)) {
@@ -656,6 +671,31 @@ export default function AppleShiftRostersPage() {
     }
   }
 
+  // Employee's personal shifts
+  const myShifts = React.useMemo(() => {
+    if (!myEmployeeId) return assignments;
+    return assignments.filter((a) => a.employeeId === myEmployeeId);
+  }, [assignments, myEmployeeId]);
+
+  const myEmployeeRecord = React.useMemo(() => {
+    return employees.find((e) => e.id === myEmployeeId);
+  }, [employees, myEmployeeId]);
+
+  const myTotalHours = React.useMemo(() => {
+    let total = 0;
+    for (const s of myShifts) {
+      if (s.startTime && s.endTime) {
+        const [sh, sm] = s.startTime.split(":").map(Number);
+        const [eh, em] = s.endTime.split(":").map(Number);
+        let mins = eh * 60 + em - (sh * 60 + sm);
+        if (mins < 0) mins += 24 * 60;
+        mins -= s.breakMinutes || 0;
+        if (mins > 0) total += mins / 60;
+      }
+    }
+    return Math.round(total * 10) / 10;
+  }, [myShifts]);
+
   if (loading) {
     return (
       <div className={`min-h-screen flex flex-col items-center justify-center font-sans antialiased ${isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"}`}>
@@ -680,12 +720,16 @@ export default function AppleShiftRostersPage() {
                 </button>
                 <span className={`text-xs ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
                 <span className="w-2 h-2 rounded-full bg-[#0071E3]" />
-                <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>Workforce Roster</span>
+                <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  {isAdmin ? "Workforce Roster Console" : "My Shift Schedule"}
+                </span>
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
                 <h1 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-                  {currentRoster ? currentRoster.name : "Shift Rosters"}
+                  {isAdmin
+                    ? (currentRoster ? currentRoster.name : "Shift Rosters")
+                    : (currentRoster ? `${currentRoster.name}` : "My Shift Schedule")}
                 </h1>
                 {currentRoster && (
                   <span className={`px-2.5 py-1 text-[11px] font-bold rounded-lg uppercase tracking-wide border ${currentRoster.status === "PUBLISHED"
@@ -696,13 +740,15 @@ export default function AppleShiftRostersPage() {
                         ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
                         : "bg-slate-500/10 text-slate-400 border-slate-500/20"
                     }`}>
-                    {currentRoster.status.replace("_", " ")}
+                    {currentRoster.status.replace(/_/g, " ")}
                   </span>
                 )}
               </div>
 
               <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                Availability-First Roster Workflow: Employees submit schedule availability → Admin assigns shifts.
+                {isAdmin
+                  ? "Availability-First Roster Workflow: Employees submit schedule availability → Admin assigns shifts."
+                  : "View your weekly scheduled working shifts and submit your schedule availability for upcoming roster periods."}
               </p>
             </div>
 
@@ -720,12 +766,14 @@ export default function AppleShiftRostersPage() {
                 ))}
               </select>
 
-              <button
-                onClick={() => setNewRosterModalOpen(true)}
-                className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
-              >
-                + Create Roster Period
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setNewRosterModalOpen(true)}
+                  className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
+                >
+                  + Create Roster Period
+                </button>
+              )}
             </div>
           </div>
 
@@ -736,8 +784,8 @@ export default function AppleShiftRostersPage() {
             </div>
           )}
 
-          {/* Workflow Status Stepper (Requirement 12) */}
-          {currentRoster && (
+          {/* Workflow Status Stepper (Only for Admins) */}
+          {isAdmin && currentRoster && (
             <div className={`p-5 rounded-3xl border transition space-y-3 ${isDark ? "bg-[#121622]/40 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"}`}>
               <div className="flex justify-between items-center">
                 <span className={`text-xs font-semibold ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>Workflow Stage</span>
@@ -797,42 +845,226 @@ export default function AppleShiftRostersPage() {
 
           {/* Navigation View Mode Tabs */}
           <div className="flex border-b border-slate-200 dark:border-white/[0.08] gap-6">
-            <button
-              onClick={() => setActiveTab("ASSIGNMENTS")}
-              className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer ${activeTab === "ASSIGNMENTS"
-                ? "border-[#0071E3] text-[#0071E3]"
-                : isDark
-                  ? "border-transparent text-[#8F95A3] hover:text-white"
-                  : "border-transparent text-slate-500 hover:text-slate-900"
-                }`}
-            >
-              Admin Shift Assignments ({assignments.length})
-            </button>
+            {!isAdmin ? (
+              <>
+                <button
+                  onClick={() => setActiveTab("MY_SCHEDULE")}
+                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer ${activeTab === "MY_SCHEDULE"
+                    ? "border-[#0071E3] text-[#0071E3]"
+                    : isDark
+                      ? "border-transparent text-[#8F95A3] hover:text-white"
+                      : "border-transparent text-slate-500 hover:text-slate-900"
+                    }`}
+                >
+                  📅 My Shifts & Schedule ({myShifts.length})
+                </button>
 
-            <button
-              onClick={() => setActiveTab("ADMIN_AVAILABILITY")}
-              className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer ${activeTab === "ADMIN_AVAILABILITY"
-                ? "border-[#0071E3] text-[#0071E3]"
-                : isDark
-                  ? "border-transparent text-[#8F95A3] hover:text-white"
-                  : "border-transparent text-slate-500 hover:text-slate-900"
-                }`}
-            >
-              Admin Availability Dashboard
-            </button>
+                <button
+                  onClick={() => setActiveTab("MY_AVAILABILITY")}
+                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer ${activeTab === "MY_AVAILABILITY"
+                    ? "border-[#0071E3] text-[#0071E3]"
+                    : isDark
+                      ? "border-transparent text-[#8F95A3] hover:text-white"
+                      : "border-transparent text-slate-500 hover:text-slate-900"
+                    }`}
+                >
+                  📝 Submit My Availability
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setActiveTab("ASSIGNMENTS")}
+                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer ${activeTab === "ASSIGNMENTS"
+                    ? "border-[#0071E3] text-[#0071E3]"
+                    : isDark
+                      ? "border-transparent text-[#8F95A3] hover:text-white"
+                      : "border-transparent text-slate-500 hover:text-slate-900"
+                    }`}
+                >
+                  📅 Shift Planner (Weekly Grid) ({assignments.length})
+                </button>
 
-            <button
-              onClick={() => setActiveTab("MY_AVAILABILITY")}
-              className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer ${activeTab === "MY_AVAILABILITY"
-                ? "border-[#0071E3] text-[#0071E3]"
-                : isDark
-                  ? "border-transparent text-[#8F95A3] hover:text-white"
-                  : "border-transparent text-slate-500 hover:text-slate-900"
-                }`}
-            >
-              Employee Availability & Schedule Portal
-            </button>
+                <button
+                  onClick={() => setActiveTab("ADMIN_AVAILABILITY")}
+                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer ${activeTab === "ADMIN_AVAILABILITY"
+                    ? "border-[#0071E3] text-[#0071E3]"
+                    : isDark
+                      ? "border-transparent text-[#8F95A3] hover:text-white"
+                      : "border-transparent text-slate-500 hover:text-slate-900"
+                    }`}
+                >
+                  👥 Staff Availability Matrix
+                </button>
+
+                <button
+                  onClick={() => setActiveTab("MY_AVAILABILITY")}
+                  className={`pb-3 text-xs font-bold transition border-b-2 cursor-pointer ${activeTab === "MY_AVAILABILITY"
+                    ? "border-[#0071E3] text-[#0071E3]"
+                    : isDark
+                      ? "border-transparent text-[#8F95A3] hover:text-white"
+                      : "border-transparent text-slate-500 hover:text-slate-900"
+                    }`}
+                >
+                  👤 Staff Self-Service Preview
+                </button>
+              </>
+            )}
           </div>
+
+          {/* TAB: EMPLOYEE PERSONAL SCHEDULE VIEW */}
+          {activeTab === "MY_SCHEDULE" && (
+            <div className="space-y-6">
+              {/* Employee Summary Card */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className={`p-5 rounded-2xl border transition ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"}`}>
+                  <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    Scheduled Hours
+                  </span>
+                  <p className={`text-2xl font-bold tracking-tight mt-1.5 ${isDark ? "text-white" : "text-slate-900"}`}>
+                    {myTotalHours}{" "}
+                    <span className={`text-xs font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>hrs</span>
+                  </p>
+                  <p className={`text-[11px] mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    Weekly Target: {myEmployeeRecord?.weeklyHoursLimit || 40}h
+                  </p>
+                </div>
+
+                <div className={`p-5 rounded-2xl border transition ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"}`}>
+                  <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    Shifts Assigned
+                  </span>
+                  <p className={`text-2xl font-bold tracking-tight mt-1.5 ${isDark ? "text-white" : "text-slate-900"}`}>
+                    {myShifts.length}{" "}
+                    <span className={`text-xs font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>shifts</span>
+                  </p>
+                  <p className={`text-[11px] mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    Across this roster week
+                  </p>
+                </div>
+
+                <div className={`p-5 rounded-2xl border transition ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"}`}>
+                  <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    Roster Status
+                  </span>
+                  <p className={`text-lg font-bold tracking-tight mt-2 ${currentRoster?.status === "PUBLISHED" ? "text-emerald-500" : "text-amber-500"}`}>
+                    {currentRoster?.status ? currentRoster.status.replace(/_/g, " ") : "Ready"}
+                  </p>
+                  <p className={`text-[11px] mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    {currentRoster?.status === "PUBLISHED" ? "Live and finalized" : "Shift assignment in progress"}
+                  </p>
+                </div>
+
+                <div className={`p-5 rounded-2xl border transition flex flex-col justify-between ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"}`}>
+                  <div>
+                    <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                      Availability
+                    </span>
+                    <p className={`text-xs font-semibold mt-1.5 ${mySubmissionStatus === "SUBMITTED" ? "text-emerald-500" : "text-amber-500"}`}>
+                      {mySubmissionStatus === "SUBMITTED" ? "✓ Submitted" : "Pending Submission"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab("MY_AVAILABILITY")}
+                    className="text-xs text-[#0071E3] hover:underline text-left font-medium cursor-pointer"
+                  >
+                    Edit Availability →
+                  </button>
+                </div>
+              </div>
+
+              {/* Day-by-Day Shift Cards */}
+              <div className="space-y-4">
+                <h3 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                  Daily Shift Breakdown ({currentRoster?.name})
+                </h3>
+
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {rosterDatesList.map((dStr) => {
+                    const dateObj = new Date(dStr);
+                    const dayShifts = myShifts.filter((s) => s.shiftDate.startsWith(dStr));
+                    const isToday = new Date().toISOString().split("T")[0] === dStr;
+
+                    return (
+                      <div
+                        key={dStr}
+                        className={`p-5 rounded-3xl border transition flex flex-col justify-between space-y-4 ${dayShifts.length > 0
+                          ? isDark
+                            ? "bg-[#121622]/90 border-blue-500/30 shadow-md"
+                            : "bg-white border-blue-200 shadow-sm"
+                          : isDark
+                            ? "bg-[#0A0C12]/50 border-white/[0.06]"
+                            : "bg-slate-50/70 border-slate-200/70"
+                          }`}
+                      >
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                                {dateObj.toLocaleDateString(undefined, { weekday: "long" })}
+                              </span>
+                              {isToday && (
+                                <span className="px-1.5 py-0.5 text-[9px] font-bold bg-[#0071E3] text-white rounded-md">
+                                  TODAY
+                                </span>
+                              )}
+                            </div>
+                            <span className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                              {dateObj.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                            </span>
+                          </div>
+
+                          {dayShifts.length > 0 ? (
+                            <div className="space-y-2">
+                              {dayShifts.map((shift) => (
+                                <div
+                                  key={shift.id}
+                                  className={`p-3.5 rounded-2xl border ${isDark
+                                    ? "bg-blue-500/10 border-blue-500/20 text-white"
+                                    : "bg-blue-50 border-blue-100 text-slate-900"
+                                    }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-[#0071E3]">
+                                      ⏰ {shift.startTime} – {shift.endTime}
+                                    </span>
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                      Confirmed
+                                    </span>
+                                  </div>
+
+                                  {shift.template && (
+                                    <div className="text-xs font-medium mt-1">
+                                      {shift.template.name}
+                                    </div>
+                                  )}
+
+                                  <div className={`text-[11px] mt-1.5 flex items-center justify-between ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                                    <span>☕ {shift.breakMinutes}m break</span>
+                                    <span>📍 {outlets.find((o) => o.id === shift.outletId)?.name || "Branch"}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="py-6 text-center space-y-1">
+                              <span className="text-xl">🌴</span>
+                              <p className={`text-xs font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                                Rest Day / Day Off
+                              </p>
+                              <p className={`text-[10px] ${isDark ? "text-[#484E5E]" : "text-slate-400"}`}>
+                                No shift scheduled
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* TAB 1: ADMIN SHIFT ASSIGNMENTS WITH WEEKLY CALENDAR & SMART SUGGESTIONS */}
           {activeTab === "ASSIGNMENTS" && (
