@@ -1,0 +1,3768 @@
+{
+  "events": {
+    "EVT-2026-001": {
+      "id": "EVT-2026-001",
+      "restaurantSubdomain": "bahubali",
+      "eventDetails": {
+        "eventName": "Ravi Kumar's Daughter Wedding Ceremony & Reception",
+        "eventType": "WEDDING",
+        "eventDate": "2026-11-20",
+        "eventTime": "12:30 PM",
+        "guestCount": 1000,
+        "venue": "Guntur Royal Convention Palace",
+        "mealType": "LUNCH",
+        "preference": "BOTH",
+        "serviceType": "FULL_CATERING",
+        "customer": {
+          "name": "Ravi Kumar Garu",
+          "phone": "+91 98480 22338",
+          "email": "ravikumar.guntur@gmail.com",
+          "organization": "Kumar Granites & Exports",
+          "address": "Brodipet 4th Line, Guntur, AP"
+        },
+        "notes": "VIP guests expected. Ensure live counters are active from 11:45 AM."
+      },
+      "templateId": "wedding-lunch-premium",
+      "template": {
+        "id": "wedding-lunch-premium",
+        "name": "Wedding Lunch – Premium Feast",
+        "description": "Grand banquet menu engineered for high-profile South Indian weddings with comprehensive vegetarian and non-vegetarian luxury spreads.",
+        "applicableEventTypes": [
+          "WEDDING",
+          "RECEPTION"
+        ],
+        "applicableMealTypes": [
+          "LUNCH",
+          "DINNER"
+        ],
+        "basePricePerPax": 850,
+        "categoryRules": [
+          {
+            "category": "Welcome Drink",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "wd-fruit-punch",
+                "name": "Exotic Fruit Punch Cooler",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Chilled blend of fresh pineapple, orange, and passion fruit with crushed ice.",
+                "basePortionPerPax": 0.18,
+                "portionUnit": "L",
+                "approxCostPerPax": 22,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "refreshing",
+                  "chilled"
+                ]
+              },
+              {
+                "id": "wd-badam-milk",
+                "name": "Royal Kesari Badam Milk",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Slow-simmered almond milk infused with pure saffron strands and cardamom.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "L",
+                "approxCostPerPax": 38,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "rich",
+                  "almond",
+                  "traditional"
+                ]
+              },
+              {
+                "id": "wd-mango-lassi",
+                "name": "Alphonso Mango Lassi",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Thick hand-churned yogurt smoothie blended with ripe Alphonso mango pulp.",
+                "basePortionPerPax": 0.18,
+                "portionUnit": "L",
+                "approxCostPerPax": 30,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "creamy",
+                  "mango"
+                ]
+              },
+              {
+                "id": "wd-mint-cooler",
+                "name": "Fresh Mint & Lemon Cooler",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Freshly squeezed lemon with crushed garden mint and rock salt.",
+                "basePortionPerPax": 0.2,
+                "portionUnit": "L",
+                "approxCostPerPax": 15,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "light",
+                  "digestive"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Starter",
+            "minSelections": 2,
+            "maxSelections": 2,
+            "availableItems": [
+              {
+                "id": "str-chicken-65",
+                "name": "Hyderabadi Chicken 65",
+                "category": "Starter",
+                "dietary": "NON_VEG",
+                "description": "Spiced crispy chicken bites tossed with fresh curry leaves, green chilies, and yogurt.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "kg",
+                "approxCostPerPax": 55,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "chicken",
+                  "signature",
+                  "crispy"
+                ]
+              },
+              {
+                "id": "str-paneer-tikka",
+                "name": "Tandoori Paneer Tikka",
+                "category": "Starter",
+                "dietary": "VEG",
+                "description": "Char-grilled fresh cottage cheese cubes marinated in mustard oil, ajwain, and Kashmiri chili.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "kg",
+                "approxCostPerPax": 48,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "paneer",
+                  "tandoori",
+                  "starter"
+                ]
+              },
+              {
+                "id": "str-apollo-fish",
+                "name": "Spicy Apollo Fish Bites",
+                "category": "Starter",
+                "dietary": "NON_VEG",
+                "description": "Boneless freshwater fish fillet strips tossed in fiery Andhra red chili temper.",
+                "basePortionPerPax": 0.11,
+                "portionUnit": "kg",
+                "approxCostPerPax": 65,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "seafood",
+                  "fish",
+                  "spicy"
+                ]
+              },
+              {
+                "id": "str-veg-spring-roll",
+                "name": "Crispy Vegetable Spring Rolls",
+                "category": "Starter",
+                "dietary": "VEG",
+                "description": "Golden rolls stuffed with julienned cabbage, bell peppers, carrots, and glass noodles.",
+                "basePortionPerPax": 2,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 28,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "veg",
+                  "crispy"
+                ]
+              },
+              {
+                "id": "str-corn-pepper",
+                "name": "Crispy Salt & Pepper Corn",
+                "category": "Starter",
+                "dietary": "VEG",
+                "description": "Sweet American corn kernels batter-fried and tossed with spring onions and cracked black pepper.",
+                "basePortionPerPax": 0.1,
+                "portionUnit": "kg",
+                "approxCostPerPax": 25,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "veg",
+                  "corn",
+                  "crunchy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Biryani",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "bir-chicken-dum",
+                "name": "Royal Hyderabadi Chicken Dum Biryani",
+                "category": "Biryani",
+                "dietary": "NON_VEG",
+                "description": "Aged long-grain Basmati rice slow-steamed with bone-in tender chicken, saffron, and pure cow ghee.",
+                "basePortionPerPax": 0.35,
+                "portionUnit": "kg",
+                "approxCostPerPax": 85,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "biryani",
+                  "chicken",
+                  "signature",
+                  "carb-heavy"
+                ]
+              },
+              {
+                "id": "bir-mutton-dum",
+                "name": "Nawabi Mutton Dum Biryani",
+                "category": "Biryani",
+                "dietary": "NON_VEG",
+                "description": "Heritage clay-pot dum biryani prepared with select young goat meat and caramelized onions.",
+                "basePortionPerPax": 0.35,
+                "portionUnit": "kg",
+                "approxCostPerPax": 135,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "biryani",
+                  "mutton",
+                  "luxury",
+                  "carb-heavy"
+                ]
+              },
+              {
+                "id": "bir-veg-dum",
+                "name": "Shahi Vegetable Dum Biryani",
+                "category": "Biryani",
+                "dietary": "VEG",
+                "description": "Fragrant basmati rice cooked with fresh seasonal vegetables, mint, and saffron milk.",
+                "basePortionPerPax": 0.3,
+                "portionUnit": "kg",
+                "approxCostPerPax": 45,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "biryani",
+                  "veg",
+                  "carb-heavy"
+                ]
+              },
+              {
+                "id": "rc-bagara",
+                "name": "Telangana Bagara Rice",
+                "category": "Biryani",
+                "dietary": "VEG",
+                "description": "Basmati rice tempered with whole spices (cinnamon, cloves, cardamom, bay leaves) and caramelized onions.",
+                "basePortionPerPax": 0.25,
+                "portionUnit": "kg",
+                "approxCostPerPax": 32,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "rice",
+                  "aromatic",
+                  "carb-heavy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Breads",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "brd-butter-naan",
+                "name": "Tandoori Butter Naan",
+                "category": "Breads",
+                "dietary": "VEG",
+                "description": "Soft leavened clay-oven flatbread brushed with pure melted butter.",
+                "basePortionPerPax": 1.5,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 18,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "bread",
+                  "tandoori"
+                ]
+              },
+              {
+                "id": "brd-rumali",
+                "name": "Handkerchief Rumali Roti",
+                "category": "Breads",
+                "dietary": "VEG",
+                "description": "Ultra-thin, soft handkerchief roti tossed over an inverted dome tawa.",
+                "basePortionPerPax": 2,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 16,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "bread",
+                  "soft"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Curry",
+            "minSelections": 2,
+            "maxSelections": 2,
+            "availableItems": [
+              {
+                "id": "cur-butter-chicken",
+                "name": "Creamy Murgh Makhani (Butter Chicken)",
+                "category": "Curry",
+                "dietary": "NON_VEG",
+                "description": "Tandoori chicken tikkas simmered in a velvety tomato, cashew, and honey butter gravy.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 65,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "chicken",
+                  "gravy",
+                  "creamy"
+                ]
+              },
+              {
+                "id": "cur-paneer-butter-masala",
+                "name": "Paneer Butter Masala",
+                "category": "Curry",
+                "dietary": "VEG",
+                "description": "Tender paneer cubes cooked in a rich, buttery tomato sauce infused with kasuri methi.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 48,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "paneer",
+                  "gravy",
+                  "sweet-tangy"
+                ]
+              },
+              {
+                "id": "cur-kadai-paneer",
+                "name": "Kadai Paneer Bell Pepper Toss",
+                "category": "Curry",
+                "dietary": "VEG",
+                "description": "Cottage cheese chunks and bell peppers simmered in a freshly pounded coriander and red chili masala.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 46,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "paneer",
+                  "gravy",
+                  "spicy"
+                ]
+              },
+              {
+                "id": "cur-veg-kolhapuri",
+                "name": "Spicy Veg Kolhapuri Melange",
+                "category": "Curry",
+                "dietary": "VEG",
+                "description": "Garden fresh carrots, beans, peas, and florets cooked in a fiery roasted coconut-sesame gravy.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 32,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "veg",
+                  "gravy",
+                  "spicy",
+                  "alternative"
+                ]
+              },
+              {
+                "id": "cur-dal-makhani",
+                "name": "Peshawari Dal Makhani",
+                "category": "Curry",
+                "dietary": "VEG",
+                "description": "Black urad lentils and red kidney beans slow-cooked for 18 hours with white butter and cream.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 28,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "dal",
+                  "gravy",
+                  "rich"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Rice",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "rc-steamed-rice",
+                "name": "Steamed Sona Masoori Rice",
+                "category": "Rice",
+                "dietary": "VEG",
+                "description": "Fluffy steamed premium Andhra Sona Masoori rice served with hot pure ghee.",
+                "basePortionPerPax": 0.18,
+                "portionUnit": "kg",
+                "approxCostPerPax": 14,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "rice",
+                  "plain",
+                  "carb-heavy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Dal",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "dal-tomato-pappu",
+                "name": "Andhra Tomato Pappu (Dal)",
+                "category": "Dal",
+                "dietary": "VEG",
+                "description": "Yellow toor dal tempered with ripe country tomatoes, mustard seeds, garlic, and dry red chilies.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "L",
+                "approxCostPerPax": 18,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "dal",
+                  "andhra",
+                  "traditional"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Sambar",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "sam-andhra-sambar",
+                "name": "Drumstick & Shallot Sambar",
+                "category": "Sambar",
+                "dietary": "VEG",
+                "description": "Slow-boiled lentils with tender drumsticks, baby pearl onions, and fragrant home-ground sambar spice.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "L",
+                "approxCostPerPax": 16,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "sambar",
+                  "traditional"
+                ]
+              },
+              {
+                "id": "ras-pepper-rasam",
+                "name": "Miriyala Pepper Rasam",
+                "category": "Sambar",
+                "dietary": "VEG",
+                "description": "Digestive broth brewed with crushed black pepper, cumin seeds, garlic, and tamarind.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "L",
+                "approxCostPerPax": 12,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "rasam",
+                  "digestive"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Sweet",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "swt-gulab-jamun",
+                "name": "Warm Shahi Gulab Jamun",
+                "category": "Sweet",
+                "dietary": "VEG",
+                "description": "Soft khoya dumplings deep-fried and soaked in rosewater and cardamom syrup.",
+                "basePortionPerPax": 2,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 26,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "sweet",
+                  "warm",
+                  "traditional"
+                ]
+              },
+              {
+                "id": "swt-double-ka-meetha",
+                "name": "Hyderabadi Double Ka Meetha",
+                "category": "Sweet",
+                "dietary": "VEG",
+                "description": "Fried bread soaked in saffron-infused rabdi and garnished with sliced pistachios and cashews.",
+                "basePortionPerPax": 0.1,
+                "portionUnit": "kg",
+                "approxCostPerPax": 34,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "sweet",
+                  "hyderabadi",
+                  "royal"
+                ]
+              },
+              {
+                "id": "swt-gajar-halwa",
+                "name": "Ghee Gajar Ka Halwa",
+                "category": "Sweet",
+                "dietary": "VEG",
+                "description": "Slow-roasted red Delhi carrots simmered with condensed milk, pure ghee, and roasted nuts.",
+                "basePortionPerPax": 0.1,
+                "portionUnit": "kg",
+                "approxCostPerPax": 36,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "sweet",
+                  "halwa",
+                  "seasonal"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Ice Cream",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "ice-malai-kulfi",
+                "name": "Matka Malai Kulfi",
+                "category": "Ice Cream",
+                "dietary": "VEG",
+                "description": "Traditional frozen dairy dessert on wooden sticks enriched with cardamom and almonds.",
+                "basePortionPerPax": 1,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 25,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "dessert",
+                  "kulfi",
+                  "chilled"
+                ]
+              },
+              {
+                "id": "ice-vanilla-fudge",
+                "name": "Vanilla Bean with Hot Chocolate Fudge",
+                "category": "Ice Cream",
+                "dietary": "VEG",
+                "description": "Premium Madagascar vanilla scoop drizzled with hot melted Belgian chocolate sauce.",
+                "basePortionPerPax": 1,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 22,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "dessert",
+                  "icecream"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "customerSelectionLink": "/restaurant/bahubali/catering/portal/EVT-2026-001",
+      "status": "LINK_SHARED",
+      "selectedItemIds": [
+        "wd-fruit-punch",
+        "str-chicken-65",
+        "str-paneer-tikka",
+        "bir-chicken-dum",
+        "brd-butter-naan",
+        "cur-butter-chicken",
+        "cur-kadai-paneer",
+        "rc-steamed-rice",
+        "dal-tomato-pappu",
+        "sam-andhra-sambar",
+        "swt-gulab-jamun",
+        "ice-malai-kulfi"
+      ],
+      "selectedAddonIds": [
+        "live-dosa",
+        "live-pani-puri"
+      ],
+      "createdAt": "2026-09-02T18:43:30.234Z"
+    },
+    "EVT-2026-002": {
+      "id": "EVT-2026-002",
+      "restaurantSubdomain": "bahubali",
+      "eventDetails": {
+        "eventName": "Infosys Annual Leadership Gala",
+        "eventType": "CORPORATE",
+        "eventDate": "2026-11-24",
+        "eventTime": "07:30 PM",
+        "guestCount": 450,
+        "venue": "Novotel Ballroom, Vijayawada",
+        "mealType": "DINNER",
+        "preference": "BOTH",
+        "serviceType": "FULL_CATERING",
+        "customer": {
+          "name": "Srinivas Rao (HR VP)",
+          "phone": "+91 99499 11002",
+          "email": "srinivas.r@infosys.com"
+        },
+        "notes": "Jain food counter needed for 40 executives."
+      },
+      "templateId": "corporate-executive",
+      "template": {
+        "id": "corporate-executive",
+        "name": "Corporate Executive Buffet",
+        "description": "Streamlined high-productivity buffet tailored for annual tech summits, conferences, and corporate galas.",
+        "applicableEventTypes": [
+          "CORPORATE"
+        ],
+        "applicableMealTypes": [
+          "LUNCH",
+          "DINNER"
+        ],
+        "basePricePerPax": 720,
+        "categoryRules": [
+          {
+            "category": "Welcome Drink",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "wd-fruit-punch",
+                "name": "Exotic Fruit Punch Cooler",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Chilled blend of fresh pineapple, orange, and passion fruit with crushed ice.",
+                "basePortionPerPax": 0.18,
+                "portionUnit": "L",
+                "approxCostPerPax": 22,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "refreshing",
+                  "chilled"
+                ]
+              },
+              {
+                "id": "wd-mint-cooler",
+                "name": "Fresh Mint & Lemon Cooler",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Freshly squeezed lemon with crushed garden mint and rock salt.",
+                "basePortionPerPax": 0.2,
+                "portionUnit": "L",
+                "approxCostPerPax": 15,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "light",
+                  "digestive"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Starter",
+            "minSelections": 2,
+            "maxSelections": 2,
+            "availableItems": [
+              {
+                "id": "str-chicken-65",
+                "name": "Hyderabadi Chicken 65",
+                "category": "Starter",
+                "dietary": "NON_VEG",
+                "description": "Spiced crispy chicken bites tossed with fresh curry leaves, green chilies, and yogurt.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "kg",
+                "approxCostPerPax": 55,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "chicken",
+                  "signature",
+                  "crispy"
+                ]
+              },
+              {
+                "id": "str-paneer-tikka",
+                "name": "Tandoori Paneer Tikka",
+                "category": "Starter",
+                "dietary": "VEG",
+                "description": "Char-grilled fresh cottage cheese cubes marinated in mustard oil, ajwain, and Kashmiri chili.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "kg",
+                "approxCostPerPax": 48,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "paneer",
+                  "tandoori",
+                  "starter"
+                ]
+              },
+              {
+                "id": "str-corn-pepper",
+                "name": "Crispy Salt & Pepper Corn",
+                "category": "Starter",
+                "dietary": "VEG",
+                "description": "Sweet American corn kernels batter-fried and tossed with spring onions and cracked black pepper.",
+                "basePortionPerPax": 0.1,
+                "portionUnit": "kg",
+                "approxCostPerPax": 25,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "veg",
+                  "corn",
+                  "crunchy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Biryani",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "bir-chicken-dum",
+                "name": "Royal Hyderabadi Chicken Dum Biryani",
+                "category": "Biryani",
+                "dietary": "NON_VEG",
+                "description": "Aged long-grain Basmati rice slow-steamed with bone-in tender chicken, saffron, and pure cow ghee.",
+                "basePortionPerPax": 0.35,
+                "portionUnit": "kg",
+                "approxCostPerPax": 85,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "biryani",
+                  "chicken",
+                  "signature",
+                  "carb-heavy"
+                ]
+              },
+              {
+                "id": "bir-veg-dum",
+                "name": "Shahi Vegetable Dum Biryani",
+                "category": "Biryani",
+                "dietary": "VEG",
+                "description": "Fragrant basmati rice cooked with fresh seasonal vegetables, mint, and saffron milk.",
+                "basePortionPerPax": 0.3,
+                "portionUnit": "kg",
+                "approxCostPerPax": 45,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "biryani",
+                  "veg",
+                  "carb-heavy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Breads",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "brd-butter-naan",
+                "name": "Tandoori Butter Naan",
+                "category": "Breads",
+                "dietary": "VEG",
+                "description": "Soft leavened clay-oven flatbread brushed with pure melted butter.",
+                "basePortionPerPax": 1.5,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 18,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "bread",
+                  "tandoori"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Curry",
+            "minSelections": 2,
+            "maxSelections": 2,
+            "availableItems": [
+              {
+                "id": "cur-butter-chicken",
+                "name": "Creamy Murgh Makhani (Butter Chicken)",
+                "category": "Curry",
+                "dietary": "NON_VEG",
+                "description": "Tandoori chicken tikkas simmered in a velvety tomato, cashew, and honey butter gravy.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 65,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "chicken",
+                  "gravy",
+                  "creamy"
+                ]
+              },
+              {
+                "id": "cur-paneer-butter-masala",
+                "name": "Paneer Butter Masala",
+                "category": "Curry",
+                "dietary": "VEG",
+                "description": "Tender paneer cubes cooked in a rich, buttery tomato sauce infused with kasuri methi.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 48,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "paneer",
+                  "gravy",
+                  "sweet-tangy"
+                ]
+              },
+              {
+                "id": "cur-dal-makhani",
+                "name": "Peshawari Dal Makhani",
+                "category": "Curry",
+                "dietary": "VEG",
+                "description": "Black urad lentils and red kidney beans slow-cooked for 18 hours with white butter and cream.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 28,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "dal",
+                  "gravy",
+                  "rich"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Sweet",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "swt-gulab-jamun",
+                "name": "Warm Shahi Gulab Jamun",
+                "category": "Sweet",
+                "dietary": "VEG",
+                "description": "Soft khoya dumplings deep-fried and soaked in rosewater and cardamom syrup.",
+                "basePortionPerPax": 2,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 26,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "sweet",
+                  "warm",
+                  "traditional"
+                ]
+              },
+              {
+                "id": "ice-vanilla-fudge",
+                "name": "Vanilla Bean with Hot Chocolate Fudge",
+                "category": "Ice Cream",
+                "dietary": "VEG",
+                "description": "Premium Madagascar vanilla scoop drizzled with hot melted Belgian chocolate sauce.",
+                "basePortionPerPax": 1,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 22,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "dessert",
+                  "icecream"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "customerSelectionLink": "/restaurant/bahubali/catering/portal/EVT-2026-002",
+      "status": "CUSTOMER_SUBMITTED",
+      "selectedItemIds": [
+        "wd-fruit-punch",
+        "str-apollo-fish",
+        "bir-mutton-dum",
+        "cur-butter-chicken"
+      ],
+      "selectedAddonIds": [
+        "live-tawa-fish",
+        "live-falooda"
+      ],
+      "createdAt": "2026-09-02T18:43:30.234Z"
+    },
+    "EVT-2026-003": {
+      "id": "EVT-2026-003",
+      "restaurantSubdomain": "bahubali",
+      "eventDetails": {
+        "eventName": "Dr. Ananya Sangeet & Reception",
+        "eventType": "RECEPTION",
+        "eventDate": "2026-11-28",
+        "eventTime": "08:00 PM",
+        "guestCount": 750,
+        "venue": "Grand Nagarjuna Lawns, Guntur",
+        "mealType": "DINNER",
+        "preference": "BOTH",
+        "serviceType": "FULL_CATERING",
+        "customer": {
+          "name": "Dr. K. Someswara Rao",
+          "phone": "+91 94401 55667",
+          "email": "drsomesh@gmail.com"
+        },
+        "notes": "Contract signed, 40% advance received."
+      },
+      "templateId": "wedding-lunch-premium",
+      "template": {
+        "id": "wedding-lunch-premium",
+        "name": "Wedding Lunch – Premium Feast",
+        "description": "Grand banquet menu engineered for high-profile South Indian weddings with comprehensive vegetarian and non-vegetarian luxury spreads.",
+        "applicableEventTypes": [
+          "WEDDING",
+          "RECEPTION"
+        ],
+        "applicableMealTypes": [
+          "LUNCH",
+          "DINNER"
+        ],
+        "basePricePerPax": 850,
+        "categoryRules": [
+          {
+            "category": "Welcome Drink",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "wd-fruit-punch",
+                "name": "Exotic Fruit Punch Cooler",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Chilled blend of fresh pineapple, orange, and passion fruit with crushed ice.",
+                "basePortionPerPax": 0.18,
+                "portionUnit": "L",
+                "approxCostPerPax": 22,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "refreshing",
+                  "chilled"
+                ]
+              },
+              {
+                "id": "wd-badam-milk",
+                "name": "Royal Kesari Badam Milk",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Slow-simmered almond milk infused with pure saffron strands and cardamom.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "L",
+                "approxCostPerPax": 38,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "rich",
+                  "almond",
+                  "traditional"
+                ]
+              },
+              {
+                "id": "wd-mango-lassi",
+                "name": "Alphonso Mango Lassi",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Thick hand-churned yogurt smoothie blended with ripe Alphonso mango pulp.",
+                "basePortionPerPax": 0.18,
+                "portionUnit": "L",
+                "approxCostPerPax": 30,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "creamy",
+                  "mango"
+                ]
+              },
+              {
+                "id": "wd-mint-cooler",
+                "name": "Fresh Mint & Lemon Cooler",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Freshly squeezed lemon with crushed garden mint and rock salt.",
+                "basePortionPerPax": 0.2,
+                "portionUnit": "L",
+                "approxCostPerPax": 15,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "light",
+                  "digestive"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Starter",
+            "minSelections": 2,
+            "maxSelections": 2,
+            "availableItems": [
+              {
+                "id": "str-chicken-65",
+                "name": "Hyderabadi Chicken 65",
+                "category": "Starter",
+                "dietary": "NON_VEG",
+                "description": "Spiced crispy chicken bites tossed with fresh curry leaves, green chilies, and yogurt.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "kg",
+                "approxCostPerPax": 55,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "chicken",
+                  "signature",
+                  "crispy"
+                ]
+              },
+              {
+                "id": "str-paneer-tikka",
+                "name": "Tandoori Paneer Tikka",
+                "category": "Starter",
+                "dietary": "VEG",
+                "description": "Char-grilled fresh cottage cheese cubes marinated in mustard oil, ajwain, and Kashmiri chili.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "kg",
+                "approxCostPerPax": 48,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "paneer",
+                  "tandoori",
+                  "starter"
+                ]
+              },
+              {
+                "id": "str-apollo-fish",
+                "name": "Spicy Apollo Fish Bites",
+                "category": "Starter",
+                "dietary": "NON_VEG",
+                "description": "Boneless freshwater fish fillet strips tossed in fiery Andhra red chili temper.",
+                "basePortionPerPax": 0.11,
+                "portionUnit": "kg",
+                "approxCostPerPax": 65,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "seafood",
+                  "fish",
+                  "spicy"
+                ]
+              },
+              {
+                "id": "str-veg-spring-roll",
+                "name": "Crispy Vegetable Spring Rolls",
+                "category": "Starter",
+                "dietary": "VEG",
+                "description": "Golden rolls stuffed with julienned cabbage, bell peppers, carrots, and glass noodles.",
+                "basePortionPerPax": 2,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 28,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "veg",
+                  "crispy"
+                ]
+              },
+              {
+                "id": "str-corn-pepper",
+                "name": "Crispy Salt & Pepper Corn",
+                "category": "Starter",
+                "dietary": "VEG",
+                "description": "Sweet American corn kernels batter-fried and tossed with spring onions and cracked black pepper.",
+                "basePortionPerPax": 0.1,
+                "portionUnit": "kg",
+                "approxCostPerPax": 25,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "veg",
+                  "corn",
+                  "crunchy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Biryani",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "bir-chicken-dum",
+                "name": "Royal Hyderabadi Chicken Dum Biryani",
+                "category": "Biryani",
+                "dietary": "NON_VEG",
+                "description": "Aged long-grain Basmati rice slow-steamed with bone-in tender chicken, saffron, and pure cow ghee.",
+                "basePortionPerPax": 0.35,
+                "portionUnit": "kg",
+                "approxCostPerPax": 85,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "biryani",
+                  "chicken",
+                  "signature",
+                  "carb-heavy"
+                ]
+              },
+              {
+                "id": "bir-mutton-dum",
+                "name": "Nawabi Mutton Dum Biryani",
+                "category": "Biryani",
+                "dietary": "NON_VEG",
+                "description": "Heritage clay-pot dum biryani prepared with select young goat meat and caramelized onions.",
+                "basePortionPerPax": 0.35,
+                "portionUnit": "kg",
+                "approxCostPerPax": 135,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "biryani",
+                  "mutton",
+                  "luxury",
+                  "carb-heavy"
+                ]
+              },
+              {
+                "id": "bir-veg-dum",
+                "name": "Shahi Vegetable Dum Biryani",
+                "category": "Biryani",
+                "dietary": "VEG",
+                "description": "Fragrant basmati rice cooked with fresh seasonal vegetables, mint, and saffron milk.",
+                "basePortionPerPax": 0.3,
+                "portionUnit": "kg",
+                "approxCostPerPax": 45,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "biryani",
+                  "veg",
+                  "carb-heavy"
+                ]
+              },
+              {
+                "id": "rc-bagara",
+                "name": "Telangana Bagara Rice",
+                "category": "Biryani",
+                "dietary": "VEG",
+                "description": "Basmati rice tempered with whole spices (cinnamon, cloves, cardamom, bay leaves) and caramelized onions.",
+                "basePortionPerPax": 0.25,
+                "portionUnit": "kg",
+                "approxCostPerPax": 32,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "rice",
+                  "aromatic",
+                  "carb-heavy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Breads",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "brd-butter-naan",
+                "name": "Tandoori Butter Naan",
+                "category": "Breads",
+                "dietary": "VEG",
+                "description": "Soft leavened clay-oven flatbread brushed with pure melted butter.",
+                "basePortionPerPax": 1.5,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 18,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "bread",
+                  "tandoori"
+                ]
+              },
+              {
+                "id": "brd-rumali",
+                "name": "Handkerchief Rumali Roti",
+                "category": "Breads",
+                "dietary": "VEG",
+                "description": "Ultra-thin, soft handkerchief roti tossed over an inverted dome tawa.",
+                "basePortionPerPax": 2,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 16,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "bread",
+                  "soft"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Curry",
+            "minSelections": 2,
+            "maxSelections": 2,
+            "availableItems": [
+              {
+                "id": "cur-butter-chicken",
+                "name": "Creamy Murgh Makhani (Butter Chicken)",
+                "category": "Curry",
+                "dietary": "NON_VEG",
+                "description": "Tandoori chicken tikkas simmered in a velvety tomato, cashew, and honey butter gravy.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 65,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "chicken",
+                  "gravy",
+                  "creamy"
+                ]
+              },
+              {
+                "id": "cur-paneer-butter-masala",
+                "name": "Paneer Butter Masala",
+                "category": "Curry",
+                "dietary": "VEG",
+                "description": "Tender paneer cubes cooked in a rich, buttery tomato sauce infused with kasuri methi.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 48,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "paneer",
+                  "gravy",
+                  "sweet-tangy"
+                ]
+              },
+              {
+                "id": "cur-kadai-paneer",
+                "name": "Kadai Paneer Bell Pepper Toss",
+                "category": "Curry",
+                "dietary": "VEG",
+                "description": "Cottage cheese chunks and bell peppers simmered in a freshly pounded coriander and red chili masala.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 46,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "paneer",
+                  "gravy",
+                  "spicy"
+                ]
+              },
+              {
+                "id": "cur-veg-kolhapuri",
+                "name": "Spicy Veg Kolhapuri Melange",
+                "category": "Curry",
+                "dietary": "VEG",
+                "description": "Garden fresh carrots, beans, peas, and florets cooked in a fiery roasted coconut-sesame gravy.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 32,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "veg",
+                  "gravy",
+                  "spicy",
+                  "alternative"
+                ]
+              },
+              {
+                "id": "cur-dal-makhani",
+                "name": "Peshawari Dal Makhani",
+                "category": "Curry",
+                "dietary": "VEG",
+                "description": "Black urad lentils and red kidney beans slow-cooked for 18 hours with white butter and cream.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 28,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "dal",
+                  "gravy",
+                  "rich"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Rice",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "rc-steamed-rice",
+                "name": "Steamed Sona Masoori Rice",
+                "category": "Rice",
+                "dietary": "VEG",
+                "description": "Fluffy steamed premium Andhra Sona Masoori rice served with hot pure ghee.",
+                "basePortionPerPax": 0.18,
+                "portionUnit": "kg",
+                "approxCostPerPax": 14,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "rice",
+                  "plain",
+                  "carb-heavy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Dal",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "dal-tomato-pappu",
+                "name": "Andhra Tomato Pappu (Dal)",
+                "category": "Dal",
+                "dietary": "VEG",
+                "description": "Yellow toor dal tempered with ripe country tomatoes, mustard seeds, garlic, and dry red chilies.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "L",
+                "approxCostPerPax": 18,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "dal",
+                  "andhra",
+                  "traditional"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Sambar",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "sam-andhra-sambar",
+                "name": "Drumstick & Shallot Sambar",
+                "category": "Sambar",
+                "dietary": "VEG",
+                "description": "Slow-boiled lentils with tender drumsticks, baby pearl onions, and fragrant home-ground sambar spice.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "L",
+                "approxCostPerPax": 16,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "sambar",
+                  "traditional"
+                ]
+              },
+              {
+                "id": "ras-pepper-rasam",
+                "name": "Miriyala Pepper Rasam",
+                "category": "Sambar",
+                "dietary": "VEG",
+                "description": "Digestive broth brewed with crushed black pepper, cumin seeds, garlic, and tamarind.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "L",
+                "approxCostPerPax": 12,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "rasam",
+                  "digestive"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Sweet",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "swt-gulab-jamun",
+                "name": "Warm Shahi Gulab Jamun",
+                "category": "Sweet",
+                "dietary": "VEG",
+                "description": "Soft khoya dumplings deep-fried and soaked in rosewater and cardamom syrup.",
+                "basePortionPerPax": 2,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 26,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "sweet",
+                  "warm",
+                  "traditional"
+                ]
+              },
+              {
+                "id": "swt-double-ka-meetha",
+                "name": "Hyderabadi Double Ka Meetha",
+                "category": "Sweet",
+                "dietary": "VEG",
+                "description": "Fried bread soaked in saffron-infused rabdi and garnished with sliced pistachios and cashews.",
+                "basePortionPerPax": 0.1,
+                "portionUnit": "kg",
+                "approxCostPerPax": 34,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "sweet",
+                  "hyderabadi",
+                  "royal"
+                ]
+              },
+              {
+                "id": "swt-gajar-halwa",
+                "name": "Ghee Gajar Ka Halwa",
+                "category": "Sweet",
+                "dietary": "VEG",
+                "description": "Slow-roasted red Delhi carrots simmered with condensed milk, pure ghee, and roasted nuts.",
+                "basePortionPerPax": 0.1,
+                "portionUnit": "kg",
+                "approxCostPerPax": 36,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "sweet",
+                  "halwa",
+                  "seasonal"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Ice Cream",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "ice-malai-kulfi",
+                "name": "Matka Malai Kulfi",
+                "category": "Ice Cream",
+                "dietary": "VEG",
+                "description": "Traditional frozen dairy dessert on wooden sticks enriched with cardamom and almonds.",
+                "basePortionPerPax": 1,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 25,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "dessert",
+                  "kulfi",
+                  "chilled"
+                ]
+              },
+              {
+                "id": "ice-vanilla-fudge",
+                "name": "Vanilla Bean with Hot Chocolate Fudge",
+                "category": "Ice Cream",
+                "dietary": "VEG",
+                "description": "Premium Madagascar vanilla scoop drizzled with hot melted Belgian chocolate sauce.",
+                "basePortionPerPax": 1,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 22,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "dessert",
+                  "icecream"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "customerSelectionLink": "/restaurant/bahubali/catering/portal/EVT-2026-003",
+      "status": "APPROVED",
+      "selectedItemIds": [
+        "wd-badam-milk",
+        "str-chicken-65",
+        "bir-chicken-dum",
+        "cur-butter-chicken"
+      ],
+      "selectedAddonIds": [
+        "live-mandi",
+        "live-dosa"
+      ],
+      "createdAt": "2026-09-02T18:43:30.234Z"
+    },
+    "EVT-2026-004": {
+      "id": "EVT-2026-004",
+      "restaurantSubdomain": "bahubali",
+      "eventDetails": {
+        "eventName": "Prasad Family Gruhapravesam",
+        "eventType": "HOUSEWARMING",
+        "eventDate": "2026-11-15",
+        "eventTime": "11:30 AM",
+        "guestCount": 300,
+        "venue": "Amaravathi Enclave, Mangalagiri",
+        "mealType": "LUNCH",
+        "preference": "VEG",
+        "serviceType": "FULL_CATERING",
+        "customer": {
+          "name": "V. Prasad Garu",
+          "phone": "+91 98850 77889"
+        },
+        "notes": "Pure Vegetarian Andhra traditional spread."
+      },
+      "templateId": "wedding-lunch-basic",
+      "template": {
+        "id": "wedding-lunch-basic",
+        "name": "Wedding Lunch – Classic Traditional",
+        "description": "Balanced, cost-effective traditional marriage feast focusing on high-velocity core dishes and authentic flavors.",
+        "applicableEventTypes": [
+          "WEDDING",
+          "HOUSEWARMING",
+          "ENGAGEMENT"
+        ],
+        "applicableMealTypes": [
+          "LUNCH"
+        ],
+        "basePricePerPax": 650,
+        "categoryRules": [
+          {
+            "category": "Welcome Drink",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "wd-fruit-punch",
+                "name": "Exotic Fruit Punch Cooler",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Chilled blend of fresh pineapple, orange, and passion fruit with crushed ice.",
+                "basePortionPerPax": 0.18,
+                "portionUnit": "L",
+                "approxCostPerPax": 22,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "refreshing",
+                  "chilled"
+                ]
+              },
+              {
+                "id": "wd-mint-cooler",
+                "name": "Fresh Mint & Lemon Cooler",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Freshly squeezed lemon with crushed garden mint and rock salt.",
+                "basePortionPerPax": 0.2,
+                "portionUnit": "L",
+                "approxCostPerPax": 15,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "light",
+                  "digestive"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Starter",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "str-chicken-65",
+                "name": "Hyderabadi Chicken 65",
+                "category": "Starter",
+                "dietary": "NON_VEG",
+                "description": "Spiced crispy chicken bites tossed with fresh curry leaves, green chilies, and yogurt.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "kg",
+                "approxCostPerPax": 55,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "chicken",
+                  "signature",
+                  "crispy"
+                ]
+              },
+              {
+                "id": "str-veg-spring-roll",
+                "name": "Crispy Vegetable Spring Rolls",
+                "category": "Starter",
+                "dietary": "VEG",
+                "description": "Golden rolls stuffed with julienned cabbage, bell peppers, carrots, and glass noodles.",
+                "basePortionPerPax": 2,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 28,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "veg",
+                  "crispy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Biryani",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "bir-chicken-dum",
+                "name": "Royal Hyderabadi Chicken Dum Biryani",
+                "category": "Biryani",
+                "dietary": "NON_VEG",
+                "description": "Aged long-grain Basmati rice slow-steamed with bone-in tender chicken, saffron, and pure cow ghee.",
+                "basePortionPerPax": 0.35,
+                "portionUnit": "kg",
+                "approxCostPerPax": 85,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "biryani",
+                  "chicken",
+                  "signature",
+                  "carb-heavy"
+                ]
+              },
+              {
+                "id": "bir-veg-dum",
+                "name": "Shahi Vegetable Dum Biryani",
+                "category": "Biryani",
+                "dietary": "VEG",
+                "description": "Fragrant basmati rice cooked with fresh seasonal vegetables, mint, and saffron milk.",
+                "basePortionPerPax": 0.3,
+                "portionUnit": "kg",
+                "approxCostPerPax": 45,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "biryani",
+                  "veg",
+                  "carb-heavy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Curry",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "cur-butter-chicken",
+                "name": "Creamy Murgh Makhani (Butter Chicken)",
+                "category": "Curry",
+                "dietary": "NON_VEG",
+                "description": "Tandoori chicken tikkas simmered in a velvety tomato, cashew, and honey butter gravy.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 65,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "chicken",
+                  "gravy",
+                  "creamy"
+                ]
+              },
+              {
+                "id": "cur-paneer-butter-masala",
+                "name": "Paneer Butter Masala",
+                "category": "Curry",
+                "dietary": "VEG",
+                "description": "Tender paneer cubes cooked in a rich, buttery tomato sauce infused with kasuri methi.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 48,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "paneer",
+                  "gravy",
+                  "sweet-tangy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Rice",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "rc-steamed-rice",
+                "name": "Steamed Sona Masoori Rice",
+                "category": "Rice",
+                "dietary": "VEG",
+                "description": "Fluffy steamed premium Andhra Sona Masoori rice served with hot pure ghee.",
+                "basePortionPerPax": 0.18,
+                "portionUnit": "kg",
+                "approxCostPerPax": 14,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "rice",
+                  "plain",
+                  "carb-heavy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Dal",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "dal-tomato-pappu",
+                "name": "Andhra Tomato Pappu (Dal)",
+                "category": "Dal",
+                "dietary": "VEG",
+                "description": "Yellow toor dal tempered with ripe country tomatoes, mustard seeds, garlic, and dry red chilies.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "L",
+                "approxCostPerPax": 18,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "dal",
+                  "andhra",
+                  "traditional"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Sambar",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "sam-andhra-sambar",
+                "name": "Drumstick & Shallot Sambar",
+                "category": "Sambar",
+                "dietary": "VEG",
+                "description": "Slow-boiled lentils with tender drumsticks, baby pearl onions, and fragrant home-ground sambar spice.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "L",
+                "approxCostPerPax": 16,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "sambar",
+                  "traditional"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Sweet",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "swt-gulab-jamun",
+                "name": "Warm Shahi Gulab Jamun",
+                "category": "Sweet",
+                "dietary": "VEG",
+                "description": "Soft khoya dumplings deep-fried and soaked in rosewater and cardamom syrup.",
+                "basePortionPerPax": 2,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 26,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "sweet",
+                  "warm",
+                  "traditional"
+                ]
+              },
+              {
+                "id": "swt-double-ka-meetha",
+                "name": "Hyderabadi Double Ka Meetha",
+                "category": "Sweet",
+                "dietary": "VEG",
+                "description": "Fried bread soaked in saffron-infused rabdi and garnished with sliced pistachios and cashews.",
+                "basePortionPerPax": 0.1,
+                "portionUnit": "kg",
+                "approxCostPerPax": 34,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "sweet",
+                  "hyderabadi",
+                  "royal"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "customerSelectionLink": "/restaurant/bahubali/catering/portal/EVT-2026-004",
+      "status": "LINK_SHARED",
+      "selectedItemIds": [
+        "rc-steamed-rice",
+        "dal-tomato-pappu",
+        "sam-andhra-sambar"
+      ],
+      "selectedAddonIds": [],
+      "createdAt": "2026-09-02T18:43:30.234Z"
+    },
+    "EVT-2026-2488": {
+      "id": "EVT-2026-2488",
+      "restaurantSubdomain": "bahubali",
+      "eventDetails": {
+        "eventName": "House warming Ceremony",
+        "eventType": "HOUSEWARMING",
+        "eventDate": "2026-11-25",
+        "guestCount": 500,
+        "venue": "Guntur Convention Center",
+        "mealType": "LUNCH",
+        "customer": {
+          "name": "Vivek Garu",
+          "phone": "8184974588"
+        }
+      },
+      "templateId": "wedding-lunch-basic",
+      "template": {
+        "id": "wedding-lunch-basic",
+        "name": "Wedding Lunch – Classic Traditional",
+        "description": "Balanced, cost-effective traditional marriage feast focusing on high-velocity core dishes and authentic flavors.",
+        "applicableEventTypes": [
+          "WEDDING",
+          "HOUSEWARMING",
+          "ENGAGEMENT"
+        ],
+        "applicableMealTypes": [
+          "LUNCH"
+        ],
+        "basePricePerPax": 650,
+        "categoryRules": [
+          {
+            "category": "Welcome Drink",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "wd-fruit-punch",
+                "name": "Exotic Fruit Punch Cooler",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Chilled blend of fresh pineapple, orange, and passion fruit with crushed ice.",
+                "basePortionPerPax": 0.18,
+                "portionUnit": "L",
+                "approxCostPerPax": 22,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "refreshing",
+                  "chilled"
+                ]
+              },
+              {
+                "id": "wd-mint-cooler",
+                "name": "Fresh Mint & Lemon Cooler",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Freshly squeezed lemon with crushed garden mint and rock salt.",
+                "basePortionPerPax": 0.2,
+                "portionUnit": "L",
+                "approxCostPerPax": 15,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "light",
+                  "digestive"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Starter",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "str-chicken-65",
+                "name": "Hyderabadi Chicken 65",
+                "category": "Starter",
+                "dietary": "NON_VEG",
+                "description": "Spiced crispy chicken bites tossed with fresh curry leaves, green chilies, and yogurt.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "kg",
+                "approxCostPerPax": 55,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "chicken",
+                  "signature",
+                  "crispy"
+                ]
+              },
+              {
+                "id": "str-veg-spring-roll",
+                "name": "Crispy Vegetable Spring Rolls",
+                "category": "Starter",
+                "dietary": "VEG",
+                "description": "Golden rolls stuffed with julienned cabbage, bell peppers, carrots, and glass noodles.",
+                "basePortionPerPax": 2,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 28,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "veg",
+                  "crispy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Biryani",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "bir-chicken-dum",
+                "name": "Royal Hyderabadi Chicken Dum Biryani",
+                "category": "Biryani",
+                "dietary": "NON_VEG",
+                "description": "Aged long-grain Basmati rice slow-steamed with bone-in tender chicken, saffron, and pure cow ghee.",
+                "basePortionPerPax": 0.35,
+                "portionUnit": "kg",
+                "approxCostPerPax": 85,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "biryani",
+                  "chicken",
+                  "signature",
+                  "carb-heavy"
+                ]
+              },
+              {
+                "id": "bir-veg-dum",
+                "name": "Shahi Vegetable Dum Biryani",
+                "category": "Biryani",
+                "dietary": "VEG",
+                "description": "Fragrant basmati rice cooked with fresh seasonal vegetables, mint, and saffron milk.",
+                "basePortionPerPax": 0.3,
+                "portionUnit": "kg",
+                "approxCostPerPax": 45,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "biryani",
+                  "veg",
+                  "carb-heavy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Curry",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "cur-butter-chicken",
+                "name": "Creamy Murgh Makhani (Butter Chicken)",
+                "category": "Curry",
+                "dietary": "NON_VEG",
+                "description": "Tandoori chicken tikkas simmered in a velvety tomato, cashew, and honey butter gravy.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 65,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "chicken",
+                  "gravy",
+                  "creamy"
+                ]
+              },
+              {
+                "id": "cur-paneer-butter-masala",
+                "name": "Paneer Butter Masala",
+                "category": "Curry",
+                "dietary": "VEG",
+                "description": "Tender paneer cubes cooked in a rich, buttery tomato sauce infused with kasuri methi.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 48,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "paneer",
+                  "gravy",
+                  "sweet-tangy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Rice",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "rc-steamed-rice",
+                "name": "Steamed Sona Masoori Rice",
+                "category": "Rice",
+                "dietary": "VEG",
+                "description": "Fluffy steamed premium Andhra Sona Masoori rice served with hot pure ghee.",
+                "basePortionPerPax": 0.18,
+                "portionUnit": "kg",
+                "approxCostPerPax": 14,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "rice",
+                  "plain",
+                  "carb-heavy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Dal",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "dal-tomato-pappu",
+                "name": "Andhra Tomato Pappu (Dal)",
+                "category": "Dal",
+                "dietary": "VEG",
+                "description": "Yellow toor dal tempered with ripe country tomatoes, mustard seeds, garlic, and dry red chilies.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "L",
+                "approxCostPerPax": 18,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "dal",
+                  "andhra",
+                  "traditional"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Sambar",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "sam-andhra-sambar",
+                "name": "Drumstick & Shallot Sambar",
+                "category": "Sambar",
+                "dietary": "VEG",
+                "description": "Slow-boiled lentils with tender drumsticks, baby pearl onions, and fragrant home-ground sambar spice.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "L",
+                "approxCostPerPax": 16,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "sambar",
+                  "traditional"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Sweet",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "swt-gulab-jamun",
+                "name": "Warm Shahi Gulab Jamun",
+                "category": "Sweet",
+                "dietary": "VEG",
+                "description": "Soft khoya dumplings deep-fried and soaked in rosewater and cardamom syrup.",
+                "basePortionPerPax": 2,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 26,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "sweet",
+                  "warm",
+                  "traditional"
+                ]
+              },
+              {
+                "id": "swt-double-ka-meetha",
+                "name": "Hyderabadi Double Ka Meetha",
+                "category": "Sweet",
+                "dietary": "VEG",
+                "description": "Fried bread soaked in saffron-infused rabdi and garnished with sliced pistachios and cashews.",
+                "basePortionPerPax": 0.1,
+                "portionUnit": "kg",
+                "approxCostPerPax": 34,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "sweet",
+                  "hyderabadi",
+                  "royal"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "customerSelectionLink": "/restaurant/bahubali/catering/portal/EVT-2026-2488",
+      "status": "LINK_SHARED",
+      "selectedItemIds": [],
+      "selectedAddonIds": [],
+      "createdAt": "2026-09-02T18:57:51.868Z"
+    },
+    "EVT-2026-1512": {
+      "id": "EVT-2026-1512",
+      "restaurantSubdomain": "bahubali",
+      "eventDetails": {
+        "eventName": "Vivek House",
+        "eventType": "WEDDING",
+        "eventDate": "2026-11-25",
+        "guestCount": 500,
+        "venue": "Guntur Convention Center",
+        "mealType": "LUNCH",
+        "customer": {
+          "name": "Vivek",
+          "phone": "8184974588"
+        }
+      },
+      "templateId": "wedding-lunch-premium",
+      "template": {
+        "id": "wedding-lunch-premium",
+        "name": "Wedding Lunch – Premium Feast",
+        "description": "Grand banquet menu engineered for high-profile South Indian weddings with comprehensive vegetarian and non-vegetarian luxury spreads.",
+        "applicableEventTypes": [
+          "WEDDING",
+          "RECEPTION"
+        ],
+        "applicableMealTypes": [
+          "LUNCH",
+          "DINNER"
+        ],
+        "basePricePerPax": 850,
+        "categoryRules": [
+          {
+            "category": "Welcome Drink",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "wd-fruit-punch",
+                "name": "Exotic Fruit Punch Cooler",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Chilled blend of fresh pineapple, orange, and passion fruit with crushed ice.",
+                "basePortionPerPax": 0.18,
+                "portionUnit": "L",
+                "approxCostPerPax": 22,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "refreshing",
+                  "chilled"
+                ]
+              },
+              {
+                "id": "wd-badam-milk",
+                "name": "Royal Kesari Badam Milk",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Slow-simmered almond milk infused with pure saffron strands and cardamom.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "L",
+                "approxCostPerPax": 38,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "rich",
+                  "almond",
+                  "traditional"
+                ]
+              },
+              {
+                "id": "wd-mango-lassi",
+                "name": "Alphonso Mango Lassi",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Thick hand-churned yogurt smoothie blended with ripe Alphonso mango pulp.",
+                "basePortionPerPax": 0.18,
+                "portionUnit": "L",
+                "approxCostPerPax": 30,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "creamy",
+                  "mango"
+                ]
+              },
+              {
+                "id": "wd-mint-cooler",
+                "name": "Fresh Mint & Lemon Cooler",
+                "category": "Welcome Drink",
+                "dietary": "VEG",
+                "description": "Freshly squeezed lemon with crushed garden mint and rock salt.",
+                "basePortionPerPax": 0.2,
+                "portionUnit": "L",
+                "approxCostPerPax": 15,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "beverage",
+                  "light",
+                  "digestive"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Starter",
+            "minSelections": 2,
+            "maxSelections": 2,
+            "availableItems": [
+              {
+                "id": "str-chicken-65",
+                "name": "Hyderabadi Chicken 65",
+                "category": "Starter",
+                "dietary": "NON_VEG",
+                "description": "Spiced crispy chicken bites tossed with fresh curry leaves, green chilies, and yogurt.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "kg",
+                "approxCostPerPax": 55,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "chicken",
+                  "signature",
+                  "crispy"
+                ]
+              },
+              {
+                "id": "str-paneer-tikka",
+                "name": "Tandoori Paneer Tikka",
+                "category": "Starter",
+                "dietary": "VEG",
+                "description": "Char-grilled fresh cottage cheese cubes marinated in mustard oil, ajwain, and Kashmiri chili.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "kg",
+                "approxCostPerPax": 48,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "paneer",
+                  "tandoori",
+                  "starter"
+                ]
+              },
+              {
+                "id": "str-apollo-fish",
+                "name": "Spicy Apollo Fish Bites",
+                "category": "Starter",
+                "dietary": "NON_VEG",
+                "description": "Boneless freshwater fish fillet strips tossed in fiery Andhra red chili temper.",
+                "basePortionPerPax": 0.11,
+                "portionUnit": "kg",
+                "approxCostPerPax": 65,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "seafood",
+                  "fish",
+                  "spicy"
+                ]
+              },
+              {
+                "id": "str-veg-spring-roll",
+                "name": "Crispy Vegetable Spring Rolls",
+                "category": "Starter",
+                "dietary": "VEG",
+                "description": "Golden rolls stuffed with julienned cabbage, bell peppers, carrots, and glass noodles.",
+                "basePortionPerPax": 2,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 28,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "veg",
+                  "crispy"
+                ]
+              },
+              {
+                "id": "str-corn-pepper",
+                "name": "Crispy Salt & Pepper Corn",
+                "category": "Starter",
+                "dietary": "VEG",
+                "description": "Sweet American corn kernels batter-fried and tossed with spring onions and cracked black pepper.",
+                "basePortionPerPax": 0.1,
+                "portionUnit": "kg",
+                "approxCostPerPax": 25,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "veg",
+                  "corn",
+                  "crunchy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Biryani",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "bir-chicken-dum",
+                "name": "Royal Hyderabadi Chicken Dum Biryani",
+                "category": "Biryani",
+                "dietary": "NON_VEG",
+                "description": "Aged long-grain Basmati rice slow-steamed with bone-in tender chicken, saffron, and pure cow ghee.",
+                "basePortionPerPax": 0.35,
+                "portionUnit": "kg",
+                "approxCostPerPax": 85,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "biryani",
+                  "chicken",
+                  "signature",
+                  "carb-heavy"
+                ]
+              },
+              {
+                "id": "bir-mutton-dum",
+                "name": "Nawabi Mutton Dum Biryani",
+                "category": "Biryani",
+                "dietary": "NON_VEG",
+                "description": "Heritage clay-pot dum biryani prepared with select young goat meat and caramelized onions.",
+                "basePortionPerPax": 0.35,
+                "portionUnit": "kg",
+                "approxCostPerPax": 135,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "biryani",
+                  "mutton",
+                  "luxury",
+                  "carb-heavy"
+                ]
+              },
+              {
+                "id": "bir-veg-dum",
+                "name": "Shahi Vegetable Dum Biryani",
+                "category": "Biryani",
+                "dietary": "VEG",
+                "description": "Fragrant basmati rice cooked with fresh seasonal vegetables, mint, and saffron milk.",
+                "basePortionPerPax": 0.3,
+                "portionUnit": "kg",
+                "approxCostPerPax": 45,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "biryani",
+                  "veg",
+                  "carb-heavy"
+                ]
+              },
+              {
+                "id": "rc-bagara",
+                "name": "Telangana Bagara Rice",
+                "category": "Biryani",
+                "dietary": "VEG",
+                "description": "Basmati rice tempered with whole spices (cinnamon, cloves, cardamom, bay leaves) and caramelized onions.",
+                "basePortionPerPax": 0.25,
+                "portionUnit": "kg",
+                "approxCostPerPax": 32,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "rice",
+                  "aromatic",
+                  "carb-heavy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Breads",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "brd-butter-naan",
+                "name": "Tandoori Butter Naan",
+                "category": "Breads",
+                "dietary": "VEG",
+                "description": "Soft leavened clay-oven flatbread brushed with pure melted butter.",
+                "basePortionPerPax": 1.5,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 18,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "bread",
+                  "tandoori"
+                ]
+              },
+              {
+                "id": "brd-rumali",
+                "name": "Handkerchief Rumali Roti",
+                "category": "Breads",
+                "dietary": "VEG",
+                "description": "Ultra-thin, soft handkerchief roti tossed over an inverted dome tawa.",
+                "basePortionPerPax": 2,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 16,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "bread",
+                  "soft"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Curry",
+            "minSelections": 2,
+            "maxSelections": 2,
+            "availableItems": [
+              {
+                "id": "cur-butter-chicken",
+                "name": "Creamy Murgh Makhani (Butter Chicken)",
+                "category": "Curry",
+                "dietary": "NON_VEG",
+                "description": "Tandoori chicken tikkas simmered in a velvety tomato, cashew, and honey butter gravy.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 65,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "chicken",
+                  "gravy",
+                  "creamy"
+                ]
+              },
+              {
+                "id": "cur-paneer-butter-masala",
+                "name": "Paneer Butter Masala",
+                "category": "Curry",
+                "dietary": "VEG",
+                "description": "Tender paneer cubes cooked in a rich, buttery tomato sauce infused with kasuri methi.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 48,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "paneer",
+                  "gravy",
+                  "sweet-tangy"
+                ]
+              },
+              {
+                "id": "cur-kadai-paneer",
+                "name": "Kadai Paneer Bell Pepper Toss",
+                "category": "Curry",
+                "dietary": "VEG",
+                "description": "Cottage cheese chunks and bell peppers simmered in a freshly pounded coriander and red chili masala.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 46,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "paneer",
+                  "gravy",
+                  "spicy"
+                ]
+              },
+              {
+                "id": "cur-veg-kolhapuri",
+                "name": "Spicy Veg Kolhapuri Melange",
+                "category": "Curry",
+                "dietary": "VEG",
+                "description": "Garden fresh carrots, beans, peas, and florets cooked in a fiery roasted coconut-sesame gravy.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 32,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "veg",
+                  "gravy",
+                  "spicy",
+                  "alternative"
+                ]
+              },
+              {
+                "id": "cur-dal-makhani",
+                "name": "Peshawari Dal Makhani",
+                "category": "Curry",
+                "dietary": "VEG",
+                "description": "Black urad lentils and red kidney beans slow-cooked for 18 hours with white butter and cream.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "kg",
+                "approxCostPerPax": 28,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "dal",
+                  "gravy",
+                  "rich"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Rice",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "rc-steamed-rice",
+                "name": "Steamed Sona Masoori Rice",
+                "category": "Rice",
+                "dietary": "VEG",
+                "description": "Fluffy steamed premium Andhra Sona Masoori rice served with hot pure ghee.",
+                "basePortionPerPax": 0.18,
+                "portionUnit": "kg",
+                "approxCostPerPax": 14,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "rice",
+                  "plain",
+                  "carb-heavy"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Dal",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "dal-tomato-pappu",
+                "name": "Andhra Tomato Pappu (Dal)",
+                "category": "Dal",
+                "dietary": "VEG",
+                "description": "Yellow toor dal tempered with ripe country tomatoes, mustard seeds, garlic, and dry red chilies.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "L",
+                "approxCostPerPax": 18,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "dal",
+                  "andhra",
+                  "traditional"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Sambar",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "sam-andhra-sambar",
+                "name": "Drumstick & Shallot Sambar",
+                "category": "Sambar",
+                "dietary": "VEG",
+                "description": "Slow-boiled lentils with tender drumsticks, baby pearl onions, and fragrant home-ground sambar spice.",
+                "basePortionPerPax": 0.15,
+                "portionUnit": "L",
+                "approxCostPerPax": 16,
+                "spiceLevel": "MEDIUM",
+                "tags": [
+                  "sambar",
+                  "traditional"
+                ]
+              },
+              {
+                "id": "ras-pepper-rasam",
+                "name": "Miriyala Pepper Rasam",
+                "category": "Sambar",
+                "dietary": "VEG",
+                "description": "Digestive broth brewed with crushed black pepper, cumin seeds, garlic, and tamarind.",
+                "basePortionPerPax": 0.12,
+                "portionUnit": "L",
+                "approxCostPerPax": 12,
+                "spiceLevel": "SPICY",
+                "tags": [
+                  "rasam",
+                  "digestive"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Sweet",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "swt-gulab-jamun",
+                "name": "Warm Shahi Gulab Jamun",
+                "category": "Sweet",
+                "dietary": "VEG",
+                "description": "Soft khoya dumplings deep-fried and soaked in rosewater and cardamom syrup.",
+                "basePortionPerPax": 2,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 26,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "sweet",
+                  "warm",
+                  "traditional"
+                ]
+              },
+              {
+                "id": "swt-double-ka-meetha",
+                "name": "Hyderabadi Double Ka Meetha",
+                "category": "Sweet",
+                "dietary": "VEG",
+                "description": "Fried bread soaked in saffron-infused rabdi and garnished with sliced pistachios and cashews.",
+                "basePortionPerPax": 0.1,
+                "portionUnit": "kg",
+                "approxCostPerPax": 34,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "sweet",
+                  "hyderabadi",
+                  "royal"
+                ]
+              },
+              {
+                "id": "swt-gajar-halwa",
+                "name": "Ghee Gajar Ka Halwa",
+                "category": "Sweet",
+                "dietary": "VEG",
+                "description": "Slow-roasted red Delhi carrots simmered with condensed milk, pure ghee, and roasted nuts.",
+                "basePortionPerPax": 0.1,
+                "portionUnit": "kg",
+                "approxCostPerPax": 36,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "sweet",
+                  "halwa",
+                  "seasonal"
+                ]
+              }
+            ]
+          },
+          {
+            "category": "Ice Cream",
+            "minSelections": 1,
+            "maxSelections": 1,
+            "availableItems": [
+              {
+                "id": "ice-malai-kulfi",
+                "name": "Matka Malai Kulfi",
+                "category": "Ice Cream",
+                "dietary": "VEG",
+                "description": "Traditional frozen dairy dessert on wooden sticks enriched with cardamom and almonds.",
+                "basePortionPerPax": 1,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 25,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "dessert",
+                  "kulfi",
+                  "chilled"
+                ]
+              },
+              {
+                "id": "ice-vanilla-fudge",
+                "name": "Vanilla Bean with Hot Chocolate Fudge",
+                "category": "Ice Cream",
+                "dietary": "VEG",
+                "description": "Premium Madagascar vanilla scoop drizzled with hot melted Belgian chocolate sauce.",
+                "basePortionPerPax": 1,
+                "portionUnit": "pcs",
+                "approxCostPerPax": 22,
+                "spiceLevel": "MILD",
+                "tags": [
+                  "dessert",
+                  "icecream"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "customerSelectionLink": "/restaurant/bahubali/catering/portal/EVT-2026-1512",
+      "status": "LINK_SHARED",
+      "selectedItemIds": [],
+      "selectedAddonIds": [],
+      "createdAt": "2026-09-02T18:57:25.499Z"
+    }
+  },
+  "templates": {
+    "wedding-lunch-premium": {
+      "id": "wedding-lunch-premium",
+      "name": "Wedding Lunch – Premium Feast",
+      "description": "Grand banquet menu engineered for high-profile South Indian weddings with comprehensive vegetarian and non-vegetarian luxury spreads.",
+      "applicableEventTypes": [
+        "WEDDING",
+        "RECEPTION"
+      ],
+      "applicableMealTypes": [
+        "LUNCH",
+        "DINNER"
+      ],
+      "basePricePerPax": 850,
+      "categoryRules": [
+        {
+          "category": "Welcome Drink",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "wd-fruit-punch",
+              "name": "Exotic Fruit Punch Cooler",
+              "category": "Welcome Drink",
+              "dietary": "VEG",
+              "description": "Chilled blend of fresh pineapple, orange, and passion fruit with crushed ice.",
+              "basePortionPerPax": 0.18,
+              "portionUnit": "L",
+              "approxCostPerPax": 22,
+              "spiceLevel": "MILD",
+              "tags": [
+                "beverage",
+                "refreshing",
+                "chilled"
+              ]
+            },
+            {
+              "id": "wd-badam-milk",
+              "name": "Royal Kesari Badam Milk",
+              "category": "Welcome Drink",
+              "dietary": "VEG",
+              "description": "Slow-simmered almond milk infused with pure saffron strands and cardamom.",
+              "basePortionPerPax": 0.15,
+              "portionUnit": "L",
+              "approxCostPerPax": 38,
+              "spiceLevel": "MILD",
+              "tags": [
+                "beverage",
+                "rich",
+                "almond",
+                "traditional"
+              ]
+            },
+            {
+              "id": "wd-mango-lassi",
+              "name": "Alphonso Mango Lassi",
+              "category": "Welcome Drink",
+              "dietary": "VEG",
+              "description": "Thick hand-churned yogurt smoothie blended with ripe Alphonso mango pulp.",
+              "basePortionPerPax": 0.18,
+              "portionUnit": "L",
+              "approxCostPerPax": 30,
+              "spiceLevel": "MILD",
+              "tags": [
+                "beverage",
+                "creamy",
+                "mango"
+              ]
+            },
+            {
+              "id": "wd-mint-cooler",
+              "name": "Fresh Mint & Lemon Cooler",
+              "category": "Welcome Drink",
+              "dietary": "VEG",
+              "description": "Freshly squeezed lemon with crushed garden mint and rock salt.",
+              "basePortionPerPax": 0.2,
+              "portionUnit": "L",
+              "approxCostPerPax": 15,
+              "spiceLevel": "MILD",
+              "tags": [
+                "beverage",
+                "light",
+                "digestive"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Starter",
+          "minSelections": 2,
+          "maxSelections": 2,
+          "availableItems": [
+            {
+              "id": "str-chicken-65",
+              "name": "Hyderabadi Chicken 65",
+              "category": "Starter",
+              "dietary": "NON_VEG",
+              "description": "Spiced crispy chicken bites tossed with fresh curry leaves, green chilies, and yogurt.",
+              "basePortionPerPax": 0.12,
+              "portionUnit": "kg",
+              "approxCostPerPax": 55,
+              "spiceLevel": "SPICY",
+              "tags": [
+                "chicken",
+                "signature",
+                "crispy"
+              ]
+            },
+            {
+              "id": "str-paneer-tikka",
+              "name": "Tandoori Paneer Tikka",
+              "category": "Starter",
+              "dietary": "VEG",
+              "description": "Char-grilled fresh cottage cheese cubes marinated in mustard oil, ajwain, and Kashmiri chili.",
+              "basePortionPerPax": 0.12,
+              "portionUnit": "kg",
+              "approxCostPerPax": 48,
+              "spiceLevel": "MEDIUM",
+              "tags": [
+                "paneer",
+                "tandoori",
+                "starter"
+              ]
+            },
+            {
+              "id": "str-apollo-fish",
+              "name": "Spicy Apollo Fish Bites",
+              "category": "Starter",
+              "dietary": "NON_VEG",
+              "description": "Boneless freshwater fish fillet strips tossed in fiery Andhra red chili temper.",
+              "basePortionPerPax": 0.11,
+              "portionUnit": "kg",
+              "approxCostPerPax": 65,
+              "spiceLevel": "SPICY",
+              "tags": [
+                "seafood",
+                "fish",
+                "spicy"
+              ]
+            },
+            {
+              "id": "str-veg-spring-roll",
+              "name": "Crispy Vegetable Spring Rolls",
+              "category": "Starter",
+              "dietary": "VEG",
+              "description": "Golden rolls stuffed with julienned cabbage, bell peppers, carrots, and glass noodles.",
+              "basePortionPerPax": 2,
+              "portionUnit": "pcs",
+              "approxCostPerPax": 28,
+              "spiceLevel": "MILD",
+              "tags": [
+                "veg",
+                "crispy"
+              ]
+            },
+            {
+              "id": "str-corn-pepper",
+              "name": "Crispy Salt & Pepper Corn",
+              "category": "Starter",
+              "dietary": "VEG",
+              "description": "Sweet American corn kernels batter-fried and tossed with spring onions and cracked black pepper.",
+              "basePortionPerPax": 0.1,
+              "portionUnit": "kg",
+              "approxCostPerPax": 25,
+              "spiceLevel": "MEDIUM",
+              "tags": [
+                "veg",
+                "corn",
+                "crunchy"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Biryani",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "bir-chicken-dum",
+              "name": "Royal Hyderabadi Chicken Dum Biryani",
+              "category": "Biryani",
+              "dietary": "NON_VEG",
+              "description": "Aged long-grain Basmati rice slow-steamed with bone-in tender chicken, saffron, and pure cow ghee.",
+              "basePortionPerPax": 0.35,
+              "portionUnit": "kg",
+              "approxCostPerPax": 85,
+              "spiceLevel": "MEDIUM",
+              "tags": [
+                "biryani",
+                "chicken",
+                "signature",
+                "carb-heavy"
+              ]
+            },
+            {
+              "id": "bir-mutton-dum",
+              "name": "Nawabi Mutton Dum Biryani",
+              "category": "Biryani",
+              "dietary": "NON_VEG",
+              "description": "Heritage clay-pot dum biryani prepared with select young goat meat and caramelized onions.",
+              "basePortionPerPax": 0.35,
+              "portionUnit": "kg",
+              "approxCostPerPax": 135,
+              "spiceLevel": "SPICY",
+              "tags": [
+                "biryani",
+                "mutton",
+                "luxury",
+                "carb-heavy"
+              ]
+            },
+            {
+              "id": "bir-veg-dum",
+              "name": "Shahi Vegetable Dum Biryani",
+              "category": "Biryani",
+              "dietary": "VEG",
+              "description": "Fragrant basmati rice cooked with fresh seasonal vegetables, mint, and saffron milk.",
+              "basePortionPerPax": 0.3,
+              "portionUnit": "kg",
+              "approxCostPerPax": 45,
+              "spiceLevel": "MEDIUM",
+              "tags": [
+                "biryani",
+                "veg",
+                "carb-heavy"
+              ]
+            },
+            {
+              "id": "rc-bagara",
+              "name": "Telangana Bagara Rice",
+              "category": "Biryani",
+              "dietary": "VEG",
+              "description": "Basmati rice tempered with whole spices (cinnamon, cloves, cardamom, bay leaves) and caramelized onions.",
+              "basePortionPerPax": 0.25,
+              "portionUnit": "kg",
+              "approxCostPerPax": 32,
+              "spiceLevel": "MILD",
+              "tags": [
+                "rice",
+                "aromatic",
+                "carb-heavy"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Breads",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "brd-butter-naan",
+              "name": "Tandoori Butter Naan",
+              "category": "Breads",
+              "dietary": "VEG",
+              "description": "Soft leavened clay-oven flatbread brushed with pure melted butter.",
+              "basePortionPerPax": 1.5,
+              "portionUnit": "pcs",
+              "approxCostPerPax": 18,
+              "spiceLevel": "MILD",
+              "tags": [
+                "bread",
+                "tandoori"
+              ]
+            },
+            {
+              "id": "brd-rumali",
+              "name": "Handkerchief Rumali Roti",
+              "category": "Breads",
+              "dietary": "VEG",
+              "description": "Ultra-thin, soft handkerchief roti tossed over an inverted dome tawa.",
+              "basePortionPerPax": 2,
+              "portionUnit": "pcs",
+              "approxCostPerPax": 16,
+              "spiceLevel": "MILD",
+              "tags": [
+                "bread",
+                "soft"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Curry",
+          "minSelections": 2,
+          "maxSelections": 2,
+          "availableItems": [
+            {
+              "id": "cur-butter-chicken",
+              "name": "Creamy Murgh Makhani (Butter Chicken)",
+              "category": "Curry",
+              "dietary": "NON_VEG",
+              "description": "Tandoori chicken tikkas simmered in a velvety tomato, cashew, and honey butter gravy.",
+              "basePortionPerPax": 0.15,
+              "portionUnit": "kg",
+              "approxCostPerPax": 65,
+              "spiceLevel": "MILD",
+              "tags": [
+                "chicken",
+                "gravy",
+                "creamy"
+              ]
+            },
+            {
+              "id": "cur-paneer-butter-masala",
+              "name": "Paneer Butter Masala",
+              "category": "Curry",
+              "dietary": "VEG",
+              "description": "Tender paneer cubes cooked in a rich, buttery tomato sauce infused with kasuri methi.",
+              "basePortionPerPax": 0.15,
+              "portionUnit": "kg",
+              "approxCostPerPax": 48,
+              "spiceLevel": "MILD",
+              "tags": [
+                "paneer",
+                "gravy",
+                "sweet-tangy"
+              ]
+            },
+            {
+              "id": "cur-kadai-paneer",
+              "name": "Kadai Paneer Bell Pepper Toss",
+              "category": "Curry",
+              "dietary": "VEG",
+              "description": "Cottage cheese chunks and bell peppers simmered in a freshly pounded coriander and red chili masala.",
+              "basePortionPerPax": 0.15,
+              "portionUnit": "kg",
+              "approxCostPerPax": 46,
+              "spiceLevel": "SPICY",
+              "tags": [
+                "paneer",
+                "gravy",
+                "spicy"
+              ]
+            },
+            {
+              "id": "cur-veg-kolhapuri",
+              "name": "Spicy Veg Kolhapuri Melange",
+              "category": "Curry",
+              "dietary": "VEG",
+              "description": "Garden fresh carrots, beans, peas, and florets cooked in a fiery roasted coconut-sesame gravy.",
+              "basePortionPerPax": 0.15,
+              "portionUnit": "kg",
+              "approxCostPerPax": 32,
+              "spiceLevel": "SPICY",
+              "tags": [
+                "veg",
+                "gravy",
+                "spicy",
+                "alternative"
+              ]
+            },
+            {
+              "id": "cur-dal-makhani",
+              "name": "Peshawari Dal Makhani",
+              "category": "Curry",
+              "dietary": "VEG",
+              "description": "Black urad lentils and red kidney beans slow-cooked for 18 hours with white butter and cream.",
+              "basePortionPerPax": 0.15,
+              "portionUnit": "kg",
+              "approxCostPerPax": 28,
+              "spiceLevel": "MILD",
+              "tags": [
+                "dal",
+                "gravy",
+                "rich"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Rice",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "rc-steamed-rice",
+              "name": "Steamed Sona Masoori Rice",
+              "category": "Rice",
+              "dietary": "VEG",
+              "description": "Fluffy steamed premium Andhra Sona Masoori rice served with hot pure ghee.",
+              "basePortionPerPax": 0.18,
+              "portionUnit": "kg",
+              "approxCostPerPax": 14,
+              "spiceLevel": "MILD",
+              "tags": [
+                "rice",
+                "plain",
+                "carb-heavy"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Dal",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "dal-tomato-pappu",
+              "name": "Andhra Tomato Pappu (Dal)",
+              "category": "Dal",
+              "dietary": "VEG",
+              "description": "Yellow toor dal tempered with ripe country tomatoes, mustard seeds, garlic, and dry red chilies.",
+              "basePortionPerPax": 0.12,
+              "portionUnit": "L",
+              "approxCostPerPax": 18,
+              "spiceLevel": "MEDIUM",
+              "tags": [
+                "dal",
+                "andhra",
+                "traditional"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Sambar",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "sam-andhra-sambar",
+              "name": "Drumstick & Shallot Sambar",
+              "category": "Sambar",
+              "dietary": "VEG",
+              "description": "Slow-boiled lentils with tender drumsticks, baby pearl onions, and fragrant home-ground sambar spice.",
+              "basePortionPerPax": 0.15,
+              "portionUnit": "L",
+              "approxCostPerPax": 16,
+              "spiceLevel": "MEDIUM",
+              "tags": [
+                "sambar",
+                "traditional"
+              ]
+            },
+            {
+              "id": "ras-pepper-rasam",
+              "name": "Miriyala Pepper Rasam",
+              "category": "Sambar",
+              "dietary": "VEG",
+              "description": "Digestive broth brewed with crushed black pepper, cumin seeds, garlic, and tamarind.",
+              "basePortionPerPax": 0.12,
+              "portionUnit": "L",
+              "approxCostPerPax": 12,
+              "spiceLevel": "SPICY",
+              "tags": [
+                "rasam",
+                "digestive"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Sweet",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "swt-gulab-jamun",
+              "name": "Warm Shahi Gulab Jamun",
+              "category": "Sweet",
+              "dietary": "VEG",
+              "description": "Soft khoya dumplings deep-fried and soaked in rosewater and cardamom syrup.",
+              "basePortionPerPax": 2,
+              "portionUnit": "pcs",
+              "approxCostPerPax": 26,
+              "spiceLevel": "MILD",
+              "tags": [
+                "sweet",
+                "warm",
+                "traditional"
+              ]
+            },
+            {
+              "id": "swt-double-ka-meetha",
+              "name": "Hyderabadi Double Ka Meetha",
+              "category": "Sweet",
+              "dietary": "VEG",
+              "description": "Fried bread soaked in saffron-infused rabdi and garnished with sliced pistachios and cashews.",
+              "basePortionPerPax": 0.1,
+              "portionUnit": "kg",
+              "approxCostPerPax": 34,
+              "spiceLevel": "MILD",
+              "tags": [
+                "sweet",
+                "hyderabadi",
+                "royal"
+              ]
+            },
+            {
+              "id": "swt-gajar-halwa",
+              "name": "Ghee Gajar Ka Halwa",
+              "category": "Sweet",
+              "dietary": "VEG",
+              "description": "Slow-roasted red Delhi carrots simmered with condensed milk, pure ghee, and roasted nuts.",
+              "basePortionPerPax": 0.1,
+              "portionUnit": "kg",
+              "approxCostPerPax": 36,
+              "spiceLevel": "MILD",
+              "tags": [
+                "sweet",
+                "halwa",
+                "seasonal"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Ice Cream",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "ice-malai-kulfi",
+              "name": "Matka Malai Kulfi",
+              "category": "Ice Cream",
+              "dietary": "VEG",
+              "description": "Traditional frozen dairy dessert on wooden sticks enriched with cardamom and almonds.",
+              "basePortionPerPax": 1,
+              "portionUnit": "pcs",
+              "approxCostPerPax": 25,
+              "spiceLevel": "MILD",
+              "tags": [
+                "dessert",
+                "kulfi",
+                "chilled"
+              ]
+            },
+            {
+              "id": "ice-vanilla-fudge",
+              "name": "Vanilla Bean with Hot Chocolate Fudge",
+              "category": "Ice Cream",
+              "dietary": "VEG",
+              "description": "Premium Madagascar vanilla scoop drizzled with hot melted Belgian chocolate sauce.",
+              "basePortionPerPax": 1,
+              "portionUnit": "pcs",
+              "approxCostPerPax": 22,
+              "spiceLevel": "MILD",
+              "tags": [
+                "dessert",
+                "icecream"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "wedding-lunch-basic": {
+      "id": "wedding-lunch-basic",
+      "name": "Wedding Lunch – Classic Traditional",
+      "description": "Balanced, cost-effective traditional marriage feast focusing on high-velocity core dishes and authentic flavors.",
+      "applicableEventTypes": [
+        "WEDDING",
+        "HOUSEWARMING",
+        "ENGAGEMENT"
+      ],
+      "applicableMealTypes": [
+        "LUNCH"
+      ],
+      "basePricePerPax": 650,
+      "categoryRules": [
+        {
+          "category": "Welcome Drink",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "wd-fruit-punch",
+              "name": "Exotic Fruit Punch Cooler",
+              "category": "Welcome Drink",
+              "dietary": "VEG",
+              "description": "Chilled blend of fresh pineapple, orange, and passion fruit with crushed ice.",
+              "basePortionPerPax": 0.18,
+              "portionUnit": "L",
+              "approxCostPerPax": 22,
+              "spiceLevel": "MILD",
+              "tags": [
+                "beverage",
+                "refreshing",
+                "chilled"
+              ]
+            },
+            {
+              "id": "wd-mint-cooler",
+              "name": "Fresh Mint & Lemon Cooler",
+              "category": "Welcome Drink",
+              "dietary": "VEG",
+              "description": "Freshly squeezed lemon with crushed garden mint and rock salt.",
+              "basePortionPerPax": 0.2,
+              "portionUnit": "L",
+              "approxCostPerPax": 15,
+              "spiceLevel": "MILD",
+              "tags": [
+                "beverage",
+                "light",
+                "digestive"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Starter",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "str-chicken-65",
+              "name": "Hyderabadi Chicken 65",
+              "category": "Starter",
+              "dietary": "NON_VEG",
+              "description": "Spiced crispy chicken bites tossed with fresh curry leaves, green chilies, and yogurt.",
+              "basePortionPerPax": 0.12,
+              "portionUnit": "kg",
+              "approxCostPerPax": 55,
+              "spiceLevel": "SPICY",
+              "tags": [
+                "chicken",
+                "signature",
+                "crispy"
+              ]
+            },
+            {
+              "id": "str-veg-spring-roll",
+              "name": "Crispy Vegetable Spring Rolls",
+              "category": "Starter",
+              "dietary": "VEG",
+              "description": "Golden rolls stuffed with julienned cabbage, bell peppers, carrots, and glass noodles.",
+              "basePortionPerPax": 2,
+              "portionUnit": "pcs",
+              "approxCostPerPax": 28,
+              "spiceLevel": "MILD",
+              "tags": [
+                "veg",
+                "crispy"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Biryani",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "bir-chicken-dum",
+              "name": "Royal Hyderabadi Chicken Dum Biryani",
+              "category": "Biryani",
+              "dietary": "NON_VEG",
+              "description": "Aged long-grain Basmati rice slow-steamed with bone-in tender chicken, saffron, and pure cow ghee.",
+              "basePortionPerPax": 0.35,
+              "portionUnit": "kg",
+              "approxCostPerPax": 85,
+              "spiceLevel": "MEDIUM",
+              "tags": [
+                "biryani",
+                "chicken",
+                "signature",
+                "carb-heavy"
+              ]
+            },
+            {
+              "id": "bir-veg-dum",
+              "name": "Shahi Vegetable Dum Biryani",
+              "category": "Biryani",
+              "dietary": "VEG",
+              "description": "Fragrant basmati rice cooked with fresh seasonal vegetables, mint, and saffron milk.",
+              "basePortionPerPax": 0.3,
+              "portionUnit": "kg",
+              "approxCostPerPax": 45,
+              "spiceLevel": "MEDIUM",
+              "tags": [
+                "biryani",
+                "veg",
+                "carb-heavy"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Curry",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "cur-butter-chicken",
+              "name": "Creamy Murgh Makhani (Butter Chicken)",
+              "category": "Curry",
+              "dietary": "NON_VEG",
+              "description": "Tandoori chicken tikkas simmered in a velvety tomato, cashew, and honey butter gravy.",
+              "basePortionPerPax": 0.15,
+              "portionUnit": "kg",
+              "approxCostPerPax": 65,
+              "spiceLevel": "MILD",
+              "tags": [
+                "chicken",
+                "gravy",
+                "creamy"
+              ]
+            },
+            {
+              "id": "cur-paneer-butter-masala",
+              "name": "Paneer Butter Masala",
+              "category": "Curry",
+              "dietary": "VEG",
+              "description": "Tender paneer cubes cooked in a rich, buttery tomato sauce infused with kasuri methi.",
+              "basePortionPerPax": 0.15,
+              "portionUnit": "kg",
+              "approxCostPerPax": 48,
+              "spiceLevel": "MILD",
+              "tags": [
+                "paneer",
+                "gravy",
+                "sweet-tangy"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Rice",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "rc-steamed-rice",
+              "name": "Steamed Sona Masoori Rice",
+              "category": "Rice",
+              "dietary": "VEG",
+              "description": "Fluffy steamed premium Andhra Sona Masoori rice served with hot pure ghee.",
+              "basePortionPerPax": 0.18,
+              "portionUnit": "kg",
+              "approxCostPerPax": 14,
+              "spiceLevel": "MILD",
+              "tags": [
+                "rice",
+                "plain",
+                "carb-heavy"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Dal",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "dal-tomato-pappu",
+              "name": "Andhra Tomato Pappu (Dal)",
+              "category": "Dal",
+              "dietary": "VEG",
+              "description": "Yellow toor dal tempered with ripe country tomatoes, mustard seeds, garlic, and dry red chilies.",
+              "basePortionPerPax": 0.12,
+              "portionUnit": "L",
+              "approxCostPerPax": 18,
+              "spiceLevel": "MEDIUM",
+              "tags": [
+                "dal",
+                "andhra",
+                "traditional"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Sambar",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "sam-andhra-sambar",
+              "name": "Drumstick & Shallot Sambar",
+              "category": "Sambar",
+              "dietary": "VEG",
+              "description": "Slow-boiled lentils with tender drumsticks, baby pearl onions, and fragrant home-ground sambar spice.",
+              "basePortionPerPax": 0.15,
+              "portionUnit": "L",
+              "approxCostPerPax": 16,
+              "spiceLevel": "MEDIUM",
+              "tags": [
+                "sambar",
+                "traditional"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Sweet",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "swt-gulab-jamun",
+              "name": "Warm Shahi Gulab Jamun",
+              "category": "Sweet",
+              "dietary": "VEG",
+              "description": "Soft khoya dumplings deep-fried and soaked in rosewater and cardamom syrup.",
+              "basePortionPerPax": 2,
+              "portionUnit": "pcs",
+              "approxCostPerPax": 26,
+              "spiceLevel": "MILD",
+              "tags": [
+                "sweet",
+                "warm",
+                "traditional"
+              ]
+            },
+            {
+              "id": "swt-double-ka-meetha",
+              "name": "Hyderabadi Double Ka Meetha",
+              "category": "Sweet",
+              "dietary": "VEG",
+              "description": "Fried bread soaked in saffron-infused rabdi and garnished with sliced pistachios and cashews.",
+              "basePortionPerPax": 0.1,
+              "portionUnit": "kg",
+              "approxCostPerPax": 34,
+              "spiceLevel": "MILD",
+              "tags": [
+                "sweet",
+                "hyderabadi",
+                "royal"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "corporate-executive": {
+      "id": "corporate-executive",
+      "name": "Corporate Executive Buffet",
+      "description": "Streamlined high-productivity buffet tailored for annual tech summits, conferences, and corporate galas.",
+      "applicableEventTypes": [
+        "CORPORATE"
+      ],
+      "applicableMealTypes": [
+        "LUNCH",
+        "DINNER"
+      ],
+      "basePricePerPax": 720,
+      "categoryRules": [
+        {
+          "category": "Welcome Drink",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "wd-fruit-punch",
+              "name": "Exotic Fruit Punch Cooler",
+              "category": "Welcome Drink",
+              "dietary": "VEG",
+              "description": "Chilled blend of fresh pineapple, orange, and passion fruit with crushed ice.",
+              "basePortionPerPax": 0.18,
+              "portionUnit": "L",
+              "approxCostPerPax": 22,
+              "spiceLevel": "MILD",
+              "tags": [
+                "beverage",
+                "refreshing",
+                "chilled"
+              ]
+            },
+            {
+              "id": "wd-mint-cooler",
+              "name": "Fresh Mint & Lemon Cooler",
+              "category": "Welcome Drink",
+              "dietary": "VEG",
+              "description": "Freshly squeezed lemon with crushed garden mint and rock salt.",
+              "basePortionPerPax": 0.2,
+              "portionUnit": "L",
+              "approxCostPerPax": 15,
+              "spiceLevel": "MILD",
+              "tags": [
+                "beverage",
+                "light",
+                "digestive"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Starter",
+          "minSelections": 2,
+          "maxSelections": 2,
+          "availableItems": [
+            {
+              "id": "str-chicken-65",
+              "name": "Hyderabadi Chicken 65",
+              "category": "Starter",
+              "dietary": "NON_VEG",
+              "description": "Spiced crispy chicken bites tossed with fresh curry leaves, green chilies, and yogurt.",
+              "basePortionPerPax": 0.12,
+              "portionUnit": "kg",
+              "approxCostPerPax": 55,
+              "spiceLevel": "SPICY",
+              "tags": [
+                "chicken",
+                "signature",
+                "crispy"
+              ]
+            },
+            {
+              "id": "str-paneer-tikka",
+              "name": "Tandoori Paneer Tikka",
+              "category": "Starter",
+              "dietary": "VEG",
+              "description": "Char-grilled fresh cottage cheese cubes marinated in mustard oil, ajwain, and Kashmiri chili.",
+              "basePortionPerPax": 0.12,
+              "portionUnit": "kg",
+              "approxCostPerPax": 48,
+              "spiceLevel": "MEDIUM",
+              "tags": [
+                "paneer",
+                "tandoori",
+                "starter"
+              ]
+            },
+            {
+              "id": "str-corn-pepper",
+              "name": "Crispy Salt & Pepper Corn",
+              "category": "Starter",
+              "dietary": "VEG",
+              "description": "Sweet American corn kernels batter-fried and tossed with spring onions and cracked black pepper.",
+              "basePortionPerPax": 0.1,
+              "portionUnit": "kg",
+              "approxCostPerPax": 25,
+              "spiceLevel": "MEDIUM",
+              "tags": [
+                "veg",
+                "corn",
+                "crunchy"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Biryani",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "bir-chicken-dum",
+              "name": "Royal Hyderabadi Chicken Dum Biryani",
+              "category": "Biryani",
+              "dietary": "NON_VEG",
+              "description": "Aged long-grain Basmati rice slow-steamed with bone-in tender chicken, saffron, and pure cow ghee.",
+              "basePortionPerPax": 0.35,
+              "portionUnit": "kg",
+              "approxCostPerPax": 85,
+              "spiceLevel": "MEDIUM",
+              "tags": [
+                "biryani",
+                "chicken",
+                "signature",
+                "carb-heavy"
+              ]
+            },
+            {
+              "id": "bir-veg-dum",
+              "name": "Shahi Vegetable Dum Biryani",
+              "category": "Biryani",
+              "dietary": "VEG",
+              "description": "Fragrant basmati rice cooked with fresh seasonal vegetables, mint, and saffron milk.",
+              "basePortionPerPax": 0.3,
+              "portionUnit": "kg",
+              "approxCostPerPax": 45,
+              "spiceLevel": "MEDIUM",
+              "tags": [
+                "biryani",
+                "veg",
+                "carb-heavy"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Breads",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "brd-butter-naan",
+              "name": "Tandoori Butter Naan",
+              "category": "Breads",
+              "dietary": "VEG",
+              "description": "Soft leavened clay-oven flatbread brushed with pure melted butter.",
+              "basePortionPerPax": 1.5,
+              "portionUnit": "pcs",
+              "approxCostPerPax": 18,
+              "spiceLevel": "MILD",
+              "tags": [
+                "bread",
+                "tandoori"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Curry",
+          "minSelections": 2,
+          "maxSelections": 2,
+          "availableItems": [
+            {
+              "id": "cur-butter-chicken",
+              "name": "Creamy Murgh Makhani (Butter Chicken)",
+              "category": "Curry",
+              "dietary": "NON_VEG",
+              "description": "Tandoori chicken tikkas simmered in a velvety tomato, cashew, and honey butter gravy.",
+              "basePortionPerPax": 0.15,
+              "portionUnit": "kg",
+              "approxCostPerPax": 65,
+              "spiceLevel": "MILD",
+              "tags": [
+                "chicken",
+                "gravy",
+                "creamy"
+              ]
+            },
+            {
+              "id": "cur-paneer-butter-masala",
+              "name": "Paneer Butter Masala",
+              "category": "Curry",
+              "dietary": "VEG",
+              "description": "Tender paneer cubes cooked in a rich, buttery tomato sauce infused with kasuri methi.",
+              "basePortionPerPax": 0.15,
+              "portionUnit": "kg",
+              "approxCostPerPax": 48,
+              "spiceLevel": "MILD",
+              "tags": [
+                "paneer",
+                "gravy",
+                "sweet-tangy"
+              ]
+            },
+            {
+              "id": "cur-dal-makhani",
+              "name": "Peshawari Dal Makhani",
+              "category": "Curry",
+              "dietary": "VEG",
+              "description": "Black urad lentils and red kidney beans slow-cooked for 18 hours with white butter and cream.",
+              "basePortionPerPax": 0.15,
+              "portionUnit": "kg",
+              "approxCostPerPax": 28,
+              "spiceLevel": "MILD",
+              "tags": [
+                "dal",
+                "gravy",
+                "rich"
+              ]
+            }
+          ]
+        },
+        {
+          "category": "Sweet",
+          "minSelections": 1,
+          "maxSelections": 1,
+          "availableItems": [
+            {
+              "id": "swt-gulab-jamun",
+              "name": "Warm Shahi Gulab Jamun",
+              "category": "Sweet",
+              "dietary": "VEG",
+              "description": "Soft khoya dumplings deep-fried and soaked in rosewater and cardamom syrup.",
+              "basePortionPerPax": 2,
+              "portionUnit": "pcs",
+              "approxCostPerPax": 26,
+              "spiceLevel": "MILD",
+              "tags": [
+                "sweet",
+                "warm",
+                "traditional"
+              ]
+            },
+            {
+              "id": "ice-vanilla-fudge",
+              "name": "Vanilla Bean with Hot Chocolate Fudge",
+              "category": "Ice Cream",
+              "dietary": "VEG",
+              "description": "Premium Madagascar vanilla scoop drizzled with hot melted Belgian chocolate sauce.",
+              "basePortionPerPax": 1,
+              "portionUnit": "pcs",
+              "approxCostPerPax": 22,
+              "spiceLevel": "MILD",
+              "tags": [
+                "dessert",
+                "icecream"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "recipes": {
+    "dish-1788376397151-585": {
+      "id": "dish-1788376397151-585",
+      "name": "baddam oreo",
+      "category": "Welcome Drink",
+      "dietary": "VEG",
+      "basePortionPerPax": 0.15,
+      "portionUnit": "L",
+      "approxCostPerPax": 45,
+      "spiceLevel": "MEDIUM",
+      "description": "Signature baddam oreo",
+      "tags": [
+        "catalog-dish"
+      ]
+    }
+  }
+}

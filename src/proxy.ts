@@ -113,7 +113,8 @@ export async function proxy(req: NextRequest) {
       const isPublicPath =
         path === `/restaurant/${pathSubdomain}/login` ||
         path === `/restaurant/${pathSubdomain}/activate` ||
-        path.startsWith(`/restaurant/${pathSubdomain}/activate/`);
+        path.startsWith(`/restaurant/${pathSubdomain}/activate/`) ||
+        path.includes("/catering/portal/");
 
       if (isPublicPath) {
         return NextResponse.next();

@@ -1,1622 +1,3330 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useParams, useSearchParams, useRouter } from "next/navigation";
+import React, { useState, useMemo, useEffect } from "react";
+import { useParams } from "next/navigation";
 import ModuleAccessGuard from "@/components/ModuleAccessGuard";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
+import {
+  CateringEventDetails,
+  SmartMenuTemplate,
+  LiveCounterAddon,
+  MenuValidationReport,
+  VersionedQuotation,
+  EventCostBreakdown,
+  TemplateCategoryRule,
+  MenuItemOption,
+} from "@/modules/catering/types";
+import {
+  SMART_MENU_TEMPLATES,
+  LIVE_COUNTERS_MASTER,
+  MENU_ITEMS_MASTER,
+} from "@/modules/catering/templatesData";
+import {
+  analyzeAndValidateMenu,
+  calculateTrueEventCost,
+  buildVersionedQuotation,
+} from "@/modules/catering/intelligenceEngine";
 
-interface CateringRecipe {
-  id: string;
-  name: string;
-  type: string;
-  yieldQuantity: number;
-  yieldUnit: string;
-  sellingPrice: number;
-  costPerUnit: number;
-}
-
-interface CateringOrderItem {
-  id?: string;
-  recipeId?: string | null;
-  itemName: string;
-  category?: string;
-  unitPrice: number;
-  quantity: number;
-  totalPrice: number;
-  notes?: string;
-  recipe?: CateringRecipe;
-}
-
-interface CateringOrder {
-  id: string;
-  orderNumber: string;
+// Registered Event Interface for the Dashboard & Calendar
+interface DashboardEvent {
+  id: string; // e.g. "EVT-2026-001"
   eventName: string;
-  clientName: string;
-  clientEmail?: string | null;
-  clientPhone?: string | null;
-  eventDate: string;
-  eventTime?: string | null;
   eventType: string;
+  eventDate: string; // "YYYY-MM-DD"
+  eventTime: string;
   guestCount: number;
-  venueAddress?: string | null;
-  status: "DRAFT" | "CONFIRMED" | "IN_PREPARATION" | "DELIVERED" | "COMPLETED" | "CANCELLED";
-  subtotal: number;
-  taxAmount: number;
-  discountAmount: number;
-  totalAmount: number;
-  advancePaid: number;
-  balanceDue: number;
-  notes?: string | null;
-  items: CateringOrderItem[];
-  createdAt: string;
+  venue: string;
+  mealType: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  templateId: string;
+  templateName: string;
+  status: "LINK_SHARED" | "CUSTOMER_SUBMITTED" | "QUOTED" | "APPROVED" | "IN_PRODUCTION";
+  selectedItemIds: string[];
+  selectedAddonIds: string[];
+  quotedAmount: number;
+  perPaxRate: number;
+  linkOpened: boolean;
+  notes?: string;
 }
 
-interface CateringPackageItem {
-  id: string;
-  recipeId?: string | null;
-  itemName: string;
-  category: string;
-  unitPrice: number;
-  portionQtyPerPax: number;
-}
-
-interface CateringPackage {
-  id: string;
-  name: string;
-  description?: string | null;
-  category: string;
-  pricePerPax: number;
-  suggestedPax: number;
-  items: CateringPackageItem[];
-}
-
-interface IngredientReportItem {
-  inventoryItemId: string;
-  name: string;
-  categoryName?: string;
-  unitOfMeasure: string;
-  requiredQuantity: number;
-  estimatedUnitCost: number;
-  totalEstimatedCost: number;
-  usedInDishes: string[];
-}
-
-interface IngredientReport {
-  orderId: string;
-  orderNumber: string;
-  eventName: string;
-  guestCount: number;
-  rawMaterials: IngredientReportItem[];
-  totalRawCost: number;
-}
-
-const COURSE_CATEGORIES = [
-  "Starters & Appetizers",
-  "Main Course",
-  "Breads & Rice",
-  "Desserts",
-  "Beverages",
-  "Equipment & Staffing",
-];
-
-export default function CateringPage() {
+export default function SmartCateringPage() {
   const params = useParams();
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const subdomain = (params?.subdomain as string) || "";
+  const subdomain = (params?.subdomain as string) || "bahubali";
 
-  const initialTab = searchParams.get("tab") || "orders";
-  const [activeTab, setActiveTab] = useState<string>(initialTab);
+  // Top-Level Dashboard Navigation Views
+  type DashboardView = "OVERVIEW" | "CALENDAR" | "TEMPLATES" | "RECIPES" | "LINK_TRACKER" | "PIPELINE";
+  const [activeView, setActiveView] = useState<DashboardView>("OVERVIEW");
 
-  const [loading, setLoading] = useState(true);
-  const [orders, setOrders] = useState<CateringOrder[]>([]);
-  const [recipes, setRecipes] = useState<CateringRecipe[]>([]);
-  const [packages, setPackages] = useState<CateringPackage[]>([]);
-  const [metrics, setMetrics] = useState({
-    totalOrders: 0,
-    activeOrders: 0,
-    totalRevenue: 0,
-    totalDeposits: 0,
-    totalBalance: 0,
+  // Selected event for the detailed 7-stage pipeline
+  const [selectedEventId, setSelectedEventId] = useState<string>("EVT-2026-001");
+
+  // ---------------------------------------------------------------------------
+  // 1. SEEDED CATERING EVENTS (CALENDAR & STATUS TRACKER)
+  // ---------------------------------------------------------------------------
+  const [eventsList, setEventsList] = useState<DashboardEvent[]>([
+    {
+      id: "EVT-2026-001",
+      eventName: "Ravi Kumar's Daughter Wedding",
+      eventType: "WEDDING",
+      eventDate: "2026-11-20",
+      eventTime: "12:30 PM",
+      guestCount: 1000,
+      venue: "Guntur Royal Convention Palace",
+      mealType: "LUNCH",
+      customerName: "Ravi Kumar Garu",
+      customerPhone: "+91 98480 22338",
+      customerEmail: "ravikumar.guntur@gmail.com",
+      templateId: "wedding-lunch-premium",
+      templateName: "Wedding Lunch – Premium Feast",
+      status: "LINK_SHARED",
+      selectedItemIds: [
+        "wd-fruit-punch",
+        "str-chicken-65",
+        "str-paneer-tikka",
+        "bir-chicken-dum",
+        "brd-butter-naan",
+        "cur-butter-chicken",
+        "cur-kadai-paneer",
+        "rc-steamed-rice",
+        "dal-tomato-pappu",
+        "sam-andhra-sambar",
+        "swt-gulab-jamun",
+        "ice-malai-kulfi",
+      ],
+      selectedAddonIds: ["live-dosa", "live-pani-puri"],
+      quotedAmount: 1128750,
+      perPaxRate: 1075,
+      linkOpened: true,
+      notes: "VIP guest count: 150 Pax. Ensure hot dum biryani batches at 1:15 PM sharp.",
+    },
+    {
+      id: "EVT-2026-002",
+      eventName: "Infosys Annual Leadership Gala",
+      eventType: "CORPORATE",
+      eventDate: "2026-11-24",
+      eventTime: "07:30 PM",
+      guestCount: 450,
+      venue: "Novotel Ballroom, Vijayawada",
+      mealType: "DINNER",
+      customerName: "Srinivas Rao (HR VP)",
+      customerPhone: "+91 99499 11002",
+      customerEmail: "srinivas.r@infosys.com",
+      templateId: "corporate-executive",
+      templateName: "Corporate Executive Buffet",
+      status: "CUSTOMER_SUBMITTED",
+      selectedItemIds: [
+        "wd-fruit-punch",
+        "str-apollo-fish",
+        "bir-mutton-dum",
+        "cur-butter-chicken",
+        "swt-gulab-jamun",
+      ],
+      selectedAddonIds: ["live-tawa-fish", "live-falooda"],
+      quotedAmount: 495000,
+      perPaxRate: 1100,
+      linkOpened: true,
+      notes: "Jain food counter needed for 40 executives.",
+    },
+    {
+      id: "EVT-2026-003",
+      eventName: "Dr. Ananya Sangeet & Reception",
+      eventType: "RECEPTION",
+      eventDate: "2026-11-28",
+      eventTime: "08:00 PM",
+      guestCount: 750,
+      venue: "Grand Nagarjuna Lawns, Guntur",
+      mealType: "DINNER",
+      customerName: "Dr. K. Someswara Rao",
+      customerPhone: "+91 94401 55667",
+      customerEmail: "drsomesh@gmail.com",
+      templateId: "wedding-lunch-premium",
+      templateName: "Wedding Lunch – Premium Feast",
+      status: "APPROVED",
+      selectedItemIds: [
+        "wd-badam-milk",
+        "str-chicken-65",
+        "bir-chicken-dum",
+        "brd-butter-naan",
+        "cur-butter-chicken",
+        "swt-double-ka-meetha",
+      ],
+      selectedAddonIds: ["live-mandi", "live-dosa"],
+      quotedAmount: 937500,
+      perPaxRate: 1250,
+      linkOpened: true,
+      notes: "Contract signed, 40% advance received via RTGS.",
+    },
+    {
+      id: "EVT-2026-004",
+      eventName: "Prasad Family Gruhapravesam",
+      eventType: "HOUSEWARMING",
+      eventDate: "2026-11-15",
+      eventTime: "11:30 AM",
+      guestCount: 300,
+      venue: "Amaravathi Enclave, Mangalagiri",
+      mealType: "LUNCH",
+      customerName: "V. Prasad Garu",
+      customerPhone: "+91 98850 77889",
+      templateId: "wedding-lunch-basic",
+      templateName: "Wedding Lunch – Classic Traditional",
+      status: "LINK_SHARED",
+      selectedItemIds: ["rc-steamed-rice", "dal-tomato-pappu", "sam-andhra-sambar"],
+      selectedAddonIds: [],
+      quotedAmount: 180000,
+      perPaxRate: 600,
+      linkOpened: false,
+      notes: "Pure Vegetarian Andhra traditional spread.",
+    },
+  ]);
+
+  // Calendar State
+  const [calendarYear, setCalendarYear] = useState<number>(2026);
+  const [calendarMonth, setCalendarMonth] = useState<number>(10); // 0-indexed: 10 = Nov
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>("2026-11-20");
+  const [showCalendarDateModal, setShowCalendarDateModal] = useState<boolean>(false);
+  const [isCalendarExpanded, setIsCalendarExpanded] = useState<boolean>(true);
+
+  // Quick Action Modal: Book New Event
+  const [showNewEventModal, setShowNewEventModal] = useState<boolean>(false);
+  const [newEventDate, setNewEventDate] = useState<string>("2026-11-25");
+  const [newEventHost, setNewEventHost] = useState<string>("");
+  const [newEventPhone, setNewEventPhone] = useState<string>("");
+  const [newEventTitle, setNewEventTitle] = useState<string>("");
+  const [newEventPax, setNewEventPax] = useState<number>(500);
+  const [newEventType, setNewEventType] = useState<string>("WEDDING");
+  const [newEventMeal, setNewEventMeal] = useState<string>("LUNCH");
+  const [newEventVenue, setNewEventVenue] = useState<string>("Guntur Convention Center");
+  const [newEventTemplateId, setNewEventTemplateId] = useState<string>("wedding-lunch-premium");
+
+  // ---------------------------------------------------------------------------
+  // 2. TEMPLATE STUDIO STATE (CRUD & EVENT TYPE MAPPING)
+  // ---------------------------------------------------------------------------
+  const [templates, setTemplates] = useState<SmartMenuTemplate[]>(SMART_MENU_TEMPLATES);
+  const [selectedTemplateForEdit, setSelectedTemplateForEdit] = useState<SmartMenuTemplate | null>(null);
+  const [isEditingTemplate, setIsEditingTemplate] = useState<boolean>(false);
+
+  // Template Form State
+  const [templateFormName, setTemplateFormName] = useState<string>("");
+  const [templateFormDesc, setTemplateFormDesc] = useState<string>("");
+  const [templateFormBasePrice, setTemplateFormBasePrice] = useState<number>(850);
+  const [templateFormEventTypes, setTemplateFormEventTypes] = useState<string[]>(["WEDDING"]);
+  const [templateFormRules, setTemplateFormRules] = useState<TemplateCategoryRule[]>([]);
+
+  // Category Recipe Assignment & Import State
+  const [activeCategoryRuleIndex, setActiveCategoryRuleIndex] = useState<number | null>(null);
+
+  // 1. Import from Recipe Module State
+  const [showRecipePickerModal, setShowRecipePickerModal] = useState<boolean>(false);
+  const [recipeCatalog, setRecipeCatalog] = useState<MenuItemOption[]>(Object.values(MENU_ITEMS_MASTER));
+  const [recipeSearch, setRecipeSearch] = useState<string>("");
+  const [recipeDietFilter, setRecipeDietFilter] = useState<"ALL" | "VEG" | "NON_VEG">("ALL");
+  const [selectedRecipesToImport, setSelectedRecipesToImport] = useState<string[]>([]);
+
+  // 2. Upload via Excel/CSV State
+  const [showExcelUploadModal, setShowExcelUploadModal] = useState<boolean>(false);
+  const [excelParsedItems, setExcelParsedItems] = useState<MenuItemOption[]>([]);
+  const [excelFileName, setExcelFileName] = useState<string>("");
+
+  // 3. Create Custom Item State
+  const [showCreateItemModal, setShowCreateItemModal] = useState<boolean>(false);
+  const [newItemName, setNewItemName] = useState<string>("");
+  const [newItemCategory, setNewItemCategory] = useState<string>("Starter");
+  const [newItemDietary, setNewItemDietary] = useState<"VEG" | "NON_VEG">("VEG");
+  const [newItemPortion, setNewItemPortion] = useState<number>(0.15);
+  const [newItemUnit, setNewItemUnit] = useState<string>("kg");
+  const [newItemCost, setNewItemCost] = useState<number>(45);
+  const [newItemSpice, setNewItemSpice] = useState<"MILD" | "MEDIUM" | "SPICY">("MEDIUM");
+  const [newItemDesc, setNewItemDesc] = useState<string>("");
+
+  // 4. Recipe Catalog Tab Filters & States
+  const [catalogSearch, setCatalogSearch] = useState<string>("");
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<string>("ALL");
+  const [catalogDietFilter, setCatalogDietFilter] = useState<"ALL" | "VEG" | "NON_VEG">("ALL");
+
+  // 5. Direct Dish Picker Modal (for Template Studio quick multi-select)
+  const [showDirectDishPickerModal, setShowDirectDishPickerModal] = useState<boolean>(false);
+
+  // 6. Template Builder Ajax Dish Autocomplete State
+  const [dishSearchQueries, setDishSearchQueries] = useState<Record<number, string>>({});
+  const [focusedRuleIndex, setFocusedRuleIndex] = useState<number | null>(null);
+
+  // ---------------------------------------------------------------------------
+  // 3. PIPELINE STUDIO STATE (FOR THE ACTIVE EVENT)
+  // ---------------------------------------------------------------------------
+  const activeEvent = useMemo(() => {
+    return eventsList.find((e) => e.id === selectedEventId) || eventsList[0];
+  }, [eventsList, selectedEventId]);
+
+  type PipelineStage =
+    | "EVENT_SETUP"
+    | "TEMPLATE_SELECTION"
+    | "MENU_BUILDER"
+    | "LIVE_COUNTERS"
+    | "AI_VALIDATION"
+    | "QUOTATION_STUDIO"
+    | "PRODUCTION_BATCH";
+
+  const [pipelineStage, setPipelineStage] = useState<PipelineStage>("EVENT_SETUP");
+
+  // Synchronized state for active event's pipeline
+  const [eventDetails, setEventDetails] = useState<CateringEventDetails>({
+    eventName: activeEvent.eventName,
+    eventType: activeEvent.eventType,
+    eventDate: activeEvent.eventDate,
+    eventTime: activeEvent.eventTime,
+    guestCount: activeEvent.guestCount,
+    venue: activeEvent.venue,
+    mealType: activeEvent.mealType as any,
+    preference: "BOTH",
+    serviceType: "FULL_CATERING",
+    customer: {
+      name: activeEvent.customerName,
+      phone: activeEvent.customerPhone,
+      email: activeEvent.customerEmail,
+    },
+    notes: activeEvent.notes,
   });
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [selectedTemplate, setSelectedTemplate] = useState<SmartMenuTemplate>(
+    templates.find((t) => t.id === activeEvent.templateId) || templates[0]
+  );
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>(activeEvent.selectedItemIds);
+  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>(activeEvent.selectedAddonIds);
+  const [isQuotationApproved, setIsQuotationApproved] = useState<boolean>(activeEvent.status === "APPROVED");
+  const [currentQuotation, setCurrentQuotation] = useState<VersionedQuotation | null>(null);
 
-  // Modal / Form state
-  const [showModal, setShowModal] = useState(false);
-  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  // Link copy feedback
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
-  // Smart Package Builder & Form Fields
-  const [builderCategoryFilter, setBuilderCategoryFilter] = useState("ALL");
-  const [formEventName, setFormEventName] = useState("");
-  const [formClientName, setFormClientName] = useState("");
-  const [formClientEmail, setFormClientEmail] = useState("");
-  const [formClientPhone, setFormClientPhone] = useState("");
-  const [formEventDate, setFormEventDate] = useState("");
-  const [formEventTime, setFormEventTime] = useState("18:00");
-  const [formEventType, setFormEventType] = useState("BUFFET");
-  const [formGuestCount, setFormGuestCount] = useState(100);
-  const [formVenueAddress, setFormVenueAddress] = useState("");
-  const [formStatus, setFormStatus] = useState<string>("DRAFT");
-  const [formTaxRate, setFormTaxRate] = useState(5);
-  const [formDiscount, setFormDiscount] = useState(0);
-  const [formAdvancePaid, setFormAdvancePaid] = useState(0);
-  const [formNotes, setFormNotes] = useState("");
-  
-  // Line Items in Builder
-  const [formItems, setFormItems] = useState<
-    Array<{
-      recipeId?: string;
-      itemName: string;
-      category: string;
-      unitPrice: number;
-      quantity: number;
-      notes?: string;
-    }>
-  >([]);
-
-  // Scaler Drawer / View
-  const [scalerOrderId, setScalerOrderId] = useState<string | null>(null);
-  const [scalerReport, setScalerReport] = useState<IngredientReport | null>(null);
-  const [scalerLoading, setScalerLoading] = useState(false);
-
-  // Invoice Print View
-  const [invoiceOrder, setInvoiceOrder] = useState<CateringOrder | null>(null);
-
-  // Package Save Modal
-  const [showPackageModal, setShowPackageModal] = useState(false);
-  const [pkgName, setPkgName] = useState("");
-  const [pkgDesc, setPkgDesc] = useState("");
-  const [pkgCategory, setPkgCategory] = useState("Buffet");
-
+  // Persistent Synchronization with Server Disk & LocalStorage
   useEffect(() => {
-    fetchCateringData();
-  }, [statusFilter]);
-
-  const fetchCateringData = async () => {
+    // 1. Immediate restore from localStorage
     try {
-      setLoading(true);
-      const q = new URLSearchParams();
-      if (statusFilter && statusFilter !== "ALL") q.set("status", statusFilter);
-      if (search) q.set("search", search);
-
-      const res = await fetch(`/api/restaurant/catering?${q.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        setOrders(data.orders || []);
-        setMetrics(data.metrics || {});
-        setRecipes(data.recipes || []);
-        setPackages(data.packages || []);
+      const savedEvs = localStorage.getItem(`bahubali_catering_events_${subdomain}`);
+      if (savedEvs) {
+        const parsed = JSON.parse(savedEvs);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setEventsList(parsed);
+        }
       }
-    } catch (err) {
-      console.error("Failed to load catering data", err);
-    } finally {
-      setLoading(false);
+      const savedTmpls = localStorage.getItem(`bahubali_catering_templates_${subdomain}`);
+      if (savedTmpls) {
+        const parsed = JSON.parse(savedTmpls);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setTemplates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not parse from localStorage:", e);
     }
-  };
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    fetchCateringData();
-  };
+    // 2. Sync with server-side persistent disk storage
+    async function loadServerStorage() {
+      try {
+        const res = await fetch(`/api/restaurant/catering/events?subdomain=${subdomain}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.events && data.events.length > 0) {
+            const mapped: DashboardEvent[] = data.events.map((e: any) => ({
+              id: e.id,
+              eventName: e.eventDetails.eventName,
+              eventType: e.eventDetails.eventType,
+              eventDate: e.eventDetails.eventDate,
+              eventTime: e.eventDetails.eventTime || "12:30 PM",
+              guestCount: e.eventDetails.guestCount,
+              venue: e.eventDetails.venue,
+              mealType: e.eventDetails.mealType,
+              customerName: e.eventDetails.customer?.name || "Customer",
+              customerPhone: e.eventDetails.customer?.phone || "",
+              customerEmail: e.eventDetails.customer?.email,
+              templateId: e.templateId,
+              templateName: e.template?.name || "Standard Template",
+              status: e.status || "LINK_SHARED",
+              selectedItemIds: e.selectedItemIds || [],
+              selectedAddonIds: e.selectedAddonIds || [],
+              quotedAmount: (e.template?.basePricePerPax || 750) * e.eventDetails.guestCount,
+              perPaxRate: e.template?.basePricePerPax || 750,
+              linkOpened: true,
+              notes: e.eventDetails.notes,
+            }));
 
-  const openCreateModal = () => {
-    setEditingOrderId(null);
-    setFormEventName("");
-    setFormClientName("");
-    setFormClientEmail("");
-    setFormClientPhone("");
-    setFormEventDate(new Date().toISOString().slice(0, 10));
-    setFormEventTime("18:00");
-    setFormEventType("BUFFET");
-    setFormGuestCount(100);
-    setFormVenueAddress("");
-    setFormStatus("DRAFT");
-    setFormTaxRate(5);
-    setFormDiscount(0);
-    setFormAdvancePaid(0);
-    setFormNotes("");
+            setEventsList(mapped);
+            try {
+              localStorage.setItem(`bahubali_catering_events_${subdomain}`, JSON.stringify(mapped));
+            } catch { }
+          }
 
-    // Pre-populate with default dish selection if available
-    if (recipes.length > 0) {
-      setFormItems(
-        recipes.slice(0, 3).map((r) => ({
-          recipeId: r.id,
-          itemName: r.name,
-          category: r.type === "SUB_RECIPE" ? "Breads & Rice" : "Main Course",
-          unitPrice: Number(r.sellingPrice) || Number(r.costPerUnit) * 2.5 || 15,
-          quantity: 100,
-        }))
-      );
-    } else {
-      setFormItems([
-        { itemName: "Welcome Drinks", category: "Beverages", unitPrice: 4, quantity: 100 },
-        { itemName: "Paneer / Chicken Starter", category: "Starters & Appetizers", unitPrice: 8, quantity: 100 },
-        { itemName: "Royal Main Course Feast", category: "Main Course", unitPrice: 18, quantity: 100 },
-        { itemName: "Assorted Breads & Naan", category: "Breads & Rice", unitPrice: 5, quantity: 100 },
-        { itemName: "Artisan Dessert Counter", category: "Desserts", unitPrice: 6, quantity: 100 },
-      ]);
+          if (data.templates && data.templates.length > 0) {
+            setTemplates(data.templates);
+            try {
+              localStorage.setItem(`bahubali_catering_templates_${subdomain}`, JSON.stringify(data.templates));
+            } catch { }
+          }
+        }
+      } catch (err) {
+        console.warn("Could not sync server events:", err);
+      }
     }
-    setShowModal(true);
-  };
 
-  const openEditModal = (order: CateringOrder) => {
-    setEditingOrderId(order.id);
-    setFormEventName(order.eventName);
-    setFormClientName(order.clientName);
-    setFormClientEmail(order.clientEmail || "");
-    setFormClientPhone(order.clientPhone || "");
-    setFormEventDate(order.eventDate ? new Date(order.eventDate).toISOString().slice(0, 10) : "");
-    setFormEventTime(order.eventTime || "18:00");
-    setFormEventType(order.eventType || "BUFFET");
-    setFormGuestCount(order.guestCount || 100);
-    setFormVenueAddress(order.venueAddress || "");
-    setFormStatus(order.status);
-    const calculatedTaxRate = order.subtotal > 0 ? (order.taxAmount * 100) / order.subtotal : 5;
-    setFormTaxRate(Number(calculatedTaxRate.toFixed(1)));
-    setFormDiscount(order.discountAmount || 0);
-    setFormAdvancePaid(order.advancePaid || 0);
-    setFormNotes(order.notes || "");
-    setFormItems(
-      order.items.map((i) => ({
-        recipeId: i.recipeId || undefined,
-        itemName: i.itemName,
-        category: i.category || "Main Course",
-        unitPrice: Number(i.unitPrice),
-        quantity: Number(i.quantity),
-        notes: i.notes || undefined,
-      }))
-    );
-    setShowModal(true);
-  };
+    loadServerStorage();
+  }, [subdomain]);
 
-  const addFormItem = () => {
-    setFormItems([
-      ...formItems,
-      { itemName: "", category: "Main Course", unitPrice: 0, quantity: formGuestCount },
-    ]);
-  };
-
-  const addRecipeToMenu = (recipe: CateringRecipe) => {
-    const existingIndex = formItems.findIndex((i) => i.recipeId === recipe.id);
-    if (existingIndex >= 0) {
-      // Increments quantity
-      const updated = [...formItems];
-      updated[existingIndex].quantity += formGuestCount;
-      setFormItems(updated);
-    } else {
-      setFormItems([
-        ...formItems,
-        {
-          recipeId: recipe.id,
-          itemName: recipe.name,
-          category: recipe.type === "SUB_RECIPE" ? "Breads & Rice" : "Main Course",
-          unitPrice: Number(recipe.sellingPrice) || Number(recipe.costPerUnit) * 2.5 || 15,
-          quantity: formGuestCount,
+  // Sync event details when selectedEventId changes
+  useEffect(() => {
+    if (activeEvent) {
+      setEventDetails({
+        eventName: activeEvent.eventName,
+        eventType: activeEvent.eventType,
+        eventDate: activeEvent.eventDate,
+        eventTime: activeEvent.eventTime,
+        guestCount: activeEvent.guestCount,
+        venue: activeEvent.venue,
+        mealType: activeEvent.mealType as any,
+        preference: "BOTH",
+        serviceType: "FULL_CATERING",
+        customer: {
+          name: activeEvent.customerName,
+          phone: activeEvent.customerPhone,
+          email: activeEvent.customerEmail,
         },
-      ]);
+        notes: activeEvent.notes,
+      });
+      setSelectedItemIds(activeEvent.selectedItemIds);
+      setSelectedAddonIds(activeEvent.selectedAddonIds);
+      setIsQuotationApproved(activeEvent.status === "APPROVED");
+      const matched = templates.find((t) => t.id === activeEvent.templateId) || templates[0];
+      setSelectedTemplate(matched);
     }
-  };
+  }, [activeEvent, templates]);
 
-  const removeFormItem = (index: number) => {
-    setFormItems(formItems.filter((_, i) => i !== index));
-  };
+  // AI Validation & Costing
+  const validationReport: MenuValidationReport = useMemo(() => {
+    return analyzeAndValidateMenu(selectedItemIds, eventDetails.guestCount, eventDetails);
+  }, [selectedItemIds, eventDetails]);
 
-  const handleRecipeSelect = (index: number, recipeId: string) => {
-    const recipe = recipes.find((r) => r.id === recipeId);
-    if (!recipe) return;
+  const costBreakdown: EventCostBreakdown = useMemo(() => {
+    return calculateTrueEventCost(
+      selectedItemIds,
+      selectedAddonIds,
+      eventDetails.guestCount,
+      selectedTemplate.basePricePerPax
+    );
+  }, [selectedItemIds, selectedAddonIds, eventDetails.guestCount, selectedTemplate]);
 
-    const updated = [...formItems];
-    updated[index] = {
-      ...updated[index],
-      recipeId: recipe.id,
-      itemName: recipe.name,
-      unitPrice: Number(recipe.sellingPrice) || Number(recipe.costPerUnit) * 2.5 || 15,
-      quantity: formGuestCount,
+  // Synchronize dynamic quotation
+  useEffect(() => {
+    const quote = buildVersionedQuotation(
+      "QUO-2026-001",
+      1,
+      eventDetails.guestCount,
+      selectedItemIds,
+      selectedAddonIds,
+      selectedTemplate.basePricePerPax,
+      0,
+      5,
+      `Quotation for ${eventDetails.guestCount.toLocaleString()} Pax • ${selectedItemIds.length} Dishes • ${selectedAddonIds.length} Live Counters`
+    );
+    setCurrentQuotation(quote);
+  }, [selectedItemIds, selectedAddonIds, eventDetails.guestCount, selectedTemplate]);
+
+  // ---------------------------------------------------------------------------
+  // CALENDAR COMPUTATION HELPERS
+  // ---------------------------------------------------------------------------
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+
+  const daysInMonth = useMemo(() => {
+    return new Date(calendarYear, calendarMonth + 1, 0).getDate();
+  }, [calendarYear, calendarMonth]);
+
+  const firstDayIndex = useMemo(() => {
+    return new Date(calendarYear, calendarMonth, 1).getDay();
+  }, [calendarYear, calendarMonth]);
+
+  const eventsByDate = useMemo(() => {
+    const map: Record<string, DashboardEvent[]> = {};
+    eventsList.forEach((e) => {
+      if (!map[e.eventDate]) {
+        map[e.eventDate] = [];
+      }
+      map[e.eventDate].push(e);
+    });
+    return map;
+  }, [eventsList]);
+
+  const selectedDateEvents = useMemo(() => {
+    if (!selectedCalendarDate) return [];
+    return eventsByDate[selectedCalendarDate] || [];
+  }, [eventsByDate, selectedCalendarDate]);
+
+  // ---------------------------------------------------------------------------
+  // HANDLERS FOR EVENT CREATION & LINK TRACKING
+  // ---------------------------------------------------------------------------
+  const handleCreateNewEvent = () => {
+    if (!newEventHost || !newEventTitle) {
+      alert("Please enter Host Name and Event Title.");
+      return;
+    }
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const newId = `EVT-2026-${randomSuffix}`;
+    const assignedTemplate =
+      templates.find((t) => t.id === newEventTemplateId) ||
+      templates.find((t) => t.applicableEventTypes.includes(newEventType)) ||
+      templates[0];
+
+    const newEv: DashboardEvent = {
+      id: newId,
+      eventName: newEventTitle,
+      eventType: newEventType,
+      eventDate: newEventDate,
+      eventTime: "12:30 PM",
+      guestCount: newEventPax,
+      venue: newEventVenue,
+      mealType: newEventMeal,
+      customerName: newEventHost,
+      customerPhone: newEventPhone || "+91 98480 12345",
+      templateId: assignedTemplate.id,
+      templateName: assignedTemplate.name,
+      status: "LINK_SHARED",
+      selectedItemIds: [
+        "wd-fruit-punch",
+        "str-chicken-65",
+        "bir-chicken-dum",
+        "brd-butter-naan",
+        "cur-butter-chicken",
+        "swt-gulab-jamun",
+      ],
+      selectedAddonIds: ["live-dosa"],
+      quotedAmount: assignedTemplate.basePricePerPax * newEventPax,
+      perPaxRate: assignedTemplate.basePricePerPax,
+      linkOpened: false,
     };
-    setFormItems(updated);
+
+    setEventsList([newEv, ...eventsList]);
+    setSelectedCalendarDate(newEventDate);
+    setShowNewEventModal(false);
+
+    // Persist to store API
+    fetch("/api/restaurant/catering/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "REGISTER_EVENT",
+        subdomain,
+        token: newId,
+        eventDetails: {
+          eventName: newEventTitle,
+          eventType: newEventType,
+          eventDate: newEventDate,
+          guestCount: newEventPax,
+          venue: newEventVenue,
+          mealType: newEventMeal,
+          customer: { name: newEventHost, phone: newEventPhone },
+        },
+        template: assignedTemplate,
+      }),
+    }).catch(console.warn);
+
+    alert(`Event "${newEventTitle}" registered successfully! Shareable Link Token: ${newId}`);
   };
 
-  // Sync Guest Pax slider to all line items
-  const handleGuestCountChange = (newPax: number) => {
-    setFormGuestCount(newPax);
-    setFormItems((prev) =>
-      prev.map((item) => ({
-        ...item,
-        quantity: newPax,
-      }))
-    );
-  };
-
-  const loadPackageIntoBuilder = (pkg: CateringPackage) => {
-    if (formItems.length > 0 && !confirm(`Load package "${pkg.name}"? This will replace current menu items.`)) {
-      return;
+  const getCustomerPortalUrl = (token: string) => {
+    if (typeof window !== "undefined") {
+      return `${window.location.origin}/restaurant/${subdomain}/catering/portal/${token}`;
     }
-    setFormItems(
-      pkg.items.map((i) => ({
-        recipeId: i.recipeId || undefined,
-        itemName: i.itemName,
-        category: i.category || "Main Course",
-        unitPrice: Number(i.unitPrice),
-        quantity: formGuestCount,
-      }))
-    );
+    return `/restaurant/${subdomain}/catering/portal/${token}`;
   };
 
-  const handleSaveAsPackage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pkgName || formItems.length === 0) {
-      alert("Please provide a Package Name and ensure items are present.");
-      return;
-    }
+  const handleCopyLink = (token: string) => {
+    const url = getCustomerPortalUrl(token);
+    navigator.clipboard.writeText(url);
+    setCopiedToken(token);
+    setTimeout(() => setCopiedToken(null), 2500);
+  };
 
-    try {
-      const pricePerPax = formItems.reduce((sum, i) => sum + Number(i.unitPrice), 0);
-      const res = await fetch("/api/restaurant/catering/packages", {
+  const handleWhatsAppReminder = (ev: DashboardEvent) => {
+    const url = getCustomerPortalUrl(ev.id);
+    const text = encodeURIComponent(
+      `Namaste ${ev.customerName}! Here is your Bahubali Catering menu selection link for "${ev.eventName}" (${ev.guestCount.toLocaleString()} Guests):\n\n${url}\n\nPlease finalize your menu dishes!`
+    );
+    window.open(`https://wa.me/?text=${text}`, "_blank");
+  };
+
+  const handleReassignEventTemplate = (eventId: string, targetTemplateId: string) => {
+    const targetTmpl = templates.find((t) => t.id === targetTemplateId);
+    if (!targetTmpl) return;
+
+    setEventsList((prev) =>
+      prev.map((e) => {
+        if (e.id === eventId) {
+          return {
+            ...e,
+            templateId: targetTmpl.id,
+            templateName: targetTmpl.name,
+            quotedAmount: targetTmpl.basePricePerPax * e.guestCount,
+            perPaxRate: targetTmpl.basePricePerPax,
+          };
+        }
+        return e;
+      })
+    );
+
+    const ev = eventsList.find((e) => e.id === eventId);
+    if (ev) {
+      fetch("/api/restaurant/catering/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: pkgName,
-          description: pkgDesc,
-          category: pkgCategory,
-          pricePerPax,
-          suggestedPax: formGuestCount,
-          items: formItems.map((i) => ({
-            recipeId: i.recipeId,
-            itemName: i.itemName,
-            category: i.category,
-            unitPrice: i.unitPrice,
-            portionQtyPerPax: 1,
-          })),
+          action: "REGISTER_EVENT",
+          subdomain,
+          token: eventId,
+          template: targetTmpl,
+          eventDetails: {
+            eventName: ev.eventName,
+            eventType: ev.eventType,
+            eventDate: ev.eventDate,
+            guestCount: ev.guestCount,
+            venue: ev.venue,
+            mealType: ev.mealType,
+            customer: { name: ev.customerName, phone: ev.customerPhone },
+          },
         }),
-      });
+      }).catch(console.warn);
+    }
 
-      if (res.ok) {
-        setShowPackageModal(false);
-        setPkgName("");
-        setPkgDesc("");
-        fetchCateringData();
-        alert("Catering package template saved successfully!");
-      } else {
-        const err = await res.json();
-        alert(err.error || "Failed to save package");
-      }
-    } catch (err: any) {
-      alert(err.message || "Failed to save package");
+    alert(`Assigned Template for ${eventId} updated to "${targetTmpl.name}"!`);
+  };
+
+  // ---------------------------------------------------------------------------
+  // TEMPLATE CRUD HANDLERS
+  // ---------------------------------------------------------------------------
+  const handleOpenCreateTemplate = () => {
+    setSelectedTemplateForEdit(null);
+    setTemplateFormName("");
+    setTemplateFormDesc("");
+    setTemplateFormBasePrice(800);
+    setTemplateFormEventTypes(["WEDDING"]);
+    setTemplateFormRules([
+      {
+        category: "Welcome Drink",
+        minSelections: 1,
+        maxSelections: 1,
+        availableItems: [
+          MENU_ITEMS_MASTER["wd-fruit-punch"],
+          MENU_ITEMS_MASTER["wd-badam-milk"],
+        ],
+      },
+      {
+        category: "Starters",
+        minSelections: 2,
+        maxSelections: 2,
+        availableItems: [
+          MENU_ITEMS_MASTER["str-chicken-65"],
+          MENU_ITEMS_MASTER["str-paneer-tikka"],
+        ],
+      },
+      {
+        category: "Biryani & Rice",
+        minSelections: 1,
+        maxSelections: 1,
+        availableItems: [
+          MENU_ITEMS_MASTER["bir-chicken-dum"],
+          MENU_ITEMS_MASTER["rc-steamed-rice"],
+        ],
+      },
+      {
+        category: "Curries & Gravies",
+        minSelections: 2,
+        maxSelections: 2,
+        availableItems: [
+          MENU_ITEMS_MASTER["cur-butter-chicken"],
+          MENU_ITEMS_MASTER["cur-kadai-paneer"],
+        ],
+      },
+      {
+        category: "Desserts & Sweets",
+        minSelections: 1,
+        maxSelections: 1,
+        availableItems: [
+          MENU_ITEMS_MASTER["swt-gulab-jamun"],
+          MENU_ITEMS_MASTER["ice-malai-kulfi"],
+        ],
+      },
+    ]);
+    setIsEditingTemplate(true);
+  };
+
+  const handleOpenEditTemplate = (tmpl: SmartMenuTemplate) => {
+    setSelectedTemplateForEdit(tmpl);
+    setTemplateFormName(tmpl.name);
+    setTemplateFormDesc(tmpl.description);
+    setTemplateFormBasePrice(tmpl.basePricePerPax);
+    setTemplateFormEventTypes(tmpl.applicableEventTypes);
+    setTemplateFormRules([...tmpl.categoryRules]);
+    setIsEditingTemplate(true);
+  };
+
+  const handleDeleteTemplate = (templateId: string) => {
+    if (confirm("Are you sure you want to delete this catering template?")) {
+      const updated = templates.filter((t) => t.id !== templateId);
+      setTemplates(updated);
+      try {
+        localStorage.setItem(`bahubali_catering_templates_${subdomain}`, JSON.stringify(updated));
+      } catch { }
+      alert("Template deleted successfully.");
     }
   };
 
-  // Calculate financial stats & margins
-  const calculateFormSubtotal = () => {
-    return formItems.reduce((sum, item) => sum + (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0), 0);
-  };
-
-  const calculateFormFoodCost = () => {
-    return formItems.reduce((sum, item) => {
-      let cost = 0;
-      if (item.recipeId) {
-        const r = recipes.find((rec) => rec.id === item.recipeId);
-        if (r) cost = Number(r.costPerUnit || 0);
-      }
-      if (cost === 0) cost = Number(item.unitPrice) * 0.35; // Default 35% estimated cost
-      return sum + cost * (Number(item.quantity) || 0);
-    }, 0);
-  };
-
-  const formSubtotal = calculateFormSubtotal();
-  const formTaxAmount = (formSubtotal * formTaxRate) / 100;
-  const formTotalAmount = Math.max(0, formSubtotal + formTaxAmount - formDiscount);
-  const formBalanceDue = Math.max(0, formTotalAmount - formAdvancePaid);
-  const formTotalFoodCost = calculateFormFoodCost();
-  const formEstimatedProfit = Math.max(0, formSubtotal - formTotalFoodCost);
-  const formGrossMarginPercent = formSubtotal > 0 ? (formEstimatedProfit * 100) / formSubtotal : 0;
-  const formPricePerPax = formGuestCount > 0 ? formSubtotal / formGuestCount : 0;
-
-  const handleSaveOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formEventName || !formClientName || !formEventDate) {
-      alert("Please fill in Event Name, Client Name, and Event Date.");
+  const handleSaveTemplateForm = () => {
+    if (!templateFormName) {
+      alert("Please enter a Template Name.");
       return;
     }
 
-    try {
-      setSaving(true);
-      const payload = {
-        eventName: formEventName,
-        clientName: formClientName,
-        clientEmail: formClientEmail || undefined,
-        clientPhone: formClientPhone || undefined,
-        eventDate: formEventDate,
-        eventTime: formEventTime,
-        eventType: formEventType,
-        guestCount: Number(formGuestCount),
-        venueAddress: formVenueAddress || undefined,
-        status: formStatus,
-        taxRatePercent: formTaxRate,
-        discountAmount: Number(formDiscount),
-        advancePaid: Number(formAdvancePaid),
-        notes: formNotes || undefined,
-        items: formItems,
+    let savedTemplate: SmartMenuTemplate;
+    let updatedList: SmartMenuTemplate[];
+
+    if (selectedTemplateForEdit) {
+      savedTemplate = {
+        ...selectedTemplateForEdit,
+        name: templateFormName,
+        description: templateFormDesc,
+        basePricePerPax: templateFormBasePrice,
+        applicableEventTypes: templateFormEventTypes,
+        categoryRules: templateFormRules,
       };
-
-      const url = editingOrderId
-        ? `/api/restaurant/catering/${editingOrderId}`
-        : `/api/restaurant/catering`;
-      const method = editingOrderId ? "PUT" : "POST";
-
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        setShowModal(false);
-        fetchCateringData();
-      } else {
-        const err = await res.json();
-        alert(err.error || "Failed to save order");
-      }
-    } catch (err: any) {
-      alert(err.message || "An unexpected error occurred.");
-    } finally {
-      setSaving(false);
+      updatedList = templates.map((t) => (t.id === savedTemplate.id ? savedTemplate : t));
+    } else {
+      savedTemplate = {
+        id: `tmpl-${Date.now()}`,
+        name: templateFormName,
+        description: templateFormDesc,
+        basePricePerPax: templateFormBasePrice,
+        applicableEventTypes: templateFormEventTypes,
+        applicableMealTypes: ["LUNCH", "DINNER"],
+        categoryRules: templateFormRules,
+      };
+      updatedList = [savedTemplate, ...templates];
     }
+
+    setTemplates(updatedList);
+    try {
+      localStorage.setItem(`bahubali_catering_templates_${subdomain}`, JSON.stringify(updatedList));
+    } catch { }
+
+    // Persist to server disk storage
+    fetch("/api/restaurant/catering/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "SAVE_CUSTOM_TEMPLATE",
+        template: savedTemplate,
+      }),
+    }).catch(console.warn);
+
+    alert(`Template "${templateFormName}" saved successfully.`);
+    setIsEditingTemplate(false);
   };
 
-  const handleDeleteOrder = async (id: string, orderNumber: string) => {
-    if (!confirm(`Are you sure you want to delete order ${orderNumber}?`)) return;
+  // ---------------------------------------------------------------------------
+  // RECIPE CATALOG & DISH MANAGEMENT HANDLERS
+  // ---------------------------------------------------------------------------
+  const handleSyncFromKitchenRecipes = async () => {
     try {
-      const res = await fetch(`/api/restaurant/catering/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        fetchCateringData();
-      } else {
-        const err = await res.json();
-        alert(err.error || "Failed to delete order");
-      }
-    } catch (err: any) {
-      alert(err.message || "Failed to delete order");
-    }
-  };
-
-  const loadIngredientScaler = async (orderId: string) => {
-    try {
-      setScalerOrderId(orderId);
-      setScalerLoading(true);
-      setActiveTab("ingredients");
-      const res = await fetch(`/api/restaurant/catering/${orderId}/ingredients`);
+      const res = await fetch(`/api/restaurant/catering/recipes?subdomain=${subdomain}`);
       if (res.ok) {
         const data = await res.json();
-        setScalerReport(data.report);
+        if (data.recipes && data.recipes.length > 0) {
+          setRecipeCatalog(data.recipes);
+          alert(`Successfully synced ${data.recipes.length} dishes from kitchen recipe master.`);
+        }
       }
-    } catch (err) {
-      console.error("Failed to calculate ingredients", err);
-    } finally {
-      setScalerLoading(false);
+    } catch (e) {
+      console.warn("Could not sync recipes:", e);
     }
   };
 
-  const openInvoiceView = (order: CateringOrder) => {
-    setInvoiceOrder(order);
-    setActiveTab("invoices");
+  const handleOpenCreateCatalogDish = () => {
+    setNewItemName("");
+    setNewItemCategory("Starter");
+    setNewItemDietary("VEG");
+    setNewItemPortion(0.15);
+    setNewItemUnit("kg");
+    setNewItemCost(45);
+    setNewItemSpice("MEDIUM");
+    setNewItemDesc("");
+    setShowCreateItemModal(true);
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "CONFIRMED":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
-            Confirmed
-          </span>
-        );
-      case "IN_PREPARATION":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-            In Preparation
-          </span>
-        );
-      case "DELIVERED":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-            Delivered
-          </span>
-        );
-      case "COMPLETED":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">
-            Completed
-          </span>
-        );
-      case "CANCELLED":
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400">
-            Cancelled
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300">
-            Draft
-          </span>
-        );
+  const handleSaveCatalogDish = async () => {
+    if (!newItemName.trim()) {
+      alert("Please enter Dish Name");
+      return;
     }
+    const newDish: MenuItemOption = {
+      id: `dish-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      name: newItemName.trim(),
+      category: newItemCategory || "Starter",
+      dietary: newItemDietary,
+      basePortionPerPax: newItemPortion,
+      portionUnit: newItemUnit,
+      approxCostPerPax: newItemCost,
+      spiceLevel: newItemSpice,
+      description: newItemDesc || `Signature ${newItemName.trim()}`,
+      tags: ["catalog-dish"],
+    };
+
+    setRecipeCatalog((prev) => [newDish, ...prev]);
+    setShowCreateItemModal(false);
+
+    await fetch("/api/restaurant/catering/recipes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "CREATE_RECIPE", recipe: newDish }),
+    }).catch(console.warn);
   };
+
+  const handleOpenExcelCatalogUpload = () => {
+    setExcelParsedItems([]);
+    setExcelFileName("");
+    setShowExcelUploadModal(true);
+  };
+
+  const handleCsvFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setExcelFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target?.result as string;
+      if (!text) return;
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length <= 1) return;
+
+      const parsed: MenuItemOption[] = [];
+      const startIndex = lines[0].toLowerCase().includes("name") ? 1 : 0;
+      for (let i = startIndex; i < lines.length; i++) {
+        const parts = lines[i].split(",").map((p) => p.trim().replace(/^["']|["']$/g, ""));
+        if (!parts[0]) continue;
+        const name = parts[0];
+        const dietaryRaw = (parts[1] || "VEG").toUpperCase();
+        const dietary = dietaryRaw.includes("NON") ? "NON_VEG" : "VEG";
+        const portion = parseFloat(parts[2]) || 0.15;
+        const unit = parts[3] || "kg";
+        const cost = parseFloat(parts[4]) || 40;
+        const spiceRaw = (parts[5] || "MEDIUM").toUpperCase();
+        const spiceLevel = spiceRaw.includes("SPIC") ? "SPICY" : spiceRaw.includes("MILD") ? "MILD" : "MEDIUM";
+        const desc = parts[6] || `Freshly prepared ${name}`;
+
+        parsed.push({
+          id: `excel-${Date.now()}-${i}-${Math.floor(Math.random() * 1000)}`,
+          name,
+          category: newItemCategory || "General",
+          dietary,
+          basePortionPerPax: portion,
+          portionUnit: unit,
+          approxCostPerPax: cost,
+          spiceLevel,
+          description: desc,
+          tags: ["excel-imported"],
+        });
+      }
+
+      setExcelParsedItems(parsed);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleConfirmExcelCatalogUpload = async () => {
+    if (excelParsedItems.length === 0) return;
+    setRecipeCatalog((prev) => [...excelParsedItems, ...prev]);
+    setShowExcelUploadModal(false);
+
+    await fetch("/api/restaurant/catering/recipes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "BULK_IMPORT", recipes: excelParsedItems }),
+    }).catch(console.warn);
+  };
+
+  const handleDeleteCatalogDish = async (dishId: string) => {
+    if (!confirm("Are you sure you want to remove this dish from the catering catalog?")) return;
+    setRecipeCatalog((prev) => prev.filter((d) => d.id !== dishId));
+    await fetch("/api/restaurant/catering/recipes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "DELETE_RECIPE", id: dishId }),
+    }).catch(console.warn);
+  };
+
+  const handleDownloadSampleCsv = () => {
+    const csvContent =
+      "Item Name,Dietary,Portion per Pax,Unit,Cost per Pax,Spice Level,Description\n" +
+      "Chicken 65,NON_VEG,0.2,kg,65,SPICY,Fiery Andhra style starter\n" +
+      "Paneer Tikka,VEG,0.15,kg,45,MEDIUM,Tandoori marinated cottage cheese\n" +
+      "Gongura Mutton,NON_VEG,0.18,kg,90,SPICY,Traditional gongura infused goat curry\n" +
+      "Gulab Jamun,VEG,2,pcs,25,MILD,Warm khoya dumplings in sugar syrup\n";
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "catering_recipes_sample.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Direct Dish Assignment Handlers for Template Studio
+  const handleAddDishToTemplateCategory = (categoryIndex: number, dishId: string) => {
+    if (!dishId) return;
+    const foundDish = recipeCatalog.find((d) => d.id === dishId);
+    if (!foundDish) return;
+    setTemplateFormRules((prev) => {
+      const copy = [...prev];
+      const target = copy[categoryIndex];
+      if (!target) return prev;
+      if ((target.availableItems || []).some((it) => it.id === dishId)) return prev;
+      target.availableItems = [...(target.availableItems || []), foundDish];
+      return copy;
+    });
+  };
+
+  const handleConfirmDirectDishPicker = () => {
+    if (activeCategoryRuleIndex === null) return;
+    const selectedDishes = recipeCatalog.filter((d) => selectedRecipesToImport.includes(d.id));
+    setTemplateFormRules((prev) => {
+      const copy = [...prev];
+      if (!copy[activeCategoryRuleIndex]) return prev;
+      copy[activeCategoryRuleIndex].availableItems = selectedDishes;
+      return copy;
+    });
+    setShowDirectDishPickerModal(false);
+  };
+
+  const handleRemoveItemFromCategory = (categoryIndex: number, itemId: string) => {
+    setTemplateFormRules((prev) => {
+      const copy = [...prev];
+      const target = copy[categoryIndex];
+      if (!target) return prev;
+      target.availableItems = (target.availableItems || []).filter((it) => it.id !== itemId);
+      return copy;
+    });
+  };
+
+  // ---------------------------------------------------------------------------
+  // QUICK TOTALS FOR OVERVIEW KPIS
+  // ---------------------------------------------------------------------------
+  const totalPipelineRevenue = useMemo(() => {
+    return eventsList.reduce((sum, e) => sum + e.quotedAmount, 0);
+  }, [eventsList]);
+
+  const totalGuestsCommitted = useMemo(() => {
+    return eventsList.reduce((sum, e) => sum + e.guestCount, 0);
+  }, [eventsList]);
 
   return (
-    <ModuleAccessGuard moduleKey="catering" moduleName="Catering & Event Management" activeSection="Catering">
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
-        <RestaurantNavbar activeSection="Catering" />
+    <ModuleAccessGuard moduleKey="catering" moduleName="Catering & Event Management" activeSection="catering">
+      <div className="min-h-screen bg-[#FCF9F5] text-[#1a120b] flex flex-col font-sans selection:bg-amber-100">
+        <RestaurantNavbar activeSection="catering" />
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-          {/* Header Banner */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
-            <div>
-              <div className="flex items-center space-x-3">
-                <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                    Smart Catering & Package Studio
-                  </h1>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Visual Menu & Item Builder, Recipe Costing, Pax Ingredient Scaler, and Client Proposals.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={openCreateModal}
-                className="inline-flex items-center px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm transition-colors shadow-xs"
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-                Smart Item Builder & Event
-              </button>
-            </div>
-          </div>
-
-          {/* Metric Overview Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Events</span>
-              <p className="text-2xl font-bold mt-1 text-slate-900 dark:text-white">{metrics.totalOrders || 0}</p>
-            </div>
-            <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Active Bookings</span>
-              <p className="text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">{metrics.activeOrders || 0}</p>
-            </div>
-            <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Projected Revenue</span>
-              <p className="text-2xl font-bold mt-1 text-slate-900 dark:text-white">${metrics.totalRevenue?.toFixed(2) || "0.00"}</p>
-            </div>
-            <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Deposits Collected</span>
-              <p className="text-2xl font-bold mt-1 text-blue-600 dark:text-blue-400">${metrics.totalDeposits?.toFixed(2) || "0.00"}</p>
-            </div>
-            <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Balance Pending</span>
-              <p className="text-2xl font-bold mt-1 text-amber-600 dark:text-amber-400">${metrics.totalBalance?.toFixed(2) || "0.00"}</p>
-            </div>
-          </div>
-
-          {/* Tab Navigation */}
-          <div className="border-b border-slate-200 dark:border-slate-800 flex space-x-8">
-            <button
-              onClick={() => setActiveTab("orders")}
-              className={`pb-4 text-sm font-semibold transition-colors border-b-2 flex items-center space-x-2 ${
-                activeTab === "orders"
-                  ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400"
-                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              }`}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              <span>Event Directory Board</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("ingredients")}
-              className={`pb-4 text-sm font-semibold transition-colors border-b-2 flex items-center space-x-2 ${
-                activeTab === "ingredients"
-                  ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400"
-                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              }`}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-              <span>Recipe Ingredient Scaler</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("invoices")}
-              className={`pb-4 text-sm font-semibold transition-colors border-b-2 flex items-center space-x-2 ${
-                activeTab === "invoices"
-                  ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400"
-                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              }`}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <span>Client Proposals & Invoices</span>
-            </button>
-          </div>
-
-          {/* TAB 1: Event Orders Directory */}
-          {activeTab === "orders" && (
-            <div className="space-y-4">
-              {/* Search & Filter Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
-                <form onSubmit={handleSearchSubmit} className="flex items-center space-x-2 flex-1 max-w-md">
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      placeholder="Search event, client, order #..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <svg className="w-4 h-4 absolute left-3 top-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <button type="submit" className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium rounded-lg">
-                    Search
-                  </button>
-                </form>
-
+        {/* TOP COMMAND HEADER */}
+        <header className="bg-white border-b border-[#E8DFC8] pt-8 pb-5 px-6 lg:px-10">
+          <div className="max-w-7xl mx-auto space-y-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-xs font-medium text-slate-500">Status:</span>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-medium"
+                  <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-200 text-[10px] font-bold uppercase tracking-wider">
+                    Executive Catering Operations Suite
+                  </span>
+                  <span className="text-xs text-stone-500 font-mono">
+                    Tenant: <strong>{subdomain.toUpperCase()}</strong>
+                  </span>
+                </div>
+                <h1 className="text-3xl font-black text-[#1a120b] tracking-tight mt-1">
+                  Catering Sales & Event Command Center
+                </h1>
+                <p className="text-stone-600 text-xs mt-0.5">
+                  Calendar schedules, custom template builder, live invitation trackers, and kitchen production handoff.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => setShowNewEventModal(true)}
+                  className="px-5 py-2.5 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 text-white font-bold text-xs rounded-2xl shadow-md transition-all flex items-center space-x-2"
+                >
+                  <span>+ Register New Event</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Navigation Tabs */}
+            <nav className="flex items-center overflow-x-auto gap-2 pt-2 border-t border-stone-100">
+              {[
+                { id: "OVERVIEW", label: "Overview", tag: "KPIs" },
+                { id: "CALENDAR", label: "Catering Calendar", tag: `${eventsList.length} Booked` },
+                { id: "TEMPLATES", label: "Template Studio (CRUD)", tag: `${templates.length} Active` },
+                { id: "RECIPES", label: "Recipe & Dish Catalog", tag: `${recipeCatalog.length} Dishes` },
+                { id: "LINK_TRACKER", label: "Link Share Tracker", tag: "Audience" },
+                { id: "PIPELINE", label: "Active Event Pipeline", tag: activeEvent.id },
+              ].map((tab) => {
+                const isActive = activeView === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveView(tab.id as DashboardView)}
+                    className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center space-x-2 border ${isActive
+                      ? "bg-[#1a120b] text-white border-[#1a120b] shadow-sm scale-102"
+                      : "bg-white text-stone-700 hover:bg-stone-50 border-[#E8DFC8]"
+                      }`}
                   >
-                    <option value="ALL">All Statuses</option>
-                    <option value="DRAFT">Draft</option>
-                    <option value="CONFIRMED">Confirmed</option>
-                    <option value="IN_PREPARATION">In Preparation</option>
-                    <option value="DELIVERED">Delivered</option>
-                    <option value="COMPLETED">Completed</option>
-                    <option value="CANCELLED">Cancelled</option>
-                  </select>
+                    <span>{tab.label}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded-md font-semibold ${isActive
+                        ? "bg-amber-500 text-white"
+                        : "bg-stone-100 text-stone-600 border border-stone-200"
+                        }`}
+                    >
+                      {tab.tag}
+                    </span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </header>
+
+        {/* MAIN BODY VIEWPORT */}
+        <main className="max-w-7xl mx-auto px-6 lg:px-10 py-8 flex-1 w-full space-y-8">
+          {/* ================================================================= */}
+          {/* VIEW 1: EXECUTIVE OVERVIEW                                        */}
+          {/* ================================================================= */}
+          {activeView === "OVERVIEW" && (
+            <div className="space-y-8 animate-in fade-in duration-300">
+              {/* Metric KPI Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div className="p-6 bg-white rounded-3xl border border-[#E8DFC8] shadow-xs space-y-2">
+                  <span className="text-[10px] uppercase font-bold text-stone-500">Pipeline Value</span>
+                  <div className="text-3xl font-black text-amber-900 font-mono">
+                    ₹{totalPipelineRevenue.toLocaleString()}
+                  </div>
+                  <p className="text-xs text-stone-600">Across {eventsList.length} active banquets</p>
+                </div>
+
+                <div className="p-6 bg-white rounded-3xl border border-[#E8DFC8] shadow-xs space-y-2">
+                  <span className="text-[10px] uppercase font-bold text-stone-500">Guests Committed</span>
+                  <div className="text-3xl font-black text-emerald-800 font-mono">
+                    {totalGuestsCommitted.toLocaleString()} Pax
+                  </div>
+                  <p className="text-xs text-stone-600">Avg {Math.round(totalGuestsCommitted / eventsList.length)} pax per banquet</p>
+                </div>
+
+                <div className="p-6 bg-white rounded-3xl border border-[#E8DFC8] shadow-xs space-y-2">
+                  <span className="text-[10px] uppercase font-bold text-stone-500">Custom Templates</span>
+                  <div className="text-3xl font-black text-stone-900 font-mono">
+                    {templates.length} Packages
+                  </div>
+                  <p className="text-xs text-stone-600">Mapped across 6 event types</p>
+                </div>
+
+                <div className="p-6 bg-white rounded-3xl border border-[#E8DFC8] shadow-xs space-y-2">
+                  <span className="text-[10px] uppercase font-bold text-stone-500">Link Share Response</span>
+                  <div className="text-3xl font-black text-blue-900 font-mono">
+                    75%
+                  </div>
+                  <p className="text-xs text-stone-600">3 of 4 clients opened selection link</p>
                 </div>
               </div>
 
-              {/* Orders Table */}
-              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
-                {loading ? (
-                  <div className="p-12 text-center text-slate-500 text-sm">Loading catering orders...</div>
-                ) : orders.length === 0 ? (
-                  <div className="p-12 text-center text-slate-500 text-sm">
-                    No catering event orders found. Click &quot;Smart Item Builder & Event&quot; to build your first event.
+              {/* Quick Jump: Calendar Teaser & Recent Invitations */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* Left: Upcoming Events */}
+                <div className="lg:col-span-7 bg-white rounded-3xl border border-[#E8DFC8] p-7 shadow-xs space-y-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl font-black text-[#1a120b]">Upcoming Banquet Schedules</h3>
+                      <p className="text-xs text-stone-500">Click any event to launch full sales & production pipeline.</p>
+                    </div>
+                    <button
+                      onClick={() => setActiveView("CALENDAR")}
+                      className="text-xs font-bold text-amber-700 hover:text-amber-800"
+                    >
+                      Open Calendar View &rarr;
+                    </button>
                   </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 uppercase font-semibold">
-                        <tr>
-                          <th className="px-4 py-3.5">Order # / Event</th>
-                          <th className="px-4 py-3.5">Client & Contact</th>
-                          <th className="px-4 py-3.5">Date & Venue</th>
-                          <th className="px-4 py-3.5">Pax</th>
-                          <th className="px-4 py-3.5">Total ($)</th>
-                          <th className="px-4 py-3.5">Paid ($)</th>
-                          <th className="px-4 py-3.5">Balance ($)</th>
-                          <th className="px-4 py-3.5">Status</th>
-                          <th className="px-4 py-3.5 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                        {orders.map((o) => (
-                          <tr key={o.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                            <td className="px-4 py-3.5 font-medium">
-                              <span className="text-slate-900 dark:text-white font-semibold block">{o.eventName}</span>
-                              <span className="text-slate-400 font-mono text-[11px]">{o.orderNumber}</span>
-                            </td>
-                            <td className="px-4 py-3.5 text-slate-600 dark:text-slate-300">
-                              <span className="block font-medium">{o.clientName}</span>
-                              <span className="text-slate-400 text-[11px] block">{o.clientPhone || o.clientEmail || "—"}</span>
-                            </td>
-                            <td className="px-4 py-3.5 text-slate-600 dark:text-slate-300">
-                              <span className="block font-medium">
-                                {new Date(o.eventDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                              </span>
-                              <span className="text-slate-400 text-[11px] block truncate max-w-[150px]">{o.venueAddress || "On-site"}</span>
-                            </td>
-                            <td className="px-4 py-3.5 font-medium">
-                              <span className="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold">
-                                {o.guestCount} Pax
-                              </span>
-                            </td>
-                            <td className="px-4 py-3.5 font-semibold text-slate-900 dark:text-white">
-                              ${Number(o.totalAmount).toFixed(2)}
-                            </td>
-                            <td className="px-4 py-3.5 text-emerald-600 dark:text-emerald-400 font-medium">
-                              ${Number(o.advancePaid).toFixed(2)}
-                            </td>
-                            <td className="px-4 py-3.5 text-amber-600 dark:text-amber-400 font-medium">
-                              ${Number(o.balanceDue).toFixed(2)}
-                            </td>
-                            <td className="px-4 py-3.5">{getStatusBadge(o.status)}</td>
-                            <td className="px-4 py-3.5 text-right space-x-2">
-                              <button
-                                onClick={() => loadIngredientScaler(o.id)}
-                                className="px-2.5 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 font-medium text-[11px]"
-                                title="Calculate ingredient requirements"
-                              >
-                                Scaler
-                              </button>
-                              <button
-                                onClick={() => openInvoiceView(o)}
-                                className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 font-medium text-[11px]"
-                                title="View Quote & Invoice"
-                              >
-                                Invoice
-                              </button>
-                              <button
-                                onClick={() => openEditModal(o)}
-                                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 inline-flex"
-                              >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                </svg>
-                              </button>
-                              <button
-                                onClick={() => handleDeleteOrder(o.id, o.orderNumber)}
-                                className="p-1.5 text-rose-400 hover:text-rose-600 inline-flex"
-                              >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+
+                  <div className="space-y-3">
+                    {eventsList.map((ev) => (
+                      <div
+                        key={ev.id}
+                        onClick={() => {
+                          setSelectedEventId(ev.id);
+                          setActiveView("PIPELINE");
+                        }}
+                        className="p-4 rounded-2xl bg-[#FCF9F5] border border-[#EFE7DC] hover:border-amber-400 cursor-pointer transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-bold text-sm text-[#1a120b]">{ev.eventName}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-stone-200 text-stone-800">
+                              {ev.id}
+                            </span>
+                          </div>
+                          <p className="text-xs text-stone-600">
+                            Host: <strong>{ev.customerName}</strong> • {ev.guestCount.toLocaleString()} Guests • {ev.eventDate} ({ev.mealType})
+                          </p>
+                        </div>
+
+                        <div className="flex items-center space-x-3 shrink-0">
+                          <span
+                            className={`text-[10px] px-3 py-1 rounded-full font-bold border ${ev.status === "APPROVED"
+                              ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                              : ev.status === "CUSTOMER_SUBMITTED"
+                                ? "bg-blue-100 text-blue-900 border-blue-300"
+                                : "bg-amber-100 text-amber-900 border-amber-300"
+                              }`}
+                          >
+                            {ev.status.replace("_", " ")}
+                          </span>
+                          <span className="font-mono font-black text-amber-900 text-sm">
+                            ₹{ev.quotedAmount.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right: Quick Template Highlights */}
+                <div className="lg:col-span-5 bg-white rounded-3xl border border-[#E8DFC8] p-7 shadow-xs space-y-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl font-black text-[#1a120b]">Catering Templates</h3>
+                      <p className="text-xs text-stone-500">Configured course quotas for guests.</p>
+                    </div>
+                    <button
+                      onClick={() => setActiveView("TEMPLATES")}
+                      className="text-xs font-bold text-amber-700 hover:text-amber-800"
+                    >
+                      Manage Templates &rarr;
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {templates.map((t) => (
+                      <div
+                        key={t.id}
+                        className="p-4 rounded-2xl bg-[#FCF9F5] border border-[#EFE7DC] flex items-center justify-between"
+                      >
+                        <div>
+                          <h4 className="font-bold text-sm text-[#1a120b]">{t.name}</h4>
+                          <span className="text-[11px] text-stone-500">
+                            {t.categoryRules.length} Courses • {t.applicableEventTypes.join(", ")}
+                          </span>
+                        </div>
+                        <span className="font-mono font-bold text-amber-900 text-xs">
+                          ₹{t.basePricePerPax} / Pax
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={handleOpenCreateTemplate}
+                    className="w-full py-3 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-bold text-xs rounded-2xl transition-colors"
+                  >
+                    + Build New Custom Template
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================================================================= */}
+          {/* VIEW 2: CALENDAR VIEW (COLLAPSED & EXPANDED ON CLICK)              */}
+          {/* ================================================================= */}
+          {activeView === "CALENDAR" && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <div className="bg-white rounded-3xl border border-[#E8DFC8] p-7 shadow-xs space-y-6">
+                {/* Month Selector & Controls */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-100 pb-5">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider">
+                      Interactive Banquet Schedule
+                    </span>
+                    <h2 className="text-2xl font-black text-[#1a120b] tracking-tight">
+                      {monthNames[calendarMonth]} {calendarYear} Catering Calendar
+                    </h2>
+                    <p className="text-xs text-stone-500 mt-0.5">
+                      Click any date to collapse or expand event details and customer portal links.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => {
+                        if (calendarMonth === 0) {
+                          setCalendarMonth(11);
+                          setCalendarYear(calendarYear - 1);
+                        } else {
+                          setCalendarMonth(calendarMonth - 1);
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-xl border border-stone-200 text-stone-700 font-bold text-xs hover:bg-stone-100"
+                    >
+                      &larr; Prev
+                    </button>
+                    <span className="font-bold text-xs text-stone-800 font-mono">
+                      {monthNames[calendarMonth].slice(0, 3)} {calendarYear}
+                    </span>
+                    <button
+                      onClick={() => {
+                        if (calendarMonth === 11) {
+                          setCalendarMonth(0);
+                          setCalendarYear(calendarYear + 1);
+                        } else {
+                          setCalendarMonth(calendarMonth + 1);
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-xl border border-stone-200 text-stone-700 font-bold text-xs hover:bg-stone-100"
+                    >
+                      Next &rarr;
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setNewEventDate(selectedCalendarDate || "2026-11-20");
+                        setShowNewEventModal(true);
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-xs"
+                    >
+                      + Book Event
+                    </button>
+                  </div>
+                </div>
+
+                {/* Calendar Day Grid */}
+                <div className="grid grid-cols-7 gap-2 text-center text-xs font-bold text-stone-500 pb-2">
+                  <div>Sun</div>
+                  <div>Mon</div>
+                  <div>Tue</div>
+                  <div>Wed</div>
+                  <div>Thu</div>
+                  <div>Fri</div>
+                  <div>Sat</div>
+                </div>
+
+                <div className="grid grid-cols-7 gap-2">
+                  {/* Empty offset days */}
+                  {Array.from({ length: firstDayIndex }).map((_, i) => (
+                    <div key={`empty-${i}`} className="h-24 bg-stone-50/50 rounded-2xl border border-dashed border-stone-200 opacity-30" />
+                  ))}
+
+                  {/* Days of month */}
+                  {Array.from({ length: daysInMonth }).map((_, i) => {
+                    const dayNum = i + 1;
+                    const dateStr = `${calendarYear}-${String(calendarMonth + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                    const dayEvents = eventsByDate[dateStr] || [];
+                    const isSelected = selectedCalendarDate === dateStr;
+                    const hasEvents = dayEvents.length > 0;
+
+                    return (
+                      <div
+                        key={dateStr}
+                        onClick={() => {
+                          setSelectedCalendarDate(dateStr);
+                          setShowCalendarDateModal(true);
+                        }}
+                        className={`h-24 p-2 rounded-2xl cursor-pointer transition-all border flex flex-col justify-between ${isSelected
+                          ? "bg-amber-50/80 border-amber-600 shadow-sm ring-2 ring-amber-400/40"
+                          : hasEvents
+                            ? "bg-white border-amber-300 hover:border-amber-400"
+                            : "bg-white/70 border-stone-200 hover:bg-stone-50"
+                          }`}
+                      >
+                        <div className="flex items-center justify-between text-xs">
+                          <span className={`font-black ${isSelected ? "text-amber-900" : "text-stone-700"}`}>
+                            {dayNum}
+                          </span>
+                          {hasEvents && (
+                            <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
+                          )}
+                        </div>
+
+                        {/* Event Tags */}
+                        <div className="space-y-1 overflow-hidden">
+                          {dayEvents.map((ev) => (
+                            <div
+                              key={ev.id}
+                              className="px-1.5 py-0.5 rounded text-[10px] font-bold truncate bg-amber-600 text-white shadow-2xs text-left"
+                            >
+                              {ev.guestCount}p • {ev.eventName}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="text-[10px] text-right text-stone-400 font-mono">
+                          {hasEvents ? `${dayEvents.length} Event` : ""}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* CALENDAR DATE DETAILS POPUP MODAL */}
+                {showCalendarDateModal && selectedCalendarDate && (
+                  <div
+                    onClick={(e) => {
+                      if (e.target === e.currentTarget) setShowCalendarDateModal(false);
+                    }}
+                    className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
+                  >
+                    <div className="bg-white rounded-3xl border-2 border-amber-500 max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[88vh] overflow-y-auto relative">
+                      <div className="flex items-center justify-between border-b border-stone-100 pb-4">
+                        <div className="flex items-center space-x-3">
+                          <span className="w-3.5 h-3.5 rounded-full bg-amber-600 animate-pulse" />
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider">
+                              Interactive Banquet Schedule
+                            </span>
+                            <h3 className="text-xl font-black text-[#1a120b]">
+                              Banquet Details for: <span className="font-mono text-amber-900">{selectedCalendarDate}</span>
+                            </h3>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-3">
+                          <button
+                            onClick={() => {
+                              setNewEventDate(selectedCalendarDate || "2026-11-20");
+                              setShowCalendarDateModal(false);
+                              setShowNewEventModal(true);
+                            }}
+                            className="px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center space-x-1"
+                          >
+                            <span>+ Book Event on this Date</span>
+                          </button>
+                          <button
+                            onClick={() => setShowCalendarDateModal(false)}
+                            className="text-stone-400 hover:text-stone-700 text-2xl font-bold px-2"
+                          >
+                            &times;
+                          </button>
+                        </div>
+                      </div>
+
+                      {selectedDateEvents.length === 0 ? (
+                        <div className="p-12 text-center bg-[#FCF9F5] rounded-3xl border-2 border-dashed border-stone-300 text-stone-500 space-y-3">
+                          <p className="text-sm font-bold text-stone-700">No catering banquets booked for {selectedCalendarDate}.</p>
+                          <p className="text-xs text-stone-500">Reserve a catering banquet slot for your guests.</p>
+                          <button
+                            onClick={() => {
+                              setNewEventDate(selectedCalendarDate || "2026-11-20");
+                              setShowCalendarDateModal(false);
+                              setShowNewEventModal(true);
+                            }}
+                            className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+                          >
+                            + Book Event Now
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                          {selectedDateEvents.map((ev) => (
+                            <div
+                              key={ev.id}
+                              className="p-6 bg-[#FCF9F5] rounded-3xl border border-[#EFE7DC] shadow-xs space-y-4 flex flex-col justify-between hover:border-amber-400 transition-all"
+                            >
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-stone-200 text-stone-800 font-mono">
+                                    Ref: {ev.id}
+                                  </span>
+                                  <span
+                                    className={`text-[10px] px-3 py-0.5 rounded-full font-bold border ${ev.status === "APPROVED"
+                                      ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                      : ev.status === "CUSTOMER_SUBMITTED"
+                                        ? "bg-blue-100 text-blue-900 border-blue-300"
+                                        : "bg-amber-100 text-amber-900 border-amber-300"
+                                      }`}
+                                  >
+                                    {ev.status.replace("_", " ")}
+                                  </span>
+                                </div>
+
+                                <h4 className="text-base font-black text-[#1a120b]">{ev.eventName}</h4>
+                                <p className="text-xs text-stone-600">
+                                  Host: <strong>{ev.customerName}</strong> ({ev.customerPhone}) &bull; {ev.guestCount.toLocaleString()} Guests &bull; {ev.mealType}
+                                </p>
+                                <p className="text-xs text-stone-500">Venue: {ev.venue}</p>
+
+                                {/* Template Assignment Selector */}
+                                <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-200 text-[11px] space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-amber-900 font-bold block">Assigned Menu Template:</span>
+                                    <span className="text-[10px] text-stone-500 font-mono">₹{ev.perPaxRate}/Pax</span>
+                                  </div>
+                                  <select
+                                    value={ev.templateId}
+                                    onChange={(e) => handleReassignEventTemplate(ev.id, e.target.value)}
+                                    className="w-full px-2 py-1.5 rounded-lg border border-amber-300 bg-white text-xs font-bold text-stone-900 focus:outline-none focus:border-amber-600"
+                                  >
+                                    {templates.map((tmpl) => (
+                                      <option key={tmpl.id} value={tmpl.id}>
+                                        {tmpl.name} (₹{tmpl.basePricePerPax}/Pax • {tmpl.categoryRules.length} Courses)
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                {/* Customer Portal Link preview */}
+                                <div className="p-3 bg-white rounded-xl border border-stone-200 text-[11px] space-y-1">
+                                  <span className="text-stone-500 font-bold block">Customer Portal Link:</span>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-mono text-amber-900 truncate underline">
+                                      {getCustomerPortalUrl(ev.id)}
+                                    </span>
+                                    <button
+                                      onClick={() => handleCopyLink(ev.id)}
+                                      className="px-2 py-1 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded text-[10px] shrink-0"
+                                    >
+                                      {copiedToken === ev.id ? "✓ Copied" : "Copy"}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="pt-4 border-t border-stone-200/80 flex items-center justify-between">
+                                <button
+                                  onClick={() => handleWhatsAppReminder(ev)}
+                                  className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center space-x-1"
+                                >
+                                  <span>💬 WhatsApp Host</span>
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    setShowCalendarDateModal(false);
+                                    setSelectedEventId(ev.id);
+                                    setActiveView("PIPELINE");
+                                  }}
+                                  className="px-4 py-2 bg-[#1a120b] hover:bg-stone-800 text-amber-300 font-bold text-xs rounded-xl shadow-xs transition-all"
+                                >
+                                  Open 7-Stage Pipeline &rarr;
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* TAB 2: Recipe Ingredient Scaler */}
-          {activeTab === "ingredients" && (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                    Bulk Ingredient Procurement Matrix
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Calculates exact raw material stock requirements based on Pax headcount and linked recipes.
-                  </p>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <span className="text-xs font-medium text-slate-500">Select Event:</span>
-                  <select
-                    value={scalerOrderId || ""}
-                    onChange={(e) => {
-                      if (e.target.value) loadIngredientScaler(e.target.value);
-                    }}
-                    className="px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-medium"
-                  >
-                    <option value="">-- Choose Catering Order --</option>
-                    {orders.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.orderNumber} - {o.eventName} ({o.guestCount} Pax)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {scalerLoading ? (
-                <div className="p-12 text-center text-slate-500 text-sm">Calculating raw ingredient requirements...</div>
-              ) : scalerReport ? (
-                <div className="space-y-6">
-                  {/* Event summary banner */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-                    <div>
-                      <span className="text-xs text-slate-400 uppercase font-semibold">Event Name</span>
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">{scalerReport.eventName}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-slate-400 uppercase font-semibold">Guest Headcount</span>
-                      <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{scalerReport.guestCount} Pax</p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-slate-400 uppercase font-semibold">Estimated Raw Material Cost</span>
-                      <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">${scalerReport.totalRawCost.toFixed(2)}</p>
-                    </div>
-                  </div>
-
-                  {scalerReport.rawMaterials.length === 0 ? (
-                    <div className="p-8 text-center text-slate-500 text-sm">
-                      No linked recipe items found in this order. Link items to recipes in the Smart Item Builder to auto-calculate ingredient scaling.
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-semibold uppercase">
-                          <tr>
-                            <th className="px-4 py-3">Ingredient Name</th>
-                            <th className="px-4 py-3">Category</th>
-                            <th className="px-4 py-3">Scaled Qty Required</th>
-                            <th className="px-4 py-3">Unit Cost ($)</th>
-                            <th className="px-4 py-3">Est. Total Cost ($)</th>
-                            <th className="px-4 py-3">Used In Dishes</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                          {scalerReport.rawMaterials.map((rm) => (
-                            <tr key={rm.inventoryItemId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                              <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">{rm.name}</td>
-                              <td className="px-4 py-3 text-slate-500">{rm.categoryName || "General"}</td>
-                              <td className="px-4 py-3 font-bold text-indigo-600 dark:text-indigo-400">
-                                {rm.requiredQuantity} {rm.unitOfMeasure}
-                              </td>
-                              <td className="px-4 py-3 text-slate-600 dark:text-slate-300">${rm.estimatedUnitCost.toFixed(2)}</td>
-                              <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">
-                                ${rm.totalEstimatedCost.toFixed(2)}
-                              </td>
-                              <td className="px-4 py-3 text-slate-500">
-                                {rm.usedInDishes.join(", ")}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="p-12 text-center text-slate-500 text-sm">
-                  Select a catering order from the dropdown above to view scaled raw ingredient requirements.
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 3: Client Proposals & Invoices View */}
-          {activeTab === "invoices" && (
-            <div className="space-y-6">
-              {!invoiceOrder ? (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-8 text-center text-slate-500 text-sm">
-                  Select an event order from the Directory tab and click &quot;Invoice&quot; to preview and print client quotation statements.
-                </div>
-              ) : (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-8 space-y-6 shadow-lg">
-                  {/* Action buttons */}
-                  <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-4 print:hidden">
-                    <button
-                      onClick={() => setInvoiceOrder(null)}
-                      className="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
-                    >
-                      &larr; Back to Select
-                    </button>
-                    <button
-                      onClick={() => window.print()}
-                      className="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 shadow-xs inline-flex items-center space-x-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                      </svg>
-                      <span>Print Client Invoice</span>
-                    </button>
-                  </div>
-
-                  {/* Document Header */}
-                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                    <div>
-                      <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white uppercase">
-                        CATERING PROPOSAL & STATEMENT
-                      </h1>
-                      <p className="text-xs text-slate-400 font-mono mt-1">Invoice #{invoiceOrder.orderNumber}</p>
-                    </div>
-                    <div className="text-right text-xs text-slate-500">
-                      <p className="font-semibold text-slate-900 dark:text-white">Issue Date:</p>
-                      <p>{new Date().toLocaleDateString()}</p>
-                    </div>
-                  </div>
-
-                  {/* Client & Event Info */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
-                    <div>
-                      <span className="font-semibold text-slate-400 uppercase tracking-wider block mb-1">CLIENT INFORMATION</span>
-                      <p className="font-bold text-slate-900 dark:text-white text-sm">{invoiceOrder.clientName}</p>
-                      <p className="text-slate-600 dark:text-slate-300">{invoiceOrder.clientPhone || "—"}</p>
-                      <p className="text-slate-600 dark:text-slate-300">{invoiceOrder.clientEmail || "—"}</p>
-                    </div>
-                    <div>
-                      <span className="font-semibold text-slate-400 uppercase tracking-wider block mb-1">EVENT SPECIFICATIONS</span>
-                      <p className="font-bold text-slate-900 dark:text-white text-sm">{invoiceOrder.eventName}</p>
-                      <p className="text-slate-600 dark:text-slate-300">
-                        Date: {new Date(invoiceOrder.eventDate).toLocaleDateString()} at {invoiceOrder.eventTime || "18:00"}
-                      </p>
-                      <p className="text-slate-600 dark:text-slate-300">Guest Pax: {invoiceOrder.guestCount} Guests</p>
-                      <p className="text-slate-600 dark:text-slate-300">Venue: {invoiceOrder.venueAddress || "On-site"}</p>
-                    </div>
-                  </div>
-
-                  {/* Line Items Table */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold uppercase">
-                        <tr>
-                          <th className="px-4 py-2.5">Item Name</th>
-                          <th className="px-4 py-2.5">Category</th>
-                          <th className="px-4 py-2.5 text-right">Unit Price</th>
-                          <th className="px-4 py-2.5 text-right">Quantity / Pax</th>
-                          <th className="px-4 py-2.5 text-right">Total ($)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                        {invoiceOrder.items.map((item, idx) => (
-                          <tr key={idx}>
-                            <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{item.itemName}</td>
-                            <td className="px-4 py-3 text-slate-500">{item.category || "Main Course"}</td>
-                            <td className="px-4 py-3 text-right">${Number(item.unitPrice).toFixed(2)}</td>
-                            <td className="px-4 py-3 text-right">{item.quantity}</td>
-                            <td className="px-4 py-3 text-right font-semibold text-slate-900 dark:text-white">
-                              ${Number(item.totalPrice).toFixed(2)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Summary Totals */}
-                  <div className="flex justify-end pt-4 border-t border-slate-200 dark:border-slate-800">
-                    <div className="w-full max-w-xs space-y-2 text-xs">
-                      <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                        <span>Subtotal:</span>
-                        <span>${Number(invoiceOrder.subtotal).toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                        <span>Tax:</span>
-                        <span>+${Number(invoiceOrder.taxAmount).toFixed(2)}</span>
-                      </div>
-                      {invoiceOrder.discountAmount > 0 && (
-                        <div className="flex justify-between text-emerald-600">
-                          <span>Discount:</span>
-                          <span>-${Number(invoiceOrder.discountAmount).toFixed(2)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between text-sm font-bold border-t border-slate-200 dark:border-slate-700 pt-2 text-slate-900 dark:text-white">
-                        <span>Total Estimated:</span>
-                        <span>${Number(invoiceOrder.totalAmount).toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-blue-600 dark:text-blue-400 font-medium">
-                        <span>Advance Paid:</span>
-                        <span>-${Number(invoiceOrder.advancePaid).toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-amber-600 dark:text-amber-400 font-bold text-sm border-t border-slate-200 dark:border-slate-700 pt-1">
-                        <span>Balance Due:</span>
-                        <span>${Number(invoiceOrder.balanceDue).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* SMART ITEM & PACKAGE BUILDER MODAL */}
-          {showModal && (
-            <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-              <div className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-6">
-                
-                {/* Modal Header */}
-                <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+          {/* ================================================================= */}
+          {/* VIEW 3: TEMPLATE STUDIO (CREATE, UPDATE, EDIT, DELETE & ASSIGN)   */}
+          {/* ================================================================= */}
+          {activeView === "TEMPLATES" && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <div className="bg-white rounded-3xl border border-[#E8DFC8] p-7 shadow-xs space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-100 pb-5">
                   <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400">
-                        Interactive Package Studio
-                      </span>
-                      <span className="text-xs text-slate-400">|</span>
-                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                        {formGuestCount} Guests (Pax)
-                      </span>
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-1">
-                      {editingOrderId ? "Edit Catering Event & Menu Builder" : "Smart Catering Package & Event Builder"}
-                    </h3>
+                    <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider">
+                      Course Quotas & Menu Blueprint Studio
+                    </span>
+                    <h2 className="text-2xl font-black text-[#1a120b] tracking-tight">
+                      Catering Template Manager (CRUD)
+                    </h2>
+                    <p className="text-xs text-stone-500 mt-0.5">
+                      Create, edit, delete, and assign templates to event types (Weddings, Receptions, Corporate, Housewarmings).
+                    </p>
                   </div>
 
                   <button
-                    onClick={() => setShowModal(false)}
-                    className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    onClick={handleOpenCreateTemplate}
+                    className="px-5 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 text-white font-bold text-xs rounded-2xl shadow-sm transition-all"
                   >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    + Create New Template
                   </button>
                 </div>
 
-                <form onSubmit={handleSaveOrder} className="p-6 space-y-6 max-h-[82vh] overflow-y-auto text-xs">
-                  
-                  {/* Preset Packages Loader Bar */}
-                  {packages.length > 0 && (
-                    <div className="p-4 bg-indigo-50/60 dark:bg-indigo-950/20 rounded-2xl border border-indigo-100 dark:border-indigo-900/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div>
-                        <span className="font-bold text-indigo-900 dark:text-indigo-300 text-xs block">
-                          Fast-Track Package Templates
-                        </span>
-                        <span className="text-[11px] text-indigo-600 dark:text-indigo-400">
-                          Load pre-configured catering packages into this event menu with 1 click:
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {packages.map((pkg) => (
-                          <button
-                            key={pkg.id}
-                            type="button"
-                            onClick={() => loadPackageIntoBuilder(pkg)}
-                            className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-indigo-600 hover:text-white text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-xl font-semibold text-[11px] shadow-2xs transition-colors"
-                          >
-                            + {pkg.name} (${Number(pkg.pricePerPax).toFixed(0)}/pax)
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Top Form Grid: Event & Client Specs */}
-                  <div className="space-y-4">
-                    <h4 className="font-semibold text-slate-900 dark:text-white text-sm border-b border-slate-200 dark:border-slate-800 pb-2">
-                      Event Profile & Guest Headcount
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">Event Title *</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Executive Corporate Gala"
-                          value={formEventName}
-                          onChange={(e) => setFormEventName(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">Client Name *</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Sarah Connor"
-                          value={formClientName}
-                          onChange={(e) => setFormClientName(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">Client Contact Phone</label>
-                        <input
-                          type="text"
-                          placeholder="+1 (555) 234-5678"
-                          value={formClientPhone}
-                          onChange={(e) => setFormClientPhone(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">Event Date *</label>
-                        <input
-                          type="date"
-                          required
-                          value={formEventDate}
-                          onChange={(e) => setFormEventDate(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">Service Type</label>
-                        <select
-                          value={formEventType}
-                          onChange={(e) => setFormEventType(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700"
-                        >
-                          <option value="BUFFET">Buffet Setup</option>
-                          <option value="WEDDING">Wedding Banquet</option>
-                          <option value="CORPORATE">Corporate Conference</option>
-                          <option value="BIRTHDAY">Birthday Celebration</option>
-                          <option value="PRIVATE_DINING">Private Dining</option>
-                          <option value="PACKED_MEALS">Packed Meals</option>
-                          <option value="OTHER">Custom Event</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">Venue Location</label>
-                        <input
-                          type="text"
-                          placeholder="Grand Hyatt Ballroom"
-                          value={formVenueAddress}
-                          onChange={(e) => setFormVenueAddress(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700"
-                        />
-                      </div>
-                    </div>
-
-                    {/* LIVE PAX GUEST SCALER SLIDER */}
-                    <div className="p-4 bg-slate-100 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2">
-                      <div className="flex justify-between items-center">
-                        <label className="font-bold text-slate-900 dark:text-white text-xs flex items-center space-x-2">
-                          <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                          </svg>
-                          <span>Live Guest Headcount (Pax Scaler)</span>
-                        </label>
-                        <span className="px-3 py-1 bg-indigo-600 text-white rounded-lg text-xs font-extrabold font-mono">
-                          {formGuestCount} Guests
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={10}
-                        max={1000}
-                        step={5}
-                        value={formGuestCount}
-                        onChange={(e) => handleGuestCountChange(Number(e.target.value))}
-                        className="w-full h-2 bg-indigo-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                      />
-                      <div className="flex justify-between text-[10px] text-slate-400">
-                        <span>10 Pax (Intimate)</span>
-                        <span>100 Pax (Standard)</span>
-                        <span>500 Pax (Banquet)</span>
-                        <span>1000 Pax (Mega Event)</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* VISUAL DISH & RECIPE PICKER CATALOG */}
-                  <div className="space-y-4 pt-2">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-2">
-                      <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-white text-sm">
-                          Course Dish Catalog & Recipe Master
-                        </h4>
-                        <p className="text-[11px] text-slate-400">
-                          Click any dish to add to this event. Linked recipes automatically calculate raw ingredients & food costs.
-                        </p>
-                      </div>
-
-                      {/* Course Filter Tabs */}
-                      <div className="flex flex-wrap gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setBuilderCategoryFilter("ALL")}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-medium ${
-                            builderCategoryFilter === "ALL"
-                              ? "bg-indigo-600 text-white"
-                              : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
-                          }`}
-                        >
-                          All Courses
-                        </button>
-                        {COURSE_CATEGORIES.map((cat) => (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => setBuilderCategoryFilter(cat)}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium ${
-                              builderCategoryFilter === cat
-                                ? "bg-indigo-600 text-white"
-                                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
-                            }`}
-                          >
-                            {cat}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Dish Cards Grid */}
-                    {recipes.length > 0 && (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-48 overflow-y-auto p-1">
-                        {recipes
-                          .filter((r) => {
-                            if (builderCategoryFilter === "ALL") return true;
-                            if (builderCategoryFilter === "Breads & Rice") return r.type === "SUB_RECIPE";
-                            return true;
-                          })
-                          .map((r) => (
-                            <div
-                              key={r.id}
-                              onClick={() => addRecipeToMenu(r)}
-                              className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/80 hover:border-indigo-500 hover:bg-indigo-50/40 dark:hover:bg-indigo-950/30 transition-all cursor-pointer flex flex-col justify-between space-y-2 group shadow-2xs"
+                {/* Templates Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {templates.map((tmpl) => (
+                    <div
+                      key={tmpl.id}
+                      className="p-6 bg-[#FCF9F5] rounded-3xl border-2 border-[#EFE7DC] hover:border-amber-400 shadow-xs flex flex-col justify-between transition-all space-y-4"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="px-3 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-100 text-amber-900 border border-amber-200">
+                            ₹{tmpl.basePricePerPax} / Pax Base
+                          </span>
+                          <div className="flex items-center space-x-1.5">
+                            <button
+                              onClick={() => handleOpenEditTemplate(tmpl)}
+                              className="px-2.5 py-1 rounded-lg bg-white border border-stone-300 text-stone-700 hover:text-amber-800 font-bold text-[11px]"
                             >
-                              <div>
-                                <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 block uppercase tracking-wider">
-                                  {r.type === "SUB_RECIPE" ? "Sub-recipe" : "Dish"}
-                                </span>
-                                <h5 className="font-bold text-slate-900 dark:text-white text-xs group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                                  {r.name}
-                                </h5>
-                              </div>
-                              <div className="flex items-center justify-between border-t border-slate-200/80 dark:border-slate-700/60 pt-2 text-[11px]">
-                                <span className="font-bold text-slate-900 dark:text-white">
-                                  ${(Number(r.sellingPrice) || Number(r.costPerUnit) * 2.5 || 15).toFixed(2)}
-                                </span>
-                                <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 font-semibold text-[10px]">
-                                  + Add
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                  </div>
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTemplate(tmpl.id)}
+                              className="px-2 py-1 rounded-lg bg-white border border-stone-300 text-red-600 hover:text-red-800 font-bold text-[11px]"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
 
-                  {/* ACTIVE MENU ITEM BUILDER TABLE */}
-                  <div className="space-y-4 pt-2">
-                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
-                      <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-white text-sm">
-                          Selected Event Menu Items ({formItems.length})
-                        </h4>
-                        <p className="text-[11px] text-slate-400">
-                          Adjust unit prices, quantities, or add custom non-recipe charges (staffing, rentals).
-                        </p>
+                        <div>
+                          <h3 className="text-lg font-black text-[#1a120b]">{tmpl.name}</h3>
+                          <p className="text-xs text-stone-600 mt-1 leading-relaxed line-clamp-2">
+                            {tmpl.description}
+                          </p>
+                        </div>
+
+                        {/* Event Types Mapped */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">
+                            Assigned Event Types:
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {tmpl.applicableEventTypes.map((et) => (
+                              <span
+                                key={et}
+                                className="px-2 py-0.5 rounded-md bg-stone-200 text-stone-800 font-mono text-[10px] font-bold"
+                              >
+                                {et}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Category Quota Rules Summary */}
+                        <div className="p-3.5 bg-white rounded-2xl border border-stone-200 text-xs space-y-1.5">
+                          <span className="font-bold text-stone-700 block text-[11px]">
+                            Course Quotas ({tmpl.categoryRules.length} Courses):
+                          </span>
+                          <div className="grid grid-cols-2 gap-1 text-[11px] text-stone-600 font-medium">
+                            {tmpl.categoryRules.map((rule, idx) => (
+                              <div key={idx} className="truncate">
+                                • {rule.category}: <strong>{rule.maxSelections}</strong>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
+
+                      <div className="pt-3 border-t border-stone-200 flex justify-between items-center">
+                        <span className="text-[11px] text-stone-500">
+                          Total Dishes: {tmpl.categoryRules.reduce((s, r) => s + r.availableItems.length, 0)}
+                        </span>
                         <button
-                          type="button"
-                          onClick={() => setShowPackageModal(true)}
-                          disabled={formItems.length === 0}
-                          className="px-3 py-1.5 text-[11px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl hover:bg-emerald-100 disabled:opacity-40"
+                          onClick={() => {
+                            setSelectedTemplate(tmpl);
+                            setActiveView("PIPELINE");
+                            setPipelineStage("MENU_BUILDER");
+                          }}
+                          className="text-xs font-bold text-amber-700 hover:text-amber-800"
                         >
-                          ★ Save Menu as Package Template
-                        </button>
-                        <button
-                          type="button"
-                          onClick={addFormItem}
-                          className="px-3 py-1.5 text-[11px] font-semibold bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 rounded-xl hover:bg-indigo-100"
-                        >
-                          + Add Custom Line Item
+                          Use in Pipeline &rarr;
                         </button>
                       </div>
                     </div>
+                  ))}
+                </div>
+              </div>
 
-                    <div className="space-y-3">
-                      {formItems.length === 0 ? (
-                        <div className="p-8 text-center text-slate-400 border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl">
-                          No items added yet. Click dishes in the catalog above or &quot;Add Custom Line Item&quot; to build your menu.
+              {/* CREATE / EDIT TEMPLATE POPUP MODAL */}
+              {isEditingTemplate && (
+                <div
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget) setIsEditingTemplate(false);
+                  }}
+                  className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
+                >
+                  <div className="bg-white rounded-3xl border-2 border-amber-500 max-w-3xl w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[88vh] overflow-y-auto relative">
+                    <div className="flex items-center justify-between border-b border-stone-100 pb-4">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800">
+                          {selectedTemplateForEdit ? "Update Template" : "Create New Template"}
+                        </span>
+                        <h3 className="text-2xl font-black text-[#1a120b]">
+                          {selectedTemplateForEdit ? `Edit "${selectedTemplateForEdit.name}"` : "Build Custom Catering Template"}
+                        </h3>
+                      </div>
+                      <button
+                        onClick={() => setIsEditingTemplate(false)}
+                        className="text-stone-400 hover:text-stone-700 text-xl font-bold px-2"
+                      >
+                        &times;
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div>
+                        <label className="text-xs font-bold text-stone-700 block mb-1">
+                          Template Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={templateFormName}
+                          onChange={(e) => setTemplateFormName(e.target.value)}
+                          placeholder="e.g. Royal Andhra Kalyanam Feast"
+                          className="w-full px-4 py-2.5 rounded-xl border border-stone-300 text-sm font-semibold focus:outline-none focus:border-amber-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-stone-700 block mb-1">
+                          Base Price Per Pax (₹) *
+                        </label>
+                        <input
+                          type="number"
+                          step={25}
+                          value={templateFormBasePrice}
+                          onChange={(e) => setTemplateFormBasePrice(parseInt(e.target.value) || 500)}
+                          className="w-full px-4 py-2.5 rounded-xl border border-stone-300 text-sm font-black text-amber-900 focus:outline-none focus:border-amber-600"
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="text-xs font-bold text-stone-700 block mb-1">
+                          Template Description
+                        </label>
+                        <input
+                          type="text"
+                          value={templateFormDesc}
+                          onChange={(e) => setTemplateFormDesc(e.target.value)}
+                          placeholder="Detailed banquet description..."
+                          className="w-full px-4 py-2 rounded-xl border border-stone-300 text-xs font-medium focus:outline-none focus:border-amber-600"
+                        />
+                      </div>
+
+                      {/* Assign to Event Types (Multi-checkbox) */}
+                      <div className="md:col-span-2 space-y-2">
+                        <label className="text-xs font-bold text-stone-700 block">
+                          Assign to Event Types:
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {["WEDDING", "RECEPTION", "ENGAGEMENT", "CORPORATE", "HOUSEWARMING", "BIRTHDAY", "CUSTOM"].map((type) => {
+                            const isAssigned = templateFormEventTypes.includes(type);
+                            return (
+                              <button
+                                key={type}
+                                type="button"
+                                onClick={() => {
+                                  if (isAssigned) {
+                                    setTemplateFormEventTypes(templateFormEventTypes.filter((t) => t !== type));
+                                  } else {
+                                    setTemplateFormEventTypes([...templateFormEventTypes, type]);
+                                  }
+                                }}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${isAssigned
+                                  ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                                  : "bg-white text-stone-700 border-stone-300 hover:bg-stone-50"
+                                  }`}
+                              >
+                                {type} {isAssigned ? "✓" : "+"}
+                              </button>
+                            );
+                          })}
                         </div>
-                      ) : (
-                        formItems.map((item, index) => (
-                          <div
-                            key={index}
-                            className="p-3 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xs space-y-2"
-                          >
-                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
-                              {/* Recipe selector */}
-                              <div className="sm:col-span-3">
-                                <label className="block text-[10px] text-slate-400 font-medium">Linked Recipe Master</label>
-                                <select
-                                  value={item.recipeId || ""}
-                                  onChange={(e) => handleRecipeSelect(index, e.target.value)}
-                                  className="w-full px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-                                >
-                                  <option value="">-- Custom Item --</option>
-                                  {recipes.map((r) => (
-                                    <option key={r.id} value={r.id}>
-                                      {r.name} (${Number(r.sellingPrice).toFixed(2)})
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
+                      </div>
+                    </div>
 
-                              {/* Item Name */}
-                              <div className="sm:col-span-3">
-                                <label className="block text-[10px] text-slate-400 font-medium">Item / Dish Name *</label>
+                    {/* Course Categories & Quota Rules */}
+                    <div className="space-y-4 pt-4 border-t border-stone-100">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-base font-black text-[#1a120b]">
+                          Course Categories & Selection Quotas ({templateFormRules.length})
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setTemplateFormRules([
+                              ...templateFormRules,
+                              {
+                                category: `New Course ${templateFormRules.length + 1}`,
+                                minSelections: 1,
+                                maxSelections: 1,
+                                availableItems: [
+                                  MENU_ITEMS_MASTER["str-corn-pepper"],
+                                  MENU_ITEMS_MASTER["cur-dal-makhani"],
+                                ],
+                              },
+                            ])
+                          }
+                          className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold rounded-xl"
+                        >
+                          + Add Course Category
+                        </button>
+                      </div>
+
+                      <div className="space-y-4">
+                        {templateFormRules.map((rule, idx) => (
+                          <div
+                            key={idx}
+                            className="p-5 bg-[#FCF9F5] rounded-3xl border-2 border-[#EFE7DC] space-y-4 shadow-xs"
+                          >
+                            {/* Course Category Header */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-200/60 pb-3">
+                              <div className="flex items-center space-x-2.5">
+                                <span className="w-6 h-6 rounded-full bg-amber-600 text-white text-xs flex items-center justify-center font-bold shrink-0">
+                                  {idx + 1}
+                                </span>
                                 <input
                                   type="text"
-                                  required
-                                  placeholder="Item name"
-                                  value={item.itemName}
+                                  value={rule.category}
                                   onChange={(e) => {
-                                    const updated = [...formItems];
-                                    updated[index].itemName = e.target.value;
-                                    setFormItems(updated);
+                                    const copy = [...templateFormRules];
+                                    copy[idx].category = e.target.value;
+                                    setTemplateFormRules(copy);
                                   }}
-                                  className="w-full px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-semibold"
+                                  placeholder="Course Name (e.g. Starters)"
+                                  className="px-3 py-1.5 rounded-xl border border-stone-300 text-xs font-black text-stone-900 bg-white focus:outline-none focus:border-amber-600"
                                 />
-                              </div>
-
-                              {/* Category */}
-                              <div className="sm:col-span-2">
-                                <label className="block text-[10px] text-slate-400 font-medium">Course Category</label>
-                                <select
-                                  value={item.category || "Main Course"}
-                                  onChange={(e) => {
-                                    const updated = [...formItems];
-                                    updated[index].category = e.target.value;
-                                    setFormItems(updated);
-                                  }}
-                                  className="w-full px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs"
-                                >
-                                  {COURSE_CATEGORIES.map((cat) => (
-                                    <option key={cat} value={cat}>
-                                      {cat}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              {/* Price per Pax */}
-                              <div className="sm:col-span-2">
-                                <label className="block text-[10px] text-slate-400 font-medium">Unit Price ($)</label>
-                                <input
-                                  type="number"
-                                  step="0.5"
-                                  min="0"
-                                  value={item.unitPrice}
-                                  onChange={(e) => {
-                                    const updated = [...formItems];
-                                    updated[index].unitPrice = Number(e.target.value);
-                                    setFormItems(updated);
-                                  }}
-                                  className="w-full px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
-                                />
-                              </div>
-
-                              {/* Total Price */}
-                              <div className="sm:col-span-1 text-right">
-                                <label className="block text-[10px] text-slate-400 font-medium">Line Total</label>
-                                <span className="font-bold text-indigo-600 dark:text-indigo-400 text-xs block py-1.5">
-                                  ${(item.unitPrice * item.quantity).toFixed(0)}
+                                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold border border-amber-200">
+                                  {rule.availableItems?.length || 0} Dishes Assigned
                                 </span>
                               </div>
 
-                              {/* Remove button */}
-                              <div className="sm:col-span-1 text-right">
+                              <div className="flex items-center space-x-3 text-xs">
+                                <span className="text-stone-500 font-medium">Customer Quota:</span>
+                                <span className="font-semibold text-stone-700">Choose</span>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={15}
+                                  value={rule.maxSelections}
+                                  onChange={(e) => {
+                                    const copy = [...templateFormRules];
+                                    copy[idx].maxSelections = parseInt(e.target.value) || 1;
+                                    setTemplateFormRules(copy);
+                                  }}
+                                  className="w-12 px-2 py-1 rounded-lg border border-stone-300 text-center font-black bg-white"
+                                />
+                                <span className="text-stone-500">dishes</span>
+
                                 <button
                                   type="button"
-                                  onClick={() => removeFormItem(index)}
-                                  className="p-1 text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
+                                  onClick={() =>
+                                    setTemplateFormRules(templateFormRules.filter((_, i) => i !== idx))
+                                  }
+                                  className="text-red-500 hover:text-red-700 font-bold px-2 py-1 ml-2 text-xs"
                                 >
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
+                                  Delete Course
                                 </button>
                               </div>
                             </div>
+
+                            {/* ASSIGNED RECIPES & DISHES SECTION */}
+                            <div className="space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold text-stone-600 uppercase tracking-wider">
+                                  Recipes &amp; Dishes in &quot;{rule.category}&quot; ({rule.availableItems?.length || 0}):
+                                </span>
+                              </div>
+
+                              {/* Dishes List */}
+                              {(!rule.availableItems || rule.availableItems.length === 0) ? (
+                                <div className="p-4 rounded-2xl bg-white border border-dashed border-stone-300 text-stone-400 text-xs text-center">
+                                  No dishes assigned to this course yet. Use the 3 options below to add recipes.
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                  {rule.availableItems.map((item) => (
+                                    <div
+                                      key={item.id}
+                                      className="p-2.5 bg-white rounded-xl border border-stone-200 flex items-center justify-between gap-2 shadow-2xs hover:border-amber-300 transition-all"
+                                    >
+                                      <div className="flex items-center space-x-2 min-w-0">
+                                        <span
+                                          className={`w-2 h-2 rounded-full shrink-0 ${item.dietary === "VEG" ? "bg-emerald-600" : "bg-red-600"
+                                            }`}
+                                        />
+                                        <div className="min-w-0">
+                                          <h5 className="font-bold text-xs text-stone-900 truncate">
+                                            {item.name}
+                                          </h5>
+                                          <span className="text-[10px] text-stone-500 block">
+                                            {item.basePortionPerPax} {item.portionUnit} • ₹{item.approxCostPerPax}/pax
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveItemFromCategory(idx, item.id)}
+                                        className="text-stone-300 hover:text-red-600 font-bold text-base px-1.5"
+                                        title="Remove dish"
+                                      >
+                                        &times;
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* AJAX AUTOCOMPLETE ON TYPING DISH ASSIGNMENT */}
+                              <div className="pt-2 border-t border-stone-200/60">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                  <div className="relative flex-1 min-w-0">
+                                    <div className="relative">
+                                      <span className="absolute left-3 top-2.5 text-stone-400 text-xs">
+                                        🔍
+                                      </span>
+                                      <input
+                                        type="text"
+                                        value={dishSearchQueries[idx] || ""}
+                                        onFocus={() => setFocusedRuleIndex(idx)}
+                                        onBlur={() => {
+                                          setTimeout(() => {
+                                            setFocusedRuleIndex((current) => (current === idx ? null : current));
+                                          }, 250);
+                                        }}
+                                        onChange={(e) => {
+                                          setDishSearchQueries({
+                                            ...dishSearchQueries,
+                                            [idx]: e.target.value,
+                                          });
+                                          setFocusedRuleIndex(idx);
+                                        }}
+                                        placeholder={`Search & assign dish to ${rule.category} (e.g. Chicken, Paneer, Biryani)...`}
+                                        className="w-full pl-9 pr-8 py-2 bg-white rounded-xl border border-stone-300 focus:border-amber-500 text-xs font-semibold text-stone-900 focus:outline-none transition-all shadow-2xs"
+                                      />
+                                      {dishSearchQueries[idx] && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setDishSearchQueries({
+                                              ...dishSearchQueries,
+                                              [idx]: "",
+                                            });
+                                          }}
+                                          className="absolute right-2.5 top-2 text-stone-400 hover:text-stone-700 text-xs font-bold"
+                                        >
+                                          ✕
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    {/* LIVE AJAX AUTOCOMPLETE FLOATING DROPDOWN */}
+                                    {focusedRuleIndex === idx && (
+                                      <div
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        className="absolute left-0 right-0 top-full mt-1 z-50 bg-white rounded-2xl shadow-xl border border-stone-200 overflow-hidden max-h-56 overflow-y-auto divide-y divide-stone-100 animate-in fade-in zoom-in-95 duration-150"
+                                      >
+                                        {(() => {
+                                          const q = (dishSearchQueries[idx] || "")
+                                            .toLowerCase()
+                                            .trim();
+                                          const matches = recipeCatalog.filter((d) => {
+                                            if (!q) {
+                                              return (
+                                                d.category
+                                                  .toLowerCase()
+                                                  .includes(rule.category.toLowerCase()) ||
+                                                rule.category
+                                                  .toLowerCase()
+                                                  .includes(d.category.toLowerCase())
+                                              );
+                                            }
+                                            return (
+                                              d.name.toLowerCase().includes(q) ||
+                                              d.category.toLowerCase().includes(q) ||
+                                              d.dietary.toLowerCase().includes(q)
+                                            );
+                                          });
+
+                                          if (matches.length === 0) {
+                                            return (
+                                              <div className="p-3 text-center text-xs text-stone-400">
+                                                No dishes matching &quot;{q}&quot; in catalog.
+                                              </div>
+                                            );
+                                          }
+
+                                          return matches.map((d) => {
+                                            const isAssigned = (
+                                              rule.availableItems || []
+                                            ).some((it) => it.id === d.id);
+
+                                            return (
+                                              <div
+                                                key={d.id}
+                                                onClick={() => {
+                                                  if (!isAssigned) {
+                                                    handleAddDishToTemplateCategory(
+                                                      idx,
+                                                      d.id
+                                                    );
+                                                    setDishSearchQueries({
+                                                      ...dishSearchQueries,
+                                                      [idx]: "",
+                                                    });
+                                                    setFocusedRuleIndex(null);
+                                                  }
+                                                }}
+                                                className={`p-2.5 flex items-center justify-between gap-2 transition-all ${
+                                                  isAssigned
+                                                    ? "bg-stone-50/70 text-stone-400 cursor-default"
+                                                    : "hover:bg-amber-50 cursor-pointer text-stone-900"
+                                                }`}
+                                              >
+                                                <div className="flex items-center space-x-2.5 min-w-0">
+                                                  <span
+                                                    className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                                                      d.dietary === "VEG"
+                                                        ? "bg-emerald-600"
+                                                        : "bg-red-600"
+                                                    }`}
+                                                  />
+                                                  <div className="min-w-0">
+                                                    <span className="font-bold text-xs truncate block">
+                                                      {d.name}
+                                                    </span>
+                                                    <span className="text-[10px] text-stone-500">
+                                                      {d.category} • {d.basePortionPerPax}{" "}
+                                                      {d.portionUnit}
+                                                    </span>
+                                                  </div>
+                                                </div>
+
+                                                <div className="flex items-center space-x-2 shrink-0">
+                                                  <span className="font-mono font-bold text-xs text-amber-900">
+                                                    ₹{d.approxCostPerPax}/pax
+                                                  </span>
+                                                  <span
+                                                    className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${
+                                                      isAssigned
+                                                        ? "bg-stone-200 text-stone-600"
+                                                        : "bg-amber-600 text-white shadow-2xs"
+                                                    }`}
+                                                  >
+                                                    {isAssigned ? "✓ Assigned" : "+ Add"}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            );
+                                          });
+                                        })()}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveCategoryRuleIndex(idx);
+                                      setSelectedRecipesToImport(
+                                        (rule.availableItems || []).map((it) => it.id)
+                                      );
+                                      setShowDirectDishPickerModal(true);
+                                    }}
+                                    className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold transition-all shrink-0 flex items-center space-x-1 shadow-2xs whitespace-nowrap"
+                                  >
+                                    <span>📋 Full List</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        ))
-                      )}
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-stone-100 flex justify-end space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingTemplate(false)}
+                        className="px-5 py-2.5 rounded-xl border border-stone-300 text-xs font-bold text-stone-700 hover:bg-stone-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveTemplateForm}
+                        className="px-6 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 text-white text-xs font-black rounded-xl shadow-sm"
+                      >
+                        Save Template &rarr;
+                      </button>
                     </div>
                   </div>
+                </div>
+              )}
+            </div>
+          )}
 
-                  {/* REAL-TIME PROFITABILITY & FOOD COST METER */}
-                  <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-3 shadow-lg">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-indigo-400 tracking-wider">
-                          Real-time Event Margin & Profitability Engine
-                        </span>
-                        <div className="flex items-center space-x-3 mt-0.5">
-                          <span className="text-xl font-extrabold text-white">
-                            ${formSubtotal.toFixed(2)} Total
-                          </span>
-                          <span className="text-xs text-slate-400">
-                            (${formPricePerPax.toFixed(2)} / Pax)
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-6 text-xs">
-                        <div>
-                          <span className="text-slate-400 block text-[10px]">Est. Raw Food Cost</span>
-                          <span className="font-semibold text-slate-200">${formTotalFoodCost.toFixed(2)}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[10px]">Est. Gross Profit</span>
-                          <span className="font-bold text-emerald-400">${formEstimatedProfit.toFixed(2)}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[10px]">Profit Margin %</span>
-                          <span
-                            className={`font-extrabold text-sm ${
-                              formGrossMarginPercent >= 65
-                                ? "text-emerald-400"
-                                : formGrossMarginPercent >= 45
-                                ? "text-amber-400"
-                                : "text-rose-400"
-                            }`}
-                          >
-                            {formGrossMarginPercent.toFixed(1)}%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Progress bar */}
-                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full transition-all duration-300 ${
-                          formGrossMarginPercent >= 65
-                            ? "bg-emerald-500"
-                            : formGrossMarginPercent >= 45
-                            ? "bg-amber-500"
-                            : "bg-rose-500"
-                        }`}
-                        style={{ width: `${Math.min(100, Math.max(0, formGrossMarginPercent))}%` }}
-                      />
-                    </div>
+          {/* ================================================================= */}
+          {/* VIEW: RECIPE & DISH CATALOG (CREATE, EXCEL UPLOAD, KITCHEN SYNC)  */}
+          {/* ================================================================= */}
+          {activeView === "RECIPES" && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <div className="bg-white rounded-3xl border border-[#E8DFC8] p-7 shadow-xs space-y-6">
+                {/* Catalog Header with Actions */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-100 pb-5">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider">
+                      Master Culinary Catalog
+                    </span>
+                    <h2 className="text-2xl font-black text-[#1a120b] tracking-tight">
+                      Catering Recipes &amp; Dishes ({recipeCatalog.length})
+                    </h2>
+                    <p className="text-xs text-stone-500 mt-0.5">
+                      Create, import, and manage all dishes available for catering templates.
+                    </p>
                   </div>
 
-                  {/* Financial & Status Summary */}
-                  <div className="space-y-4 pt-2">
-                    <h4 className="font-semibold text-slate-900 dark:text-white text-sm border-b border-slate-200 dark:border-slate-800 pb-2">
-                      Billing Status & Advance Deposit
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                      <div>
-                        <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">Status Workflow</label>
-                        <select
-                          value={formStatus}
-                          onChange={(e) => setFormStatus(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700"
-                        >
-                          <option value="DRAFT">Draft Quote</option>
-                          <option value="CONFIRMED">Confirmed Booking</option>
-                          <option value="IN_PREPARATION">In Preparation</option>
-                          <option value="DELIVERED">Delivered</option>
-                          <option value="COMPLETED">Completed</option>
-                          <option value="CANCELLED">Cancelled</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">Tax Rate (%)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          value={formTaxRate}
-                          onChange={(e) => setFormTaxRate(Number(e.target.value))}
-                          className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">Discount ($)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formDiscount}
-                          onChange={(e) => setFormDiscount(Number(e.target.value))}
-                          className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">Advance Deposit Paid ($)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formAdvancePaid}
-                          onChange={(e) => setFormAdvancePaid(Number(e.target.value))}
-                          className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-bold text-emerald-600 dark:text-emerald-400"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-indigo-50 dark:bg-indigo-950/40 rounded-2xl flex flex-wrap justify-between items-center text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      <span>Subtotal: ${formSubtotal.toFixed(2)}</span>
-                      <span>Tax: +${formTaxAmount.toFixed(2)}</span>
-                      <span>Total Quote: ${formTotalAmount.toFixed(2)}</span>
-                      <span className="text-amber-600 dark:text-amber-400 font-bold text-sm">
-                        Remaining Balance: ${formBalanceDue.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex justify-end space-x-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+                  <div className="flex flex-wrap items-center gap-2.5">
                     <button
                       type="button"
-                      onClick={() => setShowModal(false)}
-                      className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold hover:bg-slate-200"
+                      onClick={handleSyncFromKitchenRecipes}
+                      className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold transition-all flex items-center space-x-1.5 shadow-2xs"
                     >
-                      Cancel
+                      <span>Sync Kitchen Recipes</span>
                     </button>
+
                     <button
-                      type="submit"
-                      disabled={saving}
-                      className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md disabled:opacity-50"
+                      type="button"
+                      onClick={handleOpenExcelCatalogUpload}
+                      className="px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-300 text-xs font-bold transition-all flex items-center space-x-1.5 shadow-2xs"
                     >
-                      {saving ? "Saving Event..." : editingOrderId ? "Update Event Order" : "Save & Finalize Event"}
+                      <span>Upload via Excel / CSV</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleOpenCreateCatalogDish}
+                      className="px-4 py-2 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center space-x-1.5"
+                    >
+                      <span>+</span>
+                      <span>Create New Dish</span>
                     </button>
                   </div>
-                </form>
+                </div>
+
+                {/* Filters Bar */}
+                <div className="space-y-3">
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <div className="relative flex-1 w-full">
+                      <input
+                        type="text"
+                        value={catalogSearch}
+                        onChange={(e) => setCatalogSearch(e.target.value)}
+                        placeholder="Search dishes by name or keyword..."
+                        className="w-full px-4 py-2.5 rounded-2xl border border-stone-200 text-xs font-semibold focus:outline-none focus:border-amber-600 pl-9"
+                      />
+                      <span className="absolute left-3 top-2.5 text-stone-400 text-sm">🔍</span>
+                    </div>
+
+                    <div className="flex items-center space-x-1.5 w-full sm:w-auto">
+                      {(["ALL", "VEG", "NON_VEG"] as const).map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setCatalogDietFilter(d)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${catalogDietFilter === d
+                              ? "bg-[#1a120b] text-white border-[#1a120b]"
+                              : "bg-white text-stone-700 border-stone-200 hover:bg-stone-50"
+                            }`}
+                        >
+                          {d === "ALL" ? "All Diets" : d === "VEG" ? "🟢 Pure Veg" : "🔴 Non-Veg"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Category Pills */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                    {[
+                      "ALL",
+                      "Welcome Drink",
+                      "Starter",
+                      "Biryani",
+                      "Curry",
+                      "Breads",
+                      "Rice & Sambar",
+                      "Sweets",
+                      "Ice Cream",
+                    ].map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setCatalogCategoryFilter(cat)}
+                        className={`px-3 py-1 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${catalogCategoryFilter === cat
+                            ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                            : "bg-[#FAF6F0] text-stone-700 border-[#E8DFC8] hover:bg-white"
+                          }`}
+                      >
+                        {cat === "ALL" ? "All Categories" : cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Dishes Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                  {recipeCatalog
+                    .filter((dish) => {
+                      const matchQuery =
+                        dish.name.toLowerCase().includes(catalogSearch.toLowerCase()) ||
+                        dish.category.toLowerCase().includes(catalogSearch.toLowerCase()) ||
+                        (dish.description &&
+                          dish.description.toLowerCase().includes(catalogSearch.toLowerCase()));
+                      const matchDiet =
+                        catalogDietFilter === "ALL" ? true : dish.dietary === catalogDietFilter;
+                      const matchCategory =
+                        catalogCategoryFilter === "ALL"
+                          ? true
+                          : dish.category.toLowerCase().includes(catalogCategoryFilter.toLowerCase());
+                      return matchQuery && matchDiet && matchCategory;
+                    })
+                    .map((dish) => (
+                      <div
+                        key={dish.id}
+                        className="p-4 bg-[#FCF9F5] rounded-2xl border border-[#EFE7DC] hover:border-amber-300 transition-all flex flex-col justify-between space-y-3 shadow-2xs group"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between gap-2 mb-1.5">
+                            <div className="flex items-center space-x-2 min-w-0">
+                              <span
+                                className={`w-2.5 h-2.5 rounded-full shrink-0 ${dish.dietary === "VEG" ? "bg-emerald-600" : "bg-red-600"
+                                  }`}
+                              />
+                              <h4 className="font-bold text-sm text-stone-900 truncate">{dish.name}</h4>
+                            </div>
+                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-stone-100 text-stone-700 font-bold shrink-0">
+                              {dish.category}
+                            </span>
+                          </div>
+
+                          <p className="text-xs text-stone-500 line-clamp-2">{dish.description}</p>
+                        </div>
+
+                        <div className="pt-2.5 border-t border-[#E8DFC8]/60 flex items-center justify-between text-xs">
+                          <div className="space-x-2">
+                            <span className="font-bold text-amber-950 font-mono">
+                              ₹{dish.approxCostPerPax}/pax
+                            </span>
+                            <span className="text-stone-400">
+                              • {dish.basePortionPerPax} {dish.portionUnit}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${dish.spiceLevel === "SPICY"
+                                  ? "bg-red-100 text-red-800"
+                                  : dish.spiceLevel === "MEDIUM"
+                                    ? "bg-amber-100 text-amber-900"
+                                    : "bg-emerald-100 text-emerald-800"
+                                }`}
+                            >
+                              {dish.spiceLevel}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCatalogDish(dish.id)}
+                              className="text-stone-300 hover:text-red-600 transition-all font-bold text-sm px-1 opacity-60 group-hover:opacity-100"
+                              title="Delete dish from catalog"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
               </div>
             </div>
           )}
 
-          {/* SAVE AS PACKAGE TEMPLATE MODAL */}
-          {showPackageModal && (
-            <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-              <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 text-xs">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Save Menu as Reusable Package Template
-                </h3>
-                <p className="text-slate-500">
-                  Save current menu items so caterers can load this menu into future catering events with 1 click.
-                </p>
+          {/* ================================================================= */}
+          {/* VIEW 4: LINK SHARE TRACKER (AUDIENCE SELECTION STATUS)            */}
+          {/* ================================================================= */}
+          {activeView === "LINK_TRACKER" && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <div className="bg-white rounded-3xl border border-[#E8DFC8] p-7 shadow-xs space-y-6">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider">
+                    Audience Portal Monitoring
+                  </span>
+                  <h2 className="text-2xl font-black text-[#1a120b] tracking-tight">
+                    Customer Link Shares & Selection Status
+                  </h2>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    Live status of invitation links sent to hosts. Track who has opened their link and who has submitted menu choices.
+                  </p>
+                </div>
 
-                <form onSubmit={handleSaveAsPackage} className="space-y-3">
-                  <div>
-                    <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">Package Name *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Royal Wedding Feast Package"
-                      value={pkgName}
-                      onChange={(e) => setPkgName(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700"
-                    />
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#FAF6F0] text-stone-600 border-y border-[#E8DFC8]">
+                      <tr>
+                        <th className="py-3 px-4 font-bold">Event & Token Ref</th>
+                        <th className="py-3 px-4 font-bold">Customer Host</th>
+                        <th className="py-3 px-4 font-bold">Date & Headcount</th>
+                        <th className="py-3 px-4 font-bold">Assigned Template</th>
+                        <th className="py-3 px-4 font-bold text-center">Link Opened?</th>
+                        <th className="py-3 px-4 font-bold">Selection Status</th>
+                        <th className="py-3 px-4 font-bold text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {eventsList.map((ev) => (
+                        <tr key={ev.id} className="hover:bg-stone-50/60">
+                          <td className="py-3.5 px-4 font-mono font-bold text-amber-900">
+                            <div>{ev.id}</div>
+                            <span className="text-[11px] font-sans text-stone-800 font-semibold">{ev.eventName}</span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-stone-800">{ev.customerName}</div>
+                            <span className="text-stone-500 font-mono text-[11px]">{ev.customerPhone}</span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold text-stone-800">{ev.eventDate}</div>
+                            <span className="text-stone-500">{ev.guestCount.toLocaleString()} Guests ({ev.mealType})</span>
+                          </td>
+                          <td className="py-3.5 px-4 font-medium text-stone-700">
+                            <select
+                              value={ev.templateId}
+                              onChange={(e) => handleReassignEventTemplate(ev.id, e.target.value)}
+                              className="px-2 py-1 rounded-lg border border-stone-300 bg-white text-xs font-bold text-stone-900 focus:outline-none focus:border-amber-600"
+                            >
+                              {templates.map((tmpl) => (
+                                <option key={tmpl.id} value={tmpl.id}>
+                                  {tmpl.name} (₹{tmpl.basePricePerPax}/Pax)
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${ev.linkOpened ? "bg-emerald-100 text-emerald-900" : "bg-stone-100 text-stone-500"}`}>
+                              {ev.linkOpened ? "✓ Opened" : "Pending"}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span
+                              className={`px-3 py-1 rounded-full text-[10px] font-bold border ${ev.status === "APPROVED"
+                                ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                : ev.status === "CUSTOMER_SUBMITTED"
+                                  ? "bg-blue-100 text-blue-900 border-blue-300"
+                                  : "bg-amber-100 text-amber-900 border-amber-300"
+                                }`}
+                            >
+                              {ev.status.replace("_", " ")}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right space-x-2">
+                            <button
+                              onClick={() => handleCopyLink(ev.id)}
+                              className="px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold text-[11px]"
+                            >
+                              {copiedToken === ev.id ? "✓ Copied" : "Copy Link"}
+                            </button>
+                            <button
+                              onClick={() => handleWhatsAppReminder(ev)}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px]"
+                            >
+                              WhatsApp
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedEventId(ev.id);
+                                setActiveView("PIPELINE");
+                              }}
+                              className="px-3 py-1 rounded-lg bg-[#1a120b] hover:bg-stone-800 text-amber-300 font-bold text-[11px]"
+                            >
+                              Open Pipeline &rarr;
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================================================================= */}
+          {/* VIEW 5: FULL 7-STAGE PIPELINE STUDIO FOR ACTIVE EVENT              */}
+          {/* ================================================================= */}
+          {activeView === "PIPELINE" && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              {/* Pipeline Ribbon */}
+              <div className="bg-white rounded-3xl border border-[#E8DFC8] p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-mono text-xs font-bold text-amber-900">{activeEvent.id}</span>
+                    <span className="text-xs text-stone-400">•</span>
+                    <span className="text-xs font-medium text-stone-600">{activeEvent.eventName}</span>
+                  </div>
+                  <h3 className="text-xl font-black text-[#1a120b]">
+                    7-Stage Sales & Production Pipeline
+                  </h3>
+                </div>
+
+                <div className="flex items-center space-x-2 overflow-x-auto">
+                  {[
+                    { id: "EVENT_SETUP", label: "1. Event Setup" },
+                    { id: "TEMPLATE_SELECTION", label: "2. Template" },
+                    { id: "MENU_BUILDER", label: "3. Menu Options" },
+                    { id: "LIVE_COUNTERS", label: "4. Live Counters" },
+                    { id: "AI_VALIDATION", label: "5. AI Validation" },
+                    { id: "QUOTATION_STUDIO", label: "6. Quotation" },
+                    { id: "PRODUCTION_BATCH", label: "7. Production" },
+                  ].map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => setPipelineStage(s.id as PipelineStage)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${pipelineStage === s.id
+                        ? "bg-amber-600 text-white shadow-xs"
+                        : "bg-stone-100 text-stone-700 hover:bg-stone-200"
+                        }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Stage 1: Setup & Customer Link */}
+              {pipelineStage === "EVENT_SETUP" && (
+                <div className="bg-white rounded-3xl border border-[#E8DFC8] p-7 shadow-xs space-y-6">
+                  <div className="p-5 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/15 rounded-2xl border border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-amber-900 tracking-wider">
+                        Customer Menu Selection Portal Link
+                      </span>
+                      <h4 className="font-black text-lg text-[#1a120b]">Share Link with Host</h4>
+                      <p className="text-xs text-stone-600">
+                        Zero password portal for {eventDetails.customer.name} to pick items within template quotas.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleCopyLink(activeEvent.id)}
+                        className="px-4 py-2 bg-white border border-stone-300 hover:border-amber-500 text-stone-800 font-bold text-xs rounded-xl shadow-xs"
+                      >
+                        {copiedToken === activeEvent.id ? "✓ Copied" : "📋 Copy Link"}
+                      </button>
+                      <button
+                        onClick={() => handleWhatsAppReminder(activeEvent)}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs"
+                      >
+                        💬 WhatsApp
+                      </button>
+                      <a
+                        href={getCustomerPortalUrl(activeEvent.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 bg-[#1a120b] text-amber-300 font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1"
+                      >
+                        <span>Open Portal</span>
+                        <span>↗</span>
+                      </a>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">Category</label>
-                    <select
-                      value={pkgCategory}
-                      onChange={(e) => setPkgCategory(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700"
+                  {/* Form Details */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div>
+                      <label className="text-xs font-bold text-stone-700 block mb-1">Host Name</label>
+                      <input
+                        type="text"
+                        value={eventDetails.customer.name}
+                        onChange={(e) =>
+                          setEventDetails({
+                            ...eventDetails,
+                            customer: { ...eventDetails.customer, name: e.target.value },
+                          })
+                        }
+                        className="w-full px-4 py-2 rounded-xl border border-stone-300 text-sm font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-stone-700 block mb-1">Host Phone</label>
+                      <input
+                        type="text"
+                        value={eventDetails.customer.phone}
+                        onChange={(e) =>
+                          setEventDetails({
+                            ...eventDetails,
+                            customer: { ...eventDetails.customer, phone: e.target.value },
+                          })
+                        }
+                        className="w-full px-4 py-2 rounded-xl border border-stone-300 text-sm font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-stone-700 block mb-1">Guest Headcount (Pax)</label>
+                      <input
+                        type="number"
+                        value={eventDetails.guestCount}
+                        onChange={(e) =>
+                          setEventDetails({
+                            ...eventDetails,
+                            guestCount: parseInt(e.target.value) || 100,
+                          })
+                        }
+                        className="w-full px-4 py-2 rounded-xl border border-stone-300 text-sm font-black text-amber-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-stone-100 flex justify-end">
+                    <button
+                      onClick={() => setPipelineStage("TEMPLATE_SELECTION")}
+                      className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl"
                     >
-                      <option value="Buffet">Buffet Package</option>
-                      <option value="Wedding">Wedding Feast</option>
-                      <option value="Corporate">Corporate Executive Box</option>
-                      <option value="Private Dining">Private Dining</option>
+                      Next: Template Selection &rarr;
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Stage 2: Template Selection */}
+              {pipelineStage === "TEMPLATE_SELECTION" && (
+                <div className="bg-white rounded-3xl border border-[#E8DFC8] p-7 shadow-xs space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl font-black text-[#1a120b]">Assign Catering Template</h3>
+                      <p className="text-xs text-stone-500">Pick a template matching {eventDetails.eventType}.</p>
+                    </div>
+                    <button
+                      onClick={() => setActiveView("TEMPLATES")}
+                      className="text-xs font-bold text-amber-700 hover:text-amber-800"
+                    >
+                      + Create New Custom Template &rarr;
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {templates.map((t) => {
+                      const isSelected = selectedTemplate.id === t.id;
+                      return (
+                        <div
+                          key={t.id}
+                          onClick={() => setSelectedTemplate(t)}
+                          className={`p-6 rounded-3xl cursor-pointer transition-all border-2 flex flex-col justify-between ${isSelected ? "bg-white border-amber-600 shadow-md" : "bg-[#FCF9F5] border-[#EFE7DC] hover:border-amber-300"
+                            }`}
+                        >
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-100 text-amber-900">
+                                ₹{t.basePricePerPax} / Pax
+                              </span>
+                              {isSelected && <span className="text-xs font-bold text-amber-700">✓ Active</span>}
+                            </div>
+                            <h4 className="text-base font-black text-[#1a120b]">{t.name}</h4>
+                            <p className="text-xs text-stone-600 line-clamp-2">{t.description}</p>
+                          </div>
+
+                          <div className="pt-4 mt-4 border-t border-stone-200 flex justify-between items-center text-xs">
+                            <span className="text-stone-500">{t.categoryRules.length} Courses</span>
+                            <span className={`font-bold ${isSelected ? "text-amber-800" : "text-stone-600"}`}>
+                              {isSelected ? "Selected" : "Select"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="pt-4 border-t border-stone-100 flex justify-end">
+                    <button
+                      onClick={() => setPipelineStage("MENU_BUILDER")}
+                      className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl"
+                    >
+                      Next: Menu Course Options &rarr;
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Stage 3: Menu Builder */}
+              {pipelineStage === "MENU_BUILDER" && (
+                <div className="bg-white rounded-3xl border border-[#E8DFC8] p-7 shadow-xs space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl font-black text-[#1a120b]">Course Menu Selection</h3>
+                      <p className="text-xs text-stone-500">Template limits enforced ({selectedItemIds.length} items chosen).</p>
+                    </div>
+                    <button
+                      onClick={() => setPipelineStage("LIVE_COUNTERS")}
+                      className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl"
+                    >
+                      Next: Live Counters ({selectedAddonIds.length}) &rarr;
+                    </button>
+                  </div>
+
+                  <div className="space-y-6">
+                    {selectedTemplate.categoryRules.map((rule) => {
+                      const selectedInCat = selectedItemIds.filter(
+                        (id) => MENU_ITEMS_MASTER[id]?.category === rule.category
+                      );
+                      return (
+                        <div key={rule.category} className="p-5 bg-[#FCF9F5] rounded-2xl border border-[#EFE7DC] space-y-3">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-black text-sm text-[#1a120b]">{rule.category}</h4>
+                            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-white border border-stone-300">
+                              {selectedInCat.length} / {rule.maxSelections} Chosen
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                            {rule.availableItems.map((item) => {
+                              const isPicked = selectedItemIds.includes(item.id);
+                              return (
+                                <div
+                                  key={item.id}
+                                  onClick={() => {
+                                    if (isPicked) {
+                                      setSelectedItemIds(selectedItemIds.filter((id) => id !== item.id));
+                                    } else {
+                                      setSelectedItemIds([...selectedItemIds, item.id]);
+                                    }
+                                  }}
+                                  className={`p-3 rounded-xl cursor-pointer border transition-all ${isPicked ? "bg-amber-50 border-amber-600 shadow-xs" : "bg-white border-stone-200"
+                                    }`}
+                                >
+                                  <div className="flex justify-between items-center text-[10px] font-bold">
+                                    <span className={item.dietary === "VEG" ? "text-emerald-700" : "text-red-700"}>
+                                      {item.dietary}
+                                    </span>
+                                    {isPicked && <span className="text-amber-800">✓</span>}
+                                  </div>
+                                  <div className="font-bold text-xs text-[#1a120b] mt-1">{item.name}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Stage 4: Live Counters */}
+              {pipelineStage === "LIVE_COUNTERS" && (
+                <div className="bg-white rounded-3xl border border-[#E8DFC8] p-7 shadow-xs space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl font-black text-[#1a120b]">Specialty Live Counters</h3>
+                      <p className="text-xs text-stone-500">Live action culinary counters.</p>
+                    </div>
+                    <button
+                      onClick={() => setPipelineStage("AI_VALIDATION")}
+                      className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl"
+                    >
+                      Run AI Validation &rarr;
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {LIVE_COUNTERS_MASTER.map((addon) => {
+                      const isPicked = selectedAddonIds.includes(addon.id);
+                      return (
+                        <div
+                          key={addon.id}
+                          onClick={() => {
+                            if (isPicked) {
+                              setSelectedAddonIds(selectedAddonIds.filter((id) => id !== addon.id));
+                            } else {
+                              setSelectedAddonIds([...selectedAddonIds, addon.id]);
+                            }
+                          }}
+                          className={`p-5 rounded-2xl cursor-pointer border-2 transition-all ${isPicked ? "bg-amber-50/70 border-amber-600 shadow-sm" : "bg-[#FCF9F5] border-[#EFE7DC]"
+                            }`}
+                        >
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="font-bold uppercase text-stone-500">{addon.category.replace("_", " ")}</span>
+                            <span className="font-black text-amber-900">+₹{addon.pricePerPax} / Pax</span>
+                          </div>
+                          <h4 className="font-black text-sm text-[#1a120b] mt-2">{addon.name}</h4>
+                          <p className="text-xs text-stone-600 mt-1">{addon.description}</p>
+                          <div className="pt-3 mt-3 border-t border-stone-200/70 flex justify-between text-xs font-bold">
+                            <span className="text-stone-500">₹{(addon.pricePerPax * eventDetails.guestCount).toLocaleString()} Total</span>
+                            <span className={isPicked ? "text-amber-800" : "text-stone-600"}>
+                              {isPicked ? "✓ Added" : "+ Add"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Stage 5: AI Validation */}
+              {pipelineStage === "AI_VALIDATION" && (
+                <div className="bg-white rounded-3xl border border-[#E8DFC8] p-7 shadow-xs space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl font-black text-[#1a120b]">AI Menu Validation & Advisories</h3>
+                      <p className="text-xs text-stone-500">
+                        Status: <strong className="text-amber-900">{validationReport.overallStatus}</strong> &bull; Variety: {validationReport.nutritionProfile?.varietyScore}/100
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setPipelineStage("QUOTATION_STUDIO")}
+                      className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl"
+                    >
+                      Next: Quotation Studio &rarr;
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {validationReport.advisories.map((adv) => (
+                      <div
+                        key={adv.id}
+                        className={`p-5 rounded-2xl border text-xs space-y-2 ${adv.level === "GREEN" ? "bg-emerald-50/60 border-emerald-300" : "bg-amber-50/70 border-amber-300"
+                          }`}
+                      >
+                        <div className="flex items-center justify-between font-bold">
+                          <span>{adv.title}</span>
+                          <span className="text-[10px] uppercase font-mono">{adv.level}</span>
+                        </div>
+                        <p className="text-stone-700">{adv.message}</p>
+                        {adv.suggestedReplacement && (
+                          <div className="p-3 bg-white rounded-xl border border-amber-200 flex items-center justify-between">
+                            <span>Swap {adv.suggestedReplacement.removeName} &rarr; <strong>{adv.suggestedReplacement.suggestedName}</strong></span>
+                            <button
+                              onClick={() => {
+                                setSelectedItemIds((prev) =>
+                                  prev.map((id) => (id === adv.suggestedReplacement!.removeId ? adv.suggestedReplacement!.suggestedId : id))
+                                );
+                              }}
+                              className="px-3 py-1 bg-amber-600 text-white font-bold rounded-lg"
+                            >
+                              1-Click Swap
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Stage 6: Quotation Studio */}
+              {pipelineStage === "QUOTATION_STUDIO" && (
+                <div className="bg-white rounded-3xl border border-[#E8DFC8] p-7 shadow-xs space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-100 pb-5">
+                    <div>
+                      <h3 className="text-2xl font-black text-[#1a120b]">Quotation & True P&L Costing</h3>
+                      <p className="text-xs text-stone-500 mt-0.5">
+                        Itemized operational expenditures for {eventDetails.guestCount.toLocaleString()} Guests.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => {
+                          setIsQuotationApproved(true);
+                          setPipelineStage("PRODUCTION_BATCH");
+                        }}
+                        className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm"
+                      >
+                        ✓ Approve Quotation & Lock
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 space-y-3">
+                      <h4 className="font-bold text-sm text-[#1a120b]">Direct Costing Ledger</h4>
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-[#FAF6F0] border-y border-stone-200 text-stone-600">
+                          <tr>
+                            <th className="py-2 px-3 font-bold">Category</th>
+                            <th className="py-2 px-3 font-bold">Unit Rate</th>
+                            <th className="py-2 px-3 font-bold text-right">Total Cost</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-stone-100">
+                          {costBreakdown.costItems.map((ci, i) => (
+                            <tr key={i}>
+                              <td className="py-2 px-3 font-medium">{ci.name}</td>
+                              <td className="py-2 px-3 font-mono text-stone-500">₹{ci.unitCost}</td>
+                              <td className="py-2 px-3 font-mono font-bold text-right">₹{ci.totalCost.toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="border-t font-bold bg-[#FAF6F0]">
+                          <tr>
+                            <td colSpan={2} className="py-2.5 px-3">Total Direct Cost</td>
+                            <td className="py-2.5 px-3 text-right font-mono font-black text-amber-900">
+                              ₹{costBreakdown.totalDirectCost.toLocaleString()}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+
+                    <div className="p-6 bg-[#FCF9F5] rounded-3xl border border-[#EFE7DC] space-y-4">
+                      <span className="text-[10px] uppercase font-bold text-stone-500 block">Proposal Summary</span>
+                      <div className="text-2xl font-black text-amber-900 font-mono">
+                        ₹{currentQuotation?.finalTotalAmount.toLocaleString()}
+                      </div>
+                      <div className="text-xs font-bold text-emerald-800">
+                        ₹{currentQuotation?.finalPricePerPax} / Guest
+                      </div>
+                      <div className="pt-4 border-t border-stone-200 text-xs space-y-2">
+                        <div className="flex justify-between">
+                          <span>Gross Margin:</span>
+                          <strong className="text-emerald-700">{costBreakdown.targetMarginPercent}%</strong>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Direct Profit:</span>
+                          <strong className="font-mono">
+                            ₹{((currentQuotation?.finalTotalAmount || 0) - costBreakdown.totalDirectCost).toLocaleString()}
+                          </strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Stage 7: Kitchen Production Batch */}
+              {pipelineStage === "PRODUCTION_BATCH" && (
+                <div className="bg-white rounded-3xl border border-[#E8DFC8] p-7 shadow-xs space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl font-black text-[#1a120b]">Kitchen Batch & Procurement Handoff</h3>
+                      <p className="text-xs text-stone-500">Scaled recipe production sheet for {eventDetails.guestCount.toLocaleString()} guests.</p>
+                    </div>
+                    <button
+                      onClick={() => window.print()}
+                      className="px-4 py-2 border border-stone-300 font-bold text-xs rounded-xl"
+                    >
+                      Print Prep Sheet
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div className="p-5 bg-[#FCF9F5] rounded-2xl border border-[#EFE7DC] space-y-2 text-xs">
+                      <span className="text-[10px] font-bold uppercase text-amber-800 block">Biryani Station</span>
+                      <h4 className="font-bold text-sm text-[#1a120b]">Dum Handi Prep</h4>
+                      <p className="font-mono text-stone-700">Chicken Dum Biryani: <strong>120 kg (4 Handis)</strong></p>
+                      <p className="font-mono text-stone-700">Steamed Rice: <strong>80 kg</strong></p>
+                    </div>
+
+                    <div className="p-5 bg-[#FCF9F5] rounded-2xl border border-[#EFE7DC] space-y-2 text-xs">
+                      <span className="text-[10px] font-bold uppercase text-amber-800 block">Curry Station</span>
+                      <h4 className="font-bold text-sm text-[#1a120b]">Large Pot Deghs</h4>
+                      <p className="font-mono text-stone-700">Butter Chicken: <strong>150 kg (Degh 1)</strong></p>
+                      <p className="font-mono text-stone-700">Veg Gravy: <strong>140 kg (Degh 2)</strong></p>
+                    </div>
+
+                    <div className="p-5 bg-[#FCF9F5] rounded-2xl border border-[#EFE7DC] space-y-2 text-xs">
+                      <span className="text-[10px] font-bold uppercase text-emerald-800 block">Central Store</span>
+                      <h4 className="font-bold text-sm text-[#1a120b]">Procurement Depletion</h4>
+                      <p className="font-mono text-stone-700">Aged Basmati: <strong>140 kg</strong></p>
+                      <p className="font-mono text-stone-700">Chicken / Meat: <strong>210 kg</strong></p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </main>
+
+        {/* =================================================================== */}
+        {/* QUICK ACTION MODAL: BOOK NEW CATERING EVENT                        */}
+        {/* =================================================================== */}
+        {showNewEventModal && (
+          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl border-2 border-amber-500 max-w-xl w-full p-7 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+                <h3 className="text-xl font-black text-[#1a120b]">Register New Catering Event</h3>
+                <button
+                  onClick={() => setShowNewEventModal(false)}
+                  className="text-stone-400 hover:text-stone-700 text-2xl font-bold"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-stone-700 block mb-1">Host / Customer Name *</label>
+                  <input
+                    type="text"
+                    value={newEventHost}
+                    onChange={(e) => setNewEventHost(e.target.value)}
+                    placeholder="e.g. Ramesh Varma"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-semibold focus:outline-none focus:border-amber-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-stone-700 block mb-1">WhatsApp / Phone *</label>
+                  <input
+                    type="text"
+                    value={newEventPhone}
+                    onChange={(e) => setNewEventPhone(e.target.value)}
+                    placeholder="+91 98480 ..."
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-semibold focus:outline-none focus:border-amber-600"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-stone-700 block mb-1">Event Title *</label>
+                  <input
+                    type="text"
+                    value={newEventTitle}
+                    onChange={(e) => setNewEventTitle(e.target.value)}
+                    placeholder="e.g. Varma Family Reception Gala"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-semibold focus:outline-none focus:border-amber-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-stone-700 block mb-1">Event Date</label>
+                  <input
+                    type="date"
+                    value={newEventDate}
+                    onChange={(e) => setNewEventDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-stone-700 block mb-1">Guest Headcount (Pax)</label>
+                  <input
+                    type="number"
+                    value={newEventPax}
+                    onChange={(e) => setNewEventPax(parseInt(e.target.value) || 100)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-black text-amber-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-stone-700 block mb-1">Event Type</label>
+                  <select
+                    value={newEventType}
+                    onChange={(e) => setNewEventType(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-semibold bg-white"
+                  >
+                    <option value="WEDDING">Wedding Ceremony</option>
+                    <option value="RECEPTION">Reception & Sangeet</option>
+                    <option value="CORPORATE">Corporate Banquet</option>
+                    <option value="HOUSEWARMING">Gruhapravesam</option>
+                    <option value="BIRTHDAY">Birthday Gala</option>
+                    <option value="CUSTOM">Custom Private Event</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-stone-700 block mb-1">Meal Slot</label>
+                  <select
+                    value={newEventMeal}
+                    onChange={(e) => setNewEventMeal(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-semibold bg-white"
+                  >
+                    <option value="LUNCH">Afternoon Lunch</option>
+                    <option value="DINNER">Night Dinner</option>
+                    <option value="BREAKFAST">Morning Breakfast</option>
+                    <option value="HIGH_TEA">High Tea</option>
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-stone-700 block mb-1">
+                    Assign Catering Template to Customer *
+                  </label>
+                  <select
+                    value={newEventTemplateId}
+                    onChange={(e) => setNewEventTemplateId(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border-2 border-amber-400 text-xs font-bold text-stone-900 bg-amber-50/40 focus:outline-none focus:border-amber-600"
+                  >
+                    {templates.map((tmpl) => (
+                      <option key={tmpl.id} value={tmpl.id}>
+                        {tmpl.name} (₹{tmpl.basePricePerPax}/Pax • {tmpl.categoryRules.length} Courses • {tmpl.applicableEventTypes.join(", ")})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-stone-500 mt-1">
+                    The customer will select dishes according to this package&apos;s course limits.
+                  </p>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-stone-700 block mb-1">Venue Location</label>
+                  <input
+                    type="text"
+                    value={newEventVenue}
+                    onChange={(e) => setNewEventVenue(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-stone-100 flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowNewEventModal(false)}
+                  className="px-4 py-2 rounded-xl border border-stone-300 text-xs font-bold text-stone-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateNewEvent}
+                  className="px-6 py-2 bg-gradient-to-r from-amber-600 to-orange-600 text-white text-xs font-black rounded-xl shadow-sm"
+                >
+                  Register & Generate Portal Link &rarr;
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* =================================================================== */}
+        {/* MODAL 1: DIRECT DISH PICKER CHECKLIST (FOR TEMPLATE STUDIO)        */}
+        {/* =================================================================== */}
+        {showDirectDishPickerModal && activeCategoryRuleIndex !== null && (
+          <div
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowDirectDishPickerModal(false);
+            }}
+            className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <div className="bg-white rounded-3xl border-2 border-amber-500 max-w-3xl w-full p-6 sm:p-8 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[88vh] flex flex-col">
+              <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider">
+                    Course Dish Assignment
+                  </span>
+                  <h3 className="text-xl font-black text-[#1a120b]">
+                    Assign Dishes to &quot;{templateFormRules[activeCategoryRuleIndex]?.category}&quot;
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowDirectDishPickerModal(false)}
+                  className="text-stone-400 hover:text-stone-700 text-2xl font-bold"
+                >
+                  &times;
+                </button>
+              </div>
+
+              {/* Filters & Search */}
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <input
+                  type="text"
+                  value={recipeSearch}
+                  onChange={(e) => setRecipeSearch(e.target.value)}
+                  placeholder="Search dishes by name or category..."
+                  className="w-full sm:flex-1 px-3.5 py-2 rounded-xl border border-stone-300 text-xs font-semibold focus:outline-none focus:border-amber-600"
+                />
+                <div className="flex items-center space-x-1.5 w-full sm:w-auto">
+                  {(["ALL", "VEG", "NON_VEG"] as const).map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setRecipeDietFilter(f)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                        recipeDietFilter === f
+                          ? "bg-amber-600 text-white border-amber-600"
+                          : "bg-white text-stone-700 border-stone-200 hover:bg-stone-50"
+                      }`}
+                    >
+                      {f === "ALL" ? "All Dishes" : f === "VEG" ? "🟢 Pure Veg" : "🔴 Non-Veg"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recipe Checklist */}
+              <div className="flex-1 overflow-y-auto space-y-2 border border-stone-200 rounded-2xl p-3 bg-stone-50/50 max-h-96">
+                {recipeCatalog
+                  .filter((r) => {
+                    const matchQuery =
+                      r.name.toLowerCase().includes(recipeSearch.toLowerCase()) ||
+                      r.category.toLowerCase().includes(recipeSearch.toLowerCase());
+                    const matchDiet =
+                      recipeDietFilter === "ALL" ? true : r.dietary === recipeDietFilter;
+                    return matchQuery && matchDiet;
+                  })
+                  .map((r) => {
+                    const isSelected = selectedRecipesToImport.includes(r.id);
+
+                    return (
+                      <div
+                        key={r.id}
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedRecipesToImport(
+                              selectedRecipesToImport.filter((id) => id !== r.id)
+                            );
+                          } else {
+                            setSelectedRecipesToImport([...selectedRecipesToImport, r.id]);
+                          }
+                        }}
+                        className={`p-3 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                          isSelected
+                            ? "bg-amber-50/80 border-amber-500 shadow-2xs"
+                            : "bg-white border-stone-200 hover:border-amber-300"
+                        }`}
+                      >
+                        <div className="flex items-center space-x-3 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {}}
+                            className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+                          />
+                          <span
+                            className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                              r.dietary === "VEG" ? "bg-emerald-600" : "bg-red-600"
+                            }`}
+                          />
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-2">
+                              <h5 className="font-bold text-xs text-stone-900 truncate">
+                                {r.name}
+                              </h5>
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-stone-100 text-stone-600 font-mono">
+                                {r.category}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-stone-500 truncate">{r.description}</p>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="text-xs font-bold text-stone-800 font-mono block">
+                            ₹{r.approxCostPerPax}/pax
+                          </span>
+                          <span className="text-[10px] text-stone-400">
+                            {r.basePortionPerPax} {r.portionUnit}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              <div className="pt-3 border-t border-stone-100 flex items-center justify-between">
+                <span className="text-xs font-semibold text-stone-600">
+                  {selectedRecipesToImport.length} dishes selected for &quot;{templateFormRules[activeCategoryRuleIndex]?.category}&quot;
+                </span>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowDirectDishPickerModal(false)}
+                    className="px-4 py-2 rounded-xl border border-stone-300 text-xs font-bold text-stone-700 hover:bg-stone-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmDirectDishPicker}
+                    className="px-5 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 text-white text-xs font-black rounded-xl shadow-xs transition-all"
+                  >
+                    Apply Selection ({selectedRecipesToImport.length}) &rarr;
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* =================================================================== */}
+        {/* MODAL 2: UPLOAD DISHES TO CATALOG VIA EXCEL / CSV                   */}
+        {/* =================================================================== */}
+        {showExcelUploadModal && (
+          <div
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowExcelUploadModal(false);
+            }}
+            className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <div className="bg-white rounded-3xl border-2 border-blue-500 max-w-2xl w-full p-6 sm:p-8 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[88vh] flex flex-col">
+              <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-blue-800 tracking-wider">
+                    Bulk Excel / CSV Importer
+                  </span>
+                  <h3 className="text-xl font-black text-[#1a120b]">
+                    Upload Dishes to Catering Catalog
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowExcelUploadModal(false)}
+                  className="text-stone-400 hover:text-stone-700 text-2xl font-bold"
+                >
+                  &times;
+                </button>
+              </div>
+
+              {/* Sample Download banner */}
+              <div className="p-3.5 bg-blue-50/60 rounded-2xl border border-blue-200 flex items-center justify-between text-xs">
+                <div>
+                  <span className="font-bold text-blue-900 block">Expected Columns:</span>
+                  <span className="text-blue-700 font-mono text-[11px]">
+                    Item Name, Dietary, Portion per Pax, Unit, Cost per Pax, Spice Level, Description
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadSampleCsv}
+                  className="px-3 py-1.5 bg-white border border-blue-300 text-blue-800 hover:bg-blue-100 font-bold rounded-xl text-xs shrink-0 shadow-2xs"
+                >
+                  Download Sample CSV 📥
+                </button>
+              </div>
+
+              {/* Upload Dropzone */}
+              <div className="border-2 border-dashed border-blue-300 hover:border-blue-500 rounded-2xl p-6 text-center bg-blue-50/20 cursor-pointer transition-all space-y-2">
+                <input
+                  type="file"
+                  accept=".csv,.txt"
+                  onChange={handleCsvFileUpload}
+                  className="w-full text-xs font-medium text-stone-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"
+                />
+                <p className="text-[11px] text-stone-500">
+                  Select your CSV/Excel spreadsheet to extract recipes automatically.
+                </p>
+                {excelFileName && (
+                  <p className="text-xs font-bold text-blue-900 mt-1">
+                    ✓ File selected: <strong>{excelFileName}</strong> ({excelParsedItems.length} items parsed)
+                  </p>
+                )}
+              </div>
+
+              {/* Parsed Items Preview */}
+              {excelParsedItems.length > 0 && (
+                <div className="flex-1 overflow-y-auto max-h-48 border border-stone-200 rounded-2xl p-2.5 bg-stone-50 space-y-1.5">
+                  <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                    Parsed Preview ({excelParsedItems.length} dishes):
+                  </span>
+                  {excelParsedItems.map((item, i) => (
+                    <div
+                      key={i}
+                      className="p-2 bg-white rounded-xl border border-stone-200 flex items-center justify-between text-xs"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            item.dietary === "VEG" ? "bg-emerald-600" : "bg-red-600"
+                          }`}
+                        />
+                        <span className="font-bold text-stone-900">{item.name}</span>
+                        <span className="text-stone-400">• {item.basePortionPerPax} {item.portionUnit}</span>
+                      </div>
+                      <span className="font-mono font-bold text-stone-700">₹{item.approxCostPerPax}/pax</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-stone-100 flex items-center justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setShowExcelUploadModal(false)}
+                  className="px-4 py-2 rounded-xl border border-stone-300 text-xs font-bold text-stone-700 hover:bg-stone-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmExcelCatalogUpload}
+                  disabled={excelParsedItems.length === 0}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-black rounded-xl shadow-xs transition-all"
+                >
+                  Confirm &amp; Add ({excelParsedItems.length}) Dishes to Catalog &rarr;
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* =================================================================== */}
+        {/* MODAL 3: CREATE CUSTOM RECIPE / DISH FOR CATALOG                    */}
+        {/* =================================================================== */}
+        {showCreateItemModal && (
+          <div
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowCreateItemModal(false);
+            }}
+            className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <div className="bg-white rounded-3xl border-2 border-amber-500 max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider">
+                    New Culinary Dish
+                  </span>
+                  <h3 className="text-xl font-black text-[#1a120b]">
+                    Create Dish for Catering Catalog
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateItemModal(false)}
+                  className="text-stone-400 hover:text-stone-700 text-2xl font-bold"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div className="space-y-4 text-xs">
+                <div>
+                  <label className="font-bold text-stone-700 block mb-1">Item / Dish Name *</label>
+                  <input
+                    type="text"
+                    value={newItemName}
+                    onChange={(e) => setNewItemName(e.target.value)}
+                    placeholder="e.g. Royyala Vepudu (Spicy Prawn Fry)"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 text-xs font-bold text-stone-900 focus:outline-none focus:border-amber-600"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-stone-700 block mb-1">Category Course</label>
+                    <select
+                      value={newItemCategory}
+                      onChange={(e) => setNewItemCategory(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-semibold bg-white"
+                    >
+                      <option value="Welcome Drink">Welcome Drink</option>
+                      <option value="Starter">Starter</option>
+                      <option value="Biryani">Biryani</option>
+                      <option value="Curry">Curry</option>
+                      <option value="Breads">Breads</option>
+                      <option value="Rice & Sambar">Rice & Sambar</option>
+                      <option value="Sweets">Sweets</option>
+                      <option value="Ice Cream">Ice Cream</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block font-medium text-slate-700 dark:text-slate-300 mb-1">Description</label>
-                    <textarea
-                      placeholder="Includes 3 starters, 4 main courses, live naan counter & desserts..."
-                      value={pkgDesc}
-                      onChange={(e) => setPkgDesc(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700"
-                      rows={2}
+                    <label className="font-bold text-stone-700 block mb-1">Spice Level</label>
+                    <select
+                      value={newItemSpice}
+                      onChange={(e) => setNewItemSpice(e.target.value as any)}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-semibold bg-white"
+                    >
+                      <option value="MILD">MILD</option>
+                      <option value="MEDIUM">MEDIUM</option>
+                      <option value="SPICY">SPICY</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-stone-700 block mb-1">Dietary Preference</label>
+                    <div className="flex items-center space-x-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setNewItemDietary("VEG")}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${
+                          newItemDietary === "VEG"
+                            ? "bg-emerald-600 text-white border-emerald-600"
+                            : "bg-white text-stone-700 border-stone-300"
+                        }`}
+                      >
+                        VEG
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewItemDietary("NON_VEG")}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${
+                          newItemDietary === "NON_VEG"
+                            ? "bg-red-600 text-white border-red-600"
+                            : "bg-white text-stone-700 border-stone-300"
+                        }`}
+                      >
+                        NON-VEG
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-stone-700 block mb-1">Approx Cost per Pax (₹)</label>
+                    <input
+                      type="number"
+                      value={newItemCost}
+                      onChange={(e) => setNewItemCost(parseFloat(e.target.value) || 40)}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-black text-amber-900"
                     />
                   </div>
+                </div>
 
-                  <div className="flex justify-end space-x-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowPackageModal(false)}
-                      className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-                    >
-                      Save Package Template
-                    </button>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-stone-700 block mb-1">Base Portion per Pax</label>
+                    <div className="flex items-center space-x-1.5">
+                      <input
+                        type="number"
+                        step={0.05}
+                        value={newItemPortion}
+                        onChange={(e) => setNewItemPortion(parseFloat(e.target.value) || 0.15)}
+                        className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-bold"
+                      />
+                      <select
+                        value={newItemUnit}
+                        onChange={(e) => setNewItemUnit(e.target.value)}
+                        className="px-2 py-2 rounded-xl border border-stone-300 text-xs font-bold bg-white"
+                      >
+                        <option value="kg">kg</option>
+                        <option value="L">L</option>
+                        <option value="pcs">pcs</option>
+                        <option value="portions">portions</option>
+                      </select>
+                    </div>
                   </div>
-                </form>
+
+                  <div>
+                    <label className="font-bold text-stone-700 block mb-1">Short Description</label>
+                    <input
+                      type="text"
+                      value={newItemDesc}
+                      onChange={(e) => setNewItemDesc(e.target.value)}
+                      placeholder="Brief description..."
+                      className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-stone-100 flex items-center justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateItemModal(false)}
+                  className="px-4 py-2 rounded-xl border border-stone-300 text-xs font-bold text-stone-700 hover:bg-stone-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveCatalogDish}
+                  className="px-5 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 text-white text-xs font-black rounded-xl shadow-xs transition-all"
+                >
+                  + Save Dish to Catalog
+                </button>
               </div>
             </div>
-          )}
-
-        </main>
+          </div>
+        )}
       </div>
     </ModuleAccessGuard>
   );
