@@ -16,7 +16,7 @@ const TENANT_SESSION_COOKIE = "tenant_session";
 
 function isLocalHost(host: string): boolean {
   return (
-    host.startsWith("localhost") ||
+    host.includes("localhost") ||
     host.includes("127.0.0.1") ||
     host.startsWith("0.0.0.0") ||
     host.endsWith(".local")
@@ -32,8 +32,8 @@ function createCleanRedirectUrl(targetPath: string, req: NextRequest, customHost
 
   // If local development on localhost, keep localhost URL and port
   if (isLocalHost(host)) {
-    const port = rawPort || "3000";
-    return new URL(`http://localhost:${port}${targetPath}`);
+    const port = rawPort ? `:${rawPort}` : ":3000";
+    return new URL(`http://${host}${port}${targetPath}`);
   }
 
   let effectiveHost = customHost;
@@ -64,7 +64,10 @@ export async function proxy(req: NextRequest) {
     path.startsWith("/static") ||
     path.startsWith("/images") ||
     path.startsWith("/uploads") ||
-    path === "/favicon.ico"
+    path === "/favicon.ico" ||
+    path === "/robots.txt" ||
+    path === "/sitemap.xml" ||
+    /\.(png|jpg|jpeg|gif|svg|ico|webp|avif|woff2?|ttf|eot|txt|xml|json)$/i.test(path)
   ) {
     return NextResponse.next();
   }

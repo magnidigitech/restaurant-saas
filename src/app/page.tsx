@@ -95,6 +95,8 @@ export default function RestoBirdLandingPage() {
               <img
                 src="/resto-bird-logo.png"
                 alt="Resto Bird"
+                width={180}
+                height={36}
                 className="h-8 sm:h-9 w-auto object-contain group-hover:opacity-90 transition-opacity"
               />
             </Link>
