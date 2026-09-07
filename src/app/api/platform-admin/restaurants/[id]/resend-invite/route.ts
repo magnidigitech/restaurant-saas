@@ -3,6 +3,7 @@ import { prisma } from "@/core/database/client";
 import { getPlatformSession } from "@/core/auth/session";
 import { v4 as uuidv4 } from "uuid";
 import { createHash } from "node:crypto";
+import { sendTenantActivationEmail } from "@/core/mail";
 
 // POST /api/platform-admin/restaurants/[id]/resend-invite
 // Generates a fresh invitation token and returns the full activation URL
@@ -63,10 +64,25 @@ export async function POST(
       },
     });
 
+    // Trigger branded tenant activation email
+    const recipientEmail = restaurant.invitations[0].email;
+    const emailResult = await sendTenantActivationEmail({
+      adminName: restaurant.name + " Administrator",
+      adminEmail: recipientEmail,
+      restaurantName: restaurant.name,
+      subdomain: restaurant.subdomain,
+      activationToken: newToken,
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
+    }).catch((err) => {
+      console.warn("Failed to resend tenant activation email:", err);
+      return { success: false, error: err.message };
+    });
+
     return NextResponse.json({
       success: true,
       token: newToken,
       subdomain: restaurant.subdomain,
+      emailSent: emailResult?.success ?? false,
     });
   } catch (error: any) {
     console.error("Resend Invite Error:", error);

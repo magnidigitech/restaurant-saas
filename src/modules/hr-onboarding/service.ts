@@ -15,6 +15,52 @@ export const HROnboardingService = {
     });
   },
 
+  async getOrCreateDefaultTemplate(restaurantId: string) {
+    let template = await prisma.onboardingTemplate.findFirst({
+      where: { restaurantId, isDefault: true, archivedAt: null },
+    });
+    if (!template) {
+      template = await prisma.onboardingTemplate.findFirst({
+        where: { restaurantId, archivedAt: null },
+      });
+    }
+    if (!template) {
+      template = await HROnboardingService.createTemplate(restaurantId, {
+        name: "General Staff Onboarding",
+        description: "Standard onboarding checklist for new restaurant hires",
+        isDefault: true,
+        tasks: [
+          {
+            title: "Personal & Contact Verification",
+            description: "Verify full legal name, phone number, address, and emergency contact details.",
+            isRequired: true,
+            taskType: "FORM_INPUT",
+          },
+          {
+            title: "Government ID Proof Upload",
+            description: "Upload copy of Aadhaar Card, PAN Card, or Passport.",
+            isRequired: true,
+            requiresDoc: true,
+            taskType: "DOCUMENT",
+          },
+          {
+            title: "Bank Account Details for Payroll",
+            description: "Provide bank account number and IFSC code for salary disbursement.",
+            isRequired: true,
+            taskType: "FORM_INPUT",
+          },
+          {
+            title: "Kitchen Hygiene & Food Safety Code",
+            description: "Acknowledge and agree to restaurant food safety and hygiene protocols.",
+            isRequired: true,
+            taskType: "CHECKBOX",
+          },
+        ],
+      });
+    }
+    return template;
+  },
+
   async getTemplateById(restaurantId: string, id: string) {
     const template = await prisma.onboardingTemplate.findFirst({
       where: { id, restaurantId },

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/core/database/client";
 import { getTenantSession } from "@/core/auth/session";
 import { verifyAccess } from "@/core/permissions/check";
 import { HROnboardingService } from "@/modules/hr-onboarding/service";
+import { sendEmployeeOnboardingEmail } from "@/core/mail";
 import { z } from "zod";
 
 const startSchema = z.object({
@@ -44,7 +46,44 @@ export async function POST(req: NextRequest) {
       result.data.employeeId,
       result.data.templateId
     );
-    return NextResponse.json({ success: true, onboarding });
+
+    // Trigger branded employee onboarding email
+    const employee = await prisma.employee.findUnique({
+      where: { id: result.data.employeeId },
+      include: {
+        employmentRecords: {
+          where: { status: "ACTIVE" },
+          include: { department: true, designation: true },
+          take: 1,
+        },
+      },
+    });
+
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: session.activeRestaurantId },
+      include: { branding: true },
+    });
+
+    let emailSent = false;
+    if (employee?.personalEmail) {
+      const activeRecord = employee.employmentRecords[0];
+      const emailResult = await sendEmployeeOnboardingEmail({
+        employeeName: `${employee.firstName} ${employee.lastName}`.trim(),
+        employeeCode: employee.employeeCode,
+        personalEmail: employee.personalEmail,
+        restaurantName: restaurant?.name || "Our Restaurant",
+        department: activeRecord?.department?.name,
+        designation: activeRecord?.designation?.name,
+        accessToken: onboarding.accessToken,
+        branding: restaurant?.branding,
+      }).catch((err) => {
+        console.warn("Failed to dispatch onboarding email:", err);
+        return { success: false };
+      });
+      emailSent = emailResult?.success ?? false;
+    }
+
+    return NextResponse.json({ success: true, onboarding, emailSent });
   } catch (error: any) {
     console.error("POST Session Error:", error);
     return NextResponse.json({ error: error.message || "Internal server error" }, { status: 400 });

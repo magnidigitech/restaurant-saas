@@ -28,7 +28,7 @@ function createCleanRedirectUrl(targetPath: string, req: NextRequest, customHost
   const host = rawHost.split(",")[0].trim().split(":")[0].toLowerCase();
   const rawPort = rawHost.includes(":") ? rawHost.split(":")[1] : "";
 
-  const baseDomain = (process.env.ROOT_DOMAIN || "restiq.magnidigitech.com").toLowerCase();
+  const baseDomain = (process.env.ROOT_DOMAIN || "restobird.com").toLowerCase();
 
   // If local development on localhost, keep localhost URL and port
   if (isLocalHost(host)) {
@@ -74,7 +74,7 @@ export async function proxy(req: NextRequest) {
   const host = rawHost.split(",")[0].trim();
   const domain = host.split(":")[0].toLowerCase();
 
-  const baseDomain = (process.env.ROOT_DOMAIN || "restiq.magnidigitech.com").toLowerCase();
+  const baseDomain = (process.env.ROOT_DOMAIN || "restobird.com").toLowerCase();
 
   let subdomain = "";
 
@@ -180,7 +180,7 @@ export async function proxy(req: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  // 6. Check for Subdomain-based Restaurant Scope (e.g. bahubali.restiq.magnidigitech.com)
+  // 6. Check for Subdomain-based Restaurant Scope (e.g. bahubali.restobird.com)
   if (subdomain && subdomain !== "www") {
     if (path.startsWith("/api")) {
       if (path.startsWith("/api/restaurant")) {
@@ -230,6 +230,6 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // 8. Root Domain Landing Page (restiq.magnidigitech.com)
+  // 8. Root Domain Landing Page (restobird.com)
   return NextResponse.next();
 }

@@ -74,7 +74,7 @@ const STEPS: Step[] = [
     color: "text-emerald-800",
     bgLight: "bg-emerald-50",
     borderColor: "border-emerald-200",
-    summary: "Behind the scenes, RestIQ's Bill of Materials engine automatically burns raw inventory: Aged Basmati Rice (-500g), Chicken (-440g), Desi Ghee (-60ml), and Curd (-400g).",
+    summary: "Behind the scenes, Resto Bird's Bill of Materials engine automatically burns raw inventory: Aged Basmati Rice (-500g), Chicken (-440g), Desi Ghee (-60ml), and Curd (-400g).",
     technicalDetails: {
       event: "INVENTORY_DEPLETED",
       payload: "Basmati: -0.50kg • Chicken: -0.44kg • Ghee: -0.06L • Curd: -0.40kg • Mint: -0.04kg",
@@ -114,7 +114,7 @@ const STEPS: Step[] = [
     color: "text-stone-900",
     bgLight: "bg-stone-100",
     borderColor: "border-stone-300",
-    summary: "The transaction is instantly booked to the Bahubali owner's live P&L dashboard. Revenue ($58.00) minus Recipe COGS ($16.90) and Labor ($12.50) yields a Net Contribution Margin of $28.60 (49.3%).",
+    summary: "The transaction is instantly booked to the Resto Bird owner's live P&L dashboard. Revenue ($58.00) minus Recipe COGS ($16.90) and Labor ($12.50) yields a Net Contribution Margin of $28.60 (49.3%).",
     technicalDetails: {
       event: "LEDGER_ENTRY_COMMITTED",
       payload: "Gross Revenue: +$58.00 • Recipe COGS: -$16.90 • Labor Cost: -$12.50 • Net Margin: 49.3%",
@@ -151,7 +151,7 @@ export default function OrderJourneySimulator() {
             <span>End-to-End Operational Pipeline</span>
           </div>
           <h2 className="text-4xl sm:text-5xl font-black text-[#1a120b] tracking-tight">
-            How RestIQ Unifies Restaurant Operations
+            How Resto Bird Unifies Restaurant Operations
           </h2>
           <p className="text-stone-600 text-base leading-relaxed">
             Follow a single table order from the moment it is punched at the POS to the exact second raw ingredients are burned, tips are allocated, and ledger margins are booked.
@@ -233,7 +233,7 @@ export default function OrderJourneySimulator() {
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="text-emerald-400 font-bold">{activeStep.technicalDetails.event}</span>
                 </span>
-                <span className="text-[10px] text-amber-400 font-sans">RestIQ Telemetry Pipeline</span>
+                <span className="text-[10px] text-amber-400 font-sans">Resto Bird Telemetry Pipeline</span>
               </div>
               <div>
                 <span className="text-stone-400 block text-[10px] uppercase">Payload Data:</span>
@@ -267,7 +267,7 @@ export default function OrderJourneySimulator() {
                     <div className="w-3 h-3 rounded-full bg-amber-500" />
                     <div className="w-3 h-3 rounded-full bg-emerald-600" />
                     <span className="text-xs font-semibold text-stone-600 pl-2">
-                      Live Telemetry &bull; bahubali outlet
+                      Live Telemetry &bull; resto bird outlet
                     </span>
                   </div>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold border border-amber-200">

@@ -102,12 +102,12 @@ export default function ModuleDetailModal({ module, onClose }: ModuleDetailModal
             </div>
           </div>
 
-          {/* Before vs With RestIQ Comparison */}
+          {/* Before vs With Resto Bird Comparison */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-4 bg-orange-50/70 rounded-2xl border border-orange-200 space-y-1.5">
               <span className="text-xs font-bold text-orange-800 uppercase tracking-wider flex items-center space-x-1">
                 <span>✕</span>
-                <span>Without RestIQ</span>
+                <span>Without Resto Bird</span>
               </span>
               <p className="text-xs text-orange-950 leading-relaxed">
                 {module.beforeRestIQ}
@@ -117,7 +117,7 @@ export default function ModuleDetailModal({ module, onClose }: ModuleDetailModal
             <div className="p-4 bg-emerald-50/70 rounded-2xl border border-emerald-200 space-y-1.5">
               <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center space-x-1">
                 <span>✓</span>
-                <span>With RestIQ</span>
+                <span>With Resto Bird</span>
               </span>
               <p className="text-xs text-emerald-950 leading-relaxed">
                 {module.withRestIQ}
@@ -138,7 +138,7 @@ export default function ModuleDetailModal({ module, onClose }: ModuleDetailModal
           {/* Feature Highlights */}
           <div className="space-y-2">
             <span className="text-xs font-bold uppercase tracking-wider text-stone-500 block">
-              Native Capabilities in Bahubali Workspace
+              Native Capabilities in Resto Bird Workspace
             </span>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {module.highlights.map((h, i) => (
@@ -157,7 +157,7 @@ export default function ModuleDetailModal({ module, onClose }: ModuleDetailModal
         {/* Footer Actions */}
         <div className="p-6 bg-[#FAF6F0] border-t border-[#E8DFC8] flex flex-col sm:flex-row justify-between items-center gap-3">
           <span className="text-xs text-stone-500">
-            Active in Bahubali Restaurant space.
+            Active in Resto Bird Restaurant space.
           </span>
           <div className="flex items-center space-x-3 w-full sm:w-auto">
             <button
@@ -170,7 +170,7 @@ export default function ModuleDetailModal({ module, onClose }: ModuleDetailModal
               href={module.demoUrl}
               className="px-6 py-2.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 transition-all shadow-sm flex items-center justify-center space-x-1.5"
             >
-              <span>Open Module in Bahubali</span>
+              <span>Open Module in Resto Bird</span>
               <span>&rarr;</span>
             </Link>
           </div>

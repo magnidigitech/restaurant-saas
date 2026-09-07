@@ -100,13 +100,13 @@ export default function LiveDishDepletionDemo() {
       <div className="text-center max-w-3xl mx-auto space-y-4">
         <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold">
           <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
-          <span>Bahubali Recipe Engine &bull; Automatic Stock Depletion</span>
+          <span>Resto Bird Recipe Engine &bull; Automatic Stock Depletion</span>
         </div>
         <h2 className="text-4xl sm:text-5xl font-black text-[#1a120b] tracking-tight">
           Live POS Recipe Stock Depletion
         </h2>
         <p className="text-stone-600 text-base leading-relaxed">
-          Select signature dishes from our Bahubali menu catalog. Watch how RestIQ automatically burns raw ingredients from central inventory stores whenever a POS ticket is billed.
+          Select signature dishes from our menu catalog. Watch how Resto Bird automatically burns raw ingredients from central inventory stores whenever a POS ticket is billed.
         </p>
       </div>
 
@@ -292,7 +292,7 @@ export default function LiveDishDepletionDemo() {
                 </div>
                 <div className="flex justify-between text-[10px] text-stone-500 font-mono">
                   <span>Industry Par: 60%</span>
-                  <span className="text-emerald-400 font-bold">Bahubali Realized: {marginPercent}%</span>
+                  <span className="text-emerald-400 font-bold">Resto Bird Realized: {marginPercent}%</span>
                 </div>
               </div>
 
@@ -305,7 +305,7 @@ export default function LiveDishDepletionDemo() {
                   <span>Automated Purchase Order Pipeline</span>
                 </div>
                 <p className="text-stone-300 text-[11px] leading-relaxed">
-                  When raw Basmati Rice or Dairy Paneer crosses safe minimum reorder levels, RestIQ automatically writes a supplier PO into <strong className="text-amber-300">Purchase Management</strong> for 1-click WhatsApp or email dispatch.
+                  When raw Basmati Rice or Dairy Paneer crosses safe minimum reorder levels, Resto Bird automatically writes a supplier PO into <strong className="text-amber-300">Purchase Management</strong> for 1-click WhatsApp or email dispatch.
                 </p>
               </div>
             </div>

@@ -8,8 +8,8 @@ services:
     restart: always
     environment:
       - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/restaurant_saas?schema=public
-      - ROOT_DOMAIN=${ROOT_DOMAIN:-restiq.magnidigitech.com}
-      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-https://restiq.magnidigitech.com}
+      - ROOT_DOMAIN=${ROOT_DOMAIN:-restobird.com}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-https://restobird.com}
       - JWT_SECRET=${JWT_SECRET:-super-secret-jwt-token-change-in-coolify}
       - PORT=3000
     ports:

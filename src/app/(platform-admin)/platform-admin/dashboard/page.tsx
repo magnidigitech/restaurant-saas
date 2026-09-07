@@ -655,7 +655,7 @@ export default function ApplePlatformAdminDashboard() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className={`text-sm font-semibold tracking-tight ${isDark ? "text-white" : "text-[#1D1D1F]"}`}>
-                  Bahubali Platforms
+                  Resto Bird Platform
                 </h1>
                 <span
                   className={`text-[10px] font-medium tracking-wide uppercase px-2 py-0.5 rounded-full border ${

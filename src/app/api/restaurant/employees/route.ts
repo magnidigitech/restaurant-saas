@@ -3,6 +3,8 @@ import { prisma } from "@/core/database/client";
 import { getTenantSession } from "@/core/auth/session";
 import { verifyAccess } from "@/core/permissions/check";
 import { z } from "zod";
+import { sendEmployeeOnboardingEmail } from "@/core/mail";
+import { HROnboardingService } from "@/modules/hr-onboarding/service";
 
 const createEmployeeSchema = z.object({
   firstName: z.string().min(1),
@@ -228,7 +230,61 @@ export async function POST(req: NextRequest) {
       return employee;
     });
 
-    return NextResponse.json({ success: true, employee: newEmployee });
+    // 7. If personalEmail is provided, initiate onboarding session and trigger branded email
+    let emailSent = false;
+    let onboardingToken: string | undefined = undefined;
+
+    if (newEmployee.personalEmail) {
+      try {
+        const template = await HROnboardingService.getOrCreateDefaultTemplate(restaurantId);
+        if (template) {
+          const session = await HROnboardingService.startOnboarding(
+            restaurantId,
+            newEmployee.id,
+            template.id
+          );
+          onboardingToken = session.accessToken;
+
+          const restaurant = await prisma.restaurant.findUnique({
+            where: { id: restaurantId },
+            include: { branding: true },
+          });
+
+          let departmentName: string | null = null;
+          let designationName: string | null = null;
+          if (data.departmentId) {
+            const dept = await prisma.department.findUnique({ where: { id: data.departmentId } });
+            departmentName = dept?.name || null;
+          }
+          if (data.designationId) {
+            const desig = await prisma.designation.findUnique({ where: { id: data.designationId } });
+            designationName = desig?.name || null;
+          }
+
+          const emailResult = await sendEmployeeOnboardingEmail({
+            employeeName: `${newEmployee.firstName} ${newEmployee.lastName}`.trim(),
+            employeeCode: newEmployee.employeeCode,
+            personalEmail: newEmployee.personalEmail,
+            restaurantName: restaurant?.name || "Our Restaurant",
+            department: departmentName,
+            designation: designationName,
+            accessToken: session.accessToken,
+            branding: restaurant?.branding,
+          });
+
+          emailSent = emailResult.success;
+        }
+      } catch (err: any) {
+        console.warn("Failed to initiate onboarding or dispatch onboarding email:", err);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      employee: newEmployee,
+      emailSent,
+      onboardingToken,
+    });
   } catch (error: any) {
     console.error("Create Employee Error:", error);
     return NextResponse.json({ error: error.message || "Internal server error" }, { status: 400 });
