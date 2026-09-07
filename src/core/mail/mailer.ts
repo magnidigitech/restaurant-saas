@@ -32,13 +32,13 @@ export function getAppBaseUrl(): string {
  * Create or reuse nodemailer transport
  */
 function createMailerTransport() {
-  const host = process.env.SMTP_HOST;
-  const port = parseInt(process.env.SMTP_PORT || "587", 10);
-  const user = process.env.SMTP_USER;
+  const host = process.env.SMTP_HOST || "mail.restobird.com";
+  const port = parseInt(process.env.SMTP_PORT || "465", 10);
+  const user = process.env.SMTP_USER || "info@restobird.com";
   const pass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
-  const secure = process.env.SMTP_SECURE === "true" || port === 465;
+  const secure = process.env.SMTP_SECURE !== undefined ? process.env.SMTP_SECURE === "true" : port === 465;
 
-  if (!host || !user) {
+  if (!host || !user || !pass) {
     return null;
   }
 
@@ -50,6 +50,9 @@ function createMailerTransport() {
       user,
       pass,
     },
+    tls: {
+      rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED === "true",
+    },
   });
 }
 
@@ -60,7 +63,7 @@ export async function sendMail(options: MailOptions): Promise<SendMailResult> {
   const from =
     options.from ||
     process.env.SMTP_FROM ||
-    `"Bahubali Restaurant Suite" <noreply@${process.env.EMAIL_DOMAIN || "bahubali.com"}>`;
+    '"Resto Bird" <info@restobird.com>';
 
   const transport = createMailerTransport();
 

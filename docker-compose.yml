@@ -11,6 +11,13 @@ services:
       - ROOT_DOMAIN=${ROOT_DOMAIN:-restobird.com}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-https://restobird.com}
       - JWT_SECRET=${JWT_SECRET:-super-secret-jwt-token-change-in-coolify}
+      - SMTP_HOST=${SMTP_HOST:-mail.restobird.com}
+      - SMTP_PORT=${SMTP_PORT:-465}
+      - SMTP_SECURE=${SMTP_SECURE:-true}
+      - SMTP_USER=${SMTP_USER:-info@restobird.com}
+      - SMTP_PASS=${SMTP_PASS:-Resto@3939}
+      - SMTP_FROM=${SMTP_FROM:-"Resto Bird" <info@restobird.com>}
+      - SMTP_REJECT_UNAUTHORIZED=${SMTP_REJECT_UNAUTHORIZED:-false}
       - PORT=3000
     ports:
       - "3000:3000"
