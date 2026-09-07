@@ -60,10 +60,8 @@ function createMailerTransport() {
  * Send an email via SMTP or output to terminal if SMTP is unconfigured in development
  */
 export async function sendMail(options: MailOptions): Promise<SendMailResult> {
-  const from =
-    options.from ||
-    process.env.SMTP_FROM ||
-    '"Resto Bird" <info@restobird.com>';
+  const rawFrom = options.from || process.env.SMTP_FROM || "info@restobird.com";
+  const from = rawFrom.includes("<") ? rawFrom : `"Resto Bird" <${rawFrom}>`;
 
   const transport = createMailerTransport();
 

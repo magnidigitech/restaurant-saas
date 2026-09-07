@@ -16,7 +16,7 @@ services:
       - SMTP_SECURE=${SMTP_SECURE:-true}
       - SMTP_USER=${SMTP_USER:-info@restobird.com}
       - SMTP_PASS=${SMTP_PASS:-Resto@3939}
-      - SMTP_FROM=${SMTP_FROM:-"Resto Bird" <info@restobird.com>}
+      - SMTP_FROM=${SMTP_FROM:-info@restobird.com}
       - SMTP_REJECT_UNAUTHORIZED=${SMTP_REJECT_UNAUTHORIZED:-false}
       - PORT=3000
     ports:
