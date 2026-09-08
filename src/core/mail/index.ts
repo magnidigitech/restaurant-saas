@@ -2,8 +2,10 @@ import { sendMail } from "./mailer";
 import {
   generateTenantActivationEmail,
   generateEmployeeOnboardingEmail,
+  generateStaffAccessEmail,
   TenantActivationEmailParams,
   EmployeeOnboardingEmailParams,
+  StaffAccessEmailParams,
 } from "./templates";
 
 export * from "./mailer";
@@ -32,6 +34,22 @@ export async function sendEmployeeOnboardingEmail(params: EmployeeOnboardingEmai
   const { subject, html, text } = generateEmployeeOnboardingEmail(params);
   return sendMail({
     to: params.personalEmail,
+    subject,
+    html,
+    text,
+  });
+}
+
+/**
+ * High-level helper: Send Staff Access & Set Password Email
+ */
+export async function sendStaffAccessEmail(params: StaffAccessEmailParams) {
+  if (!params.recipientEmail) {
+    return { success: false, error: "No recipient email provided" };
+  }
+  const { subject, html, text } = generateStaffAccessEmail(params);
+  return sendMail({
+    to: params.recipientEmail,
     subject,
     html,
     text,

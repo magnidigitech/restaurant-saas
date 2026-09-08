@@ -35,16 +35,20 @@ export default function InternalUsersPage({
 
   const [memberships, setMemberships] = useState<any[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [outlets, setOutlets] = useState<Outlet[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [createdInviteUrl, setCreatedInviteUrl] = useState("");
+  const [createdEmailSent, setCreatedEmailSent] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -72,6 +76,7 @@ export default function InternalUsersPage({
       if (resUsers.ok) {
         setMemberships(dataUsers.memberships || []);
         setPendingInvitations(dataUsers.pendingInvitations || []);
+        if (dataUsers.currentUserId) setCurrentUserId(dataUsers.currentUserId);
       }
       if (resEmps.ok) setEmployees(dataEmps.employees || []);
       if (resRoles.ok) setRoles(dataRoles.roles || []);
@@ -100,6 +105,7 @@ export default function InternalUsersPage({
     e.preventDefault();
     setSaving(true);
     setError("");
+    setSuccessMsg("");
     setCreatedInviteUrl("");
 
     try {
@@ -116,12 +122,82 @@ export default function InternalUsersPage({
       const host = window.location.host;
       const url = `${protocol}//${host}/restaurant/${subdomain}/activate?token=${data.inviteToken}`;
       setCreatedInviteUrl(url);
+      setCreatedEmailSent(!!data.emailSent);
+
+      if (data.emailSent) {
+        setSuccessMsg(`Invitation created & user access email sent to ${formData.email}`);
+      } else {
+        setSuccessMsg("Invitation created. Copy the link below to share with staff.");
+      }
 
       fetchData();
     } catch (err: any) {
       setError(err.message || "Error creating invitation");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCancelInvitation = async (invitationId: string) => {
+    setActionLoadingId(`cancel-${invitationId}`);
+    setError("");
+    try {
+      const res = await fetch(`/api/restaurant/users?invitationId=${invitationId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to cancel invitation");
+      setSuccessMsg("Staff invitation cancelled successfully");
+      fetchData();
+    } catch (err: any) {
+      setError(err.message || "Failed to cancel invitation");
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleResendInvite = async (invitationId: string, email: string) => {
+    setActionLoadingId(`resend-${invitationId}`);
+    setError("");
+    try {
+      const res = await fetch("/api/restaurant/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invitationId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to resend invitation email");
+      setSuccessMsg(`Access invitation email resent to ${email}`);
+      fetchData();
+    } catch (err: any) {
+      setError(err.message || "Failed to resend invitation email");
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleRemoveMembership = async (membershipId: string, email: string) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to remove user access for ${email}? They will no longer be able to log in to this restaurant.`
+      )
+    ) {
+      return;
+    }
+    setActionLoadingId(`remove-${membershipId}`);
+    setError("");
+    try {
+      const res = await fetch(`/api/restaurant/users?membershipId=${membershipId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to remove user membership");
+      setSuccessMsg(`User access removed for ${email}`);
+      fetchData();
+    } catch (err: any) {
+      setError(err.message || "Failed to remove user membership");
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
@@ -200,9 +276,30 @@ export default function InternalUsersPage({
           </button>
         </div>
 
+        {successMsg && (
+          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-2xl flex items-center justify-between animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <span className="font-bold">✓</span>
+              <span>{successMsg}</span>
+            </div>
+            <button
+              onClick={() => setSuccessMsg("")}
+              className="text-emerald-400/70 hover:text-emerald-300 font-bold ml-4 cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {error && (
-          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl">
-            {error}
+          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl flex items-center justify-between">
+            <span>{error}</span>
+            <button
+              onClick={() => setError("")}
+              className="text-rose-500/70 hover:text-rose-400 font-bold ml-4 cursor-pointer"
+            >
+              ✕
+            </button>
           </div>
         )}
 
@@ -233,6 +330,7 @@ export default function InternalUsersPage({
                     <th className="pb-3 px-3">Linked Staff Profile</th>
                     <th className="pb-3 px-3">Member Since</th>
                     <th className="pb-3 px-3">Status</th>
+                    <th className="pb-3 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
@@ -245,12 +343,31 @@ export default function InternalUsersPage({
                         {m.employee ? `${m.employee.firstName} ${m.employee.lastName} (${m.employee.employeeCode})` : "Unlinked Account"}
                       </td>
                       <td className={`py-3.5 px-3 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                        {new Date(m.createdAt).toLocaleDateString()}
+                        {m.joinedAt
+                          ? new Date(m.joinedAt).toLocaleDateString()
+                          : m.createdAt
+                          ? new Date(m.createdAt).toLocaleDateString()
+                          : "Active"}
                       </td>
                       <td className="py-3.5 px-3">
                         <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
                           Active
                         </span>
+                      </td>
+                      <td className="py-3.5 px-3 text-right">
+                        {m.user.id === currentUserId ? (
+                          <span className={`text-[11px] font-medium italic ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                            You
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleRemoveMembership(m.id, m.user.email)}
+                            disabled={actionLoadingId === `remove-${m.id}`}
+                            className="px-2.5 py-1 text-[11px] font-medium rounded-lg text-rose-500 hover:text-rose-600 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition cursor-pointer disabled:opacity-50"
+                          >
+                            {actionLoadingId === `remove-${m.id}` ? "Removing..." : "Remove Access"}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -285,6 +402,7 @@ export default function InternalUsersPage({
                     <th className="pb-3 px-3">Role Assigned</th>
                     <th className="pb-3 px-3">Branch Outlet</th>
                     <th className="pb-3 px-3">Expires</th>
+                    <th className="pb-3 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
@@ -301,6 +419,30 @@ export default function InternalUsersPage({
                       </td>
                       <td className={`py-3.5 px-3 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
                         {new Date(inv.expiresAt).toLocaleDateString()}
+                      </td>
+                      <td className="py-3.5 px-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleResendInvite(inv.id, inv.email)}
+                            disabled={actionLoadingId === `resend-${inv.id}`}
+                            title="Resend access invitation email"
+                            className={`px-2.5 py-1 text-[11px] font-medium rounded-lg border transition cursor-pointer disabled:opacity-50 ${
+                              isDark
+                                ? "bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border-white/[0.08]"
+                                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+                            }`}
+                          >
+                            {actionLoadingId === `resend-${inv.id}` ? "Sending..." : "Resend Email"}
+                          </button>
+                          <button
+                            onClick={() => handleCancelInvitation(inv.id)}
+                            disabled={actionLoadingId === `cancel-${inv.id}`}
+                            title="Cancel invitation and free up user slot"
+                            className="px-2.5 py-1 text-[11px] font-medium rounded-lg text-rose-500 hover:text-rose-600 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition cursor-pointer disabled:opacity-50"
+                          >
+                            {actionLoadingId === `cancel-${inv.id}` ? "Cancelling..." : "Cancel"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -341,8 +483,15 @@ export default function InternalUsersPage({
             {createdInviteUrl ? (
               <div className="space-y-4 pt-2">
                 <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-2xl space-y-2">
-                  <p className="font-semibold">Staff Invitation Generated!</p>
-                  <p className="opacity-90">Share this activation link with the staff member to let them set up their account password.</p>
+                  <p className="font-semibold flex items-center gap-1.5">
+                    <span>{createdEmailSent ? "✉️" : "✓"}</span>
+                    <span>{createdEmailSent ? "Access Email Delivered to Staff Member!" : "Staff Invitation Generated!"}</span>
+                  </p>
+                  <p className="opacity-90 leading-relaxed">
+                    {createdEmailSent
+                      ? `A clean, professional access invitation email has been sent to ${formData.email} to set up their password. You can also copy the direct activation link below:`
+                      : "Share this activation link with the staff member to let them set up their account password."}
+                  </p>
                 </div>
 
                 <div className="space-y-1.5">
