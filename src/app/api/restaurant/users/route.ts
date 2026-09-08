@@ -121,6 +121,11 @@ export async function POST(req: NextRequest) {
     // 2. Verify target role belongs to restaurant or is platform default
     const role = await prisma.role.findFirst({
       where: { id: data.roleId, restaurantId },
+      include: {
+        permissions: {
+          include: { permission: true },
+        },
+      },
     });
     if (!role) {
       return NextResponse.json({ error: "Role not found or access denied" }, { status: 404 });
@@ -247,6 +252,8 @@ export async function POST(req: NextRequest) {
         restaurantName: restaurant.name,
         subdomain: restaurant.subdomain,
         roleName: role.name,
+        roleDescription: role.description,
+        permissions: role.permissions?.map((p) => p.permissionId) || [],
         outletName: outlet?.name || null,
         activationToken: transaction.inviteToken,
         expiresAt: transaction.invitation.expiresAt,
@@ -423,7 +430,13 @@ export async function PATCH(req: NextRequest) {
       where: { id: invitationId, restaurantId, status: "SENT" },
       include: {
         restaurant: true,
-        role: true,
+        role: {
+          include: {
+            permissions: {
+              include: { permission: true },
+            },
+          },
+        },
         outlet: true,
       },
     });
@@ -458,6 +471,8 @@ export async function PATCH(req: NextRequest) {
       restaurantName: invitation.restaurant.name,
       subdomain: invitation.restaurant.subdomain,
       roleName: invitation.role.name,
+      roleDescription: invitation.role.description,
+      permissions: invitation.role.permissions?.map((p) => p.permissionId) || [],
       outletName: invitation.outlet?.name || null,
       activationToken: newToken,
       expiresAt,

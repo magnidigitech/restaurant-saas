@@ -510,10 +510,212 @@ export interface StaffAccessEmailParams {
   restaurantName: string;
   subdomain: string;
   roleName: string;
+  roleDescription?: string | null;
+  permissions?: string[];
   outletName?: string | null;
   activationToken: string;
   expiresAt?: Date;
   baseUrl?: string;
+}
+
+export interface RoleCapabilityItem {
+  title: string;
+  description: string;
+}
+
+export function resolveRoleCapabilities(
+  roleName: string,
+  permissions?: string[],
+  roleDescription?: string | null
+): RoleCapabilityItem[] {
+  const items: RoleCapabilityItem[] = [];
+
+  // Step 1: Password setup is universally required for account activation
+  items.push({
+    title: "Define Secure Password",
+    description: "Establish your private master password to activate your personal credentials.",
+  });
+
+  const rName = (roleName || "").toLowerCase();
+  const perms = new Set((permissions || []).map((p) => p.toLowerCase()));
+
+  // Role categorization flags
+  const isExecutive =
+    rName.includes("owner") ||
+    rName.includes("admin") ||
+    rName.includes("general manager") ||
+    rName.includes("director") ||
+    perms.has("platform:admin");
+
+  const isKitchen =
+    rName.includes("chef") ||
+    rName.includes("cook") ||
+    rName.includes("kitchen") ||
+    rName.includes("culinary") ||
+    rName.includes("boh") ||
+    rName.includes("prep") ||
+    perms.has("catering:view") ||
+    perms.has("catering:manage_orders");
+
+  const isFrontOfHouse =
+    rName.includes("cashier") ||
+    rName.includes("server") ||
+    rName.includes("waiter") ||
+    rName.includes("waitress") ||
+    rName.includes("bartender") ||
+    rName.includes("foh") ||
+    rName.includes("front") ||
+    rName.includes("host") ||
+    perms.has("pos:view") ||
+    perms.has("pos:manage_orders") ||
+    perms.has("pos:create_order");
+
+  const isInventoryLead =
+    rName.includes("inventory") ||
+    rName.includes("store") ||
+    rName.includes("procurement") ||
+    rName.includes("supply") ||
+    rName.includes("stock") ||
+    rName.includes("warehouse") ||
+    perms.has("inventory:view") ||
+    perms.has("inventory:manage") ||
+    perms.has("inventory:create_item");
+
+  const isAccountant =
+    rName.includes("account") ||
+    rName.includes("finan") ||
+    rName.includes("controller") ||
+    rName.includes("tax") ||
+    rName.includes("audit") ||
+    rName.includes("billing") ||
+    rName.includes("payroll") ||
+    perms.has("finance:view") ||
+    perms.has("finance:manage") ||
+    perms.has("payroll:view");
+
+  const isShiftManager =
+    rName.includes("shift") ||
+    rName.includes("roster") ||
+    rName.includes("supervisor") ||
+    rName.includes("floor lead") ||
+    perms.has("shifts:manage_roster") ||
+    perms.has("shifts:approve_swap");
+
+  const isHR =
+    rName.includes("hr") ||
+    rName.includes("human resources") ||
+    rName.includes("people") ||
+    rName.includes("recruiter") ||
+    perms.has("hr:view_employees") ||
+    perms.has("hr:manage_onboarding");
+
+  if (isExecutive) {
+    items.push({
+      title: "Comprehensive Workspace Oversight",
+      description: "Administer restaurant configuration, branch outlets, user access, and operational standards.",
+    });
+    items.push({
+      title: "Executive Intelligence & Controls",
+      description: "Monitor real-time sales telemetry, operational costs, labor margins, and business performance.",
+    });
+  } else if (isKitchen) {
+    items.push({
+      title: "Kitchen Station Operations",
+      description: "Access recipe master manuals, prep checklists, culinary specifications, and production orders.",
+    });
+    items.push({
+      title: "Station Readiness & Coordination",
+      description: "Track live dish prep queues and coordinate recipe execution with dining and dispatch stations.",
+    });
+  } else if (isInventoryLead) {
+    items.push({
+      title: "Inventory & Stock Tracking",
+      description: "Manage stock item masters, track minimum par thresholds, and record stock usage and wastage.",
+    });
+    items.push({
+      title: "Vendor Purchase Orders",
+      description: "Issue supplier purchase orders and verify delivery receipts against item catalogues.",
+    });
+  } else if (isFrontOfHouse) {
+    items.push({
+      title: "Dining & POS Terminal Operations",
+      description: "Process dine-in and takeaway orders, manage table checks, and handle customer billing.",
+    });
+    items.push({
+      title: "Live Order Dispatch",
+      description: "Send orders directly to the kitchen display screen (KDS) and coordinate floor service.",
+    });
+  } else if (isAccountant) {
+    items.push({
+      title: "Financial Ledgers & Invoices",
+      description: "Review accounts payable, monitor upcoming vendor bills, and audit operational revenue logs.",
+    });
+    items.push({
+      title: "Payroll & Compliance Oversight",
+      description: "Access approved payroll cycles, employee pay structures, and compliance summaries.",
+    });
+  } else if (isShiftManager) {
+    items.push({
+      title: "Roster Management & Shift Allocations",
+      description: "Schedule employee shift rosters, publish duty schedules, and review shift swap requests.",
+    });
+    items.push({
+      title: "Live Attendance Monitoring",
+      description: "Review real-time digital punch kiosk records and approve pending staff timesheets.",
+    });
+  } else if (isHR) {
+    items.push({
+      title: "Workforce & Staff Profiles",
+      description: "Access employee directories, review onboarding documents, and maintain personnel compliance.",
+    });
+    items.push({
+      title: "Department Coordination",
+      description: "Manage staff designations, job grades, and outlet assignments.",
+    });
+  } else {
+    // Dynamic fallback matching specific granted permissions or role description
+    if (perms.has("inventory:view") || [...perms].some((p) => p.startsWith("inventory:"))) {
+      items.push({
+        title: "Inventory Management",
+        description: "Access inventory catalogs, stock levels, and supply chain records.",
+      });
+    }
+    if (perms.has("pos:view") || [...perms].some((p) => p.startsWith("pos:"))) {
+      items.push({
+        title: "Point-of-Sale Access",
+        description: "Access order terminals, table management, and payment processing.",
+      });
+    }
+    if (perms.has("shifts:view") || [...perms].some((p) => p.startsWith("shifts:"))) {
+      items.push({
+        title: "Shift Schedules & Rosters",
+        description: "View upcoming shift assignments and coordinate availability.",
+      });
+    }
+    if (perms.has("attendance:punch") || [...perms].some((p) => p.startsWith("attendance:"))) {
+      items.push({
+        title: "Digital Attendance Kiosk",
+        description: "Clock in and out using your assigned credentials and track your timesheets.",
+      });
+    }
+
+    // If still only 1 item (password setup), provide tailored role-specific capability descriptions
+    if (items.length === 1) {
+      const customDesc =
+        roleDescription ||
+        `Access tools, workflows, and modules specifically configured for your ${roleName} profile.`;
+      items.push({
+        title: `${roleName} Operational Access`,
+        description: customDesc,
+      });
+      items.push({
+        title: "Branch Collaboration",
+        description: "Coordinate with supervisors and team members in your assigned branch in real time.",
+      });
+    }
+  }
+
+  return items;
 }
 
 export function generateStaffAccessEmail(params: StaffAccessEmailParams) {
@@ -527,6 +729,8 @@ export function generateStaffAccessEmail(params: StaffAccessEmailParams) {
         day: "numeric",
       })
     : "7 days";
+
+  const capabilities = resolveRoleCapabilities(params.roleName, params.permissions, params.roleDescription);
 
   const subject = `Welcome to ${params.restaurantName} | Set Up Your Account Password`;
 
@@ -569,7 +773,7 @@ export function generateStaffAccessEmail(params: StaffAccessEmailParams) {
             See your restaurant differently
           </p>
           <div style="display: inline-block; margin-top: 16px; padding: 5px 14px; border-radius: 9999px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); color: #60a5fa; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;">
-            TEAM ACCESS INVITATION &bull; ${params.roleName.toUpperCase()}
+            DYNAMIC ROLE ACCESS &bull; ${params.roleName.toUpperCase()}
           </div>
         </td>
       </tr>
@@ -586,7 +790,7 @@ export function generateStaffAccessEmail(params: StaffAccessEmailParams) {
           </p>
 
           <p style="margin: 0 0 24px 0; color: #94a3b8; font-size: 14px; line-height: 1.6;">
-            You have been invited by the management of <strong style="color: #f1f5f9;">${params.restaurantName}</strong> to access their workspace on Resto Bird. Your account has been provisioned with the role of <strong style="color: #f59e0b;">${params.roleName}</strong>. Please set up your password to activate your access.
+            You have been invited by the management of <strong style="color: #f1f5f9;">${params.restaurantName}</strong> to access their workspace on Resto Bird. Your account has been provisioned with the tailored role of <strong style="color: #f59e0b;">${params.roleName}</strong>. Please set up your password to activate your access.
           </p>
 
           <!-- Specifications Card -->
@@ -636,38 +840,28 @@ export function generateStaffAccessEmail(params: StaffAccessEmailParams) {
             </tr>
           </table>
 
-          <!-- Getting Started Checklist -->
+          <!-- Dynamic Role Capabilities Card -->
           <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; background-color: #0d121c; border: 1px solid #1a2233; border-radius: 12px; margin-bottom: 26px;">
             <tr>
               <td style="padding: 20px;">
                 <div style="color: #f8fafc; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px;">
-                  What You Can Do Once Activated
+                  What You Can Do Once Activated (${params.roleName})
                 </div>
                 <table border="0" cellpadding="0" cellspacing="0" style="width: 100%;">
+                  ${capabilities
+                    .map(
+                      (cap, idx) => `
                   <tr>
-                    <td valign="top" style="padding-bottom: 12px; width: 28px;">
-                      <div style="width: 20px; height: 20px; border-radius: 50%; background: #1e293b; color: #f59e0b; text-align: center; font-size: 11px; line-height: 20px; font-weight: 700;">1</div>
+                    <td valign="top" style="padding-bottom: ${idx === capabilities.length - 1 ? "0" : "12px"}; width: 28px;">
+                      <div style="width: 20px; height: 20px; border-radius: 50%; background: #1e293b; color: #f59e0b; text-align: center; font-size: 11px; line-height: 20px; font-weight: 700;">${idx + 1}</div>
                     </td>
-                    <td style="padding-bottom: 12px; color: #94a3b8; font-size: 13px; line-height: 1.5;">
-                      <strong style="color: #f1f5f9;">Create Your Password:</strong> Secure your account with a private password.
+                    <td style="padding-bottom: ${idx === capabilities.length - 1 ? "0" : "12px"}; color: #94a3b8; font-size: 13px; line-height: 1.5;">
+                      <strong style="color: #f1f5f9;">${cap.title}:</strong> ${cap.description}
                     </td>
                   </tr>
-                  <tr>
-                    <td valign="top" style="padding-bottom: 12px; width: 28px;">
-                      <div style="width: 20px; height: 20px; border-radius: 50%; background: #1e293b; color: #f59e0b; text-align: center; font-size: 11px; line-height: 20px; font-weight: 700;">2</div>
-                    </td>
-                    <td style="padding-bottom: 12px; color: #94a3b8; font-size: 13px; line-height: 1.5;">
-                      <strong style="color: #f1f5f9;">View Assigned Shifts &amp; Duties:</strong> Check your roster schedules, digital punch kiosk credentials, and kitchen tasks.
-                    </td>
-                  </tr>
-                  <tr>
-                    <td valign="top" style="width: 28px;">
-                      <div style="width: 20px; height: 20px; border-radius: 50%; background: #1e293b; color: #f59e0b; text-align: center; font-size: 11px; line-height: 20px; font-weight: 700;">3</div>
-                    </td>
-                    <td style="color: #94a3b8; font-size: 13px; line-height: 1.5;">
-                      <strong style="color: #f1f5f9;">Collaborate in Real Time:</strong> Coordinate with floor managers, kitchen prep stations, and inventory dispatchers.
-                    </td>
-                  </tr>
+                  `
+                    )
+                    .join("")}
                 </table>
               </td>
             </tr>
@@ -736,6 +930,10 @@ ACTIVATE YOUR ACCOUNT & SET PASSWORD:
 --------------------------------------------------------------------------------
 Open the following activation link in your browser:
 ${activationUrl}
+
+WHAT YOU CAN DO ONCE ACTIVATED (${params.roleName.toUpperCase()}):
+--------------------------------------------------------------------------------
+${capabilities.map((cap, idx) => `${idx + 1}. ${cap.title}: ${cap.description}`).join("\n")}
 
 SECURITY NOTICE:
 This invitation link is cryptographically signed and expires in 7 days.
