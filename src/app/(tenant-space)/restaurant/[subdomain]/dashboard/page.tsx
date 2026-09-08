@@ -655,6 +655,12 @@ export default function AppleTenantDashboard() {
                   badge: "Security",
                 },
                 {
+                  label: "Security & 2FA",
+                  desc: "Authenticator app, TOTP & backup recovery codes",
+                  path: `/restaurant/${subdomain}/settings/security`,
+                  badge: "MFA",
+                },
+                {
                   label: "Access Grants",
                   desc: "Outlet and module scoped entitlements",
                   path: `/restaurant/${subdomain}/settings/access-grants`,

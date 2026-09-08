@@ -295,6 +295,11 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
       desc: "Branding colors, identity & subscriptions",
       href: `/restaurant/${subdomain}/settings/profile`,
     },
+    {
+      label: "Security & 2FA",
+      desc: "Two-factor authentication & recovery codes",
+      href: `/restaurant/${subdomain}/settings/security`,
+    },
     ...(activeModules === null || activeModules.includes("vault")
       ? [
         {

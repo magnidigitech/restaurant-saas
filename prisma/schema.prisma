@@ -186,8 +186,41 @@ model User {
   vaultItemsCreated        VaultItem[]            @relation("VaultItemAuthor")
   vaultItemSharesReceived  VaultItemShare[]       @relation("VaultShareRecipient")
   vaultAuditLogs           VaultAuditLog[]
+  twoFactorAuth            TwoFactorAuth?
+  recoveryCodes            TwoFactorRecoveryCode[]
 
   @@map("users")
+}
+
+model TwoFactorAuth {
+  id              String                  @id @default(uuid())
+  userId          String                  @unique @map("user_id")
+  enabled         Boolean                 @default(false)
+  secretEncrypted String?                 @map("secret_encrypted")
+  verifiedAt      DateTime?               @map("verified_at")
+  createdAt       DateTime                @default(now()) @map("created_at")
+  updatedAt       DateTime                @updatedAt @map("updated_at")
+
+  user            User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recoveryCodes   TwoFactorRecoveryCode[]
+
+  @@map("two_factor_auth")
+}
+
+model TwoFactorRecoveryCode {
+  id              String         @id @default(uuid())
+  twoFactorAuthId String         @map("two_factor_auth_id")
+  userId          String         @map("user_id")
+  codeHash        String         @map("code_hash")
+  usedAt          DateTime?      @map("used_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  twoFactorAuth   TwoFactorAuth  @relation(fields: [twoFactorAuthId], references: [id], onDelete: Cascade)
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([twoFactorAuthId])
+  @@map("two_factor_recovery_codes")
 }
 
 model RestaurantMembership {

@@ -3,6 +3,7 @@ import { prisma } from "@/core/database/client";
 import { setTenantSession } from "@/core/auth/session";
 import { isRateLimited } from "@/core/auth/rate-limiter";
 import { validateCsrf } from "@/core/auth/csrf";
+import { sign2FAChallenge } from "@/core/auth/two-factor";
 import * as bcrypt from "bcryptjs";
 import { z } from "zod";
 
@@ -78,6 +79,31 @@ export async function POST(req: NextRequest) {
 
     if (!membership || membership.status !== "ACTIVE") {
       return NextResponse.json({ error: "User is not an active member of this restaurant" }, { status: 403 });
+    }
+
+    // Check for Two-Factor Authentication
+    const twoFactor = await prisma.twoFactorAuth.findUnique({
+      where: { userId: user.id },
+    });
+
+    if (twoFactor?.enabled) {
+      const challengeToken = await sign2FAChallenge({
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        restaurantId: restaurant.id,
+        subdomain,
+        tokenVersion: user.tokenVersion,
+      });
+
+      return NextResponse.json({
+        requiresTwoFactor: true,
+        challengeToken,
+        user: {
+          name: user.name,
+          email: user.email,
+        },
+      });
     }
 
     // Save session payload including tokenVersion

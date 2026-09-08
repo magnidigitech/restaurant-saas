@@ -38,6 +38,14 @@ export default function AppleTenantLoginPage() {
   const [error, setError] = useState("");
   const [pageLoading, setPageLoading] = useState(true);
 
+  // 2FA Challenge State
+  const [step, setStep] = useState<"CREDENTIALS" | "2FA">("CREDENTIALS");
+  const [challengeToken, setChallengeToken] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [verifying2fa, setVerifying2fa] = useState(false);
+
   // Theme check from local storage (default: light)
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
@@ -87,6 +95,16 @@ export default function AppleTenantLoginPage() {
         throw new Error(data.error || "Invalid credentials. Please verify your email and password.");
       }
 
+      // Check if account has 2FA enabled
+      if (data.requiresTwoFactor && data.challengeToken) {
+        setChallengeToken(data.challengeToken);
+        setStep("2FA");
+        setOtpCode("");
+        setIsRecoveryMode(false);
+        setRecoveryCode("");
+        return;
+      }
+
       router.push(`/restaurant/${subdomain}/dashboard`);
       router.refresh();
     } catch (err: any) {
@@ -94,6 +112,51 @@ export default function AppleTenantLoginPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handle2FASubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    const codeToVerify = isRecoveryMode ? recoveryCode.trim().toUpperCase() : otpCode.trim();
+    if (!codeToVerify) {
+      setError(isRecoveryMode ? "Please enter your backup recovery code" : "Please enter the 6-digit code");
+      return;
+    }
+
+    setVerifying2fa(true);
+    try {
+      const res = await fetch("/api/restaurant/auth/2fa/challenge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          challengeToken,
+          code: codeToVerify,
+          isRecoveryCode: isRecoveryMode,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Verification failed. Please check your code.");
+      }
+
+      router.push(`/restaurant/${subdomain}/dashboard`);
+      router.refresh();
+    } catch (err: any) {
+      setError(err.message || "Verification code failed");
+    } finally {
+      setVerifying2fa(false);
+    }
+  };
+
+  const handleBackToLogin = () => {
+    setStep("CREDENTIALS");
+    setChallengeToken("");
+    setOtpCode("");
+    setRecoveryCode("");
+    setIsRecoveryMode(false);
+    setError("");
   };
 
   if (pageLoading) {
@@ -162,7 +225,15 @@ export default function AppleTenantLoginPage() {
           {/* Header */}
           <div className="text-center space-y-2">
             <div className="flex justify-center mb-3">
-              {branding?.logoUrl ? (
+              {step === "2FA" ? (
+                <div
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-white text-base shadow-sm bg-emerald-600"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+              ) : branding?.logoUrl ? (
                 <img src={branding.logoUrl} alt="Logo" className="h-12 w-auto max-w-[120px] object-contain" />
               ) : (
                 <div
@@ -175,10 +246,14 @@ export default function AppleTenantLoginPage() {
             </div>
 
             <h1 className={`text-lg font-semibold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-              {branding?.name || "Restaurant Workspace"}
+              {step === "2FA" ? "Two-Step Verification" : branding?.name || "Restaurant Workspace"}
             </h1>
-            <p className={`text-xs font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              {subdomain}.yourplatform.com
+            <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              {step === "2FA"
+                ? isRecoveryMode
+                  ? "Enter one of your 8 backup recovery codes"
+                  : "Enter the 6-digit code from your authenticator app"
+                : `${subdomain}.yourplatform.com`}
             </p>
           </div>
 
@@ -194,80 +269,172 @@ export default function AppleTenantLoginPage() {
             </div>
           )}
 
-          {/* Form */}
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            <div>
-              <label
-                htmlFor="email"
-                className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}
-              >
-                Work Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                autoComplete="email"
-                placeholder="staff@restaurant.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={`w-full rounded-xl px-3.5 py-2.5 text-xs transition focus:outline-none focus:border-[#0071E3] border ${isDark
-                  ? "bg-[#0A0C12] border-white/[0.08] text-white placeholder-[#5E6573]"
-                  : "bg-[#F5F5F7] border-slate-200 text-slate-900 placeholder-slate-400"
-                  }`}
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}
-              >
-                Password
-              </label>
-              <div className="relative">
+          {/* STEP 1: Email + Password Form */}
+          {step === "CREDENTIALS" && (
+            <form className="space-y-4" onSubmit={handleSubmit}>
+              <div>
+                <label
+                  htmlFor="email"
+                  className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}
+                >
+                  Work Email
+                </label>
                 <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
+                  id="email"
+                  type="email"
                   required
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`w-full rounded-xl px-3.5 py-2.5 pr-10 text-xs transition focus:outline-none focus:border-[#0071E3] border ${isDark
+                  autoComplete="email"
+                  placeholder="staff@restaurant.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={`w-full rounded-xl px-3.5 py-2.5 text-xs transition focus:outline-none focus:border-[#0071E3] border ${isDark
                     ? "bg-[#0A0C12] border-white/[0.08] text-white placeholder-[#5E6573]"
                     : "bg-[#F5F5F7] border-slate-200 text-slate-900 placeholder-slate-400"
                     }`}
                 />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="password"
+                  className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}
+                >
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={`w-full rounded-xl px-3.5 py-2.5 pr-10 text-xs transition focus:outline-none focus:border-[#0071E3] border ${isDark
+                      ? "bg-[#0A0C12] border-white/[0.08] text-white placeholder-[#5E6573]"
+                      : "bg-[#F5F5F7] border-slate-200 text-slate-900 placeholder-slate-400"
+                      }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-2.5 p-0.5 cursor-pointer"
+                  >
+                    <EyeIcon open={showPassword} />
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-white transition shadow-sm hover:opacity-95 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 mt-2"
+                style={{ backgroundColor: buttonBgColor }}
+              >
+                {loading ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Signing In...</span>
+                  </>
+                ) : (
+                  "Sign In to Restaurant"
+                )}
+              </button>
+            </form>
+          )}
+
+          {/* STEP 2: 2FA Verification Challenge */}
+          {step === "2FA" && (
+            <form className="space-y-4" onSubmit={handle2FASubmit}>
+              {!isRecoveryMode ? (
+                <div>
+                  <label
+                    htmlFor="otp"
+                    className={`block text-xs font-medium mb-1.5 text-center ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}
+                  >
+                    6-Digit Security Code
+                  </label>
+                  <input
+                    id="otp"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    autoFocus
+                    required
+                    placeholder="000000"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    className={`w-full rounded-xl px-4 py-3 text-center font-mono text-xl tracking-[0.4em] font-bold border transition focus:outline-none focus:border-[#0071E3] ${isDark
+                      ? "bg-[#0A0C12] border-white/[0.1] text-white"
+                      : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label
+                    htmlFor="recovery-code"
+                    className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}
+                  >
+                    Backup Recovery Code
+                  </label>
+                  <input
+                    id="recovery-code"
+                    type="text"
+                    autoFocus
+                    required
+                    placeholder="RB-XXXX-XXXX"
+                    value={recoveryCode}
+                    onChange={(e) => setRecoveryCode(e.target.value.toUpperCase())}
+                    className={`w-full rounded-xl px-3.5 py-2.5 text-center font-mono text-sm tracking-wider font-bold border transition focus:outline-none focus:border-[#0071E3] ${isDark
+                      ? "bg-[#0A0C12] border-white/[0.1] text-white placeholder-[#5E6573]"
+                      : "bg-[#F5F5F7] border-slate-200 text-slate-900 placeholder-slate-400"
+                      }`}
+                  />
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={verifying2fa || (!isRecoveryMode && otpCode.length !== 6) || (isRecoveryMode && !recoveryCode.trim())}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-white transition shadow-sm hover:opacity-95 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 mt-2 bg-[#0071E3]"
+              >
+                {verifying2fa ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Verifying Code...</span>
+                  </>
+                ) : (
+                  "Verify & Complete Sign In"
+                )}
+              </button>
+
+              <div className="pt-2 text-center space-y-2 border-t border-black/[0.06] dark:border-white/[0.06]">
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-2.5 p-0.5 cursor-pointer"
+                  onClick={() => {
+                    setIsRecoveryMode(!isRecoveryMode);
+                    setError("");
+                  }}
+                  className="text-[11px] text-[#0071E3] hover:underline font-medium cursor-pointer"
                 >
-                  <EyeIcon open={showPassword} />
+                  {isRecoveryMode ? "Use 6-digit authenticator code instead" : "Can't access your authenticator? Use recovery code"}
                 </button>
+
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleBackToLogin}
+                    className={`text-[11px] hover:underline cursor-pointer ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}
+                  >
+                    &larr; Back to password sign in
+                  </button>
+                </div>
               </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-white transition shadow-sm hover:opacity-95 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 mt-2"
-              style={{ backgroundColor: buttonBgColor }}
-            >
-              {loading ? (
-                <>
-                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Signing In...</span>
-                </>
-              ) : (
-                "Sign In to Restaurant"
-              )}
-            </button>
-          </form>
+            </form>
+          )}
         </div>
-
-        {/* Footer */}
       </div>
     </main>
   );
