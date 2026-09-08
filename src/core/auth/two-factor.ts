@@ -205,3 +205,44 @@ export async function verify2FAChallenge(token: string): Promise<TwoFactorChalle
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// PLATFORM SUPER ADMIN 2FA CHALLENGE
+// ---------------------------------------------------------------------------
+
+export interface Platform2FAChallengePayload {
+  type: "PLATFORM_2FA_CHALLENGE";
+  platformUserId: string;
+  email: string;
+  name: string;
+  tokenVersion: number;
+}
+
+export async function signPlatform2FAChallenge(
+  payload: Omit<Platform2FAChallengePayload, "type">
+): Promise<string> {
+  return await new jose.SignJWT({ ...payload, type: "PLATFORM_2FA_CHALLENGE" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("5m")
+    .sign(CHALLENGE_SECRET);
+}
+
+export async function verifyPlatform2FAChallenge(
+  token: string
+): Promise<Platform2FAChallengePayload | null> {
+  try {
+    const { payload } = await jose.jwtVerify(token, CHALLENGE_SECRET, {
+      algorithms: ["HS256"],
+    });
+
+    if (payload.type !== "PLATFORM_2FA_CHALLENGE") {
+      return null;
+    }
+
+    return payload as unknown as Platform2FAChallengePayload;
+  } catch (error) {
+    return null;
+  }
+}
+

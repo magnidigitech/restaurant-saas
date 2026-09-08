@@ -139,7 +139,13 @@ export async function proxy(req: NextRequest) {
 
   // 5. Check for Platform Super Admin Scope (admin.domain, /platform-admin, or /api/platform-admin)
   if (subdomain === "admin" || path.startsWith("/platform-admin") || path.startsWith("/api/platform-admin")) {
-    if (path.startsWith("/api/platform-admin") && path !== "/api/platform-admin/auth/login") {
+    const isPublicPlatformApi =
+      path === "/api/platform-admin/auth/login" ||
+      path === "/api/platform-admin/auth/2fa/challenge" ||
+      path === "/api/platform-admin/auth/passkeys/auth-options" ||
+      path === "/api/platform-admin/auth/passkeys/auth-verify";
+
+    if (path.startsWith("/api/platform-admin") && !isPublicPlatformApi) {
       const token = req.cookies.get(PLATFORM_SESSION_COOKIE)?.value;
       const session = token ? await verifyToken(token) : null;
       if (!session || session.role !== "PLATFORM_ADMIN") {

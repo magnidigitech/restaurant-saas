@@ -126,6 +126,78 @@ export async function ensureTwoFactorTables(): Promise<void> {
       CREATE INDEX IF NOT EXISTS "security_audit_logs_organization_id_idx" ON "security_audit_logs"("organization_id");
       CREATE INDEX IF NOT EXISTS "security_audit_logs_user_id_idx" ON "security_audit_logs"("user_id");
       CREATE INDEX IF NOT EXISTS "security_audit_logs_created_at_idx" ON "security_audit_logs"("created_at");
+
+      CREATE TABLE IF NOT EXISTS "platform_two_factor_auth" (
+        "id" TEXT NOT NULL,
+        "platform_user_id" TEXT NOT NULL,
+        "enabled" BOOLEAN NOT NULL DEFAULT false,
+        "secret_encrypted" TEXT,
+        "verified_at" TIMESTAMP(3),
+        "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "platform_two_factor_auth_pkey" PRIMARY KEY ("id")
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS "platform_two_factor_auth_platform_user_id_key" ON "platform_two_factor_auth"("platform_user_id");
+
+      CREATE TABLE IF NOT EXISTS "platform_two_factor_recovery_codes" (
+        "id" TEXT NOT NULL,
+        "platform_two_factor_id" TEXT NOT NULL,
+        "platform_user_id" TEXT NOT NULL,
+        "code_hash" TEXT NOT NULL,
+        "used_at" TIMESTAMP(3),
+        "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "platform_two_factor_recovery_codes_pkey" PRIMARY KEY ("id")
+      );
+      CREATE INDEX IF NOT EXISTS "platform_two_factor_recovery_codes_platform_user_id_idx" ON "platform_two_factor_recovery_codes"("platform_user_id");
+      CREATE INDEX IF NOT EXISTS "platform_two_factor_recovery_codes_platform_two_factor_id_idx" ON "platform_two_factor_recovery_codes"("platform_two_factor_id");
+
+      CREATE TABLE IF NOT EXISTS "platform_passkeys" (
+        "id" TEXT NOT NULL,
+        "platform_user_id" TEXT NOT NULL,
+        "credential_id" TEXT NOT NULL,
+        "public_key" TEXT NOT NULL,
+        "counter" BIGINT NOT NULL DEFAULT 0,
+        "device_type" TEXT,
+        "backed_up" BOOLEAN NOT NULL DEFAULT false,
+        "name" TEXT,
+        "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "last_used_at" TIMESTAMP(3),
+        "revoked_at" TIMESTAMP(3),
+        CONSTRAINT "platform_passkeys_pkey" PRIMARY KEY ("id")
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS "platform_passkeys_credential_id_key" ON "platform_passkeys"("credential_id");
+      CREATE INDEX IF NOT EXISTS "platform_passkeys_platform_user_id_idx" ON "platform_passkeys"("platform_user_id");
+
+      CREATE TABLE IF NOT EXISTS "platform_trusted_devices" (
+        "id" TEXT NOT NULL,
+        "platform_user_id" TEXT NOT NULL,
+        "device_name" TEXT,
+        "token_hash" TEXT NOT NULL,
+        "ip_address" TEXT,
+        "last_used_at" TIMESTAMP(3),
+        "expires_at" TIMESTAMP(3) NOT NULL,
+        "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "revoked_at" TIMESTAMP(3),
+        CONSTRAINT "platform_trusted_devices_pkey" PRIMARY KEY ("id")
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS "platform_trusted_devices_token_hash_key" ON "platform_trusted_devices"("token_hash");
+      CREATE INDEX IF NOT EXISTS "platform_trusted_devices_platform_user_id_idx" ON "platform_trusted_devices"("platform_user_id");
+
+      CREATE TABLE IF NOT EXISTS "platform_user_sessions" (
+        "id" TEXT NOT NULL,
+        "platform_user_id" TEXT NOT NULL,
+        "token_hash" TEXT NOT NULL,
+        "ip_address" TEXT,
+        "user_agent" TEXT,
+        "device_name" TEXT,
+        "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "last_active_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "expires_at" TIMESTAMP(3) NOT NULL,
+        "revoked_at" TIMESTAMP(3),
+        CONSTRAINT "platform_user_sessions_pkey" PRIMARY KEY ("id")
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS "platform_user_sessions_token_hash_key" ON "platform_user_sessions"("token_hash");
+      CREATE INDEX IF NOT EXISTS "platform_user_sessions_platform_user_id_idx" ON "platform_user_sessions"("platform_user_id");
     `);
     ensured = true;
   } catch (err: any) {

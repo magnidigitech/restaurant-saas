@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import SecurityTab from "./SecurityTab";
 
 // --- Types ---
 interface Branding {
@@ -190,7 +191,7 @@ export default function ApplePlatformAdminDashboard() {
   const isDark = theme === "dark";
 
   // Navigation
-  const [activeTab, setActiveTab] = useState<"tenants" | "onboard" | "modules" | "logs">("tenants");
+  const [activeTab, setActiveTab] = useState<"tenants" | "onboard" | "modules" | "logs" | "security">("tenants");
 
   // Data
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -818,6 +819,7 @@ export default function ApplePlatformAdminDashboard() {
               { id: "onboard", label: "Onboard Restaurant" },
               { id: "modules", label: "Add-on Catalog" },
               { id: "logs", label: "Audit Logs", count: logs.length },
+              { id: "security", label: "Security & Passkeys" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1841,6 +1843,11 @@ export default function ApplePlatformAdminDashboard() {
               </table>
             </div>
           </div>
+        )}
+
+        {/* TAB 5: SECURITY & PASSKEYS */}
+        {activeTab === "security" && (
+          <SecurityTab isDark={isDark} />
         )}
       </div>
 

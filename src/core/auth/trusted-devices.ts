@@ -139,3 +139,112 @@ export async function clearTrustedDeviceCookie() {
   const cookieStore = await cookies();
   cookieStore.delete(TRUSTED_DEVICE_COOKIE);
 }
+
+// ---------------------------------------------------------------------------
+// PLATFORM SUPER ADMIN TRUSTED DEVICES
+// ---------------------------------------------------------------------------
+
+export const PLATFORM_TRUSTED_DEVICE_COOKIE = "resto_platform_trusted_device";
+
+export async function createPlatformTrustedDevice(
+  platformUserId: string,
+  reqHeaders?: Headers,
+  days: number = 30
+): Promise<{ deviceId: string; rawToken: string; expiresAt: Date }> {
+  await ensureTwoFactorTables();
+
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = hashDeviceToken(rawToken);
+
+  const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  const ipAddress = reqHeaders?.get("x-forwarded-for") || reqHeaders?.get("x-real-ip") || null;
+  const userAgent = reqHeaders?.get("user-agent") || "";
+  const deviceName = parseDeviceName(userAgent);
+
+  const device = await prisma.platformTrustedDevice.create({
+    data: {
+      platformUserId,
+      deviceName,
+      tokenHash,
+      ipAddress,
+      expiresAt,
+      lastUsedAt: new Date(),
+    },
+  });
+
+  try {
+    const cookieStore = await cookies();
+    cookieStore.set(PLATFORM_TRUSTED_DEVICE_COOKIE, rawToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      path: "/",
+      maxAge: days * 24 * 60 * 60,
+    });
+  } catch (cookieErr) {
+    // Gracefully handle non-HTTP execution contexts (e.g. background tasks or unit tests)
+  }
+
+  return { deviceId: device.id, rawToken, expiresAt };
+}
+
+export async function isPlatformDeviceTrusted(
+  platformUserId: string,
+  explicitRawToken?: string
+): Promise<boolean> {
+  try {
+    await ensureTwoFactorTables();
+    let rawToken = explicitRawToken;
+
+    if (!rawToken) {
+      try {
+        const cookieStore = await cookies();
+        rawToken = cookieStore.get(PLATFORM_TRUSTED_DEVICE_COOKIE)?.value;
+      } catch (e) {
+        // Not in HTTP context
+      }
+    }
+
+    if (!rawToken) return false;
+
+    const tokenHash = hashDeviceToken(rawToken);
+
+    const device = await prisma.platformTrustedDevice.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!device) return false;
+    if (device.platformUserId !== platformUserId) return false;
+    if (device.revokedAt !== null) return false;
+    if (new Date(device.expiresAt) < new Date()) return false;
+
+    await prisma.platformTrustedDevice.update({
+      where: { id: device.id },
+      data: { lastUsedAt: new Date() },
+    });
+
+    return true;
+  } catch (err) {
+    console.warn("Error checking platform trusted device:", err);
+    return false;
+  }
+}
+
+export async function revokePlatformTrustedDevice(deviceId: string, platformUserId: string): Promise<boolean> {
+  await ensureTwoFactorTables();
+  const device = await prisma.platformTrustedDevice.findUnique({
+    where: { id: deviceId },
+  });
+
+  if (!device || device.platformUserId !== platformUserId) {
+    return false;
+  }
+
+  await prisma.platformTrustedDevice.update({
+    where: { id: deviceId },
+    data: { revokedAt: new Date() },
+  });
+
+  return true;
+}
+

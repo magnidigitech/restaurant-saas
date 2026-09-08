@@ -143,3 +143,155 @@ export async function revokeAllOtherSessions(userId: string): Promise<number> {
 
   return result.count;
 }
+
+// ---------------------------------------------------------------------------
+// PLATFORM SUPER ADMIN SESSIONS
+// ---------------------------------------------------------------------------
+
+export const PLATFORM_SESSION_ID_COOKIE = "resto_platform_session_id";
+
+export async function trackPlatformSession(
+  platformUserId: string,
+  reqHeaders?: Headers
+): Promise<string> {
+  await ensureTwoFactorTables();
+
+  let existingToken: string | undefined;
+  try {
+    const cookieStore = await cookies();
+    existingToken = cookieStore.get(PLATFORM_SESSION_ID_COOKIE)?.value;
+  } catch (e) {
+    // Non-HTTP execution context
+  }
+
+  const ipAddress = reqHeaders?.get("x-forwarded-for") || reqHeaders?.get("x-real-ip") || null;
+  const userAgent = reqHeaders?.get("user-agent") || "";
+  const deviceName = parseDeviceName(userAgent);
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hrs
+
+  if (existingToken) {
+    const tokenHash = hashSessionId(existingToken);
+    const existing = await prisma.platformUserSession.findUnique({
+      where: { tokenHash },
+    });
+
+    if (existing && !existing.revokedAt && existing.platformUserId === platformUserId) {
+      await prisma.platformUserSession.update({
+        where: { id: existing.id },
+        data: {
+          lastActiveAt: new Date(),
+          ipAddress: ipAddress || existing.ipAddress,
+          userAgent: userAgent || existing.userAgent,
+          deviceName: deviceName || existing.deviceName,
+        },
+      });
+      return existingToken;
+    }
+  }
+
+  const rawSessionId = crypto.randomBytes(32).toString("hex");
+  const tokenHash = hashSessionId(rawSessionId);
+
+  await prisma.platformUserSession.create({
+    data: {
+      platformUserId,
+      tokenHash,
+      ipAddress,
+      userAgent,
+      deviceName,
+      expiresAt,
+    },
+  });
+
+  try {
+    const cookieStore = await cookies();
+    cookieStore.set(PLATFORM_SESSION_ID_COOKIE, rawSessionId, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 24 * 60 * 60,
+    });
+  } catch (e) {
+    // Non-HTTP execution context
+  }
+
+  return rawSessionId;
+}
+
+export async function listPlatformSessions(platformUserId: string, currentSessionToken?: string) {
+  await ensureTwoFactorTables();
+  let currentToken = currentSessionToken;
+  if (!currentToken) {
+    try {
+      const cookieStore = await cookies();
+      currentToken = cookieStore.get(PLATFORM_SESSION_ID_COOKIE)?.value;
+    } catch (e) {
+      // Non-HTTP execution context
+    }
+  }
+
+  const currentTokenHash = currentToken ? hashSessionId(currentToken) : null;
+
+  const sessions = await prisma.platformUserSession.findMany({
+    where: {
+      platformUserId,
+      revokedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { lastActiveAt: "desc" },
+  });
+
+  return sessions.map((s) => ({
+    id: s.id,
+    deviceName: s.deviceName || "Unknown Device",
+    ipAddress: s.ipAddress || "Unknown IP",
+    userAgent: s.userAgent,
+    createdAt: s.createdAt,
+    lastActiveAt: s.lastActiveAt,
+    isCurrent: s.tokenHash === currentTokenHash,
+  }));
+}
+
+export async function revokePlatformSession(sessionId: string, platformUserId: string): Promise<boolean> {
+  await ensureTwoFactorTables();
+  const session = await prisma.platformUserSession.findUnique({
+    where: { id: sessionId },
+  });
+
+  if (!session || session.platformUserId !== platformUserId) return false;
+
+  await prisma.platformUserSession.update({
+    where: { id: sessionId },
+    data: { revokedAt: new Date() },
+  });
+
+  return true;
+}
+
+export async function revokeAllOtherPlatformSessions(platformUserId: string, currentSessionToken?: string): Promise<number> {
+  await ensureTwoFactorTables();
+  let currentToken = currentSessionToken;
+  if (!currentToken) {
+    try {
+      const cookieStore = await cookies();
+      currentToken = cookieStore.get(PLATFORM_SESSION_ID_COOKIE)?.value;
+    } catch (e) {
+      // Non-HTTP execution context
+    }
+  }
+
+  const currentTokenHash = currentToken ? hashSessionId(currentToken) : null;
+
+  const result = await prisma.platformUserSession.updateMany({
+    where: {
+      platformUserId,
+      revokedAt: null,
+      tokenHash: { not: currentTokenHash || "" },
+    },
+    data: { revokedAt: new Date() },
+  });
+
+  return result.count;
+}
+

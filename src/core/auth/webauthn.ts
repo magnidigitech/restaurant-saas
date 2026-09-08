@@ -257,3 +257,177 @@ export async function verifyPasskeyAuthResponse(
     user: passkey.user,
   };
 }
+
+// ---------------------------------------------------------------------------
+// PLATFORM SUPER ADMIN WEBAUTHN / PASSKEYS
+// ---------------------------------------------------------------------------
+
+export async function getPlatformPasskeyRegistrationOptions(
+  admin: { id: string; email: string; name: string },
+  req?: Request
+) {
+  await ensureTwoFactorTables();
+  const config = getWebAuthnConfig(req);
+
+  const existing = await prisma.platformPasskey.findMany({
+    where: { platformUserId: admin.id, revokedAt: null },
+    select: { credentialId: true },
+  });
+
+  const options = await generateRegistrationOptions({
+    rpName: "Resto Bird Super Admin",
+    rpID: config.rpID,
+    userID: Buffer.from(admin.id, "utf-8"),
+    userName: admin.email,
+    userDisplayName: admin.name || admin.email,
+    attestationType: "none",
+    excludeCredentials: existing.map((pk) => ({
+      id: pk.credentialId,
+      transports: ["internal", "hybrid", "usb", "ble", "nfc"],
+    })),
+    authenticatorSelection: {
+      residentKey: "preferred",
+      userVerification: "preferred",
+    },
+  });
+
+  saveChallenge(`platform_reg:${admin.id}`, {
+    challenge: options.challenge,
+    userId: admin.id,
+    createdAt: Date.now(),
+  });
+
+  return options;
+}
+
+export async function verifyPlatformPasskeyRegistrationResponse(
+  platformUserId: string,
+  response: RegistrationResponseJSON,
+  deviceName?: string,
+  req?: Request
+): Promise<VerifiedRegistrationResponse> {
+  await ensureTwoFactorTables();
+  const config = getWebAuthnConfig(req);
+
+  const challengeRecord = getAndClearChallenge(`platform_reg:${platformUserId}`);
+  if (!challengeRecord || !challengeRecord.challenge) {
+    throw new Error("Registration session expired or invalid. Please try registering passkey again.");
+  }
+
+  const verification = await verifyRegistrationResponse({
+    response,
+    expectedChallenge: challengeRecord.challenge,
+    expectedOrigin: config.origin,
+    expectedRPID: config.rpID,
+    requireUserVerification: false,
+  });
+
+  if (!verification.verified || !verification.registrationInfo) {
+    throw new Error("Passkey registration verification failed.");
+  }
+
+  const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
+
+  await prisma.platformPasskey.create({
+    data: {
+      platformUserId,
+      credentialId: credential.id,
+      publicKey: Buffer.from(credential.publicKey).toString("base64"),
+      counter: BigInt(credential.counter),
+      deviceType: credentialDeviceType,
+      backedUp: credentialBackedUp,
+      name: deviceName || "Super Admin Passkey",
+    },
+  });
+
+  return verification;
+}
+
+export async function getPlatformPasskeyAuthOptions(email?: string, req?: Request) {
+  await ensureTwoFactorTables();
+  const config = getWebAuthnConfig(req);
+
+  let allowCredentials = undefined;
+
+  if (email) {
+    const admin = await prisma.platformUser.findUnique({
+      where: { email },
+      include: {
+        passkeys: {
+          where: { revokedAt: null },
+        },
+      },
+    });
+
+    if (admin && admin.passkeys.length > 0) {
+      allowCredentials = admin.passkeys.map((pk) => ({
+        id: pk.credentialId,
+        transports: ["internal", "hybrid", "usb", "ble", "nfc"] as any,
+      }));
+    }
+  }
+
+  const options = await generateAuthenticationOptions({
+    rpID: config.rpID,
+    userVerification: "preferred",
+    allowCredentials,
+  });
+
+  const sessionKey = options.challenge;
+  saveChallenge(`platform_auth:${sessionKey}`, {
+    challenge: options.challenge,
+    createdAt: Date.now(),
+  });
+
+  return options;
+}
+
+export async function verifyPlatformPasskeyAuthResponse(
+  response: AuthenticationResponseJSON,
+  expectedChallenge: string,
+  req?: Request
+): Promise<{ verified: boolean; passkey: any; platformUser: any }> {
+  await ensureTwoFactorTables();
+  const config = getWebAuthnConfig(req);
+
+  const passkey = await prisma.platformPasskey.findUnique({
+    where: { credentialId: response.id },
+    include: { platformUser: true },
+  });
+
+  if (!passkey || passkey.revokedAt) {
+    throw new Error("Passkey credential not found or has been revoked.");
+  }
+
+  const verification = await verifyAuthenticationResponse({
+    response,
+    expectedChallenge,
+    expectedOrigin: config.origin,
+    expectedRPID: config.rpID,
+    credential: {
+      id: passkey.credentialId,
+      publicKey: Buffer.from(passkey.publicKey, "base64"),
+      counter: Number(passkey.counter),
+    },
+    requireUserVerification: false,
+  });
+
+  if (!verification.verified) {
+    throw new Error("Passkey authentication could not be verified.");
+  }
+
+  await prisma.platformPasskey.update({
+    where: { id: passkey.id },
+    data: {
+      counter: BigInt(verification.authenticationInfo.newCounter),
+      lastUsedAt: new Date(),
+    },
+  });
+
+  return {
+    verified: true,
+    passkey,
+    platformUser: passkey.platformUser,
+  };
+}
+
