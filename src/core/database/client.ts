@@ -51,6 +51,8 @@ export function getPrismaClient(requiredProp?: string | symbol): PrismaClient {
     !p.recipe ||
     !p.rosterDateAvailability ||
     !p.rosterEmployeeSubmission ||
+    !p.twoFactorAuth ||
+    !p.twoFactorRecoveryCode ||
     (requiredProp && typeof requiredProp === "string" && !requiredProp.startsWith("$") && !requiredProp.startsWith("_") && !p[requiredProp])
   ) {
     try {
