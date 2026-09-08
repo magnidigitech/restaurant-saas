@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/core/database/client";
 import { setTenantSession } from "@/core/auth/session";
 import { isRateLimited } from "@/core/auth/rate-limiter";
+import { ensureTwoFactorTables } from "@/core/database/ensure-tables";
 import {
   verify2FAChallenge,
   decryptTotpSecret,
@@ -11,6 +12,7 @@ import {
 
 export async function POST(req: NextRequest) {
   try {
+    await ensureTwoFactorTables();
     const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
 
     // Strict rate limiting on OTP verification: 5 attempts per IP/challenge per 10 minutes

@@ -1,6 +1,8 @@
 import { prisma } from "../src/core/database/client";
+import { ensureTwoFactorTables } from "../src/core/database/ensure-tables";
 
 async function main() {
+  await ensureTwoFactorTables();
   const email = process.argv[2]?.trim();
 
   if (!email) {

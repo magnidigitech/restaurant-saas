@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/core/database/client";
 import { getTenantSession } from "@/core/auth/session";
+import { ensureTwoFactorTables } from "@/core/database/ensure-tables";
 import {
   decryptTotpSecret,
   verifyTotpCode,
@@ -10,6 +11,7 @@ import {
 
 export async function POST(req: NextRequest) {
   try {
+    await ensureTwoFactorTables();
     const session = await getTenantSession();
     if (!session?.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
