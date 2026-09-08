@@ -30,7 +30,18 @@ export function createPrismaClient() {
     connectionTimeoutMillis: 5000,
   });
   const adapter = new PrismaPg(pool);
-  return new PrismaClient({ adapter });
+  let ClientClass: any = PrismaClient;
+  if (typeof require !== "undefined") {
+    try {
+      const freshModule = require("@prisma/client");
+      if (freshModule && freshModule.PrismaClient) {
+        ClientClass = freshModule.PrismaClient;
+      }
+    } catch {
+      // fallback to static import
+    }
+  }
+  return new ClientClass({ adapter });
 }
 
 export function getPrismaClient(requiredProp?: string | symbol): PrismaClient {
@@ -72,7 +83,7 @@ export const prisma = new Proxy({} as PrismaClient, {
       // Re-instantiate once more to ensure latest generated Prisma Client is loaded in long-running dev processes
       try {
         globalForPrisma.prisma = createPrismaClient();
-        client = globalForPrisma.prisma;
+        client = globalForPrisma.prisma!;
         val = (client as any)[prop];
       } catch {
         // ignore

@@ -77,6 +77,13 @@ export default function InternalUsersPage({
     email: string;
   } | null>(null);
 
+  // Reset 2FA Modal State
+  const [confirmReset2faTarget, setConfirmReset2faTarget] = useState<{
+    membershipId: string;
+    email: string;
+  } | null>(null);
+  const [resetting2fa, setResetting2fa] = useState(false);
+
   // Edit User & Multiple Roles Modal State
   const [editRolesTarget, setEditRolesTarget] = useState<{
     membershipId: string;
@@ -310,6 +317,30 @@ export default function InternalUsersPage({
     }
   };
 
+  const handleConfirmReset2fa = async () => {
+    if (!confirmReset2faTarget) return;
+    setResetting2fa(true);
+    try {
+      const res = await fetch("/api/restaurant/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          membershipId: confirmReset2faTarget.membershipId,
+          action: "RESET_2FA",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to reset 2FA");
+      setSuccessMsg(data.message || `Two-factor authentication reset for ${confirmReset2faTarget.email}`);
+      setConfirmReset2faTarget(null);
+      fetchData();
+    } catch (err: any) {
+      setError(err.message || "Failed to reset 2FA");
+    } finally {
+      setResetting2fa(false);
+    }
+  };
+
   if (loading) {
     return (
       <div
@@ -464,7 +495,22 @@ export default function InternalUsersPage({
                   {memberships.map((m) => (
                     <tr key={m.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition">
                       <td className={`py-3.5 px-3 font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
-                        {m.user.email}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span>{m.user.email}</span>
+                          {m.user.twoFactorAuth?.enabled && (
+                            <span
+                              className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${
+                                isDark
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                  : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              }`}
+                              title="Two-Factor Authentication Active"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              2FA Active
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className={`py-3.5 px-3 ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
                         {m.employee ? (
@@ -550,7 +596,7 @@ export default function InternalUsersPage({
                                 setSelectedLinkEmployeeId("");
                               }}
                               className={`text-[10px] font-semibold underline cursor-pointer transition ${
-                                isDark ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-800"
+                                isDark ? "text-sky-400 hover:text-sky-300" : "text-sky-600 hover:text-sky-800"
                               }`}
                             >
                               Link Profile
@@ -568,32 +614,24 @@ export default function InternalUsersPage({
                             ).entries()
                           );
                           return activeRoles.length > 0 ? (
-                            <div className="flex flex-wrap items-center gap-1.5 max-w-xs">
-                              {activeRoles.map(([rId, rName]) => (
+                            <div className="flex flex-wrap gap-1">
+                              {activeRoles.map(([id, name]) => (
                                 <span
-                                  key={rId}
-                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
-                                    rName.toLowerCase().includes("owner") || rName.toLowerCase().includes("admin")
-                                      ? isDark
-                                        ? "bg-purple-500/15 text-purple-300 border-purple-500/30"
-                                        : "bg-purple-100 text-purple-800 border-purple-300"
-                                      : isDark
-                                      ? "bg-blue-500/15 text-blue-300 border-blue-500/30"
-                                      : "bg-blue-50 text-blue-800 border-blue-200"
+                                  key={id}
+                                  className={`px-2 py-0.5 rounded-md font-medium text-[11px] ${
+                                    isDark ? "bg-white/[0.08] text-white" : "bg-slate-100 text-slate-800 border border-slate-200"
                                   }`}
                                 >
-                                  {rName}
+                                  {name}
                                 </span>
                               ))}
                             </div>
                           ) : (
-                            <span className={`text-[11px] italic ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-                              No Roles Assigned
-                            </span>
+                            <span className="text-slate-400 text-xs italic">No roles assigned</span>
                           );
                         })()}
                       </td>
-                      <td className={`py-3.5 px-3 ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+                      <td className={`py-3.5 px-3 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
                         {m.joinedAt
                           ? new Date(m.joinedAt).toLocaleDateString()
                           : m.createdAt
@@ -602,13 +640,17 @@ export default function InternalUsersPage({
                       </td>
                       <td className="py-3.5 px-3">
                         <span
-                          className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${
-                            isDark
-                              ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                              : "bg-emerald-100 text-emerald-800 border-emerald-300"
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            m.status === "ACTIVE"
+                              ? isDark
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : isDark
+                              ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                              : "bg-amber-50 text-amber-700 border border-amber-200"
                           }`}
                         >
-                          Active
+                          {m.status}
                         </span>
                       </td>
                       <td className="py-3.5 px-3 text-right">
@@ -624,6 +666,20 @@ export default function InternalUsersPage({
                           >
                             Edit Roles & Profile
                           </button>
+                          {m.user.twoFactorAuth?.enabled && (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmReset2faTarget({ membershipId: m.id, email: m.user.email })}
+                              className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition cursor-pointer border ${
+                                isDark
+                                  ? "text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30"
+                                  : "text-amber-800 bg-amber-50 hover:bg-amber-100 border-amber-200"
+                              }`}
+                              title="Reset 2FA credentials if user lost phone/recovery codes"
+                            >
+                              Reset 2FA
+                            </button>
+                          )}
                           {m.user.id === currentUserId ? (
                             <span className={`text-[11px] font-medium italic ${isDark ? "text-slate-500" : "text-slate-400"}`}>
                               You
@@ -1505,6 +1561,77 @@ export default function InternalUsersPage({
                   </>
                 ) : (
                   <span>Save Roles &amp; Profile</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset 2FA Confirmation Modal */}
+      {confirmReset2faTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className={`max-w-md w-full p-6 rounded-3xl border shadow-2xl space-y-4 ${
+              isDark ? "bg-[#121622] border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-base font-bold">Reset Two-Factor Authentication?</h3>
+                <p className={`text-xs mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                  Emergency override for staff lockout
+                </p>
+              </div>
+            </div>
+
+            <div
+              className={`p-3.5 rounded-2xl border text-xs space-y-2 ${
+                isDark ? "bg-[#0A0C12] border-white/10 text-slate-300" : "bg-amber-50/70 border-amber-200 text-amber-900"
+              }`}
+            >
+              <p>
+                You are about to reset Two-Factor Authentication for:
+              </p>
+              <p className="font-mono font-bold text-xs">{confirmReset2faTarget.email}</p>
+              <p className="text-[11px] opacity-85">
+                This will immediately delete their TOTP secret and all 8 recovery codes. The user will be able to log in with their email and password, and set up a new authenticator device.
+              </p>
+            </div>
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmReset2faTarget(null)}
+                disabled={resetting2fa}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                  isDark ? "border-white/10 hover:bg-white/[0.04] text-white" : "border-slate-200 hover:bg-slate-50 text-slate-700"
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReset2fa}
+                disabled={resetting2fa}
+                className="flex-1 py-2.5 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white transition shadow-sm disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+              >
+                {resetting2fa ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Resetting...</span>
+                  </>
+                ) : (
+                  "Confirm Reset 2FA"
                 )}
               </button>
             </div>

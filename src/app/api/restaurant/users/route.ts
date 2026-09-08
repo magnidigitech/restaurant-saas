@@ -34,7 +34,17 @@ export async function GET(req: NextRequest) {
     const memberships = await prisma.restaurantMembership.findMany({
       where: { restaurantId: session.activeRestaurantId },
       include: {
-        user: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            createdAt: true,
+            twoFactorAuth: {
+              select: { enabled: true },
+            },
+          },
+        },
         employee: true,
         accessGrants: {
           include: {
@@ -445,6 +455,51 @@ export async function PATCH(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}));
     const { invitationId, membershipId, employeeId, roleIds, outletId } = body;
+
+    // Emergency/Admin Reset of Two-Factor Authentication
+    if (body.action === "RESET_2FA" && membershipId) {
+      const membership = await prisma.restaurantMembership.findFirst({
+        where: { id: membershipId, restaurantId },
+        include: { user: true },
+      });
+      if (!membership) {
+        return NextResponse.json({ error: "Membership not found" }, { status: 404 });
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.twoFactorRecoveryCode.deleteMany({
+          where: { userId: membership.userId },
+        });
+        await tx.twoFactorAuth.upsert({
+          where: { userId: membership.userId },
+          update: {
+            enabled: false,
+            secretEncrypted: null,
+            verifiedAt: null,
+          },
+          create: {
+            userId: membership.userId,
+            enabled: false,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            restaurantId,
+            userId: session.userId,
+            userEmail: session.email,
+            action: "2FA_RESET_BY_ADMIN",
+            entityType: "UserTwoFactor",
+            entityId: membership.userId,
+            newValues: JSON.stringify({ targetUserEmail: membership.user.email }),
+          },
+        });
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Two-factor authentication has been reset for ${membership.user.email}`,
+      });
+    }
 
     // Handle updating membership profile and/or assigning multiple roles
     if (membershipId) {
