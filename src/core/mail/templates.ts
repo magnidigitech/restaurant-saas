@@ -254,6 +254,22 @@ This invitation link is cryptographically signed and expires in 7 days. If you d
   return { subject, html, text };
 }
 
+export interface EmployeeOnboardingEmailParams {
+  employeeName: string;
+  employeeCode: string;
+  personalEmail: string;
+  restaurantName: string;
+  accessToken: string;
+  designation?: string | null;
+  department?: string | null;
+  branding?: {
+    applicationName?: string;
+    primaryColor?: string;
+    logoUrl?: string | null;
+    supportEmail?: string | null;
+  } | null;
+}
+
 /**
  * 2. EMPLOYEE ONBOARDING EMAIL TEMPLATE (WITH RESTAURANT BRANDING)
  */

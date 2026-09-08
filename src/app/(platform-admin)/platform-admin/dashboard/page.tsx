@@ -232,6 +232,15 @@ export default function ApplePlatformAdminDashboard() {
   const [limitsLoading, setLimitsLoading] = useState(false);
   const [limitsError, setLimitsError] = useState<string | null>(null);
 
+  // Delete Tenant Modal (2-Stage Confirmation)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteTenant, setDeleteTenant] = useState<Restaurant | null>(null);
+  const [deleteStage, setDeleteStage] = useState<1 | 2>(1);
+  const [deleteInputSubdomain, setDeleteInputSubdomain] = useState("");
+  const [deleteAcknowledged, setDeleteAcknowledged] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   // Module Pricing
   const [pricingInputs, setPricingInputs] = useState<Record<string, number>>({});
   const [pricingSaving, setPricingSaving] = useState<string | null>(null);
@@ -526,6 +535,46 @@ export default function ApplePlatformAdminDashboard() {
       setLimitsError(err.message);
     } finally {
       setLimitsLoading(false);
+    }
+  };
+
+  const openDeleteModal = (tenant: Restaurant) => {
+    setDeleteTenant(tenant);
+    setDeleteStage(1);
+    setDeleteInputSubdomain("");
+    setDeleteAcknowledged(false);
+    setDeleteError(null);
+    setDeleteModalOpen(true);
+  };
+
+  const handleExecuteDeleteTenant = async () => {
+    if (!deleteTenant) return;
+    if (deleteInputSubdomain.trim().toLowerCase() !== deleteTenant.subdomain.toLowerCase()) {
+      setDeleteError(`Subdomain confirmation does not match "${deleteTenant.subdomain}"`);
+      return;
+    }
+    if (!deleteAcknowledged) {
+      setDeleteError("Please confirm your acknowledgment by checking the verification box.");
+      return;
+    }
+
+    setDeleteLoading(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/platform-admin/restaurants/${deleteTenant.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete tenant instance");
+
+      showToast(`Tenant "${deleteTenant.name}" (${deleteTenant.subdomain}) was permanently deleted`, "success");
+      setDeleteModalOpen(false);
+      setDeleteTenant(null);
+      await fetchData();
+    } catch (err: any) {
+      setDeleteError(err.message || "An unexpected error occurred while deleting the tenant");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -1052,9 +1101,29 @@ export default function ApplePlatformAdminDashboard() {
                             {subPlan?.name || "Standard"}
                           </span>
 
-                          <span className={`text-xs font-mono pl-1 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-                            {isExpanded ? "−" : "+"}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openDeleteModal(restaurant);
+                              }}
+                              title={`Delete ${restaurant.name}`}
+                              className={`p-1.5 rounded-lg text-xs transition border cursor-pointer ${
+                                isDark
+                                  ? "text-[#8F95A3] hover:text-rose-400 hover:bg-rose-500/10 border-transparent hover:border-rose-500/20"
+                                  : "text-slate-400 hover:text-rose-600 hover:bg-rose-50 border-transparent hover:border-rose-200"
+                              }`}
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+
+                            <span className={`text-xs font-mono pl-1 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                              {isExpanded ? "−" : "+"}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
@@ -1353,6 +1422,49 @@ export default function ApplePlatformAdminDashboard() {
                               </div>
                             </div>
                           )}
+
+                          {/* Danger Zone: Permanent Tenant Deletion */}
+                          <div
+                            className={`border p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${
+                              isDark
+                                ? "bg-rose-500/[0.04] border-rose-500/20"
+                                : "bg-rose-50/70 border-rose-200"
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-semibold ${isDark ? "text-rose-400" : "text-rose-700"}`}>
+                                  Danger Zone • Permanent Tenant Purge
+                                </span>
+                                <span
+                                  className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
+                                    isDark
+                                      ? "bg-rose-500/10 text-rose-300 border-rose-500/20"
+                                      : "bg-rose-100 text-rose-800 border-rose-300"
+                                  }`}
+                                >
+                                  Irreversible
+                                </span>
+                              </div>
+                              <p className={`text-xs mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                                Permanently wipe <strong className={isDark ? "text-white" : "text-slate-900"}>{restaurant.name}</strong> ({restaurant.subdomain}), all child outlets, user memberships, inventory, and system data.
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openDeleteModal(restaurant);
+                              }}
+                              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-semibold rounded-xl transition shadow-sm flex items-center gap-2 flex-shrink-0 cursor-pointer"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              <span>Delete Tenant</span>
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2001,6 +2113,257 @@ export default function ApplePlatformAdminDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 2-STAGE TENANT DELETION CONFIRMATION MODAL */}
+      {deleteModalOpen && deleteTenant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 overflow-y-auto">
+          <div
+            className={`border rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 ${
+              isDark ? "bg-[#121622] border-white/[0.08]" : "bg-white border-slate-200"
+            }`}
+          >
+            {/* Modal Header */}
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                      deleteStage === 1
+                        ? isDark
+                          ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                          : "bg-amber-50 text-amber-800 border-amber-200"
+                        : isDark
+                        ? "bg-rose-500/20 text-rose-300 border-rose-500/30"
+                        : "bg-rose-100 text-rose-900 border-rose-300"
+                    }`}
+                  >
+                    Stage {deleteStage} of 2 • {deleteStage === 1 ? "Impact Assessment" : "Security Lock"}
+                  </span>
+                </div>
+                <h3 className={`text-base font-bold tracking-tight mt-1.5 ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {deleteStage === 1 ? `Delete Tenant Instance` : `Final Purge Confirmation`}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!deleteLoading) {
+                    setDeleteModalOpen(false);
+                    setDeleteTenant(null);
+                  }
+                }}
+                disabled={deleteLoading}
+                className={`text-base p-1 rounded-lg transition ${
+                  isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-400 hover:text-slate-700"
+                }`}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Error Message */}
+            {deleteError && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs rounded-xl flex items-start gap-2">
+                <span className="text-sm">⚠️</span>
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            {/* STAGE 1: IMPACT ASSESSMENT */}
+            {deleteStage === 1 && (
+              <div className="space-y-4">
+                <div
+                  className={`p-4 rounded-2xl border space-y-2.5 ${
+                    isDark ? "bg-amber-500/[0.06] border-amber-500/20" : "bg-amber-50/80 border-amber-200"
+                  }`}
+                >
+                  <p className={`text-xs font-semibold ${isDark ? "text-amber-300" : "text-amber-900"}`}>
+                    ⚠️ Critical Warning: This action cannot be undone.
+                  </p>
+                  <p className={`text-xs leading-relaxed ${isDark ? "text-[#C5C9D3]" : "text-slate-700"}`}>
+                    You are requesting the complete permanent removal of the restaurant instance{" "}
+                    <strong className={isDark ? "text-white" : "text-slate-900"}>{deleteTenant.name}</strong>.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className={`text-[11px] font-semibold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    Data Entities Slated for Immediate Deletion:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <div className={`p-2.5 rounded-xl border flex items-center gap-2 ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
+                      <span>🌐</span>
+                      <div>
+                        <p className={`font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>Subdomain & Routing</p>
+                        <p className={`text-[11px] font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>{deleteTenant.subdomain}</p>
+                      </div>
+                    </div>
+
+                    <div className={`p-2.5 rounded-xl border flex items-center gap-2 ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
+                      <span>🏢</span>
+                      <div>
+                        <p className={`font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>Outlets & Locations</p>
+                        <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>{deleteTenant._count?.outlets || 1} provisioned</p>
+                      </div>
+                    </div>
+
+                    <div className={`p-2.5 rounded-xl border flex items-center gap-2 ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
+                      <span>👥</span>
+                      <div>
+                        <p className={`font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>Staff & Memberships</p>
+                        <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>{deleteTenant._count?.memberships || 1} team members</p>
+                      </div>
+                    </div>
+
+                    <div className={`p-2.5 rounded-xl border flex items-center gap-2 ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
+                      <span>📦</span>
+                      <div>
+                        <p className={`font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>Operations & Ledgers</p>
+                        <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>Stock, shifts, orders & payroll</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2.5 pt-3 border-t border-white/[0.06] dark:border-white/[0.06]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteModalOpen(false);
+                      setDeleteTenant(null);
+                    }}
+                    className={`px-4 py-2 text-xs font-medium rounded-xl transition ${
+                      isDark ? "text-[#8F95A3] hover:text-white bg-white/[0.04]" : "text-slate-600 hover:text-slate-900 bg-slate-100"
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteError(null);
+                      setDeleteStage(2);
+                    }}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white text-xs font-semibold rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Proceed to Stage 2</span>
+                    <span>→</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* STAGE 2: SUBDOMAIN VERIFICATION & EXECUTION */}
+            {deleteStage === 2 && (
+              <div className="space-y-4">
+                <div
+                  className={`p-4 rounded-2xl border space-y-2 ${
+                    isDark ? "bg-rose-500/[0.08] border-rose-500/20" : "bg-rose-50 border-rose-200"
+                  }`}
+                >
+                  <p className={`text-xs font-semibold ${isDark ? "text-rose-400" : "text-rose-800"}`}>
+                    Final Safety Gate
+                  </p>
+                  <p className={`text-xs leading-relaxed ${isDark ? "text-[#C5C9D3]" : "text-slate-700"}`}>
+                    To confirm the permanent destruction of{" "}
+                    <strong className={isDark ? "text-white" : "text-slate-900"}>{deleteTenant.name}</strong>, please
+                    enter its exact subdomain below:
+                  </p>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/20 dark:bg-black/40 border border-black/10 text-xs font-mono font-bold">
+                    <span>{deleteTenant.subdomain}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteInputSubdomain(deleteTenant.subdomain);
+                      }}
+                      className="text-[10px] font-sans font-medium text-[#0071E3] hover:underline"
+                    >
+                      (Auto-fill)
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Type <span className="font-mono font-bold text-rose-500">{deleteTenant.subdomain}</span> to proceed:
+                  </label>
+                  <input
+                    type="text"
+                    autoFocus
+                    value={deleteInputSubdomain}
+                    onChange={(e) => setDeleteInputSubdomain(e.target.value)}
+                    placeholder={deleteTenant.subdomain}
+                    className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold border focus:outline-none transition ${
+                      deleteInputSubdomain.trim().toLowerCase() === deleteTenant.subdomain.toLowerCase()
+                        ? "border-emerald-500 ring-2 ring-emerald-500/20"
+                        : isDark
+                        ? "bg-[#0A0C12] border-white/[0.08] text-white focus:border-rose-500"
+                        : "bg-[#F5F5F7] border-slate-200 text-slate-900 focus:border-rose-500"
+                    }`}
+                  />
+                </div>
+
+                <label className={`flex items-start gap-2.5 text-xs cursor-pointer p-3 rounded-xl border transition ${
+                  deleteAcknowledged
+                    ? isDark ? "bg-rose-500/10 border-rose-500/30" : "bg-rose-50 border-rose-200"
+                    : isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"
+                }`}>
+                  <input
+                    type="checkbox"
+                    checked={deleteAcknowledged}
+                    onChange={(e) => setDeleteAcknowledged(e.target.checked)}
+                    className="mt-0.5 rounded text-rose-600 focus:ring-0 cursor-pointer"
+                  />
+                  <span className={`leading-relaxed ${isDark ? "text-[#C5C9D3]" : "text-slate-700"}`}>
+                    I explicitly acknowledge that all tenant databases, credentials, outlets, and history will be permanently deleted and cannot be recovered.
+                  </span>
+                </label>
+
+                <div className="flex justify-between items-center pt-3 border-t border-white/[0.06] dark:border-white/[0.06]">
+                  <button
+                    type="button"
+                    disabled={deleteLoading}
+                    onClick={() => {
+                      setDeleteError(null);
+                      setDeleteStage(1);
+                    }}
+                    className={`px-3.5 py-2 text-xs font-medium rounded-xl transition ${
+                      isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    ← Back to Stage 1
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={
+                      deleteLoading ||
+                      deleteInputSubdomain.trim().toLowerCase() !== deleteTenant.subdomain.toLowerCase() ||
+                      !deleteAcknowledged
+                    }
+                    onClick={handleExecuteDeleteTenant}
+                    className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition shadow-lg shadow-rose-600/20 flex items-center gap-2 cursor-pointer"
+                  >
+                    {deleteLoading ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Permanently Purging...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span>Permanently Delete Tenant</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
