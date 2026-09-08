@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     const encryptedSecret = encryptTotpSecret(secret);
 
     // Upsert unverified 2FA record
-    await prisma.twoFactorAuth.upsert({
+    await (prisma as any).twoFactorAuth.upsert({
       where: { userId: user.id },
       update: {
         secretEncrypted: encryptedSecret,
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       issuer: "Resto Bird",
     });
   } catch (error: any) {
-    console.error("2FA Setup API Error:", error);
-    return NextResponse.json({ error: "Failed to initialize 2FA setup" }, { status: 500 });
+    console.error("2FA Setup API Error:", error?.message || error);
+    return NextResponse.json({ error: error?.message || "Failed to initialize 2FA setup" }, { status: 500 });
   }
 }
