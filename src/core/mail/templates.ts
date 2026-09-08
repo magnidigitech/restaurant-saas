@@ -7,31 +7,14 @@ export interface TenantActivationEmailParams {
   subdomain: string;
   activationToken: string;
   expiresAt?: Date;
-}
-
-export interface EmployeeOnboardingEmailParams {
-  employeeName: string;
-  employeeCode: string;
-  personalEmail: string;
-  restaurantName: string;
-  department?: string | null;
-  designation?: string | null;
-  accessToken: string;
-  branding?: {
-    applicationName?: string;
-    logoUrl?: string | null;
-    primaryColor?: string | null;
-    secondaryColor?: string | null;
-    supportEmail?: string | null;
-    supportPhone?: string | null;
-  } | null;
+  baseUrl?: string;
 }
 
 /**
- * 1. TENANT ACTIVATION EMAIL TEMPLATE
+ * 1. TENANT ACTIVATION EMAIL TEMPLATE (RESTO BIRD EXECUTIVE ONBOARDING)
  */
 export function generateTenantActivationEmail(params: TenantActivationEmailParams) {
-  const baseUrl = getAppBaseUrl();
+  const baseUrl = (params.baseUrl || getAppBaseUrl()).replace(/\/$/, "");
   const activationUrl = `${baseUrl}/activate?token=${params.activationToken}&subdomain=${params.subdomain}`;
   const expirationText = params.expiresAt
     ? params.expiresAt.toLocaleDateString("en-US", {
@@ -42,7 +25,7 @@ export function generateTenantActivationEmail(params: TenantActivationEmailParam
       })
     : "7 days";
 
-  const subject = `Activate your restaurant account: ${params.restaurantName} (Resto Bird)`;
+  const subject = `Welcome to Resto Bird | Activate Your Restaurant Account: ${params.restaurantName}`;
 
   const html = `
 <!DOCTYPE html>
@@ -50,192 +33,222 @@ export function generateTenantActivationEmail(params: TenantActivationEmailParam
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>${subject}</title>
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background-color: #f7f4ef;
-      color: #1a120b;
-    }
-    .wrapper {
-      max-width: 600px;
-      margin: 30px auto;
-      background: #ffffff;
-      border-radius: 20px;
-      overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.06);
-      border: 1px solid #e8dfc8;
-    }
-    .header {
-      background: linear-gradient(135deg, #1a120b 0%, #2c1e13 100%);
-      padding: 40px 30px;
-      text-align: center;
-      color: #ffffff;
-    }
-    .badge {
-      display: inline-block;
-      padding: 5px 14px;
-      background: rgba(232, 168, 56, 0.18);
-      border: 1px solid #e8a838;
-      border-radius: 20px;
-      color: #fbd38d;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      margin-bottom: 12px;
-    }
-    .title {
-      font-size: 26px;
-      font-weight: 900;
-      margin: 0 0 8px 0;
-      color: #ffffff;
-      letter-spacing: -0.5px;
-    }
-    .subtitle {
-      font-size: 14px;
-      color: #d6cbba;
-      margin: 0;
-    }
-    .content {
-      padding: 35px 35px 25px 35px;
-      line-height: 1.6;
-    }
-    .info-card {
-      background: #faf7f2;
-      border: 1px solid #ebe2d3;
-      border-radius: 14px;
-      padding: 20px;
-      margin: 24px 0;
-    }
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 6px 0;
-      border-bottom: 1px dashed #e2d7c5;
-      font-size: 13px;
-    }
-    .info-row:last-child {
-      border-bottom: none;
-    }
-    .info-label {
-      color: #786a58;
-      font-weight: 600;
-    }
-    .info-value {
-      font-weight: 700;
-      color: #1a120b;
-    }
-    .btn-container {
-      text-align: center;
-      margin: 35px 0 25px 0;
-    }
-    .btn {
-      display: inline-block;
-      background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
-      color: #ffffff !important;
-      text-decoration: none;
-      padding: 16px 36px;
-      border-radius: 14px;
-      font-size: 14px;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-      box-shadow: 0 6px 20px rgba(180, 83, 9, 0.3);
-    }
-    .fallback-link {
-      font-size: 11px;
-      color: #8c7d6b;
-      word-break: break-all;
-      background: #f5f2eb;
-      padding: 12px;
-      border-radius: 8px;
-      margin-top: 15px;
-      font-family: monospace;
-    }
-    .footer {
-      background: #faf7f2;
-      padding: 25px 35px;
-      text-align: center;
-      font-size: 12px;
-      color: #9c8e7c;
-      border-top: 1px solid #ebe2d3;
+    /* Client-specific Resets */
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
+    body { margin: 0; padding: 0; width: 100% !important; background-color: #06080d; }
+    @media only screen and (max-width: 620px) {
+      .email-wrapper { width: 100% !important; border-radius: 0 !important; }
+      .content-padding { padding: 24px 20px !important; }
+      .header-padding { padding: 28px 20px 22px 20px !important; }
+      .cta-button { width: 100% !important; box-sizing: border-box !important; text-align: center !important; }
     }
   </style>
 </head>
-<body>
-  <div class="wrapper">
-    <div class="header">
-      <div class="badge">Enterprise Platform</div>
-      <h1 class="title">Bahubali Restaurant Suite</h1>
-      <p class="subtitle">Next-Generation Multi-Tenant Culinary Operating System</p>
-    </div>
+<body style="margin: 0; padding: 0; background-color: #06080d; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #cbd5e1;">
+  <div style="background-color: #06080d; padding: 32px 12px;">
+    <!-- Main Email Container -->
+    <table align="center" border="0" cellpadding="0" cellspacing="0" class="email-wrapper" style="max-width: 600px; width: 100%; background-color: #0c1017; border: 1px solid #1f2738; border-radius: 18px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.6);">
+      
+      <!-- Brand Header -->
+      <tr>
+        <td align="center" class="header-padding" style="background-color: #090d14; border-bottom: 1px solid #1a2233; padding: 36px 32px 28px 32px;">
+          <!-- Resto Bird Logo -->
+          <table border="0" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center">
+                <img src="https://restobird.com/resto-bird-logo.png" alt="Resto Bird" width="160" style="display: block; width: 160px; max-width: 160px; height: auto; margin-bottom: 8px;" />
+              </td>
+            </tr>
+          </table>
+          <p style="margin: 0; color: #64748b; font-size: 13px; font-weight: 500; letter-spacing: 0.4px;">
+            See your restaurant differently
+          </p>
+          <div style="display: inline-block; margin-top: 16px; padding: 5px 14px; border-radius: 9999px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); color: #fbbf24; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;">
+            ADMINISTRATIVE ONBOARDING INVITATION
+          </div>
+        </td>
+      </tr>
 
-    <div class="content">
-      <p style="font-size: 16px; margin-top: 0;">
-        Hello <strong>${params.adminName}</strong>,
-      </p>
-      <p style="color: #4a3e31; font-size: 14px;">
-        Welcome to the Bahubali platform! Your restaurant organization <strong>${params.restaurantName}</strong> has been provisioned. Click below to activate your administrative privileges and set up your master security password.
-      </p>
+      <!-- Body Content -->
+      <tr>
+        <td class="content-padding" style="padding: 36px 32px;">
+          <h1 style="margin: 0 0 14px 0; color: #ffffff; font-size: 22px; font-weight: 800; letter-spacing: -0.4px; line-height: 1.3;">
+            Your Restaurant Operations Console is Ready
+          </h1>
+          
+          <p style="margin: 0 0 16px 0; color: #94a3b8; font-size: 14px; line-height: 1.6;">
+            Hello <strong style="color: #ffffff;">${params.adminName}</strong>,
+          </p>
 
-      <div class="info-card">
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr>
-            <td style="padding: 6px 0; color: #786a58; font-size: 13px; font-weight: 600;">Restaurant Entity:</td>
-            <td style="padding: 6px 0; text-align: right; font-weight: 700; color: #1a120b; font-size: 13px;">${params.restaurantName}</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; color: #786a58; font-size: 13px; font-weight: 600;">Subdomain:</td>
-            <td style="padding: 6px 0; text-align: right; font-weight: 700; color: #d97706; font-size: 13px;">${params.subdomain}</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; color: #786a58; font-size: 13px; font-weight: 600;">Primary Admin Login:</td>
-            <td style="padding: 6px 0; text-align: right; font-weight: 700; color: #1a120b; font-size: 13px;">${params.adminEmail}</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; color: #786a58; font-size: 13px; font-weight: 600;">Activation Expiration:</td>
-            <td style="padding: 6px 0; text-align: right; font-weight: 600; color: #b45309; font-size: 13px;">Valid until ${expirationText}</td>
-          </tr>
-        </table>
-      </div>
+          <p style="margin: 0 0 24px 0; color: #94a3b8; font-size: 14px; line-height: 1.6;">
+            Your restaurant organization <strong style="color: #f1f5f9;">${params.restaurantName}</strong> has been provisioned on the Resto Bird Intelligent Operating System. You have been designated as the primary administrator with full permissions to configure menus, floor layouts, shift scheduling, inventory depletion, and staff access.
+          </p>
 
-      <div class="btn-container">
-        <a href="${activationUrl}" class="btn">
-          Activate Restaurant &amp; Set Password &rarr;
-        </a>
-      </div>
+          <!-- Specifications Card -->
+          <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; background-color: #111723; border: 1px solid #1e293b; border-radius: 14px; margin-bottom: 28px;">
+            <tr>
+              <td style="padding: 18px 20px;">
+                <table border="0" cellpadding="0" cellspacing="0" style="width: 100%;">
+                  <tr>
+                    <td style="padding: 7px 0; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Organization</td>
+                    <td align="right" style="padding: 7px 0; color: #ffffff; font-size: 13px; font-weight: 700;">${params.restaurantName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 7px 0; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-top: 1px solid #1b2434;">Assigned Subdomain</td>
+                    <td align="right" style="padding: 7px 0; color: #f59e0b; font-size: 13px; font-weight: 700; font-family: ui-monospace, monospace; border-top: 1px solid #1b2434;">${params.subdomain}.restobird.com</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 7px 0; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-top: 1px solid #1b2434;">Administrator ID</td>
+                    <td align="right" style="padding: 7px 0; color: #ffffff; font-size: 13px; font-weight: 600; border-top: 1px solid #1b2434;">${params.adminEmail}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 7px 0; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-top: 1px solid #1b2434;">Role Scope</td>
+                    <td align="right" style="padding: 7px 0; color: #10b981; font-size: 13px; font-weight: 700; border-top: 1px solid #1b2434;">Master Administrator</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 7px 0; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-top: 1px solid #1b2434;">Invitation Expiry</td>
+                    <td align="right" style="padding: 7px 0; color: #fbbf24; font-size: 13px; font-weight: 600; border-top: 1px solid #1b2434;">Valid until ${expirationText}</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
 
-      <p style="font-size: 12px; color: #786a58; margin-bottom: 5px;">
-        If the button above does not work, copy and paste this link into your browser:
-      </p>
-      <div class="fallback-link">${activationUrl}</div>
-    </div>
+          <!-- Primary CTA Button -->
+          <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; margin: 30px 0 32px 0;">
+            <tr>
+              <td align="center">
+                <table border="0" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="center" style="border-radius: 12px; background: #f59e0b;">
+                      <a href="${activationUrl}" target="_blank" class="cta-button" style="display: inline-block; padding: 16px 36px; font-size: 14px; font-weight: 700; color: #000000; text-decoration: none; border-radius: 12px; letter-spacing: 0.3px; background-color: #f59e0b;">
+                        Activate Restaurant &amp; Set Password &rarr;
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
 
-    <div class="footer">
-      &copy; ${new Date().getFullYear()} Resto Bird. High-scale restaurant &amp; cloud kitchen operations suite.<br>
-      This is a secure system notification intended for ${params.adminEmail}.
-    </div>
+          <!-- Onboarding Checklist -->
+          <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; background-color: #0d121c; border: 1px solid #1a2233; border-radius: 12px; margin-bottom: 26px;">
+            <tr>
+              <td style="padding: 20px;">
+                <div style="color: #f8fafc; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px;">
+                  3-Step Onboarding Checklist
+                </div>
+                <table border="0" cellpadding="0" cellspacing="0" style="width: 100%;">
+                  <tr>
+                    <td valign="top" style="padding-bottom: 12px; width: 28px;">
+                      <div style="width: 20px; height: 20px; border-radius: 50%; background: #1e293b; color: #f59e0b; text-align: center; font-size: 11px; line-height: 20px; font-weight: 700;">1</div>
+                    </td>
+                    <td style="padding-bottom: 12px; color: #94a3b8; font-size: 13px; line-height: 1.5;">
+                      <strong style="color: #f1f5f9;">Establish Master Credentials:</strong> Click the activation button above to set your password and initialize your account.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top" style="padding-bottom: 12px; width: 28px;">
+                      <div style="width: 20px; height: 20px; border-radius: 50%; background: #1e293b; color: #f59e0b; text-align: center; font-size: 11px; line-height: 20px; font-weight: 700;">2</div>
+                    </td>
+                    <td style="padding-bottom: 12px; color: #94a3b8; font-size: 13px; line-height: 1.5;">
+                      <strong style="color: #f1f5f9;">Configure Outlets &amp; Floor:</strong> Set up your dining areas, point-of-sale stations, and kitchen display screen (KDS) feeds.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td valign="top" style="width: 28px;">
+                      <div style="width: 20px; height: 20px; border-radius: 50%; background: #1e293b; color: #f59e0b; text-align: center; font-size: 11px; line-height: 20px; font-weight: 700;">3</div>
+                    </td>
+                    <td style="color: #94a3b8; font-size: 13px; line-height: 1.5;">
+                      <strong style="color: #f1f5f9;">Grant Team Access:</strong> Invite kitchen managers, floor staff, and inventory controllers with granular permissions.
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+
+          <!-- Fallback Direct Link -->
+          <p style="margin: 0 0 8px 0; color: #64748b; font-size: 12px; line-height: 1.4;">
+            If the button does not work in your email client, copy and paste this link into your browser:
+          </p>
+          <div style="background-color: #090d14; border: 1px solid #1e293b; border-radius: 8px; padding: 12px 14px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; color: #f59e0b; word-break: break-all; line-height: 1.5; margin-bottom: 22px;">
+            ${activationUrl}
+          </div>
+
+          <!-- Security Notice Box -->
+          <table border="0" cellpadding="0" cellspacing="0" style="width: 100%; background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 8px;">
+            <tr>
+              <td style="padding: 12px 16px; color: #d97706; font-size: 11px; line-height: 1.5;">
+                <strong>Security Guard:</strong> This activation link is cryptographically signed and valid for single use within 7 days. If you did not request this invitation, please notify <a href="mailto:info@restobird.com" style="color: #f59e0b; text-decoration: underline;">info@restobird.com</a>.
+              </td>
+            </tr>
+          </table>
+
+        </td>
+      </tr>
+
+      <!-- Footer -->
+      <tr>
+        <td align="center" style="background-color: #090d14; border-top: 1px solid #1a2233; padding: 26px 32px; color: #64748b; font-size: 12px; line-height: 1.6;">
+          <p style="margin: 0 0 6px 0; color: #94a3b8; font-weight: 600;">
+            Resto Bird &bull; Intelligent Restaurant Operating System
+          </p>
+          <p style="margin: 0 0 10px 0; font-size: 11px; color: #64748b;">
+            See your restaurant differently &bull; <a href="https://restobird.com" style="color: #94a3b8; text-decoration: none;">restobird.com</a>
+          </p>
+          <p style="margin: 0; font-size: 11px; color: #475569;">
+            &copy; ${new Date().getFullYear()} Resto Bird Inc. All rights reserved. Intended exclusively for ${params.adminEmail}.
+          </p>
+        </td>
+      </tr>
+
+    </table>
   </div>
 </body>
 </html>
 `;
 
   const text = `
-Resto Bird - Tenant Activation
+================================================================================
+RESTO BIRD - RESTAURANT ONBOARDING INVITATION
+See your restaurant differently
+================================================================================
 
 Hello ${params.adminName},
 
-Your restaurant account "${params.restaurantName}" has been provisioned on Resto Bird.
+Welcome to Resto Bird. Your restaurant organization "${params.restaurantName}" has been provisioned on the Resto Bird Intelligent Operating System.
 
-Restaurant: ${params.restaurantName}
-Subdomain: ${params.subdomain}
-Admin Email: ${params.adminEmail}
-Valid Until: ${expirationText}
+You have been granted Master Administrator credentials to oversee kitchen operations, shift rosters, inventory depletion, and live floor telemetry.
 
-Click the link below to activate your account and configure your password:
+ORGANIZATION DETAILS:
+--------------------------------------------------------------------------------
+- Restaurant Entity:    ${params.restaurantName}
+- Assigned Subdomain:   ${params.subdomain}.restobird.com
+- Administrator Email:  ${params.adminEmail}
+- Access Scope:         Master Administrator (Owner)
+- Validity:             Valid until ${expirationText}
+
+ACTIVATE YOUR ACCOUNT & SET MASTER PASSWORD:
+--------------------------------------------------------------------------------
+Click or open the following activation link in your browser:
 ${activationUrl}
+
+3-STEP ONBOARDING CHECKLIST:
+1. Establish Master Credentials: Open the link above to define your master password.
+2. Configure Outlets & Floor: Set up your dining sections, POS, and KDS stations.
+3. Grant Team Access: Invite kitchen managers, floor staff, and inventory controllers.
+
+SECURITY NOTICE:
+This invitation link is cryptographically signed and expires in 7 days. If you did not expect this invitation, please contact info@restobird.com.
+
+================================================================================
+(c) ${new Date().getFullYear()} Resto Bird Inc. | https://restobird.com | info@restobird.com
 `;
 
   return { subject, html, text };

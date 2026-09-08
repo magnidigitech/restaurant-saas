@@ -209,6 +209,7 @@ export default function ApplePlatformAdminDashboard() {
   const [statusLoadingId, setStatusLoadingId] = useState<string | null>(null);
   const [inviteLoadingId, setInviteLoadingId] = useState<string | null>(null);
   const [inviteUrls, setInviteUrls] = useState<Record<string, string>>({});
+  const [inviteEmailStatus, setInviteEmailStatus] = useState<Record<string, { email: string; sent: boolean; error?: string }>>({});
   const [toast, setToast] = useState<{ message: string; type?: "success" | "error" } | null>(null);
 
   // Password Reset Modal
@@ -415,8 +416,16 @@ export default function ApplePlatformAdminDashboard() {
         : window.location.origin;
       const fullUrl = `${rootOrigin}/activate?token=${data.token}&subdomain=${data.subdomain}`;
       setInviteUrls((prev) => ({ ...prev, [restaurantId]: fullUrl }));
+      setInviteEmailStatus((prev) => ({
+        ...prev,
+        [restaurantId]: { email: data.email, sent: !!data.emailSent, error: data.emailError },
+      }));
       await navigator.clipboard.writeText(fullUrl);
-      showToast("Activation link copied to clipboard");
+      if (data.emailSent) {
+        showToast(`Invite generated & onboarding email sent to ${data.email}`);
+      } else {
+        showToast("Activation link copied to clipboard");
+      }
       fetchData();
     } catch (err: any) {
       showToast(err.message, "error");
@@ -1299,25 +1308,49 @@ export default function ApplePlatformAdminDashboard() {
                           </div>
 
                           {inviteUrls[restaurant.id] && (
-                            <div
-                              className={`p-3 rounded-xl border flex items-center justify-between text-xs font-mono ${
-                                isDark
-                                  ? "bg-[#0A0C12] border-white/[0.08] text-emerald-400"
-                                  : "bg-emerald-50 border-emerald-200 text-emerald-800"
-                              }`}
-                            >
-                              <span className="truncate mr-3">{inviteUrls[restaurant.id]}</span>
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(inviteUrls[restaurant.id]);
-                                  showToast("Copied to clipboard");
-                                }}
-                                className={`px-2.5 py-1 rounded-lg text-[11px] font-sans font-medium ${
-                                  isDark ? "bg-white/[0.08] text-white hover:bg-white/[0.15]" : "bg-emerald-600 text-white hover:bg-emerald-700"
+                            <div className="space-y-2 mt-1">
+                              {inviteEmailStatus[restaurant.id] && (
+                                <div
+                                  className={`px-3 py-2 rounded-xl text-xs flex items-center justify-between font-sans ${
+                                    inviteEmailStatus[restaurant.id].sent
+                                      ? isDark
+                                        ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
+                                        : "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                      : isDark
+                                      ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
+                                      : "bg-amber-50 text-amber-800 border border-amber-200"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm">{inviteEmailStatus[restaurant.id].sent ? "✉️" : "⚠️"}</span>
+                                    <span>
+                                      {inviteEmailStatus[restaurant.id].sent
+                                        ? `Onboarding invitation email sent to ${inviteEmailStatus[restaurant.id].email}`
+                                        : `Link generated for ${inviteEmailStatus[restaurant.id].email} (Email status: ${inviteEmailStatus[restaurant.id].error || "pending/unconfigured"})`}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                              <div
+                                className={`p-3 rounded-xl border flex items-center justify-between text-xs font-mono ${
+                                  isDark
+                                    ? "bg-[#0A0C12] border-white/[0.08] text-emerald-400"
+                                    : "bg-emerald-50 border-emerald-200 text-emerald-800"
                                 }`}
                               >
-                                Copy
-                              </button>
+                                <span className="truncate mr-3">{inviteUrls[restaurant.id]}</span>
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(inviteUrls[restaurant.id]);
+                                    showToast("Copied to clipboard");
+                                  }}
+                                  className={`px-2.5 py-1 rounded-lg text-[11px] font-sans font-medium ${
+                                    isDark ? "bg-white/[0.08] text-white hover:bg-white/[0.15]" : "bg-emerald-600 text-white hover:bg-emerald-700"
+                                  }`}
+                                >
+                                  Copy
+                                </button>
+                              </div>
                             </div>
                           )}
                         </div>

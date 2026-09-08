@@ -5,6 +5,8 @@ import { v4 as uuidv4 } from "uuid";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 
+import { sendTenantActivationEmail } from "@/core/mail";
+
 const generateInviteSchema = z.object({
   email: z.string().email().optional(),
   roleId: z.string().uuid().optional(),
@@ -123,12 +125,47 @@ export async function POST(
       },
     });
 
+    // Determine base URL from headers or environment
+    const rawProto = req.headers.get("x-forwarded-proto") || "https";
+    const proto = rawProto.split(",")[0].trim();
+    const rawHost = req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
+    const host = rawHost.split(",")[0].trim();
+    const cleanHost = host.startsWith("admin.") ? host.replace(/^admin\./, "") : host;
+    const reqBaseUrl = cleanHost ? `${proto}://${cleanHost}` : undefined;
+
+    const adminUser = restaurant.memberships.find((m) => m.user?.email === targetEmail)?.user;
+    const adminDisplayName = adminUser?.name || `${restaurant.name} Administrator`;
+
+    // Dispatch professional HTML onboarding email
+    let emailSent = false;
+    let emailError: string | null = null;
+    try {
+      const emailResult = await sendTenantActivationEmail({
+        adminName: adminDisplayName,
+        adminEmail: targetEmail,
+        restaurantName: restaurant.name,
+        subdomain: restaurant.subdomain,
+        activationToken: newToken,
+        expiresAt,
+        baseUrl: reqBaseUrl,
+      });
+      emailSent = emailResult?.success ?? false;
+      if (!emailResult?.success && emailResult?.error) {
+        emailError = emailResult.error;
+      }
+    } catch (err: any) {
+      console.warn("Failed to dispatch tenant onboarding activation email:", err);
+      emailError = err.message;
+    }
+
     return NextResponse.json({
       success: true,
       token: newToken,
       email: targetEmail,
       subdomain: restaurant.subdomain,
       activationUrl: `/activate?token=${newToken}&subdomain=${restaurant.subdomain}`,
+      emailSent,
+      emailError,
     });
   } catch (error: any) {
     console.error("Generate Invite Error:", error);
