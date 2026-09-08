@@ -188,7 +188,9 @@ export async function POST(req: NextRequest) {
       const activeMemberEmails = new Set(activeMemberships.map((m) => m.user.email.toLowerCase()));
 
       if (activeMemberEmails.has(data.email.toLowerCase())) {
-        throw new Error("This user is already an active member of this restaurant.");
+        throw new Error(
+          `This user (${data.email}) is already an active member of this restaurant. To change or assign additional roles, please use the "Edit Roles" option in the Active Members table.`
+        );
       }
 
       // Count only pending invitations for users who are NOT already active members
@@ -442,9 +444,9 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { invitationId, membershipId, employeeId } = body;
+    const { invitationId, membershipId, employeeId, roleIds, outletId } = body;
 
-    // Handle manual link / unlink of staff profile to user membership
+    // Handle updating membership profile and/or assigning multiple roles
     if (membershipId) {
       const membership = await prisma.restaurantMembership.findFirst({
         where: { id: membershipId, restaurantId },
@@ -454,31 +456,106 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: "Membership not found" }, { status: 404 });
       }
 
+      // Self-protection: prevent user from removing all roles from their own admin account
+      if (membership.userId === session.userId && Array.isArray(roleIds) && roleIds.length === 0) {
+        return NextResponse.json(
+          { error: "You cannot remove all roles from your own administrator account." },
+          { status: 400 }
+        );
+      }
+
+      let employee = null;
       if (employeeId) {
-        const emp = await prisma.employee.findFirst({
+        employee = await prisma.employee.findFirst({
           where: { id: employeeId, restaurantId, archivedAt: null },
         });
-        if (!emp) {
+        if (!employee) {
           return NextResponse.json({ error: "Employee profile not found" }, { status: 404 });
         }
-        await prisma.restaurantMembership.update({
-          where: { id: membership.id },
-          data: { employeeId: emp.id },
-        });
-        return NextResponse.json({
-          success: true,
-          message: `Linked account ${membership.user.email} to staff profile ${emp.firstName} ${emp.lastName} (${emp.employeeCode})`,
-        });
-      } else {
-        await prisma.restaurantMembership.update({
-          where: { id: membership.id },
-          data: { employeeId: null },
-        });
-        return NextResponse.json({
-          success: true,
-          message: `Unlinked staff profile from account ${membership.user.email}`,
-        });
       }
+
+      let rolesToAssign: any[] = [];
+      if (Array.isArray(roleIds) && roleIds.length > 0) {
+        rolesToAssign = await prisma.role.findMany({
+          where: { id: { in: roleIds }, restaurantId },
+          include: {
+            permissions: {
+              include: { permission: true },
+            },
+          },
+        });
+        if (rolesToAssign.length !== roleIds.length) {
+          return NextResponse.json(
+            { error: "One or more selected roles were not found in this restaurant" },
+            { status: 404 }
+          );
+        }
+      }
+
+      await prisma.$transaction(async (tx) => {
+        // 1. Update employee link if employeeId was explicitly passed
+        if (employeeId !== undefined) {
+          await tx.restaurantMembership.update({
+            where: { id: membership.id },
+            data: { employeeId: employee ? employee.id : null },
+          });
+        }
+
+        // 2. Update role access grants if roleIds was provided
+        if (Array.isArray(roleIds)) {
+          // Remove existing grants for this membership
+          await tx.accessGrant.deleteMany({
+            where: { membershipId: membership.id, restaurantId },
+          });
+
+          // Create new grants for each role and module
+          for (const r of rolesToAssign) {
+            const moduleIds: string[] = Array.from(new Set<string>(r.permissions.map((rp: any) => String(rp.permission.moduleId))));
+            const targets: string[] = moduleIds.length > 0 ? moduleIds : ["workforce"];
+            for (const moduleId of targets) {
+              await tx.accessGrant.create({
+                data: {
+                  restaurantId,
+                  membershipId: membership.id,
+                  moduleId,
+                  roleId: r.id,
+                  outletId: outletId || null,
+                  status: "ACTIVE",
+                },
+              });
+            }
+          }
+
+          // Invalidate user token version so session caches refresh
+          await tx.user.update({
+            where: { id: membership.userId },
+            data: { tokenVersion: { increment: 1 } },
+          });
+        }
+
+        await tx.auditLog.create({
+          data: {
+            restaurantId,
+            userId: session.userId,
+            userEmail: session.email,
+            action: "MEMBERSHIP_PROFILE_AND_ROLES_UPDATED",
+            entityType: "RestaurantMembership",
+            entityId: membership.id,
+            newValues: JSON.stringify({
+              userId: membership.userId,
+              email: membership.user.email,
+              employeeId: employee ? employee.id : employeeId === null ? null : undefined,
+              roleIds: Array.isArray(roleIds) ? roleIds : undefined,
+              outletId: outletId || null,
+            }),
+          },
+        });
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Account settings and assigned roles updated for ${membership.user.email}`,
+      });
     }
 
     if (!invitationId) {

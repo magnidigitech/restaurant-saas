@@ -8,6 +8,8 @@ import RestaurantNavbar from "@/components/RestaurantNavbar";
 interface Role {
   id: string;
   name: string;
+  description?: string | null;
+  permissions?: any[];
 }
 
 interface Outlet {
@@ -45,8 +47,10 @@ export default function InternalUsersPage({
   const [successMsg, setSuccessMsg] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
+  // Grant Portal Access Modal State
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState("");
   const [createdInviteUrl, setCreatedInviteUrl] = useState("");
   const [createdEmailSent, setCreatedEmailSent] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
@@ -66,6 +70,23 @@ export default function InternalUsersPage({
   } | null>(null);
   const [selectedLinkEmployeeId, setSelectedLinkEmployeeId] = useState("");
   const [linkSaving, setLinkSaving] = useState(false);
+
+  // Remove Access Confirmation Modal State
+  const [confirmRemoveTarget, setConfirmRemoveTarget] = useState<{
+    membershipId: string;
+    email: string;
+  } | null>(null);
+
+  // Edit User & Multiple Roles Modal State
+  const [editRolesTarget, setEditRolesTarget] = useState<{
+    membershipId: string;
+    userEmail: string;
+    employeeId: string;
+    selectedRoleIds: string[];
+    outletId: string;
+  } | null>(null);
+  const [editRolesSaving, setEditRolesSaving] = useState(false);
+  const [editRolesError, setEditRolesError] = useState("");
 
   const fetchData = async () => {
     setLoading(true);
@@ -114,6 +135,7 @@ export default function InternalUsersPage({
     e.preventDefault();
     setSaving(true);
     setError("");
+    setModalError("");
     setSuccessMsg("");
     setCreatedInviteUrl("");
 
@@ -141,7 +163,7 @@ export default function InternalUsersPage({
 
       fetchData();
     } catch (err: any) {
-      setError(err.message || "Error creating invitation");
+      setModalError(err.message || "Error creating invitation");
     } finally {
       setSaving(false);
     }
@@ -240,6 +262,51 @@ export default function InternalUsersPage({
       setError(err.message || "Failed to update link");
     } finally {
       setLinkSaving(false);
+    }
+  };
+
+  const handleOpenEditRoles = (m: any) => {
+    const currentRoleIds = Array.from(
+      new Set(
+        (m.accessGrants || [])
+          .filter((g: any) => g.status === "ACTIVE" && g.role)
+          .map((g: any) => g.role.id)
+      )
+    );
+    setEditRolesTarget({
+      membershipId: m.id,
+      userEmail: m.user.email,
+      employeeId: m.employeeId || "",
+      selectedRoleIds: currentRoleIds as string[],
+      outletId: m.accessGrants?.[0]?.outletId || "",
+    });
+    setEditRolesError("");
+  };
+
+  const handleSaveRolesAndProfile = async () => {
+    if (!editRolesTarget) return;
+    setEditRolesSaving(true);
+    setEditRolesError("");
+    try {
+      const res = await fetch("/api/restaurant/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          membershipId: editRolesTarget.membershipId,
+          employeeId: editRolesTarget.employeeId || null,
+          roleIds: editRolesTarget.selectedRoleIds,
+          outletId: editRolesTarget.outletId || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update profile and roles");
+      setSuccessMsg(data.message || "Profile and assigned roles updated successfully");
+      setEditRolesTarget(null);
+      fetchData();
+    } catch (err: any) {
+      setEditRolesError(err.message || "Failed to update profile and roles");
+    } finally {
+      setEditRolesSaving(false);
     }
   };
 
@@ -387,6 +454,7 @@ export default function InternalUsersPage({
                   >
                     <th className="pb-3 px-3">User Email</th>
                     <th className="pb-3 px-3">Linked Staff Profile</th>
+                    <th className="pb-3 px-3">Assigned Roles</th>
                     <th className="pb-3 px-3">Member Since</th>
                     <th className="pb-3 px-3">Status</th>
                     <th className="pb-3 px-3 text-right">Actions</th>
@@ -490,6 +558,41 @@ export default function InternalUsersPage({
                           </div>
                         )}
                       </td>
+                      <td className={`py-3.5 px-3 ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+                        {(() => {
+                          const activeRoles: [string, string][] = Array.from(
+                            new Map<string, string>(
+                              (m.accessGrants || [])
+                                .filter((g: any) => g.status === "ACTIVE" && g.role)
+                                .map((g: any): [string, string] => [String(g.role.id), String(g.role.name)])
+                            ).entries()
+                          );
+                          return activeRoles.length > 0 ? (
+                            <div className="flex flex-wrap items-center gap-1.5 max-w-xs">
+                              {activeRoles.map(([rId, rName]) => (
+                                <span
+                                  key={rId}
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                                    rName.toLowerCase().includes("owner") || rName.toLowerCase().includes("admin")
+                                      ? isDark
+                                        ? "bg-purple-500/15 text-purple-300 border-purple-500/30"
+                                        : "bg-purple-100 text-purple-800 border-purple-300"
+                                      : isDark
+                                      ? "bg-blue-500/15 text-blue-300 border-blue-500/30"
+                                      : "bg-blue-50 text-blue-800 border-blue-200"
+                                  }`}
+                                >
+                                  {rName}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className={`text-[11px] italic ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                              No Roles Assigned
+                            </span>
+                          );
+                        })()}
+                      </td>
                       <td className={`py-3.5 px-3 ${isDark ? "text-slate-400" : "text-slate-600"}`}>
                         {m.joinedAt
                           ? new Date(m.joinedAt).toLocaleDateString()
@@ -509,23 +612,36 @@ export default function InternalUsersPage({
                         </span>
                       </td>
                       <td className="py-3.5 px-3 text-right">
-                        {m.user.id === currentUserId ? (
-                          <span className={`text-[11px] font-medium italic ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-                            You
-                          </span>
-                        ) : (
+                        <div className="flex items-center justify-end gap-2 flex-wrap">
                           <button
-                            onClick={() => handleRemoveMembership(m.id, m.user.email)}
-                            disabled={actionLoadingId === `remove-${m.id}`}
-                            className={`px-3 py-1 text-[11px] font-semibold rounded-lg transition cursor-pointer disabled:opacity-50 border ${
+                            type="button"
+                            onClick={() => handleOpenEditRoles(m)}
+                            className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition cursor-pointer border ${
                               isDark
-                                ? "text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30"
-                                : "text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-200"
+                                ? "text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/30"
+                                : "text-blue-700 bg-blue-50 hover:bg-blue-100 border-blue-200"
                             }`}
                           >
-                            {actionLoadingId === `remove-${m.id}` ? "Removing..." : "Remove Access"}
+                            Edit Roles & Profile
                           </button>
-                        )}
+                          {m.user.id === currentUserId ? (
+                            <span className={`text-[11px] font-medium italic ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                              You
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmRemoveTarget({ membershipId: m.id, email: m.user.email })}
+                              className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition cursor-pointer border ${
+                                isDark
+                                  ? "text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30"
+                                  : "text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-200"
+                              }`}
+                            >
+                              Remove Access
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -822,6 +938,29 @@ export default function InternalUsersPage({
               </div>
             ) : (
               <form onSubmit={handleCreateInvite} className="space-y-4 pt-1">
+                {modalError && (
+                  <div
+                    className={`p-3.5 rounded-2xl border text-xs flex items-start gap-2.5 animate-in fade-in transition ${
+                      isDark
+                        ? "bg-rose-950/60 border-rose-500/40 text-rose-200"
+                        : "bg-rose-50 border-rose-300 text-rose-900"
+                    }`}
+                  >
+                    <span className="text-base shrink-0 leading-none">⚠️</span>
+                    <div className="flex-1 text-[11px] leading-relaxed">
+                      <span className="font-bold block text-xs mb-0.5">Invitation Not Allowed</span>
+                      {modalError}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setModalError("")}
+                      className="text-xs p-1 opacity-70 hover:opacity-100 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
                 <div>
                   <label className={`block text-xs font-semibold mb-1.5 ${isDark ? "text-slate-200" : "text-slate-800"}`}>
                     Select Staff Member
@@ -853,13 +992,36 @@ export default function InternalUsersPage({
                     required
                     placeholder="name@company.com"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, email: e.target.value });
+                      if (modalError) setModalError("");
+                    }}
                     className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:ring-2 focus:ring-[#0071E3]/20 focus:border-[#0071E3] ${
                       isDark
                         ? "bg-[#0A0C12] border-white/10 text-white"
                         : "bg-white border-slate-300 text-slate-900 shadow-xs"
                     }`}
                   />
+                  {formData.email.trim() &&
+                    memberships.some(
+                      (m) => m.user.email.toLowerCase() === formData.email.trim().toLowerCase()
+                    ) && (
+                      <div
+                        className={`mt-2 p-3 rounded-xl border text-[11px] flex items-start gap-2 animate-in fade-in transition ${
+                          isDark
+                            ? "bg-amber-950/40 border-amber-500/30 text-amber-200"
+                            : "bg-amber-50 border-amber-300 text-amber-900"
+                        }`}
+                      >
+                        <span className="text-base shrink-0 leading-none">💡</span>
+                        <div className="leading-relaxed">
+                          <strong className="block font-bold">This user is already an active member!</strong>
+                          <span>
+                            {formData.email} already has portal access. To assign them additional roles (e.g. Analytics, Shift Manager), please close this dialog and click <strong>&quot;Edit Roles &amp; Profile&quot;</strong> on their row in the Active Members table.
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   <p className={`text-[11px] mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                     Access instructions and a cryptographic password setup link will be dispatched to this email.
                   </p>
@@ -1045,6 +1207,306 @@ export default function InternalUsersPage({
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM REVOKE ACCESS MODAL */}
+      {confirmRemoveTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-150">
+          <div
+            className={`w-full max-w-md p-6 sm:p-7 rounded-3xl border shadow-2xl space-y-4 ${
+              isDark ? "bg-[#121622] border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-500 text-xl font-bold shrink-0">
+                ⚠️
+              </div>
+              <div className="space-y-1 flex-1">
+                <h3 className="text-base font-bold">Revoke User Access</h3>
+                <p className={`text-xs leading-relaxed ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+                  Are you sure you want to revoke access for <strong className={isDark ? "text-white" : "text-slate-900"}>{confirmRemoveTarget.email}</strong>?
+                </p>
+                <p className={`text-[11px] p-2.5 rounded-xl border mt-2 leading-relaxed ${
+                  isDark ? "bg-rose-950/30 border-rose-500/20 text-rose-300" : "bg-rose-50 border-rose-200 text-rose-800"
+                }`}>
+                  This will remove all assigned roles, revoke login access, and invalidate all active sessions for this restaurant.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+              <button
+                type="button"
+                disabled={actionLoadingId === `remove-${confirmRemoveTarget.membershipId}`}
+                onClick={() => setConfirmRemoveTarget(null)}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                  isDark ? "text-slate-300 hover:text-white" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={actionLoadingId === `remove-${confirmRemoveTarget.membershipId}`}
+                onClick={async () => {
+                  await handleRemoveMembership(confirmRemoveTarget.membershipId, confirmRemoveTarget.email);
+                  setConfirmRemoveTarget(null);
+                }}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-sm disabled:opacity-50 flex items-center gap-2"
+              >
+                {actionLoadingId === `remove-${confirmRemoveTarget.membershipId}` ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Revoking Access...</span>
+                  </>
+                ) : (
+                  <span>Yes, Revoke Access</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* UPDATE PROFILE & ASSIGN MULTIPLE ROLES MODAL */}
+      {editRolesTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 overflow-y-auto">
+          <div
+            className={`w-full max-w-lg p-6 sm:p-7 rounded-3xl border shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 transition ${
+              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            {/* Header */}
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-[#0071E3] block">
+                  Workforce &amp; Permissions
+                </span>
+                <h2 className="text-base font-bold tracking-tight mt-0.5">Edit Profile &amp; Assign Roles</h2>
+                <p className={`text-xs mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                  Update roles and linked staff profile for <strong className={isDark ? "text-white" : "text-slate-900"}>{editRolesTarget.userEmail}</strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditRolesTarget(null)}
+                className={`p-1.5 rounded-lg transition text-base cursor-pointer ${
+                  isDark ? "text-slate-400 hover:text-white" : "text-slate-400 hover:text-slate-700"
+                }`}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Error */}
+            {editRolesError && (
+              <div
+                className={`p-3.5 rounded-2xl border text-xs flex items-start gap-2.5 animate-in fade-in transition ${
+                  isDark ? "bg-rose-950/60 border-rose-500/40 text-rose-200" : "bg-rose-50 border-rose-300 text-rose-900"
+                }`}
+              >
+                <span className="text-base shrink-0 leading-none">⚠️</span>
+                <div className="flex-1 text-[11px] leading-relaxed">
+                  <span className="font-bold block text-xs mb-0.5">Failed to Update</span>
+                  {editRolesError}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditRolesError("")}
+                  className="text-xs p-1 opacity-70 hover:opacity-100 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              {/* Linked Staff Profile */}
+              <div>
+                <label className={`block text-xs font-semibold mb-1.5 ${isDark ? "text-slate-200" : "text-slate-800"}`}>
+                  Linked HR Staff Profile
+                </label>
+                <select
+                  value={editRolesTarget.employeeId}
+                  onChange={(e) =>
+                    setEditRolesTarget({ ...editRolesTarget, employeeId: e.target.value })
+                  }
+                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:ring-2 focus:ring-[#0071E3]/20 focus:border-[#0071E3] cursor-pointer ${
+                    isDark
+                      ? "bg-[#0A0C12] border-white/10 text-white"
+                      : "bg-white border-slate-300 text-slate-900 shadow-xs"
+                  }`}
+                >
+                  <option value="">-- No HR Staff Profile Linked (Unlinked) --</option>
+                  {employees
+                    .filter((e) => !e.archivedAt)
+                    .map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.firstName} {emp.lastName} ({emp.employeeCode}) {emp.personalEmail ? `• ${emp.personalEmail}` : ""}
+                      </option>
+                    ))}
+                </select>
+                <p className={`text-[11px] mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                  Links this user login to time punches, shift rosters, and payroll records.
+                </p>
+              </div>
+
+              {/* Multiple Roles Checkbox Selector */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className={`text-xs font-semibold ${isDark ? "text-slate-200" : "text-slate-800"}`}>
+                    Assigned Roles ({editRolesTarget.selectedRoleIds.length} Selected)
+                  </label>
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEditRolesTarget({
+                          ...editRolesTarget,
+                          selectedRoleIds: roles.map((r) => r.id),
+                        })
+                      }
+                      className="text-[#0071E3] hover:underline font-semibold cursor-pointer"
+                    >
+                      Select All
+                    </button>
+                    <span className={isDark ? "text-white/20" : "text-slate-300"}>•</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEditRolesTarget({
+                          ...editRolesTarget,
+                          selectedRoleIds: [],
+                        })
+                      }
+                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  className={`p-3 rounded-2xl border max-h-56 overflow-y-auto space-y-2 ${
+                    isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50/70 border-slate-200"
+                  }`}
+                >
+                  {roles.length === 0 ? (
+                    <p className={`text-xs p-3 text-center ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                      No roles created yet.
+                    </p>
+                  ) : (
+                    roles.map((r) => {
+                      const isChecked = editRolesTarget.selectedRoleIds.includes(r.id);
+                      return (
+                        <label
+                          key={r.id}
+                          className={`flex items-start gap-3 p-2.5 rounded-xl border transition cursor-pointer select-none ${
+                            isChecked
+                              ? isDark
+                                ? "bg-blue-500/15 border-blue-500/30 text-white"
+                                : "bg-blue-50/80 border-blue-200 text-blue-900"
+                              : isDark
+                              ? "bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.04] text-slate-300"
+                              : "bg-white border-slate-200/80 hover:bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const newRoles = e.target.checked
+                                ? [...editRolesTarget.selectedRoleIds, r.id]
+                                : editRolesTarget.selectedRoleIds.filter((id) => id !== r.id);
+                              setEditRolesTarget({
+                                ...editRolesTarget,
+                                selectedRoleIds: newRoles,
+                              });
+                            }}
+                            className="mt-0.5 w-4 h-4 rounded text-[#0071E3] focus:ring-[#0071E3] cursor-pointer"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-xs">{r.name}</span>
+                              {r.permissions && r.permissions.length > 0 && (
+                                <span
+                                  className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                                    isDark ? "bg-white/10 text-slate-300" : "bg-slate-200 text-slate-700"
+                                  }`}
+                                >
+                                  {r.permissions.length} perms
+                                </span>
+                              )}
+                            </div>
+                            {r.description && (
+                              <p className={`text-[11px] mt-0.5 truncate ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                                {r.description}
+                              </p>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Branch Outlet Scope */}
+              <div>
+                <label className={`block text-xs font-semibold mb-1.5 ${isDark ? "text-slate-200" : "text-slate-800"}`}>
+                  Branch Outlet Scope
+                </label>
+                <select
+                  value={editRolesTarget.outletId}
+                  onChange={(e) =>
+                    setEditRolesTarget({ ...editRolesTarget, outletId: e.target.value })
+                  }
+                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:ring-2 focus:ring-[#0071E3]/20 focus:border-[#0071E3] cursor-pointer ${
+                    isDark
+                      ? "bg-[#0A0C12] border-white/10 text-white"
+                      : "bg-white border-slate-300 text-slate-900 shadow-xs"
+                  }`}
+                >
+                  <option value="">All Outlets (Global Scope)</option>
+                  {outlets.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+              <button
+                type="button"
+                onClick={() => setEditRolesTarget(null)}
+                disabled={editRolesSaving}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                  isDark ? "text-slate-300 hover:text-white" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveRolesAndProfile}
+                disabled={editRolesSaving}
+                className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-sm disabled:opacity-50 flex items-center gap-2"
+              >
+                {editRolesSaving ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Saving Changes...</span>
+                  </>
+                ) : (
+                  <span>Save Roles &amp; Profile</span>
+                )}
+              </button>
             </div>
           </div>
         </div>
