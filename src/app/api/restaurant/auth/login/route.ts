@@ -4,6 +4,9 @@ import { setTenantSession } from "@/core/auth/session";
 import { isRateLimited } from "@/core/auth/rate-limiter";
 import { validateCsrf } from "@/core/auth/csrf";
 import { sign2FAChallenge } from "@/core/auth/two-factor";
+import { isCurrentDeviceTrusted } from "@/core/auth/trusted-devices";
+import { trackUserSession } from "@/core/auth/sessions";
+import { logSecurityAudit } from "@/core/auth/security-audit";
 import * as bcrypt from "bcryptjs";
 import { z } from "zod";
 
@@ -64,6 +67,14 @@ export async function POST(req: NextRequest) {
     // Compare passwords
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
+      await logSecurityAudit({
+        organizationId: restaurant.id,
+        userId: user.id,
+        userEmail: user.email,
+        event: "LOGIN_FAILED",
+        reqHeaders: req.headers,
+        metadata: { reason: "Bad password" },
+      });
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
@@ -81,6 +92,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User is not an active member of this restaurant" }, { status: 403 });
     }
 
+    // Check organization MFA policy
+    const policy = await prisma.restaurantSecurityPolicy.findUnique({
+      where: { restaurantId: restaurant.id },
+    });
+
+    let requiredByPolicy = false;
+    if (policy) {
+      try {
+        const requiredRoles: string[] = JSON.parse(policy.requireMfaRoles);
+        const { getUserRoleNames } = await import("@/core/auth/user-roles");
+        const userRoles = await getUserRoleNames(user.id, restaurant.id);
+        
+        if (Array.isArray(requiredRoles)) {
+          const match = userRoles.some((r) =>
+            requiredRoles.some((req) => req.toLowerCase() === r.toLowerCase())
+          );
+          if (match) requiredByPolicy = true;
+        }
+        if (policy.enforceImmediateMfa) {
+          requiredByPolicy = true;
+        }
+      } catch (e) {}
+    }
+
     // Check for Two-Factor Authentication safely
     let twoFactor = null;
     try {
@@ -90,10 +125,23 @@ export async function POST(req: NextRequest) {
         });
       }
     } catch (twoFactorErr) {
-      console.warn("Could not query TwoFactorAuth, skipping 2FA challenge:", twoFactorErr);
+      console.warn("Could not query TwoFactorAuth:", twoFactorErr);
     }
 
-    if (twoFactor?.enabled) {
+    // Has user registered passkeys?
+    const hasPasskeys = await prisma.passkey.count({
+      where: { userId: user.id, revokedAt: null },
+    });
+
+    const mfaConfigured = !!twoFactor?.enabled || hasPasskeys > 0;
+
+    // Check if current device is trusted (Trusted Device Bypass)
+    const isTrusted = await isCurrentDeviceTrusted(user.id, restaurant.id);
+
+    // Require 2FA challenge if:
+    // (a) user has 2FA configured OR policy mandates it
+    // AND device is not currently trusted
+    if ((mfaConfigured || requiredByPolicy) && !isTrusted) {
       const challengeToken = await sign2FAChallenge({
         userId: user.id,
         email: user.email,
@@ -106,6 +154,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         requiresTwoFactor: true,
         challengeToken,
+        hasPasskeys: hasPasskeys > 0,
+        hasTotp: !!twoFactor?.enabled,
+        requiredByPolicy,
         user: {
           name: user.name,
           email: user.email,
@@ -122,6 +173,19 @@ export async function POST(req: NextRequest) {
       activeRestaurantId: restaurant.id,
       activeRestaurantSubdomain: subdomain,
       tokenVersion: user.tokenVersion,
+    });
+
+    // Track active UserSession
+    await trackUserSession(user.id, restaurant.id, req.headers);
+
+    // Audit Log
+    await logSecurityAudit({
+      organizationId: restaurant.id,
+      userId: user.id,
+      userEmail: user.email,
+      event: "LOGIN_SUCCESS",
+      reqHeaders: req.headers,
+      metadata: { method: isTrusted ? "TRUSTED_DEVICE" : "PASSWORD" },
     });
 
     return NextResponse.json({ success: true, user: { name: user.name, email: user.email } });

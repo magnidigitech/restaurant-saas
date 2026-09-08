@@ -685,17 +685,54 @@ export default function InternalUsersPage({
                               You
                             </span>
                           ) : (
-                            <button
-                              type="button"
-                              onClick={() => setConfirmRemoveTarget({ membershipId: m.id, email: m.user.email })}
-                              className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition cursor-pointer border ${
-                                isDark
-                                  ? "text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30"
-                                  : "text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-200"
-                              }`}
-                            >
-                              Remove Access
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (
+                                    !window.confirm(
+                                      `INSTANT OFFBOARDING:\n\nAre you sure you want to completely offboard ${m.user.name} (${m.user.email})?\n\nThis will immediately:\n1. Deactivate their account\n2. Revoke all active user sessions\n3. Revoke all trusted devices\n4. Invalidate all passkeys\n5. Invalidate JWT tokens\n\nProceed?`
+                                    )
+                                  ) {
+                                    return;
+                                  }
+                                  try {
+                                    setActionLoadingId(`offboard-${m.user.id}`);
+                                    const res = await fetch(`/api/restaurant/users/${m.user.id}/offboard`, {
+                                      method: "POST",
+                                    });
+                                    const data = await res.json();
+                                    if (!res.ok) throw new Error(data.error || "Offboarding failed");
+                                    setSuccessMsg(data.message || "Employee offboarded successfully.");
+                                    fetchData();
+                                  } catch (err: any) {
+                                    setError(err.message);
+                                  } finally {
+                                    setActionLoadingId(null);
+                                  }
+                                }}
+                                disabled={actionLoadingId === `offboard-${m.user.id}`}
+                                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition cursor-pointer border ${
+                                  isDark
+                                    ? "text-red-400 bg-red-600/20 hover:bg-red-600/30 border-red-500/40"
+                                    : "text-red-800 bg-red-100 hover:bg-red-200 border-red-300"
+                                }`}
+                                title="Atomic offboarding: disables account, revokes sessions, clears trusted devices, and invalidates passkeys"
+                              >
+                                {actionLoadingId === `offboard-${m.user.id}` ? "Offboarding..." : "Offboard"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmRemoveTarget({ membershipId: m.id, email: m.user.email })}
+                                className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition cursor-pointer border ${
+                                  isDark
+                                    ? "text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30"
+                                    : "text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-200"
+                                }`}
+                              >
+                                Remove Access
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>

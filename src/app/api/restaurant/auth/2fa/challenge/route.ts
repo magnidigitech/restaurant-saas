@@ -3,6 +3,9 @@ import { prisma } from "@/core/database/client";
 import { setTenantSession } from "@/core/auth/session";
 import { isRateLimited } from "@/core/auth/rate-limiter";
 import { ensureTwoFactorTables } from "@/core/database/ensure-tables";
+import { createTrustedDevice } from "@/core/auth/trusted-devices";
+import { trackUserSession } from "@/core/auth/sessions";
+import { logSecurityAudit } from "@/core/auth/security-audit";
 import {
   verify2FAChallenge,
   decryptTotpSecret,
@@ -24,7 +27,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { challengeToken, code, isRecoveryCode } = body;
+    const { challengeToken, code, isRecoveryCode, trustDevice } = body;
 
     if (!challengeToken || typeof challengeToken !== "string") {
       return NextResponse.json({ error: "Missing or invalid challenge token" }, { status: 400 });
@@ -72,8 +75,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Access to this restaurant workspace is unavailable" }, { status: 403 });
     }
 
-    const userAgent = req.headers.get("user-agent") || "unknown";
-
     // 4. Case A: Recovery Code Verification
     if (isRecoveryCode) {
       const unusedCodes = await prisma.twoFactorRecoveryCode.findMany({
@@ -104,19 +105,15 @@ export async function POST(req: NextRequest) {
           where: { id: matchedCodeId },
           data: { usedAt: new Date() },
         }),
-        prisma.auditLog.create({
-          data: {
-            restaurantId: payload.restaurantId,
-            userId: user.id,
-            userEmail: user.email,
-            action: "RECOVERY_CODE_USED",
-            entityType: "UserTwoFactor",
-            entityId: user.id,
-            ipAddress: ip,
-            userAgent,
-          },
-        }),
       ]);
+
+      await logSecurityAudit({
+        organizationId: payload.restaurantId,
+        userId: user.id,
+        userEmail: user.email,
+        event: "RECOVERY_CODE_USED",
+        reqHeaders: req.headers,
+      });
 
       // Issue full tenant session cookie
       await setTenantSession({
@@ -128,6 +125,14 @@ export async function POST(req: NextRequest) {
         activeRestaurantSubdomain: payload.subdomain,
         tokenVersion: user.tokenVersion,
       });
+
+      // Track session
+      await trackUserSession(user.id, payload.restaurantId, req.headers);
+
+      // Trusted device registration
+      if (trustDevice) {
+        await createTrustedDevice(user.id, payload.restaurantId, req.headers, 30);
+      }
 
       return NextResponse.json({
         success: true,
@@ -150,6 +155,15 @@ export async function POST(req: NextRequest) {
 
     const isValid = await verifyTotpCode(secret, code);
     if (!isValid) {
+      await logSecurityAudit({
+        organizationId: payload.restaurantId,
+        userId: user.id,
+        userEmail: user.email,
+        event: "MFA_FAILED",
+        reqHeaders: req.headers,
+        metadata: { reason: "Invalid TOTP" },
+      });
+
       return NextResponse.json(
         { error: "Invalid 6-digit authenticator code. Please check your authenticator app and try again." },
         { status: 400 }
@@ -157,17 +171,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Log successful 2FA verification
-    await prisma.auditLog.create({
-      data: {
-        restaurantId: payload.restaurantId,
-        userId: user.id,
-        userEmail: user.email,
-        action: "2FA_VERIFICATION_SUCCESS",
-        entityType: "UserTwoFactor",
-        entityId: user.id,
-        ipAddress: ip,
-        userAgent,
-      },
+    await logSecurityAudit({
+      organizationId: payload.restaurantId,
+      userId: user.id,
+      userEmail: user.email,
+      event: "MFA_SUCCESS",
+      reqHeaders: req.headers,
     });
 
     // Issue full tenant session cookie
@@ -180,6 +189,21 @@ export async function POST(req: NextRequest) {
       activeRestaurantSubdomain: payload.subdomain,
       tokenVersion: user.tokenVersion,
     });
+
+    // Track active UserSession
+    await trackUserSession(user.id, payload.restaurantId, req.headers);
+
+    // Trusted device registration
+    if (trustDevice) {
+      await createTrustedDevice(user.id, payload.restaurantId, req.headers, 30);
+      await logSecurityAudit({
+        organizationId: payload.restaurantId,
+        userId: user.id,
+        userEmail: user.email,
+        event: "TRUSTED_DEVICE_CREATED",
+        reqHeaders: req.headers,
+      });
+    }
 
     return NextResponse.json({
       success: true,
