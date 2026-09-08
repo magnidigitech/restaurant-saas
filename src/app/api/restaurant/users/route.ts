@@ -47,6 +47,28 @@ export async function GET(req: NextRequest) {
       orderBy: { joinedAt: "desc" },
     });
 
+    // Auto-reconcile unlinked staff profiles:
+    // If a membership has employeeId === null, check if an employee exists with matching personalEmail
+    for (const m of memberships) {
+      if (!m.employeeId && m.user?.email) {
+        const matchedEmp = await prisma.employee.findFirst({
+          where: {
+            restaurantId: session.activeRestaurantId,
+            personalEmail: { equals: m.user.email, mode: "insensitive" },
+            archivedAt: null,
+          },
+        });
+        if (matchedEmp) {
+          await prisma.restaurantMembership.update({
+            where: { id: m.id },
+            data: { employeeId: matchedEmp.id },
+          });
+          m.employeeId = matchedEmp.id;
+          m.employee = matchedEmp;
+        }
+      }
+    }
+
     const memberEmails = new Set(memberships.map((m) => m.user.email.toLowerCase()));
 
     // Auto-reconcile: If an invitation exists for a user who is ALREADY an active member,
@@ -420,10 +442,47 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const invitationId = body.invitationId;
+    const { invitationId, membershipId, employeeId } = body;
+
+    // Handle manual link / unlink of staff profile to user membership
+    if (membershipId) {
+      const membership = await prisma.restaurantMembership.findFirst({
+        where: { id: membershipId, restaurantId },
+        include: { user: true },
+      });
+      if (!membership) {
+        return NextResponse.json({ error: "Membership not found" }, { status: 404 });
+      }
+
+      if (employeeId) {
+        const emp = await prisma.employee.findFirst({
+          where: { id: employeeId, restaurantId, archivedAt: null },
+        });
+        if (!emp) {
+          return NextResponse.json({ error: "Employee profile not found" }, { status: 404 });
+        }
+        await prisma.restaurantMembership.update({
+          where: { id: membership.id },
+          data: { employeeId: emp.id },
+        });
+        return NextResponse.json({
+          success: true,
+          message: `Linked account ${membership.user.email} to staff profile ${emp.firstName} ${emp.lastName} (${emp.employeeCode})`,
+        });
+      } else {
+        await prisma.restaurantMembership.update({
+          where: { id: membership.id },
+          data: { employeeId: null },
+        });
+        return NextResponse.json({
+          success: true,
+          message: `Unlinked staff profile from account ${membership.user.email}`,
+        });
+      }
+    }
 
     if (!invitationId) {
-      return NextResponse.json({ error: "Missing invitationId" }, { status: 400 });
+      return NextResponse.json({ error: "Missing invitationId or membershipId" }, { status: 400 });
     }
 
     const invitation = await prisma.staffInvitation.findFirst({

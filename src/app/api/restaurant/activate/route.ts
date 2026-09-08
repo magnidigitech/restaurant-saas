@@ -91,18 +91,31 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      // Find matching employee profile by email in this restaurant if exists
+      const matchingEmployee = await tx.employee.findFirst({
+        where: {
+          restaurantId: invitation.restaurantId,
+          personalEmail: { equals: invitation.email, mode: "insensitive" },
+          archivedAt: null,
+        },
+      });
+
       if (!membership) {
         membership = await tx.restaurantMembership.create({
           data: {
             restaurantId: invitation.restaurantId,
             userId: user.id,
+            employeeId: matchingEmployee?.id || null,
             status: "ACTIVE",
           },
         });
       } else {
         await tx.restaurantMembership.update({
           where: { id: membership.id },
-          data: { status: "ACTIVE" },
+          data: {
+            status: "ACTIVE",
+            ...(matchingEmployee && !membership.employeeId ? { employeeId: matchingEmployee.id } : {}),
+          },
         });
       }
 
