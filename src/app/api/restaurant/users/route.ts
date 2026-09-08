@@ -525,12 +525,6 @@ export async function PATCH(req: NextRequest) {
               });
             }
           }
-
-          // Invalidate user token version so session caches refresh
-          await tx.user.update({
-            where: { id: membership.userId },
-            data: { tokenVersion: { increment: 1 } },
-          });
         }
 
         await tx.auditLog.create({

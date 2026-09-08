@@ -67,6 +67,11 @@ export default function AppleTenantDashboard() {
       const dataAlerts = resAlerts && resAlerts.ok ? await resAlerts.json() : null;
       const dataPayroll = resPayroll && resPayroll.ok ? await resPayroll.json() : null;
 
+      if (resModules.status === 401) {
+        router.push(`/restaurant/${subdomain}/login`);
+        return;
+      }
+
       if (resBranding.ok) setBranding(dataBranding);
       if (resModules.ok) {
         setModules(dataModules.modules || []);
