@@ -189,6 +189,8 @@ export async function proxy(req: NextRequest) {
       if (path.startsWith("/api/restaurant")) {
         const isPublicTenantApi =
           path === "/api/restaurant/auth/login" ||
+          path.startsWith("/api/restaurant/auth/passkeys") ||
+          path.startsWith("/api/restaurant/auth/2fa/challenge") ||
           path === "/api/restaurant/activate" ||
           path.endsWith("/branding") ||
           path.startsWith("/api/restaurant/onboarding/portal");
