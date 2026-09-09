@@ -12,6 +12,8 @@ import {
   AlertTriangle,
   Mail,
   RefreshCw,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 interface Role {
@@ -508,32 +510,80 @@ export default function UsersTab({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                    <div className="flex items-center gap-2 shrink-0">
                       {m.user.twoFactorAuth?.enabled && (
                         <span
+                          title="Two-Factor Authentication Active"
                           className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
                             isDark
                               ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/25"
                               : "bg-emerald-50 text-emerald-700 border-emerald-200"
                           }`}
                         >
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                           2FA
                         </span>
                       )}
+
+                      {/* Active Status: Green Dot */}
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${
-                          m.status === "ACTIVE"
-                            ? isDark
-                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                              : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : isDark
-                            ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                            : "bg-amber-50 text-amber-700 border border-amber-200"
+                        title={m.status === "ACTIVE" ? "Active Account" : `Status: ${m.status}`}
+                        className="relative flex h-2.5 w-2.5 mx-0.5"
+                      >
+                        {m.status === "ACTIVE" ? (
+                          <>
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                          </>
+                        ) : (
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+                        )}
+                      </span>
+
+                      {/* Edit Roles Pencil Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditRoles(m)}
+                        title="Edit Roles & Access"
+                        className={`p-1.5 rounded-xl border transition cursor-pointer flex items-center justify-center ${
+                          isDark
+                            ? "text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/30"
+                            : "text-[#0071E3] bg-blue-50 hover:bg-blue-100 border-blue-200 shadow-2xs"
                         }`}
                       >
-                        {m.status}
-                      </span>
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Reset 2FA if enabled */}
+                      {m.user.twoFactorAuth?.enabled && (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmReset2faTarget({ membershipId: m.id, email: m.user.email })}
+                          title="Reset 2FA"
+                          className={`p-1.5 rounded-xl border transition cursor-pointer flex items-center justify-center ${
+                            isDark
+                              ? "text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30"
+                              : "text-amber-800 bg-amber-50 hover:bg-amber-100 border-amber-200"
+                          }`}
+                        >
+                          <KeyRound className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
+                      {/* Remove Access if not current user */}
+                      {!isCurrentUser && (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmRemoveTarget({ membershipId: m.id, email: m.user.email })}
+                          title="Revoke Staff Access"
+                          className={`p-1.5 rounded-xl border transition cursor-pointer flex items-center justify-center ${
+                            isDark
+                              ? "text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30"
+                              : "text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-200"
+                          }`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -642,47 +692,6 @@ export default function UsersTab({
                         <span className="text-slate-400 text-xs italic">No roles assigned</span>
                       )}
                     </div>
-                  </div>
-
-                  {/* Bottom row: Action Buttons */}
-                  <div className="flex items-center justify-end gap-2 pt-1 flex-wrap border-t border-black/[0.04] dark:border-white/[0.06]">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEditRoles(m)}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition cursor-pointer border ${
-                        isDark
-                          ? "text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/30"
-                          : "text-blue-700 bg-blue-50 hover:bg-blue-100 border-blue-200"
-                      }`}
-                    >
-                      Edit Roles
-                    </button>
-                    {m.user.twoFactorAuth?.enabled && (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmReset2faTarget({ membershipId: m.id, email: m.user.email })}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition cursor-pointer border ${
-                          isDark
-                            ? "text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30"
-                            : "text-amber-800 bg-amber-50 hover:bg-amber-100 border-amber-200"
-                        }`}
-                      >
-                        Reset 2FA
-                      </button>
-                    )}
-                    {!isCurrentUser && (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmRemoveTarget({ membershipId: m.id, email: m.user.email })}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition cursor-pointer border ${
-                          isDark
-                            ? "text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30"
-                            : "text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-200"
-                        }`}
-                      >
-                        Remove Access
-                      </button>
-                    )}
                   </div>
                 </div>
               );
