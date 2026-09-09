@@ -180,6 +180,41 @@ export default function InventoryItemsPage({
     costPerUnit: "",
   });
 
+  // Quick Category Creation States
+  const [showQuickCategory, setShowQuickCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [quickCategoryError, setQuickCategoryError] = useState("");
+
+  const handleQuickCreateCategory = async (target: "create" | "edit" = "create") => {
+    if (!newCategoryName.trim()) return;
+    setCreatingCategory(true);
+    setQuickCategoryError("");
+    try {
+      const res = await fetch("/api/restaurant/inventory/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newCategoryName.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create category");
+
+      const newCat: Category = data.category;
+      setCategories((prev) => [...prev, newCat]);
+      if (target === "create") {
+        setForm((prev) => ({ ...prev, categoryId: newCat.id }));
+      } else {
+        setEditForm((prev) => ({ ...prev, categoryId: newCat.id }));
+      }
+      setNewCategoryName("");
+      setShowQuickCategory(false);
+    } catch (err: any) {
+      setQuickCategoryError(err.message || "Failed to create category");
+    } finally {
+      setCreatingCategory(false);
+    }
+  };
+
   const fetchData = async (s = search, cat = categoryFilter) => {
     try {
       const p = new URLSearchParams();
@@ -828,23 +863,80 @@ export default function InventoryItemsPage({
                   </div>
 
                   <div>
-                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                      Category
-                    </label>
-                    <select
-                      value={editForm.categoryId}
-                      onChange={(e) => setEditForm({ ...editForm, categoryId: e.target.value })}
-                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
-                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                      }`}
-                    >
-                      <option value="">No Category</option>
-                      {categories.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className={`block text-xs font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                        Category
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowQuickCategory((prev) => !prev);
+                          setQuickCategoryError("");
+                        }}
+                        className="text-[11px] font-semibold text-[#0071E3] hover:underline cursor-pointer flex items-center gap-0.5"
+                      >
+                        {showQuickCategory ? "✕ Cancel" : "+ New Category"}
+                      </button>
+                    </div>
+
+                    {showQuickCategory ? (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            autoFocus
+                            placeholder="Category name..."
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleQuickCreateCategory("edit");
+                              }
+                            }}
+                            className={`flex-1 px-3 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                              isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            disabled={creatingCategory || !newCategoryName.trim()}
+                            onClick={() => handleQuickCreateCategory("edit")}
+                            className="px-3 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50 shrink-0"
+                          >
+                            {creatingCategory ? "Adding..." : "Add"}
+                          </button>
+                        </div>
+                        {quickCategoryError && (
+                          <p className="text-[10px] text-rose-500 font-medium">{quickCategoryError}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <select
+                        value={editForm.categoryId}
+                        onChange={(e) => {
+                          if (e.target.value === "__NEW__") {
+                            setShowQuickCategory(true);
+                            setQuickCategoryError("");
+                          } else {
+                            setEditForm({ ...editForm, categoryId: e.target.value });
+                          }
+                        }}
+                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                          isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                        }`}
+                      >
+                        <option value="">No Category</option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                        <option value="__NEW__" className="text-[#0071E3] font-semibold">
+                          + Add new category...
                         </option>
-                      ))}
-                    </select>
+                      </select>
+                    )}
                   </div>
                 </div>
 
@@ -1410,23 +1502,80 @@ export default function InventoryItemsPage({
                   </div>
 
                   <div>
-                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                      Category
-                    </label>
-                    <select
-                      value={form.categoryId}
-                      onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
-                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                      }`}
-                    >
-                      <option value="">No Category</option>
-                      {categories.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className={`block text-xs font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                        Category
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowQuickCategory((prev) => !prev);
+                          setQuickCategoryError("");
+                        }}
+                        className="text-[11px] font-semibold text-[#0071E3] hover:underline cursor-pointer flex items-center gap-0.5"
+                      >
+                        {showQuickCategory ? "✕ Cancel" : "+ New Category"}
+                      </button>
+                    </div>
+
+                    {showQuickCategory ? (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            autoFocus
+                            placeholder="Category name..."
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleQuickCreateCategory("create");
+                              }
+                            }}
+                            className={`flex-1 px-3 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                              isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            disabled={creatingCategory || !newCategoryName.trim()}
+                            onClick={() => handleQuickCreateCategory("create")}
+                            className="px-3 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50 shrink-0"
+                          >
+                            {creatingCategory ? "Adding..." : "Add"}
+                          </button>
+                        </div>
+                        {quickCategoryError && (
+                          <p className="text-[10px] text-rose-500 font-medium">{quickCategoryError}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <select
+                        value={form.categoryId}
+                        onChange={(e) => {
+                          if (e.target.value === "__NEW__") {
+                            setShowQuickCategory(true);
+                            setQuickCategoryError("");
+                          } else {
+                            setForm({ ...form, categoryId: e.target.value });
+                          }
+                        }}
+                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                          isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                        }`}
+                      >
+                        <option value="">No Category</option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                        <option value="__NEW__" className="text-[#0071E3] font-semibold">
+                          + Add new category...
                         </option>
-                      ))}
-                    </select>
+                      </select>
+                    )}
                   </div>
                 </div>
 
