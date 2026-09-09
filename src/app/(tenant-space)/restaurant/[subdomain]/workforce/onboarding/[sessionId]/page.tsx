@@ -171,7 +171,7 @@ export default function OnboardingSessionDetailPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to delete session");
-      router.push(`/restaurant/${subdomain}/workforce/onboarding`);
+      router.push(`/restaurant/${subdomain}/workforce/employees?tab=onboarding`);
     } catch (err: any) {
       setError(err.message || "Error deleting session");
       setDeleting(false);
@@ -246,7 +246,7 @@ export default function OnboardingSessionDetailPage() {
         <RestaurantNavbar activeSection="Employees" />
         <main className="max-w-4xl mx-auto p-6 space-y-4">
           <button
-            onClick={() => router.push(`/restaurant/${subdomain}/workforce/onboarding`)}
+            onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees?tab=onboarding`)}
             className="text-xs text-[#0071E3] hover:underline cursor-pointer"
           >
             ← Back to Onboarding
@@ -285,7 +285,7 @@ export default function OnboardingSessionDetailPage() {
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => router.push(`/restaurant/${subdomain}/workforce/onboarding`)}
+                onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees?tab=onboarding`)}
                 className={`text-xs font-medium transition cursor-pointer ${
                   isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
                 }`}

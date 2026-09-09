@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import ModuleAccessGuard from "@/components/ModuleAccessGuard";
+import OnboardingTab from "./OnboardingTab";
+import { Users, UserCheck } from "lucide-react";
 
 interface Department {
   id: string;
@@ -248,8 +250,37 @@ interface Employee {
 export default function AppleEmployeeDirectoryPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams?.get("tab");
   const subdomain = (params?.subdomain as string) || "";
   const { isDark } = useTheme();
+
+  const [activeTab, setActiveTab] = useState<"directory" | "onboarding">(
+    tabParam === "onboarding" ? "onboarding" : "directory"
+  );
+  const [onboardingCount, setOnboardingCount] = useState<number>(0);
+
+  useEffect(() => {
+    if (tabParam === "onboarding") {
+      setActiveTab("onboarding");
+    } else if (tabParam === "directory") {
+      setActiveTab("directory");
+    }
+  }, [tabParam]);
+
+  const switchTab = (tab: "directory" | "onboarding") => {
+    setActiveTab(tab);
+    router.replace(`/restaurant/${subdomain}/workforce/employees?tab=${tab}`, { scroll: false });
+  };
+
+  useEffect(() => {
+    fetch("/api/restaurant/onboarding/sessions")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.sessions) setOnboardingCount(data.sessions.length);
+      })
+      .catch(() => {});
+  }, []);
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -502,7 +533,7 @@ export default function AppleEmployeeDirectoryPage() {
       <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Executive Header Banner */}
         <div
-          className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+          className={`p-5 sm:p-7 rounded-3xl border transition ${
             isDark
               ? "bg-[#121622]/60 border-white/[0.06]"
               : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
@@ -510,71 +541,179 @@ export default function AppleEmployeeDirectoryPage() {
         >
           <div className="space-y-1">
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push(`/restaurant/${subdomain}/dashboard`)}
+                className={`text-xs font-medium transition cursor-pointer ${
+                  isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                ← Dashboard
+              </button>
+              <span className={`text-xs ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
               <span className="w-2 h-2 rounded-full bg-[#0071E3]" />
               <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                Human Resources & Staff
+                Human Resources & Workforce
               </span>
             </div>
 
-            <h1 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-              Employee Directory
+            <h1 className={`text-xl sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+              Employee Directory & HR Onboarding
             </h1>
-            <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Manage staff profiles, worker classifications, and primary branch outlet assignments.
+          </div>
+        </div>
+
+        {/* Interactive Stats Grid - Merged Data Overview */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div
+            onClick={() => switchTab("directory")}
+            className={`p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition cursor-pointer space-y-1 ${
+              activeTab === "directory"
+                ? isDark
+                  ? "bg-[#0071E3]/15 border-[#0071E3]/50 shadow-sm shadow-[#0071E3]/10"
+                  : "bg-blue-50/80 border-blue-300 shadow-sm"
+                : isDark
+                ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/10"
+                : "bg-white border-slate-200/80 hover:border-slate-300"
+            }`}
+          >
+            <p className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Total Staff
+            </p>
+            <p className={`text-lg sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+              {stats.total}
+            </p>
+            <p className={`text-[10px] sm:text-[11px] truncate ${isDark ? "text-[#6C7280]" : "text-slate-400"}`}>
+              Registered profiles
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          <div
+            onClick={() => switchTab("onboarding")}
+            className={`p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition cursor-pointer space-y-1 ${
+              activeTab === "onboarding"
+                ? isDark
+                  ? "bg-[#0071E3]/15 border-[#0071E3]/50 shadow-sm shadow-[#0071E3]/10"
+                  : "bg-blue-50/80 border-blue-300 shadow-sm"
+                : isDark
+                ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/10"
+                : "bg-white border-slate-200/80 hover:border-slate-300"
+            }`}
+          >
+            <p className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              HR Onboarding
+            </p>
+            <p className={`text-lg sm:text-2xl font-bold tracking-tight ${isDark ? "text-[#58A6FF]" : "text-blue-600"}`}>
+              {onboardingCount}
+            </p>
+            <p className={`text-[10px] sm:text-[11px] truncate ${isDark ? "text-[#6C7280]" : "text-slate-400"}`}>
+              Active sessions
+            </p>
+          </div>
+
+          <div
+            onClick={() => switchTab("directory")}
+            className={`p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition cursor-pointer space-y-1 ${
+              isDark
+                ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/10"
+                : "bg-white border-slate-200/80 hover:border-slate-300"
+            }`}
+          >
+            <p className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Full-Time
+            </p>
+            <p className={`text-lg sm:text-2xl font-bold tracking-tight ${isDark ? "text-emerald-400" : "text-emerald-600"}`}>
+              {stats.fullTime}
+            </p>
+            <p className={`text-[10px] sm:text-[11px] truncate ${isDark ? "text-[#6C7280]" : "text-slate-400"}`}>
+              48h / wk staff
+            </p>
+          </div>
+
+          <div
+            onClick={() => switchTab("directory")}
+            className={`p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition cursor-pointer space-y-1 ${
+              isDark
+                ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/10"
+                : "bg-white border-slate-200/80 hover:border-slate-300"
+            }`}
+          >
+            <p className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Branch Outlets
+            </p>
+            <p className={`text-lg sm:text-2xl font-bold tracking-tight ${isDark ? "text-amber-300" : "text-amber-600"}`}>
+              {stats.outletsCount}
+            </p>
+            <p className={`text-[10px] sm:text-[11px] truncate ${isDark ? "text-[#6C7280]" : "text-slate-400"}`}>
+              Locations
+            </p>
+          </div>
+        </div>
+
+        {/* Tab Switcher & Actions */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="p-1 sm:p-1.5 bg-slate-200/70 dark:bg-white/[0.06] rounded-2xl grid grid-cols-2 gap-1 w-full sm:w-auto sm:min-w-[360px]">
             <button
-              onClick={() => router.push(`/restaurant/${subdomain}/workforce/onboarding`)}
-              className={`w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl text-xs font-semibold border transition cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                isDark
-                  ? "bg-white/[0.04] text-white border-white/[0.08] hover:bg-white/[0.08]"
-                  : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50 shadow-xs"
+              onClick={() => switchTab("directory")}
+              className={`py-2 px-4 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap ${
+                activeTab === "directory"
+                  ? "bg-white dark:bg-[#151A28] text-[#0071E3] dark:text-white shadow-sm font-bold"
+                  : isDark
+                  ? "text-[#8F95A3] hover:text-white"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <span>Onboarding Sessions →</span>
+              <Users className="w-3.5 h-3.5 shrink-0" />
+              <span>Employee Directory</span>
+              <span
+                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                  activeTab === "directory"
+                    ? "bg-blue-50 text-[#0071E3] dark:bg-white/10 dark:text-white"
+                    : isDark
+                    ? "bg-white/[0.06] text-[#8F95A3]"
+                    : "bg-slate-200 text-slate-700"
+                }`}
+              >
+                {employees.length}
+              </span>
             </button>
 
+            <button
+              onClick={() => switchTab("onboarding")}
+              className={`py-2 px-4 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap ${
+                activeTab === "onboarding"
+                  ? "bg-white dark:bg-[#151A28] text-[#0071E3] dark:text-white shadow-sm font-bold"
+                  : isDark
+                  ? "text-[#8F95A3] hover:text-white"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <UserCheck className="w-3.5 h-3.5 shrink-0" />
+              <span>HR Onboarding</span>
+              <span
+                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                  activeTab === "onboarding"
+                    ? "bg-blue-50 text-[#0071E3] dark:bg-white/10 dark:text-white"
+                    : isDark
+                    ? "bg-white/[0.06] text-[#8F95A3]"
+                    : "bg-slate-200 text-slate-700"
+                }`}
+              >
+                {onboardingCount}
+              </span>
+            </button>
+          </div>
+
+          {activeTab === "directory" && (
             <button
               onClick={() => {
                 setError("");
                 setShowModal(true);
               }}
-              className="w-full sm:w-auto px-5 py-2.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer text-center whitespace-nowrap"
+              className="px-5 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer text-center whitespace-nowrap self-end sm:self-auto"
             >
               + Add Employee
             </button>
-          </div>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {[
-            { label: "Total Staff", value: stats.total, color: isDark ? "text-white" : "text-slate-900", sub: "Registered employees" },
-            { label: "Full-Time", value: stats.fullTime, color: isDark ? "text-emerald-400" : "text-emerald-600", sub: "48h / week capacity" },
-            { label: "Part-Time & Interns", value: stats.partTime, color: isDark ? "text-[#58A6FF]" : "text-blue-600", sub: "20h / week capacity" },
-            { label: "Branch Outlets", value: stats.outletsCount, color: isDark ? "text-amber-300" : "text-amber-600", sub: "Operating locations" },
-          ].map((stat, idx) => (
-            <div
-              key={idx}
-              className={`p-4 sm:p-5 rounded-2xl border transition space-y-1 ${
-                isDark
-                  ? "bg-[#121622]/60 border-white/[0.06]"
-                  : "bg-white border-slate-200/80 shadow-xs"
-              }`}
-            >
-              <p className={`text-[10px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                {stat.label}
-              </p>
-              <p className={`text-xl sm:text-2xl font-bold tracking-tight ${stat.color}`}>
-                {stat.value}
-              </p>
-              <p className={`text-[11px] ${isDark ? "text-[#6C7280]" : "text-slate-400"}`}>
-                {stat.sub}
-              </p>
-            </div>
-          ))}
+          )}
         </div>
 
         {error && (
@@ -583,6 +722,10 @@ export default function AppleEmployeeDirectoryPage() {
           </div>
         )}
 
+        {activeTab === "onboarding" ? (
+          <OnboardingTab subdomain={subdomain} onCountChange={setOnboardingCount} />
+        ) : (
+          <>
         {/* Search & Filter Toolbar */}
         <div
           className={`p-3.5 sm:p-4 rounded-2xl border transition flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 ${
@@ -881,6 +1024,8 @@ export default function AppleEmployeeDirectoryPage() {
                 </table>
               </div>
             </div>
+          </>
+        )}
           </>
         )}
       </main>

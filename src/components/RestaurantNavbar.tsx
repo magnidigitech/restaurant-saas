@@ -237,7 +237,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
         {
           label: "Onboarding Portal",
           desc: "New hire checklists & compliance verification",
-          href: p("/workforce/onboarding"),
+          href: p("/workforce/employees?tab=onboarding"),
         },
       ],
     },
