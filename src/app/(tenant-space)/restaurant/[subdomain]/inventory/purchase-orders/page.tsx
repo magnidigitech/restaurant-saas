@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import ModuleAccessGuard from "@/components/ModuleAccessGuard";
+import { ArrowLeft, ShoppingCart, Truck } from "lucide-react";
 
 interface POItem {
   id: string;
@@ -555,62 +556,101 @@ export default function PurchaseOrdersDirectoryPage({
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Executive Header Banner */}
         <div
-          className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+          className={`p-4 sm:p-5 rounded-2xl border transition relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4 ${
             isDark
-              ? "bg-[#121622]/60 border-white/[0.06]"
-              : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
+              ? "bg-gradient-to-br from-[#121829] via-[#0E1320] to-[#0A0D14] border-white/[0.08] shadow-xl shadow-black/20"
+              : "bg-gradient-to-br from-blue-50/80 via-indigo-50/25 to-white border-blue-100/80 shadow-sm shadow-blue-500/5"
           }`}
         >
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
+          {/* Ambient Glow Orbs */}
+          <div className="absolute -right-16 -top-16 w-72 h-72 bg-sky-500/10 dark:bg-sky-500/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute right-1/3 -bottom-16 w-60 h-60 bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Left: Nav & Title */}
+          <div className="relative z-10 space-y-2 sm:space-y-2.5 w-full md:w-auto min-w-0">
+            <div className="flex items-center justify-between sm:justify-start gap-2 flex-wrap">
               <button
                 onClick={() => router.push(`/restaurant/${subdomain}/inventory`)}
-                className={`text-xs font-medium transition cursor-pointer ${
-                  isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition cursor-pointer whitespace-nowrap ${
+                  isDark
+                    ? "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
+                    : "bg-white hover:bg-slate-100 text-slate-700 border-slate-200 shadow-2xs"
                 }`}
               >
-                ← Inventory Hub
+                <ArrowLeft className="w-3 h-3" />
+                <span>Inventory</span>
               </button>
-              <span className={`text-xs ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
-              <span className="w-2 h-2 rounded-full bg-[#0071E3]" />
-              <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                Procurement & Stock Orders
+              <span className="hidden sm:inline text-slate-300 dark:text-white/20">•</span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 whitespace-nowrap">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
+                <span>Procurement &amp; Orders</span>
               </span>
             </div>
 
-            <h1 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-              Purchase Orders Directory
-            </h1>
-            <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              {purchaseOrders.length} total orders recorded • {pendingCount} pending deliveries awaiting branch receipt.
-            </p>
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-sky-500/20 shrink-0 border border-white/20">
+                <ShoppingCart className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <h1 className={`text-base sm:text-xl font-extrabold tracking-tight truncate ${isDark ? "text-white" : "text-slate-900"}`}>
+                  Purchase Orders Directory
+                </h1>
+                <p className={`text-[10px] sm:text-xs mt-0.5 truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  {purchaseOrders.length} total orders recorded • {pendingCount} pending deliveries awaiting branch receipt.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            <button
-              onClick={() => fetchPOs()}
-              className={`flex-1 md:flex-none px-4 py-2.5 sm:py-2 rounded-xl text-xs font-semibold border transition cursor-pointer text-center justify-center ${
-                isDark
-                  ? "bg-white/[0.04] text-white border-white/[0.08] hover:bg-white/[0.08]"
-                  : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50 shadow-xs"
-              }`}
-            >
-              Refresh
-            </button>
-            <button
-              onClick={() => {
-                if (outlets.length > 0 && !formOutletId) {
-                  setFormOutletId(outlets[0].id);
-                }
-                setShowCreate(true);
-                setAutoFillMsg("");
-                setError("");
-              }}
-              className="flex-1 md:flex-none px-4 py-2.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer flex items-center justify-center gap-1.5 text-center"
-            >
-              <span>+</span>
-              <span>Create PO</span>
-            </button>
+          {/* Right: Actions & Status Capsule */}
+          <div className="relative z-10 flex flex-wrap items-center gap-2.5 shrink-0">
+            <div className={`hidden lg:flex p-2.5 px-3 rounded-xl border items-center gap-2.5 ${
+              isDark
+                ? "bg-[#141A29]/80 border-white/[0.08] shadow-sm"
+                : "bg-white/90 backdrop-blur-xs border-slate-200/80 shadow-xs"
+            }`}>
+              <div className="w-7 h-7 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 flex items-center justify-center shrink-0">
+                <Truck className="w-3.5 h-3.5" />
+              </div>
+              <div className="text-left">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-white">
+                    Procurement Live
+                  </span>
+                </div>
+                <span className={`text-[10px] font-medium block mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  {pendingCount} Pending • {purchaseOrders.length} Total
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <button
+                onClick={() => fetchPOs()}
+                className={`flex-1 md:flex-none px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-semibold border transition cursor-pointer text-center justify-center ${
+                  isDark
+                    ? "bg-white/[0.04] text-white border-white/[0.08] hover:bg-white/[0.08]"
+                    : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50 shadow-xs"
+                }`}
+              >
+                Refresh
+              </button>
+              <button
+                onClick={() => {
+                  if (outlets.length > 0 && !formOutletId) {
+                    setFormOutletId(outlets[0].id);
+                  }
+                  setShowCreate(true);
+                  setAutoFillMsg("");
+                  setError("");
+                }}
+                className="flex-1 md:flex-none px-3.5 py-1.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer flex items-center justify-center gap-1.5 text-center whitespace-nowrap"
+              >
+                <span>+</span>
+                <span>Create PO</span>
+              </button>
+            </div>
           </div>
         </div>
 

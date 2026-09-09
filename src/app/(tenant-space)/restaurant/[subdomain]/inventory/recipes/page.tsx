@@ -6,6 +6,7 @@ import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import ModuleAccessGuard from "@/components/ModuleAccessGuard";
 import { convertUnitCost, getUnitPricingMatrix, formatUnit } from "@/core/inventory/units";
+import { ArrowLeft, UtensilsCrossed, ChefHat } from "lucide-react";
 
 interface Recipe {
   id: string;
@@ -326,63 +327,102 @@ export default function RecipesDirectoryPage({
         <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           {/* Executive Header Banner */}
           <div
-            className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+            className={`p-4 sm:p-5 rounded-2xl border transition relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4 ${
               isDark
-                ? "bg-[#121622]/60 border-white/[0.06]"
-                : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
+                ? "bg-gradient-to-br from-[#121829] via-[#0E1320] to-[#0A0D14] border-white/[0.08] shadow-xl shadow-black/20"
+                : "bg-gradient-to-br from-blue-50/80 via-indigo-50/25 to-white border-blue-100/80 shadow-sm shadow-blue-500/5"
             }`}
           >
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => router.push(`/restaurant/${subdomain}/inventory`)}
-                className={`text-xs font-medium transition cursor-pointer ${
-                  isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                ← Inventory Hub
-              </button>
-              <span className={`text-xs ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
-              <span className="w-2 h-2 rounded-full bg-[#0071E3]" />
-              <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                Professional Culinary Engine
-              </span>
+            {/* Ambient Glow Orbs */}
+            <div className="absolute -right-16 -top-16 w-72 h-72 bg-emerald-500/10 dark:bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute right-1/3 -bottom-16 w-60 h-60 bg-teal-500/10 dark:bg-teal-600/15 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Left: Nav & Title */}
+            <div className="relative z-10 space-y-2 sm:space-y-2.5 w-full md:w-auto min-w-0">
+              <div className="flex items-center justify-between sm:justify-start gap-2 flex-wrap">
+                <button
+                  onClick={() => router.push(`/restaurant/${subdomain}/inventory`)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition cursor-pointer whitespace-nowrap ${
+                    isDark
+                      ? "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
+                      : "bg-white hover:bg-slate-100 text-slate-700 border-slate-200 shadow-2xs"
+                  }`}
+                >
+                  <ArrowLeft className="w-3 h-3" />
+                  <span>Inventory</span>
+                </button>
+                <span className="hidden sm:inline text-slate-300 dark:text-white/20">•</span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 whitespace-nowrap">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Culinary Engine &amp; Pricing</span>
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 shrink-0 border border-white/20">
+                  <UtensilsCrossed className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h1 className={`text-base sm:text-xl font-extrabold tracking-tight truncate ${isDark ? "text-white" : "text-slate-900"}`}>
+                    Recipe Studio &amp; Unit Pricing Matrix
+                  </h1>
+                  <p className={`text-[10px] sm:text-xs mt-0.5 truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    {dishesCount} Menu Dishes • {subRecipesCount} Sub-Recipes • Multi-format unit conversions.
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <h1 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-              Recipe Studio & Unit Pricing Matrix
-            </h1>
-            <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              {dishesCount} Menu Dishes • {subRecipesCount} Sub-Recipes • Multi-format unit conversions (LB, OZ, Gram, KG, Ladle, Cup, Portion).
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => router.push(`/restaurant/${subdomain}/pos`)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer flex items-center gap-1.5 ${
+            {/* Right: Actions & Status Capsule */}
+            <div className="relative z-10 flex flex-wrap items-center gap-2.5 shrink-0">
+              <div className={`hidden lg:flex p-2.5 px-3 rounded-xl border items-center gap-2.5 ${
                 isDark
-                  ? "bg-white/[0.04] text-white border-white/[0.08] hover:bg-white/[0.08]"
-                  : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50 shadow-xs"
-              }`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-              <span>Launch POS Terminal</span>
-            </button>
+                  ? "bg-[#141A29]/80 border-white/[0.08] shadow-sm"
+                  : "bg-white/90 backdrop-blur-xs border-slate-200/80 shadow-xs"
+              }`}>
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                  <ChefHat className="w-3.5 h-3.5" />
+                </div>
+                <div className="text-left">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">
+                      Formulas Active
+                    </span>
+                  </div>
+                  <span className={`text-[10px] font-medium block mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    {recipes.length} Recipe Formulas
+                  </span>
+                </div>
+              </div>
 
-            <button
-              onClick={() => {
-                setError("");
-                setShowCreate(true);
-              }}
-              className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
-            >
-              + Create Recipe / Sub-Recipe
-            </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => router.push(`/restaurant/${subdomain}/pos`)}
+                  className={`px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-semibold border transition cursor-pointer flex items-center gap-1.5 ${
+                    isDark
+                      ? "bg-white/[0.04] text-white border-white/[0.08] hover:bg-white/[0.08]"
+                      : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50 shadow-xs"
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                  <span>POS Terminal</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setError("");
+                    setShowCreate(true);
+                  }}
+                  className="px-3.5 py-1.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer whitespace-nowrap"
+                >
+                  + Create Recipe
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
 
         {error && (
           <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl">
