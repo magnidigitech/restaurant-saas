@@ -439,73 +439,121 @@ export default function UsersTab({
         </div>
       )}
 
-      {/* Active Memberships Table */}
-      <div
-        className={`p-5 sm:p-7 rounded-3xl border transition space-y-4 ${
-          isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
-        }`}
-      >
-        <div className="flex justify-between items-center">
-          <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+      {/* Active Staff Memberships Section */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h2 className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
             Active Staff Memberships ({filteredMemberships.length})
           </h2>
         </div>
 
         {filteredMemberships.length === 0 ? (
-          <div className={`p-8 text-center text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+          <div
+            className={`p-8 text-center text-xs rounded-2xl sm:rounded-3xl border ${
+              isDark ? "bg-[#121622]/40 border-white/[0.04] text-[#8F95A3]" : "bg-white border-slate-200/60 text-slate-400"
+            }`}
+          >
             No staff accounts found matching query.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr
-                  className={`border-b text-[11px] font-bold uppercase tracking-wider ${
-                    isDark ? "border-white/[0.08] text-slate-400" : "border-slate-200 text-slate-600"
+          <div className="grid gap-3.5 sm:grid-cols-1 lg:grid-cols-2">
+            {filteredMemberships.map((m) => {
+              const isCurrentUser = m.user.id === currentUserId;
+              const activeRoles = Array.from(
+                new Map<string, string>(
+                  (m.accessGrants || [])
+                    .filter((g: any) => g.status === "ACTIVE" && g.role)
+                    .map((g: any): [string, string] => [String(g.role.id), String(g.role.name)])
+                ).entries()
+              );
+
+              return (
+                <div
+                  key={m.id}
+                  className={`p-4 sm:p-5 rounded-2xl sm:rounded-3xl border transition flex flex-col justify-between space-y-3.5 ${
+                    isDark
+                      ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.12]"
+                      : "bg-white border-slate-200/80 shadow-xs hover:border-slate-300"
                   }`}
                 >
-                  <th className="pb-3 px-3">User Email</th>
-                  <th className="pb-3 px-3">Linked Staff Profile</th>
-                  <th className="pb-3 px-3">Assigned Roles</th>
-                  <th className="pb-3 px-3">Member Since</th>
-                  <th className="pb-3 px-3">Status</th>
-                  <th className="pb-3 px-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
-                {filteredMemberships.map((m) => (
-                  <tr key={m.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition">
-                    <td className={`py-3.5 px-3 font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span>{m.user.email}</span>
-                        {m.user.twoFactorAuth?.enabled && (
-                          <span
-                            className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${
-                              isDark
-                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                                : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            }`}
-                            title="Two-Factor Authentication Active"
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                            2FA
-                          </span>
-                        )}
+                  {/* Top row: User Info & Badges */}
+                  <div className="flex items-start justify-between gap-2.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 border font-bold text-xs sm:text-sm ${
+                          isDark
+                            ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                            : "bg-blue-50 text-blue-700 border-blue-200"
+                        }`}
+                      >
+                        {m.user.email.slice(0, 2).toUpperCase()}
                       </div>
-                    </td>
-                    <td className={`py-3.5 px-3 ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className={`text-xs sm:text-sm font-bold tracking-tight truncate ${isDark ? "text-white" : "text-slate-900"}`}>
+                            {m.user.email}
+                          </h3>
+                          {isCurrentUser && (
+                            <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded border ${
+                              isDark ? "bg-white/5 text-slate-400 border-white/10" : "bg-slate-100 text-slate-600 border-slate-200"
+                            }`}>
+                              You
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-[10px] sm:text-[11px] block mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                          Member since {m.joinedAt ? new Date(m.joinedAt).toLocaleDateString() : m.createdAt ? new Date(m.createdAt).toLocaleDateString() : "Active"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                      {m.user.twoFactorAuth?.enabled && (
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
+                            isDark
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/25"
+                              : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          }`}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          2FA
+                        </span>
+                      )}
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${
+                          m.status === "ACTIVE"
+                            ? isDark
+                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                              : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : isDark
+                            ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                            : "bg-amber-50 text-amber-700 border border-amber-200"
+                        }`}
+                      >
+                        {m.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Middle row: Linked Profile & Roles Info Box */}
+                  <div className={`p-3 rounded-xl border text-xs grid grid-cols-1 sm:grid-cols-2 gap-2.5 ${
+                    isDark ? "bg-[#0A0C12]/50 border-white/[0.04]" : "bg-slate-50/70 border-slate-200/60"
+                  }`}>
+                    {/* Linked Staff Profile */}
+                    <div className="space-y-1">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider block ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                        Linked Staff Profile
+                      </span>
                       {m.employee ? (
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                          <span className={`font-semibold text-xs ${isDark ? "text-white" : "text-slate-800"}`}>
                             {m.employee.firstName} {m.employee.lastName}
                           </span>
-                          <span
-                            className={`text-[10px] font-mono px-2 py-0.5 rounded-md font-bold ${
-                              isDark
-                                ? "bg-white/[0.08] text-slate-300 border border-white/[0.08]"
-                                : "bg-slate-100 text-slate-700 border border-slate-200"
-                            }`}
-                          >
+                          <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded border ${
+                            isDark ? "bg-white/10 text-slate-200 border-white/10" : "bg-white text-slate-700 border-slate-200"
+                          }`}>
                             {m.employee.employeeCode}
                           </span>
                           <button
@@ -518,22 +566,16 @@ export default function UsersTab({
                               });
                               setSelectedLinkEmployeeId(m.employee.id);
                             }}
-                            className={`text-[10px] underline ml-1 cursor-pointer transition ${
-                              isDark ? "text-slate-400 hover:text-white" : "text-slate-500 hover:text-slate-900"
-                            }`}
+                            className="text-[11px] text-[#0071E3] hover:underline cursor-pointer font-medium ml-1"
                           >
                             Change
                           </button>
                         </div>
                       ) : m.user.id === currentUserId ? (
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                            className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
-                              isDark
-                                ? "bg-sky-500/15 text-sky-300 border-sky-500/30"
-                                : "bg-sky-50 text-sky-800 border-sky-300"
-                            }`}
-                          >
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
+                            isDark ? "bg-sky-500/15 text-sky-300 border-sky-500/30" : "bg-sky-50 text-sky-800 border-sky-300"
+                          }`}>
                             Tenant Owner (Admin)
                           </span>
                           <button
@@ -546,22 +588,16 @@ export default function UsersTab({
                               });
                               setSelectedLinkEmployeeId("");
                             }}
-                            className={`text-[10px] underline cursor-pointer transition ${
-                              isDark ? "text-slate-400 hover:text-white" : "text-slate-500 hover:text-slate-900"
-                            }`}
+                            className="text-[11px] text-[#0071E3] hover:underline cursor-pointer font-medium whitespace-nowrap"
                           >
                             + Link Profile
                           </button>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                            className={`inline-flex items-center text-[10px] font-semibold px-2.5 py-0.5 rounded-full border ${
-                              isDark
-                                ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                                : "bg-amber-50 text-amber-800 border-amber-200"
-                            }`}
-                          >
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                            isDark ? "bg-amber-500/15 text-amber-300 border-amber-500/30" : "bg-amber-50 text-amber-800 border-amber-200"
+                          }`}>
                             Unlinked Account
                           </span>
                           <button
@@ -574,188 +610,175 @@ export default function UsersTab({
                               });
                               setSelectedLinkEmployeeId("");
                             }}
-                            className={`text-[10px] font-semibold underline cursor-pointer transition ${
-                              isDark ? "text-sky-400 hover:text-sky-300" : "text-sky-600 hover:text-sky-800"
-                            }`}
+                            className="text-[11px] text-[#0071E3] hover:underline cursor-pointer font-medium"
                           >
                             Link Profile
                           </button>
                         </div>
                       )}
-                    </td>
-                    <td className={`py-3.5 px-3 ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
-                      {(() => {
-                        const activeRoles: [string, string][] = Array.from(
-                          new Map<string, string>(
-                            (m.accessGrants || [])
-                              .filter((g: any) => g.status === "ACTIVE" && g.role)
-                              .map((g: any): [string, string] => [String(g.role.id), String(g.role.name)])
-                          ).entries()
-                        );
-                        return activeRoles.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {activeRoles.map(([id, name]) => (
-                              <span
-                                key={id}
-                                className={`px-2 py-0.5 rounded-md font-medium text-[11px] ${
-                                  isDark ? "bg-white/[0.08] text-white" : "bg-slate-100 text-slate-800 border border-slate-200"
-                                }`}
-                              >
-                                {name}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 text-xs italic">No roles</span>
-                        );
-                      })()}
-                    </td>
-                    <td className={`py-3.5 px-3 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                      {m.joinedAt
-                        ? new Date(m.joinedAt).toLocaleDateString()
-                        : m.createdAt
-                        ? new Date(m.createdAt).toLocaleDateString()
-                        : "Active"}
-                    </td>
-                    <td className="py-3.5 px-3">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          m.status === "ACTIVE"
-                            ? isDark
-                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                              : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : isDark
-                            ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                            : "bg-amber-50 text-amber-700 border border-amber-200"
+                    </div>
+
+                    {/* Assigned Roles */}
+                    <div className="space-y-1">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider block ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                        Assigned Roles
+                      </span>
+                      {activeRoles.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {activeRoles.map(([id, name]) => (
+                            <span
+                              key={id}
+                              className={`px-2 py-0.5 rounded-lg font-medium text-[11px] border ${
+                                isDark
+                                  ? "bg-white/[0.06] text-white border-white/[0.08]"
+                                  : "bg-white text-slate-800 border-slate-200 shadow-2xs"
+                              }`}
+                            >
+                              {name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-xs italic">No roles assigned</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Bottom row: Action Buttons */}
+                  <div className="flex items-center justify-end gap-2 pt-1 flex-wrap border-t border-black/[0.04] dark:border-white/[0.06]">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditRoles(m)}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition cursor-pointer border ${
+                        isDark
+                          ? "text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/30"
+                          : "text-blue-700 bg-blue-50 hover:bg-blue-100 border-blue-200"
+                      }`}
+                    >
+                      Edit Roles
+                    </button>
+                    {m.user.twoFactorAuth?.enabled && (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmReset2faTarget({ membershipId: m.id, email: m.user.email })}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition cursor-pointer border ${
+                          isDark
+                            ? "text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30"
+                            : "text-amber-800 bg-amber-50 hover:bg-amber-100 border-amber-200"
                         }`}
                       >
-                        {m.status}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditRoles(m)}
-                          className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition cursor-pointer border ${
-                            isDark
-                              ? "text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/30"
-                              : "text-blue-700 bg-blue-50 hover:bg-blue-100 border-blue-200"
-                          }`}
-                        >
-                          Edit Roles
-                        </button>
-                        {m.user.twoFactorAuth?.enabled && (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmReset2faTarget({ membershipId: m.id, email: m.user.email })}
-                            className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition cursor-pointer border ${
-                              isDark
-                                ? "text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30"
-                                : "text-amber-800 bg-amber-50 hover:bg-amber-100 border-amber-200"
-                            }`}
-                          >
-                            Reset 2FA
-                          </button>
-                        )}
-                        {m.user.id !== currentUserId && (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmRemoveTarget({ membershipId: m.id, email: m.user.email })}
-                            className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition cursor-pointer border ${
-                              isDark
-                                ? "text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30"
-                                : "text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-200"
-                            }`}
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        Reset 2FA
+                      </button>
+                    )}
+                    {!isCurrentUser && (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmRemoveTarget({ membershipId: m.id, email: m.user.email })}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition cursor-pointer border ${
+                          isDark
+                            ? "text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30"
+                            : "text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-200"
+                        }`}
+                      >
+                        Remove Access
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Pending Invitations Table */}
-      <div
-        className={`p-5 sm:p-7 rounded-3xl border transition space-y-4 ${
-          isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
-        }`}
-      >
-        <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
-          Pending Staff Invitations ({filteredInvitations.length})
-        </h2>
+      {/* Pending Staff Invitations Section */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h2 className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+            Pending Staff Invitations ({filteredInvitations.length})
+          </h2>
+        </div>
 
         {filteredInvitations.length === 0 ? (
-          <div className={`p-8 text-center text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+          <div
+            className={`p-6 text-center text-xs rounded-2xl sm:rounded-3xl border ${
+              isDark ? "bg-[#121622]/40 border-white/[0.04] text-[#8F95A3]" : "bg-white border-slate-200/60 text-slate-400"
+            }`}
+          >
             No pending staff invitations awaiting activation.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr
-                  className={`border-b text-[11px] font-bold uppercase tracking-wider ${
-                    isDark ? "border-white/[0.08] text-slate-400" : "border-slate-200 text-slate-600"
-                  }`}
-                >
-                  <th className="pb-3 px-3">Invited Email</th>
-                  <th className="pb-3 px-3">Role Assigned</th>
-                  <th className="pb-3 px-3">Branch Outlet</th>
-                  <th className="pb-3 px-3">Expires</th>
-                  <th className="pb-3 px-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
-                {filteredInvitations.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition">
-                    <td className={`py-3.5 px-3 font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
-                      {inv.email}
-                    </td>
-                    <td className={`py-3.5 px-3 font-medium ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+          <div className="grid gap-3.5 sm:grid-cols-1 lg:grid-cols-2">
+            {filteredInvitations.map((inv) => (
+              <div
+                key={inv.id}
+                className={`p-4 sm:p-5 rounded-2xl sm:rounded-3xl border transition flex flex-col justify-between space-y-3 ${
+                  isDark
+                    ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.12]"
+                    : "bg-white border-slate-200/80 shadow-xs hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2.5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 border ${
+                        isDark
+                          ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                          : "bg-amber-50 text-amber-700 border-amber-200"
+                      }`}
+                    >
+                      <Mail className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className={`text-xs sm:text-sm font-bold tracking-tight truncate ${isDark ? "text-white" : "text-slate-900"}`}>
+                        {inv.email}
+                      </h4>
+                      <span className={`text-[10px] sm:text-[11px] block mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                        Expires {new Date(inv.expiresAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                    <span className={`px-2 py-0.5 rounded-full font-medium text-[10px] border whitespace-nowrap ${
+                      isDark ? "bg-white/[0.06] text-slate-200 border-white/[0.08]" : "bg-slate-100 text-slate-700 border-slate-200"
+                    }`}>
                       {inv.role?.name || "General Access"}
-                    </td>
-                    <td className={`py-3.5 px-3 ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full font-medium text-[10px] border whitespace-nowrap ${
+                      isDark ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : "bg-blue-50 text-blue-700 border-blue-200"
+                    }`}>
                       {inv.outlet?.name || "All Outlets"}
-                    </td>
-                    <td className={`py-3.5 px-3 font-mono ${isDark ? "text-slate-400" : "text-slate-600"}`}>
-                      {new Date(inv.expiresAt).toLocaleDateString()}
-                    </td>
-                    <td className="py-3.5 px-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleResendInvite(inv.id, inv.email)}
-                          disabled={actionLoadingId === `resend-${inv.id}`}
-                          className={`px-3 py-1 text-[11px] font-semibold rounded-lg border transition cursor-pointer disabled:opacity-50 ${
-                            isDark
-                              ? "bg-white/[0.06] hover:bg-white/[0.12] text-slate-200 border-white/10"
-                              : "bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300"
-                          }`}
-                        >
-                          {actionLoadingId === `resend-${inv.id}` ? "Sending..." : "Resend"}
-                        </button>
-                        <button
-                          onClick={() => handleCancelInvitation(inv.id)}
-                          disabled={actionLoadingId === `cancel-${inv.id}`}
-                          className={`px-3 py-1 text-[11px] font-semibold rounded-lg transition cursor-pointer disabled:opacity-50 border ${
-                            isDark
-                              ? "text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30"
-                              : "text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-200"
-                          }`}
-                        >
-                          {actionLoadingId === `cancel-${inv.id}` ? "Cancelling..." : "Cancel"}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-1 border-t border-black/[0.04] dark:border-white/[0.06]">
+                  <button
+                    onClick={() => handleResendInvite(inv.id, inv.email)}
+                    disabled={actionLoadingId === `resend-${inv.id}`}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition cursor-pointer disabled:opacity-50 ${
+                      isDark
+                        ? "bg-white/[0.06] hover:bg-white/[0.12] text-slate-200 border-white/10"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300"
+                    }`}
+                  >
+                    {actionLoadingId === `resend-${inv.id}` ? "Sending..." : "Resend"}
+                  </button>
+                  <button
+                    onClick={() => handleCancelInvitation(inv.id)}
+                    disabled={actionLoadingId === `cancel-${inv.id}`}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50 border ${
+                      isDark
+                        ? "text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30"
+                        : "text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-200"
+                    }`}
+                  >
+                    {actionLoadingId === `cancel-${inv.id}` ? "Cancelling..." : "Cancel"}
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

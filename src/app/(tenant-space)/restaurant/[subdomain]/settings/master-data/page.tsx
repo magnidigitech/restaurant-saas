@@ -779,70 +779,131 @@ export default function MasterDataAndRolesPage({
                 </div>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr
-                      className={`border-b text-[11px] font-semibold uppercase tracking-wider ${
-                        isDark ? "border-white/[0.06] text-[#8F95A3]" : "border-slate-200 text-slate-500"
+              <div>
+                {/* Mobile Cards View */}
+                <div className="sm:hidden space-y-2.5">
+                  {(activeTab === "departments" ? filteredDepartments : filteredDesignations).map((item) => (
+                    <div
+                      key={item.id}
+                      className={`p-4 rounded-2xl border transition flex flex-col justify-between space-y-2.5 ${
+                        isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
                       }`}
                     >
-                      <th className="pb-3 px-3">Identifier Code</th>
-                      <th className="pb-3 px-3">
-                        {activeTab === "departments" ? "Department Name" : "Designation Title"}
-                      </th>
-                      <th className="pb-3 px-3">Scope / Description</th>
-                      <th className="pb-3 px-3">Status</th>
-                      <th className="pb-3 px-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
-                    {(activeTab === "departments" ? filteredDepartments : filteredDesignations).map((item) => (
-                      <tr key={item.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition">
-                        <td className="py-3.5 px-3">
-                          <span
-                            className={`font-mono text-[10px] font-semibold px-2 py-0.5 rounded border ${
-                              isDark
-                                ? "bg-white/[0.04] text-[#BAC0CD] border-white/[0.08]"
-                                : "bg-slate-100 text-slate-700 border-slate-200"
-                            }`}
-                          >
-                            {item.code}
-                          </span>
-                        </td>
-                        <td className={`py-3.5 px-3 font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
-                          {item.name}
-                        </td>
-                        <td className={`py-3.5 px-3 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                          {item.description || "—"}
-                        </td>
-                        <td className="py-3.5 px-3">
-                          <span
-                            className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${
-                              item.status === "ACTIVE"
-                                ? isDark
-                                  ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25"
-                                  : "bg-emerald-100 text-emerald-800 border-emerald-200"
-                                : isDark
-                                ? "bg-white/[0.04] text-[#8F95A3] border-white/[0.08]"
-                                : "bg-slate-100 text-slate-600 border-slate-200"
-                            }`}
-                          >
-                            {item.status}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-3 text-right">
-                          <button
-                            onClick={() => handleOpenEditMaster(item)}
-                            className="text-xs text-[#0071E3] hover:underline cursor-pointer font-semibold"
-                          >
-                            Edit
-                          </button>
-                        </td>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`font-mono text-[10px] font-semibold px-2 py-0.5 rounded border ${
+                                isDark
+                                  ? "bg-white/[0.04] text-[#BAC0CD] border-white/[0.08]"
+                                  : "bg-slate-100 text-slate-700 border-slate-200"
+                              }`}
+                            >
+                              {item.code}
+                            </span>
+                            <h4 className={`text-xs font-bold tracking-tight truncate ${isDark ? "text-white" : "text-slate-900"}`}>
+                              {item.name}
+                            </h4>
+                          </div>
+                          {item.description && (
+                            <p className={`text-[11px] line-clamp-2 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                              {item.description}
+                            </p>
+                          )}
+                        </div>
+                        <span
+                          className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0 ${
+                            item.status === "ACTIVE"
+                              ? isDark
+                                ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25"
+                                : "bg-emerald-100 text-emerald-800 border-emerald-200"
+                              : isDark
+                              ? "bg-white/[0.04] text-[#8F95A3] border-white/[0.08]"
+                              : "bg-slate-100 text-slate-600 border-slate-200"
+                          }`}
+                        >
+                          {item.status}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-end pt-1 border-t border-black/[0.04] dark:border-white/[0.06]">
+                        <button
+                          onClick={() => handleOpenEditMaster(item)}
+                          className="text-xs text-[#0071E3] hover:underline cursor-pointer font-semibold py-1 px-2"
+                        >
+                          Edit Details →
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr
+                        className={`border-b text-[11px] font-semibold uppercase tracking-wider ${
+                          isDark ? "border-white/[0.06] text-[#8F95A3]" : "border-slate-200 text-slate-500"
+                        }`}
+                      >
+                        <th className="pb-3 px-3">Identifier Code</th>
+                        <th className="pb-3 px-3">
+                          {activeTab === "departments" ? "Department Name" : "Designation Title"}
+                        </th>
+                        <th className="pb-3 px-3">Scope / Description</th>
+                        <th className="pb-3 px-3">Status</th>
+                        <th className="pb-3 px-3 text-right">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
+                      {(activeTab === "departments" ? filteredDepartments : filteredDesignations).map((item) => (
+                        <tr key={item.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition">
+                          <td className="py-3.5 px-3">
+                            <span
+                              className={`font-mono text-[10px] font-semibold px-2 py-0.5 rounded border ${
+                                isDark
+                                  ? "bg-white/[0.04] text-[#BAC0CD] border-white/[0.08]"
+                                  : "bg-slate-100 text-slate-700 border-slate-200"
+                              }`}
+                            >
+                              {item.code}
+                            </span>
+                          </td>
+                          <td className={`py-3.5 px-3 font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                            {item.name}
+                          </td>
+                          <td className={`py-3.5 px-3 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                            {item.description || "—"}
+                          </td>
+                          <td className="py-3.5 px-3">
+                            <span
+                              className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${
+                                item.status === "ACTIVE"
+                                  ? isDark
+                                    ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25"
+                                    : "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                  : isDark
+                                  ? "bg-white/[0.04] text-[#8F95A3] border-white/[0.08]"
+                                  : "bg-slate-100 text-slate-600 border-slate-200"
+                              }`}
+                            >
+                              {item.status}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-3 text-right">
+                            <button
+                              onClick={() => handleOpenEditMaster(item)}
+                              className="text-xs text-[#0071E3] hover:underline cursor-pointer font-semibold"
+                            >
+                              Edit
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
