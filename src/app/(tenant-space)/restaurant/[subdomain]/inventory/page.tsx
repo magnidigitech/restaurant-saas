@@ -5,7 +5,74 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import ModuleAccessGuard from "@/components/ModuleAccessGuard";
-import { Boxes, PackageCheck, ArrowLeft } from "lucide-react";
+import {
+  Boxes,
+  PackageCheck,
+  ArrowLeft,
+  Package,
+  ShoppingCart,
+  Building2,
+  FolderTree,
+  UtensilsCrossed,
+  History,
+  AlertTriangle,
+  Scale,
+  ArrowRight,
+  Info,
+} from "lucide-react";
+
+// Interactive frosted-glass tooltip for feature descriptions
+function InfoTooltip({
+  title,
+  description,
+  category,
+}: {
+  title: string;
+  description: string;
+  category?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div
+      className="relative inline-flex items-center"
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+      onClick={(e) => {
+        e.stopPropagation();
+        setIsOpen((prev) => !prev);
+      }}
+    >
+      <button
+        type="button"
+        aria-label={`About ${title}`}
+        className="w-5 h-5 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors focus:outline-none cursor-pointer"
+      >
+        <Info className="w-3.5 h-3.5" />
+      </button>
+
+      {isOpen && (
+        <div
+          className="absolute bottom-full right-0 mb-2.5 w-64 p-3 bg-[#0B0F19]/95 dark:bg-[#151A28]/95 backdrop-blur-xl text-white rounded-2xl shadow-2xl border border-white/15 text-left z-50 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between gap-2 mb-1.5 pb-1 border-b border-white/10">
+            <span className="text-xs font-semibold text-white tracking-tight">{title}</span>
+            {category && (
+              <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/10 text-blue-300">
+                {category}
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-300 leading-relaxed font-normal">
+            {description}
+          </p>
+          <div className="absolute top-full right-2 -mt-1 w-2 h-2 rotate-45 bg-[#0B0F19]/95 dark:bg-[#151A28]/95 border-r border-b border-white/15" />
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface DashboardStats {
   totalItems: number;
@@ -74,52 +141,87 @@ export default function InventoryDashboard({
   const navCards = [
     {
       title: "Item Master & SKUs",
-      desc: "Manage catalog ingredients, standard units, par levels, and SKU codes.",
+      category: "Catalog & SKUs",
+      desc: "Manage catalog ingredients, standard units, par levels, barcode mappings, and SKU codes.",
       path: `/restaurant/${subdomain}/inventory/items`,
       badge: `${stats.totalItems} Items`,
       badgeType: "default",
+      featureTag: "Ingredients & Par Levels",
+      icon: Package,
+      bgLight: "bg-blue-500/10 text-blue-600 border-blue-500/25",
+      bgDark: "bg-blue-500/10 text-blue-400 border-blue-500/20",
     },
     {
       title: "Purchase Orders",
-      desc: "Draft procurement orders, track supplier deliveries, and receive stock.",
+      category: "Procurement",
+      desc: "Draft procurement orders, track supplier deliveries, receive batch stocks, and update invoice records.",
       path: `/restaurant/${subdomain}/inventory/purchase-orders`,
       badge: "Procurement",
       badgeType: "default",
+      featureTag: "Supplier Orders & Receiving",
+      icon: ShoppingCart,
+      bgLight: "bg-sky-500/10 text-sky-600 border-sky-500/25",
+      bgDark: "bg-sky-500/10 text-sky-400 border-sky-500/20",
     },
     {
       title: "Vendor Management",
-      desc: "Supplier directories, payment terms, contracts, and preferred vendor links.",
+      category: "Suppliers & B2B",
+      desc: "Supplier directories, payment terms, contracts, contacts, and preferred vendor links.",
       path: `/restaurant/${subdomain}/inventory/vendors`,
       badge: `${stats.totalVendors} Vendors`,
       badgeType: "default",
+      featureTag: "Directories & Payment Terms",
+      icon: Building2,
+      bgLight: "bg-purple-500/10 text-purple-600 border-purple-500/25",
+      bgDark: "bg-purple-500/10 text-purple-400 border-purple-500/20",
     },
     {
       title: "Categories Hierarchy",
-      desc: "Organize ingredients and menu supplies into structured tree categories.",
+      category: "Taxonomy",
+      desc: "Organize raw ingredients and menu preparation supplies into structured tree categories.",
       path: `/restaurant/${subdomain}/inventory/categories`,
       badge: `${stats.totalCategories} Categories`,
       badgeType: "default",
+      featureTag: "Structured Ingredient Trees",
+      icon: FolderTree,
+      bgLight: "bg-indigo-500/10 text-indigo-600 border-indigo-500/25",
+      bgDark: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
     },
     {
       title: "Recipes & Costing Engine",
-      desc: "Formula composition, sub-recipe nesting, unit conversions, and gross margin analysis.",
+      category: "Food Costing",
+      desc: "Formula composition, sub-recipe nesting, unit conversions, yield percentages, and gross margin analysis.",
       path: `/restaurant/${subdomain}/inventory/recipes`,
       badge: "Food Costing",
       badgeType: "default",
+      featureTag: "Sub-Recipes & Gross Margins",
+      icon: UtensilsCrossed,
+      bgLight: "bg-emerald-500/10 text-emerald-600 border-emerald-500/25",
+      bgDark: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
     },
     {
       title: "Stock Management Ledger",
-      desc: "Real-time stock on hand per outlet, batch movement audits, and wastage logging.",
+      category: "Live Inventory",
+      desc: "Real-time stock on hand per outlet, batch movement audits, depletion tracking, and wastage logging.",
       path: `/restaurant/${subdomain}/inventory/stock`,
       badge: "Live Ledger",
       badgeType: "default",
+      featureTag: "Batch Audits & Wastage Logs",
+      icon: History,
+      bgLight: "bg-cyan-500/10 text-cyan-600 border-cyan-500/25",
+      bgDark: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
     },
     {
       title: "Low-Stock Alerts",
-      desc: "Critical alerts for items that have dropped below minimum reorder thresholds.",
+      category: "Deficit Control",
+      desc: "Critical alerts for ingredients and supplies that have dropped below minimum reorder thresholds.",
       path: `/restaurant/${subdomain}/inventory/alerts`,
       badge: stats.lowStockCount > 0 ? `${stats.lowStockCount} Critical Deficits` : "All Healthy",
       badgeType: stats.lowStockCount > 0 ? "warning" : "success",
+      featureTag: "Critical Reorder Thresholds",
+      icon: AlertTriangle,
+      bgLight: stats.lowStockCount > 0 ? "bg-amber-500/10 text-amber-600 border-amber-500/25" : "bg-emerald-500/10 text-emerald-600 border-emerald-500/25",
+      bgDark: stats.lowStockCount > 0 ? "bg-amber-500/10 text-amber-400 border-amber-500/20" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
     },
   ];
 
@@ -245,129 +347,281 @@ export default function InventoryDashboard({
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div
             onClick={() => router.push(`/restaurant/${subdomain}/inventory/items`)}
-            className={`p-5 rounded-3xl border transition cursor-pointer ${
+            className={`p-5 rounded-2xl border transition-all duration-200 cursor-pointer group ${
               isDark
-                ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.12]"
-                : "bg-white border-slate-200/80 shadow-xs hover:border-slate-300"
+                ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.14] hover:bg-[#121622]/80"
+                : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300 hover:shadow-md"
             }`}
           >
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Catalog Items
-            </span>
-            <p className={`text-2xl font-bold tracking-tight mt-1 ${isDark ? "text-white" : "text-slate-900"}`}>
-              {stats.totalItems}
+            <div className="flex justify-between items-start">
+              <span
+                className={`text-[11px] font-semibold uppercase tracking-wider ${
+                  isDark ? "text-[#8F95A3]" : "text-slate-500"
+                }`}
+              >
+                Catalog Items
+              </span>
+              <div
+                className={`w-7 h-7 rounded-lg flex items-center justify-center transition ${
+                  isDark ? "bg-blue-500/10 text-blue-400" : "bg-blue-50 text-blue-600"
+                }`}
+              >
+                <Package className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <p className={`text-2xl font-bold tracking-tight mt-2 ${isDark ? "text-white" : "text-slate-900"}`}>
+              {stats.totalItems}{" "}
+              <span className={`text-xs font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>SKUs</span>
             </p>
-            <p className={`text-[11px] mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-              Across {stats.totalCategories} categories
-            </p>
+            <div className="flex justify-between items-center mt-2 text-[11px]">
+              <span className={isDark ? "text-[#8F95A3]" : "text-slate-500"}>
+                Across {stats.totalCategories} {stats.totalCategories === 1 ? "category" : "categories"}
+              </span>
+              <span className="text-[#0071E3] font-medium group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                Manage <ArrowRight className="w-3 h-3 inline" />
+              </span>
+            </div>
           </div>
 
           <div
             onClick={() => router.push(`/restaurant/${subdomain}/inventory/alerts`)}
-            className={`p-5 rounded-3xl border transition cursor-pointer ${
+            className={`p-5 rounded-2xl border transition-all duration-200 cursor-pointer group ${
               stats.lowStockCount > 0
                 ? isDark
-                  ? "bg-amber-500/[0.05] border-amber-500/30"
-                  : "bg-amber-50/50 border-amber-200 shadow-xs"
+                  ? "bg-amber-500/[0.05] border-amber-500/30 hover:border-amber-500/50 hover:bg-amber-500/[0.08]"
+                  : "bg-amber-50/50 border-amber-200 shadow-sm hover:border-amber-300 hover:shadow-md"
                 : isDark
-                ? "bg-[#121622]/60 border-white/[0.06]"
-                : "bg-white border-slate-200/80 shadow-xs"
+                ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.14] hover:bg-[#121622]/80"
+                : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300 hover:shadow-md"
             }`}
           >
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${
-              stats.lowStockCount > 0 ? "text-amber-500" : isDark ? "text-[#8F95A3]" : "text-slate-500"
-            }`}>
-              Low Stock Alerts
-            </span>
-            <p className={`text-2xl font-bold tracking-tight mt-1 ${
-              stats.lowStockCount > 0 ? "text-amber-500" : isDark ? "text-white" : "text-slate-900"
-            }`}>
-              {stats.lowStockCount}
+            <div className="flex justify-between items-start">
+              <span
+                className={`text-[11px] font-semibold uppercase tracking-wider ${
+                  stats.lowStockCount > 0 ? "text-amber-500" : isDark ? "text-[#8F95A3]" : "text-slate-500"
+                }`}
+              >
+                Low Stock Alerts
+              </span>
+              <div
+                className={`w-7 h-7 rounded-lg flex items-center justify-center transition ${
+                  stats.lowStockCount > 0
+                    ? isDark
+                      ? "bg-amber-500/10 text-amber-400"
+                      : "bg-amber-50 text-amber-600"
+                    : isDark
+                    ? "bg-emerald-500/10 text-emerald-400"
+                    : "bg-emerald-50 text-emerald-600"
+                }`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <p
+              className={`text-2xl font-bold tracking-tight mt-2 ${
+                stats.lowStockCount > 0
+                  ? "text-amber-500"
+                  : isDark
+                  ? "text-emerald-400"
+                  : "text-emerald-600"
+              }`}
+            >
+              {stats.lowStockCount > 0 ? `${stats.lowStockCount} Deficits` : "Optimal"}
             </p>
-            <p className={`text-[11px] mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-              {stats.lowStockCount > 0 ? "Requires reordering" : "Levels optimal"}
-            </p>
+            <div className="flex justify-between items-center mt-2 text-[11px]">
+              <span className={isDark ? "text-[#8F95A3]" : "text-slate-500"}>
+                {stats.lowStockCount > 0 ? "Requires reordering" : "All levels healthy"}
+              </span>
+              <span className="text-[#0071E3] font-medium group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                Alerts <ArrowRight className="w-3 h-3 inline" />
+              </span>
+            </div>
           </div>
 
           <div
             onClick={() => router.push(`/restaurant/${subdomain}/inventory/vendors`)}
-            className={`p-5 rounded-3xl border transition cursor-pointer ${
+            className={`p-5 rounded-2xl border transition-all duration-200 cursor-pointer group ${
               isDark
-                ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.12]"
-                : "bg-white border-slate-200/80 shadow-xs hover:border-slate-300"
+                ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.14] hover:bg-[#121622]/80"
+                : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300 hover:shadow-md"
             }`}
           >
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Active Suppliers
-            </span>
-            <p className={`text-2xl font-bold tracking-tight mt-1 ${isDark ? "text-white" : "text-slate-900"}`}>
-              {stats.totalVendors}
+            <div className="flex justify-between items-start">
+              <span
+                className={`text-[11px] font-semibold uppercase tracking-wider ${
+                  isDark ? "text-[#8F95A3]" : "text-slate-500"
+                }`}
+              >
+                Active Suppliers
+              </span>
+              <div
+                className={`w-7 h-7 rounded-lg flex items-center justify-center transition ${
+                  isDark ? "bg-purple-500/10 text-purple-400" : "bg-purple-50 text-purple-600"
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <p className={`text-2xl font-bold tracking-tight mt-2 ${isDark ? "text-white" : "text-slate-900"}`}>
+              {stats.totalVendors}{" "}
+              <span className={`text-xs font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>Vendors</span>
             </p>
-            <p className={`text-[11px] mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-              Registered vendor profiles
-            </p>
+            <div className="flex justify-between items-center mt-2 text-[11px]">
+              <span className={isDark ? "text-[#8F95A3]" : "text-slate-500"}>
+                Registered vendor profiles
+              </span>
+              <span className="text-[#0071E3] font-medium group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                Directory <ArrowRight className="w-3 h-3 inline" />
+              </span>
+            </div>
           </div>
 
           <div
             onClick={() => router.push(`/restaurant/${subdomain}/inventory/stock`)}
-            className={`p-5 rounded-3xl border transition cursor-pointer ${
+            className={`p-5 rounded-2xl border transition-all duration-200 cursor-pointer group ${
               isDark
-                ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.12]"
-                : "bg-white border-slate-200/80 shadow-xs hover:border-slate-300"
+                ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.14] hover:bg-[#121622]/80"
+                : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300 hover:shadow-md"
             }`}
           >
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Wastage (MTD)
-            </span>
-            <p className={`text-2xl font-bold tracking-tight mt-1 ${isDark ? "text-white" : "text-slate-900"}`}>
-              {stats.wastageThisMonth}
+            <div className="flex justify-between items-start">
+              <span
+                className={`text-[11px] font-semibold uppercase tracking-wider ${
+                  isDark ? "text-[#8F95A3]" : "text-slate-500"
+                }`}
+              >
+                Wastage (MTD)
+              </span>
+              <div
+                className={`w-7 h-7 rounded-lg flex items-center justify-center transition ${
+                  isDark ? "bg-rose-500/10 text-rose-400" : "bg-rose-50 text-rose-600"
+                }`}
+              >
+                <History className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <p className={`text-2xl font-bold tracking-tight mt-2 ${isDark ? "text-white" : "text-slate-900"}`}>
+              {stats.wastageThisMonth}{" "}
+              <span className={`text-xs font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>Logs</span>
             </p>
-            <p className={`text-[11px] mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-              Incidents logged this month
-            </p>
+            <div className="flex justify-between items-center mt-2 text-[11px]">
+              <span className={isDark ? "text-[#8F95A3]" : "text-slate-500"}>
+                Incidents logged this month
+              </span>
+              <span className="text-[#0071E3] font-medium group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                Ledger <ArrowRight className="w-3 h-3 inline" />
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Submodules Grid Navigation */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {navCards.map((card) => (
-            <div
-              key={card.path}
-              onClick={() => router.push(card.path)}
-              className={`p-6 rounded-3xl border transition cursor-pointer flex flex-col justify-between space-y-4 group ${
-                isDark
-                  ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.15] hover:bg-[#121622]/90"
-                  : "bg-white border-slate-200/80 shadow-xs hover:shadow-md hover:border-slate-300"
+        {/* Operational Business Modules Grid */}
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <span
+              className={`text-[11px] font-semibold uppercase tracking-wider ${
+                isDark ? "text-[#8F95A3]" : "text-slate-500"
               }`}
             >
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <h3 className={`text-base font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-                    {card.title}
-                  </h3>
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
-                    card.badgeType === "warning"
-                      ? isDark ? "bg-amber-500/15 text-amber-300 border-amber-500/25" : "bg-amber-100 text-amber-800 border-amber-200"
-                      : card.badgeType === "success"
-                      ? isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-100 text-emerald-800 border-emerald-200"
-                      : isDark ? "bg-white/[0.04] text-[#BAC0CD] border-white/[0.08]" : "bg-slate-100 text-slate-700 border-slate-200"
-                  }`}>
-                    {card.badge}
-                  </span>
-                </div>
-                <p className={`text-xs leading-relaxed ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                  {card.desc}
-                </p>
-              </div>
+              Inventory Submodules & Control
+            </span>
+            <span
+              className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
+                isDark
+                  ? "bg-white/[0.04] text-[#8F95A3] border-white/[0.06]"
+                  : "bg-slate-100 text-slate-600 border-slate-200"
+              }`}
+            >
+              {navCards.length} Submodules Available
+            </span>
+          </div>
 
-              <div className={`pt-3 border-t flex justify-between items-center text-xs ${
-                isDark ? "border-white/[0.06] text-[#8F95A3]" : "border-slate-100 text-slate-400"
-              }`}>
-                <span className="text-[#0071E3] font-medium group-hover:underline">Access Module</span>
-                <span className="group-hover:translate-x-1 transition-transform">→</span>
-              </div>
-            </div>
-          ))}
+          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+            {navCards.map((card) => {
+              const IconComponent = card.icon;
+
+              return (
+                <div
+                  key={card.path}
+                  onClick={() => router.push(card.path)}
+                  className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer group flex flex-col justify-between gap-3 ${
+                    isDark
+                      ? "bg-[#121622]/60 border-white/[0.06] hover:bg-[#121622]/90 hover:border-white/[0.14] hover:shadow-lg hover:shadow-black/20"
+                      : "bg-white border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md hover:border-slate-300"
+                  }`}
+                >
+                  {/* Header Row: Icon + Name + Badge + Tooltip */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 duration-200 ${
+                          isDark ? card.bgDark : card.bgLight
+                        }`}
+                      >
+                        <IconComponent className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <span
+                          className={`block text-[10px] font-semibold uppercase tracking-wider truncate ${
+                            isDark ? "text-[#8F95A3]" : "text-slate-400"
+                          }`}
+                        >
+                          {card.category}
+                        </span>
+                        <h4
+                          className={`text-sm font-semibold tracking-tight truncate group-hover:text-[#0071E3] dark:group-hover:text-blue-400 transition-colors ${
+                            isDark ? "text-white" : "text-slate-900"
+                          }`}
+                        >
+                          {card.title}
+                        </h4>
+                      </div>
+                    </div>
+
+                    {/* Right Controls: Badge + Tooltip */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {card.badge && (
+                        <span
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${
+                            card.badgeType === "warning"
+                              ? isDark
+                                ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
+                                : "bg-amber-50 text-amber-800 border-amber-200"
+                              : card.badgeType === "success"
+                              ? isDark
+                                ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+                                : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : isDark
+                              ? "bg-blue-500/10 text-blue-300 border-blue-500/20"
+                              : "bg-blue-50 text-blue-800 border-blue-200"
+                          }`}
+                        >
+                          {card.badge}
+                        </span>
+                      )}
+
+                      {/* Interactive Tooltip Trigger for Description */}
+                      <InfoTooltip
+                        title={card.title}
+                        description={card.desc}
+                        category={card.category}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Footer Row: Feature tag & sleek launch CTA */}
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-white/[0.04] text-xs">
+                    <span className={`text-[11px] font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                      {card.featureTag}
+                    </span>
+                    <span className="font-semibold text-[#0071E3] dark:text-blue-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform text-[11px]">
+                      Launch <ArrowRight className="w-3 h-3" />
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </main>
     </div>
