@@ -458,7 +458,7 @@ export default function UsersTab({
             No staff accounts found matching query.
           </div>
         ) : (
-          <div className="grid gap-3.5 sm:grid-cols-1 lg:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredMemberships.map((m) => {
               const isCurrentUser = m.user.id === currentUserId;
               const activeRoles = Array.from(
@@ -588,7 +588,7 @@ export default function UsersTab({
                   </div>
 
                   {/* Middle row: Linked Profile & Roles Info Box */}
-                  <div className={`p-3 rounded-xl border text-xs grid grid-cols-1 sm:grid-cols-2 gap-2.5 ${
+                  <div className={`p-3 rounded-xl border text-xs grid grid-cols-1 gap-2.5 ${
                     isDark ? "bg-[#0A0C12]/50 border-white/[0.04]" : "bg-slate-50/70 border-slate-200/60"
                   }`}>
                     {/* Linked Staff Profile */}
@@ -717,7 +717,7 @@ export default function UsersTab({
             No pending staff invitations awaiting activation.
           </div>
         ) : (
-          <div className="grid gap-3.5 sm:grid-cols-1 lg:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredInvitations.map((inv) => (
               <div
                 key={inv.id}
