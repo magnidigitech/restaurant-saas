@@ -19,6 +19,9 @@ import {
   CheckCircle2,
   AlertTriangle,
   ArrowRight,
+  Users,
+  Shield,
+  Database,
 } from "lucide-react";
 
 interface Outlet {
@@ -304,9 +307,8 @@ export default function RestaurantProfilePage({
   if (profileLoading && outletsLoading) {
     return (
       <div
-        className={`min-h-screen flex flex-col items-center justify-center font-sans antialiased ${
-          isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
-        }`}
+        className={`min-h-screen flex flex-col items-center justify-center font-sans antialiased ${isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+          }`}
       >
         <div className="w-8 h-8 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin mb-3" />
         <p className="text-xs font-medium">Loading Restaurant & Outlets...</p>
@@ -318,37 +320,33 @@ export default function RestaurantProfilePage({
 
   return (
     <div
-      className={`min-h-screen font-sans antialiased transition-colors duration-200 flex flex-col ${
-        isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
-      }`}
+      className={`min-h-screen font-sans antialiased transition-colors duration-200 flex flex-col ${isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+        }`}
     >
       <RestaurantNavbar activeSection="Restaurant & Outlets" />
 
-      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-16 sm:py-6 space-y-6">
         {/* Executive Header Banner */}
         <div
-          className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
-            isDark
+          className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${isDark
               ? "bg-[#121622]/60 border-white/[0.06] shadow-xl shadow-black/20"
               : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
-          }`}
+            }`}
         >
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => router.push(p("/dashboard"))}
-                className={`text-xs font-medium transition cursor-pointer ${
-                  isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
-                }`}
+                className={`text-xs font-medium transition cursor-pointer ${isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
+                  }`}
               >
                 ← Dashboard
               </button>
               <span className={`text-xs ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
               <span className="w-2 h-2 rounded-full bg-[#0071E3]" />
               <span
-                className={`text-[11px] font-semibold uppercase tracking-wider ${
-                  isDark ? "text-[#8F95A3]" : "text-slate-500"
-                }`}
+                className={`text-[11px] font-semibold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"
+                  }`}
               >
                 Administration & Setup
               </span>
@@ -364,11 +362,10 @@ export default function RestaurantProfilePage({
 
           <div className="flex items-center gap-2">
             <span
-              className={`text-xs font-mono uppercase px-3 py-1.5 rounded-full border ${
-                isDark
+              className={`text-xs font-mono uppercase px-3 py-1.5 rounded-full border ${isDark
                   ? "bg-white/[0.04] text-[#BAC0CD] border-white/[0.08]"
                   : "bg-slate-100 text-slate-700 border-slate-200"
-              }`}
+                }`}
             >
               Domain: {subdomain}
             </span>
@@ -379,26 +376,24 @@ export default function RestaurantProfilePage({
         <div className="p-1 sm:p-1.5 bg-slate-200/70 dark:bg-white/[0.06] rounded-2xl grid grid-cols-2 gap-1 w-full max-w-md">
           <button
             onClick={() => switchTab("profile")}
-            className={`py-2.5 px-3 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 ${
-              activeTab === "profile"
+            className={`py-2.5 px-3 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 ${activeTab === "profile"
                 ? "bg-white dark:bg-[#151A28] text-[#0071E3] dark:text-white shadow-sm font-bold"
                 : isDark
-                ? "text-[#8F95A3] hover:text-white"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
+                  ? "text-[#8F95A3] hover:text-white"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
           >
             <Store className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Brand Profile</span>
           </button>
           <button
             onClick={() => switchTab("outlets")}
-            className={`py-2.5 px-3 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 ${
-              activeTab === "outlets"
+            className={`py-2.5 px-3 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 ${activeTab === "outlets"
                 ? "bg-white dark:bg-[#151A28] text-[#0071E3] dark:text-white shadow-sm font-bold"
                 : isDark
-                ? "text-[#8F95A3] hover:text-white"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
+                  ? "text-[#8F95A3] hover:text-white"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
           >
             <MapPin className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Branch Outlets ({outlets.length})</span>
@@ -425,48 +420,67 @@ export default function RestaurantProfilePage({
             {/* Subscription Plan & Limits Overview */}
             {activeSub && (
               <div
-                className={`p-6 rounded-3xl border transition space-y-4 ${
-                  isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+                className={`p-5 sm:p-6 rounded-3xl border transition space-y-4 ${
+                  isDark ? "bg-[#121622]/60 border-white/[0.06] shadow-xl shadow-black/10" : "bg-white border-slate-200/80 shadow-xs"
                 }`}
               >
-                <div className="flex justify-between items-center">
-                  <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
-                    Active Subscription Plan
-                  </h2>
-                  <span className="text-xs font-bold uppercase px-3 py-1 bg-[#0071E3]/15 text-[#58A6FF] border border-[#0071E3]/25 rounded-full">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    <h2 className={`text-xs sm:text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+                      Active Subscription Plan
+                    </h2>
+                  </div>
+                  <span className="self-start sm:self-auto text-[11px] font-bold uppercase px-3 py-1 bg-[#0071E3]/10 dark:bg-[#0071E3]/20 text-[#0071E3] dark:text-[#58A6FF] border border-[#0071E3]/25 rounded-full whitespace-nowrap">
                     Plan: {activeSub.plan.name}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                  <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
-                    <span className={`block text-[10px] uppercase font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                      Outlets Capacity
-                    </span>
-                    <span className={`font-bold text-lg ${isDark ? "text-white" : "text-slate-900"}`}>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-xs">
+                  <div className={`p-4 rounded-2xl border flex flex-col justify-between gap-2 ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50/80 border-slate-200/80"}`}>
+                    <div className="flex items-center justify-between">
+                      <span className={`block text-[10px] uppercase font-semibold tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                        Outlets
+                      </span>
+                      <Building2 className="w-3.5 h-3.5 text-blue-500" />
+                    </div>
+                    <span className={`font-bold text-lg sm:text-xl ${isDark ? "text-white" : "text-slate-900"}`}>
                       {activeSub.plan.maxOutlets}
                     </span>
                   </div>
-                  <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
-                    <span className={`block text-[10px] uppercase font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                      Staff Limit
-                    </span>
-                    <span className={`font-bold text-lg ${isDark ? "text-white" : "text-slate-900"}`}>
+
+                  <div className={`p-4 rounded-2xl border flex flex-col justify-between gap-2 ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50/80 border-slate-200/80"}`}>
+                    <div className="flex items-center justify-between">
+                      <span className={`block text-[10px] uppercase font-semibold tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                        Staff Limit
+                      </span>
+                      <Users className="w-3.5 h-3.5 text-indigo-500" />
+                    </div>
+                    <span className={`font-bold text-lg sm:text-xl ${isDark ? "text-white" : "text-slate-900"}`}>
                       {activeSub.plan.maxEmployees}
                     </span>
                   </div>
-                  <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
-                    <span className={`block text-[10px] uppercase font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                      Admin Logins
-                    </span>
-                    <span className={`font-bold text-lg ${isDark ? "text-white" : "text-slate-900"}`}>
+
+                  <div className={`p-4 rounded-2xl border flex flex-col justify-between gap-2 ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50/80 border-slate-200/80"}`}>
+                    <div className="flex items-center justify-between">
+                      <span className={`block text-[10px] uppercase font-semibold tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                        Admin Logins
+                      </span>
+                      <Shield className="w-3.5 h-3.5 text-emerald-500" />
+                    </div>
+                    <span className={`font-bold text-lg sm:text-xl ${isDark ? "text-white" : "text-slate-900"}`}>
                       {activeSub.plan.maxAdminUsers}
                     </span>
                   </div>
-                  <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
-                    <span className={`block text-[10px] uppercase font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                      Cloud Storage
-                    </span>
-                    <span className={`font-bold text-lg ${isDark ? "text-white" : "text-slate-900"}`}>
+
+                  <div className={`p-4 rounded-2xl border flex flex-col justify-between gap-2 ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50/80 border-slate-200/80"}`}>
+                    <div className="flex items-center justify-between">
+                      <span className={`block text-[10px] uppercase font-semibold tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                        Cloud Storage
+                      </span>
+                      <Database className="w-3.5 h-3.5 text-purple-500" />
+                    </div>
+                    <span className={`font-bold text-lg sm:text-xl ${isDark ? "text-white" : "text-slate-900"}`}>
                       {activeSub.plan.storageQuotaGb} GB
                     </span>
                   </div>
@@ -477,11 +491,10 @@ export default function RestaurantProfilePage({
             {/* Profile Settings Form */}
             <form onSubmit={handleProfileSubmit} className="space-y-6">
               <div
-                className={`p-6 sm:p-7 rounded-3xl border transition space-y-5 ${
-                  isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
-                }`}
+                className={`p-5 sm:p-7 rounded-3xl border transition space-y-5 ${isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+                  }`}
               >
-                <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+                <h2 className={`text-xs sm:text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
                   General Identity & Branding
                 </h2>
 
@@ -495,9 +508,8 @@ export default function RestaurantProfilePage({
                       required
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                      }`}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] focus:ring-2 focus:ring-[#0071E3]/10 ${isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-slate-50/80 border-slate-200/90 text-slate-900 focus:bg-white"
+                        }`}
                     />
                   </div>
 
@@ -509,9 +521,8 @@ export default function RestaurantProfilePage({
                       type="text"
                       value={formData.applicationName}
                       onChange={(e) => setFormData({ ...formData, applicationName: e.target.value })}
-                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                      }`}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] focus:ring-2 focus:ring-[#0071E3]/10 ${isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-slate-50/80 border-slate-200/90 text-slate-900 focus:bg-white"
+                        }`}
                     />
                   </div>
                 </div>
@@ -526,9 +537,8 @@ export default function RestaurantProfilePage({
                       placeholder="https://example.com/logo.png"
                       value={formData.logoUrl}
                       onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
-                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                      }`}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] focus:ring-2 focus:ring-[#0071E3]/10 ${isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-slate-50/80 border-slate-200/90 text-slate-900 focus:bg-white"
+                        }`}
                     />
                   </div>
 
@@ -541,9 +551,8 @@ export default function RestaurantProfilePage({
                       placeholder="https://example.com/favicon.ico"
                       value={formData.faviconUrl}
                       onChange={(e) => setFormData({ ...formData, faviconUrl: e.target.value })}
-                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                      }`}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] focus:ring-2 focus:ring-[#0071E3]/10 ${isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-slate-50/80 border-slate-200/90 text-slate-900 focus:bg-white"
+                        }`}
                     />
                   </div>
                 </div>
@@ -558,15 +567,14 @@ export default function RestaurantProfilePage({
                         type="color"
                         value={formData.primaryColor}
                         onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
-                        className="w-10 h-10 p-0 border-0 rounded-xl cursor-pointer bg-transparent"
+                        className="w-10 h-10 p-0 border-0 rounded-xl cursor-pointer bg-transparent shrink-0"
                       />
                       <input
                         type="text"
                         value={formData.primaryColor}
                         onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
-                        className={`flex-1 px-3.5 py-2.5 text-xs font-mono rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                          isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                        }`}
+                        className={`flex-1 px-3.5 py-2.5 text-xs font-mono rounded-xl border transition focus:outline-none focus:border-[#0071E3] focus:ring-2 focus:ring-[#0071E3]/10 ${isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-slate-50/80 border-slate-200/90 text-slate-900 focus:bg-white"
+                          }`}
                       />
                     </div>
                   </div>
@@ -580,15 +588,14 @@ export default function RestaurantProfilePage({
                         type="color"
                         value={formData.secondaryColor}
                         onChange={(e) => setFormData({ ...formData, secondaryColor: e.target.value })}
-                        className="w-10 h-10 p-0 border-0 rounded-xl cursor-pointer bg-transparent"
+                        className="w-10 h-10 p-0 border-0 rounded-xl cursor-pointer bg-transparent shrink-0"
                       />
                       <input
                         type="text"
                         value={formData.secondaryColor}
                         onChange={(e) => setFormData({ ...formData, secondaryColor: e.target.value })}
-                        className={`flex-1 px-3.5 py-2.5 text-xs font-mono rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                          isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                        }`}
+                        className={`flex-1 px-3.5 py-2.5 text-xs font-mono rounded-xl border transition focus:outline-none focus:border-[#0071E3] focus:ring-2 focus:ring-[#0071E3]/10 ${isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-slate-50/80 border-slate-200/90 text-slate-900 focus:bg-white"
+                          }`}
                       />
                     </div>
                   </div>
@@ -603,9 +610,8 @@ export default function RestaurantProfilePage({
                       type="email"
                       value={formData.supportEmail}
                       onChange={(e) => setFormData({ ...formData, supportEmail: e.target.value })}
-                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                      }`}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] focus:ring-2 focus:ring-[#0071E3]/10 ${isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-slate-50/80 border-slate-200/90 text-slate-900 focus:bg-white"
+                        }`}
                     />
                   </div>
 
@@ -617,9 +623,8 @@ export default function RestaurantProfilePage({
                       type="tel"
                       value={formData.supportPhone}
                       onChange={(e) => setFormData({ ...formData, supportPhone: e.target.value })}
-                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                      }`}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] focus:ring-2 focus:ring-[#0071E3]/10 ${isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-slate-50/80 border-slate-200/90 text-slate-900 focus:bg-white"
+                        }`}
                     />
                   </div>
                 </div>
@@ -678,16 +683,14 @@ export default function RestaurantProfilePage({
             {/* Outlets List or Empty State */}
             {outlets.length === 0 ? (
               <div
-                className={`p-8 sm:p-12 rounded-3xl border text-center flex flex-col items-center justify-center space-y-4 ${
-                  isDark ? "bg-[#121622]/40 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
-                }`}
+                className={`p-8 sm:p-12 rounded-3xl border text-center flex flex-col items-center justify-center space-y-4 ${isDark ? "bg-[#121622]/40 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+                  }`}
               >
                 <div
-                  className={`w-14 h-14 rounded-2xl flex items-center justify-center border ${
-                    isDark
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center border ${isDark
                       ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                       : "bg-emerald-50 text-emerald-600 border-emerald-200"
-                  }`}
+                    }`}
                 >
                   <Building2 className="w-7 h-7" />
                 </div>
@@ -704,7 +707,7 @@ export default function RestaurantProfilePage({
                   className="w-full sm:w-auto px-6 py-3.5 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-2xl transition shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>+ Add Your First Branch Location</span>
+                  <span>Add Your First Branch Location</span>
                 </button>
               </div>
             ) : (
@@ -712,21 +715,19 @@ export default function RestaurantProfilePage({
                 {outlets.map((outlet) => (
                   <div
                     key={outlet.id}
-                    className={`p-5 rounded-3xl border transition flex flex-col justify-between space-y-4 ${
-                      isDark
+                    className={`p-5 rounded-3xl border transition flex flex-col justify-between space-y-4 ${isDark
                         ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.12]"
                         : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300"
-                    }`}
+                      }`}
                   >
                     <div className="space-y-3">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2.5">
                           <div
-                            className={`w-9 h-9 rounded-xl flex items-center justify-center border ${
-                              isDark
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center border ${isDark
                                 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                                 : "bg-emerald-50 text-emerald-600 border-emerald-200"
-                            }`}
+                              }`}
                           >
                             <Building2 className="w-4 h-4" />
                           </div>
@@ -735,9 +736,8 @@ export default function RestaurantProfilePage({
                               {outlet.name}
                             </h3>
                             <span
-                              className={`inline-block text-[10px] px-2 py-0.5 rounded-full font-medium mt-0.5 ${
-                                isDark ? "bg-white/[0.04] text-[#8F95A3]" : "bg-slate-100 text-slate-600"
-                              }`}
+                              className={`inline-block text-[10px] px-2 py-0.5 rounded-full font-medium mt-0.5 ${isDark ? "bg-white/[0.04] text-[#8F95A3]" : "bg-slate-100 text-slate-600"
+                                }`}
                             >
                               ID: {outlet.id.slice(0, 8)}...
                             </span>
@@ -747,11 +747,10 @@ export default function RestaurantProfilePage({
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => openEditModal(outlet)}
-                            className={`p-1.5 rounded-lg text-xs transition cursor-pointer ${
-                              isDark
+                            className={`p-1.5 rounded-lg text-xs transition cursor-pointer ${isDark
                                 ? "text-[#8F95A3] hover:text-white hover:bg-white/[0.06]"
                                 : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-                            }`}
+                              }`}
                             title="Edit Outlet"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
@@ -810,9 +809,8 @@ export default function RestaurantProfilePage({
         {showCreateModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
             <div
-              className={`w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
-                isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
-              }`}
+              className={`w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                }`}
             >
               <div className="flex justify-between items-center pb-2 border-b border-black/[0.06] dark:border-white/[0.06]">
                 <h2 className="text-base font-bold tracking-tight">Add New Branch Location</h2>
@@ -835,9 +833,8 @@ export default function RestaurantProfilePage({
                     placeholder="e.g. Downtown Central"
                     value={createFormData.name}
                     onChange={(e) => setCreateFormData({ ...createFormData, name: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
                   />
                 </div>
 
@@ -850,9 +847,8 @@ export default function RestaurantProfilePage({
                     placeholder="Street, City, Postal Code"
                     value={createFormData.address}
                     onChange={(e) => setCreateFormData({ ...createFormData, address: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
                   />
                 </div>
 
@@ -882,9 +878,8 @@ export default function RestaurantProfilePage({
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
-                    className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
-                      isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
-                    }`}
+                    className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
+                      }`}
                   >
                     Cancel
                   </button>
@@ -905,9 +900,8 @@ export default function RestaurantProfilePage({
         {editingOutlet && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
             <div
-              className={`w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
-                isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
-              }`}
+              className={`w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                }`}
             >
               <div className="flex justify-between items-center pb-2 border-b border-black/[0.06] dark:border-white/[0.06]">
                 <h2 className="text-base font-bold tracking-tight">Edit Branch Location</h2>
@@ -929,9 +923,8 @@ export default function RestaurantProfilePage({
                     required
                     value={editFormData.name}
                     onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
                   />
                 </div>
 
@@ -944,9 +937,8 @@ export default function RestaurantProfilePage({
                     placeholder="Street, City, Postal Code"
                     value={editFormData.address}
                     onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
                   />
                 </div>
 
@@ -976,9 +968,8 @@ export default function RestaurantProfilePage({
                   <button
                     type="button"
                     onClick={() => setEditingOutlet(null)}
-                    className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
-                      isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
-                    }`}
+                    className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
+                      }`}
                   >
                     Cancel
                   </button>
@@ -999,9 +990,8 @@ export default function RestaurantProfilePage({
         {deletingOutlet && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
             <div
-              className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 ${
-                isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
-              }`}
+              className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 ${isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                }`}
             >
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center justify-center flex-shrink-0">
@@ -1027,11 +1017,10 @@ export default function RestaurantProfilePage({
                   type="button"
                   disabled={deleting}
                   onClick={() => setDeletingOutlet(null)}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
-                    isDark
+                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${isDark
                       ? "bg-white/[0.04] text-[#8F95A3] hover:text-white hover:bg-white/[0.08]"
                       : "bg-slate-100 text-slate-700 hover:text-slate-900 hover:bg-slate-200"
-                  }`}
+                    }`}
                 >
                   Cancel
                 </button>
