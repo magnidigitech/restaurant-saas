@@ -291,27 +291,17 @@ export async function POST(req: NextRequest) {
       return { restaurant, invitation, inviteToken };
     });
 
-    // Trigger branded tenant activation email
-    const emailResult = await sendTenantActivationEmail({
-      adminName: data.primaryAdminName,
-      adminEmail: data.primaryAdminEmail,
-      restaurantName: transaction.restaurant.name,
-      subdomain: transaction.restaurant.subdomain,
-      activationToken: transaction.inviteToken,
-      expiresAt: transaction.invitation.expiresAt,
-    }).catch((err) => {
-      console.warn("Failed to trigger tenant activation email:", err);
-      return { success: false, error: err.message };
-    });
-
     return NextResponse.json({
       success: true,
       restaurant: transaction.restaurant,
       restaurantId: transaction.restaurant.id,
       subdomain: transaction.restaurant.subdomain,
       invitationToken: transaction.inviteToken,
+      adminEmail: data.primaryAdminEmail,
+      adminName: data.primaryAdminName,
+      restaurantName: transaction.restaurant.name,
       activationUrl: `/activate?token=${transaction.inviteToken}&subdomain=${transaction.restaurant.subdomain}`,
-      emailSent: emailResult?.success ?? false,
+      emailSent: false,
     });
   } catch (error: any) {
     console.error("Create Restaurant Error:", error);

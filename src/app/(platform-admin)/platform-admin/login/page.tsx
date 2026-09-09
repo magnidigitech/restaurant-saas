@@ -166,81 +166,121 @@ export default function PlatformAdminLoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-12 sm:px-6 lg:px-8 text-slate-100">
-      <div className="w-full max-w-md space-y-8 bg-slate-900/50 p-8 rounded-2xl border border-slate-800 backdrop-blur-md shadow-2xl">
-        <div className="text-center">
-          <div className="w-12 h-12 rounded-2xl bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center mx-auto mb-3 font-bold text-lg">
-            🛡️
+    <main className="relative min-h-screen flex items-center justify-center bg-[#07090e] px-3 sm:px-4 py-8 sm:py-12 text-slate-100 overflow-hidden font-sans selection:bg-amber-500 selection:text-black">
+      {/* Background Ambient Glows */}
+      <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[720px] h-[480px] bg-gradient-to-b from-amber-500/10 via-amber-600/5 to-transparent rounded-full blur-[130px] pointer-events-none" />
+      <div className="absolute -bottom-40 right-1/4 w-[500px] h-[400px] bg-blue-600/[0.04] rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute top-1/3 -left-32 w-[400px] h-[400px] bg-amber-500/[0.03] rounded-full blur-[120px] pointer-events-none" />
+
+      {/* Main Card Container */}
+      <div className="relative w-full max-w-[440px] rounded-3xl bg-[#0d121c]/90 backdrop-blur-2xl border border-white/[0.08] p-5 sm:p-9 shadow-[0_30px_80px_rgba(0,0,0,0.8),0_0_50px_rgba(245,158,11,0.06)]">
+        {/* Subtle Top Border Glow Accent */}
+        <div className="absolute inset-x-12 top-0 h-[1px] bg-gradient-to-r from-transparent via-amber-400/40 to-transparent" />
+
+        {/* Header with Resto Bird Logo */}
+        <div className="flex flex-col items-center text-center mb-6 sm:mb-7">
+          <div className="relative mb-3 flex items-center justify-center">
+            <div className="absolute -inset-2 bg-gradient-to-r from-amber-500/20 via-amber-400/10 to-amber-600/20 rounded-2xl blur-xl" />
+            <img
+              src="/resto-bird-logo.png"
+              alt="Resto Bird"
+              className="relative h-10 sm:h-12 w-auto object-contain drop-shadow-md"
+            />
           </div>
-          <h2 className="text-2xl font-extrabold tracking-tight text-white">
-            {step === "2FA" ? "Super Admin Verification" : "Super Admin Portal"}
-          </h2>
-          <p className="mt-1 text-xs text-slate-400">
+
+          <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-400 text-[10px] sm:text-[10.5px] font-mono uppercase tracking-wider mb-2 sm:mb-2.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            Super Admin Console
+          </div>
+
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            {step === "2FA" ? "Security Verification" : "Super Admin Portal"}
+          </h1>
+          <p className="mt-1 text-xs text-slate-400 max-w-[290px]">
             {step === "2FA"
-              ? "Provide second-factor authentication to continue"
-              : "Resto Bird Platform Infrastructure & Tenant Management"}
+              ? "Multi-factor authentication required for privileged infrastructure access"
+              : "Resto Bird Platform Infrastructure & Tenant Operations"}
           </p>
         </div>
 
         {error && (
-          <div className="bg-red-950/50 border border-red-800 text-red-200 text-xs px-4 py-3 rounded-xl text-center font-medium animate-in fade-in">
-            {error}
+          <div className="flex items-center gap-2.5 bg-rose-950/40 border border-rose-500/30 text-rose-200 text-xs px-4 py-3 rounded-xl font-medium mb-6 animate-in fade-in duration-200">
+            <svg className="w-4 h-4 text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span className="flex-1 text-left">{error}</span>
           </div>
         )}
 
         {/* STEP 1: CREDENTIALS */}
         {step === "CREDENTIALS" && (
-          <div className="space-y-5">
+          <div className="space-y-4 sm:space-y-5">
             {/* Instant Passkey Login */}
             <button
               type="button"
               onClick={handlePasskeySignIn}
               disabled={passkeyLoading}
-              className="w-full py-3 px-4 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/15 border border-white/20 text-white transition flex items-center justify-center gap-2 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99]"
+              className="w-full py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl text-xs font-semibold bg-gradient-to-b from-white/[0.07] to-white/[0.03] hover:from-white/[0.11] hover:to-white/[0.05] border border-white/[0.11] hover:border-amber-400/40 text-white transition-all flex items-center justify-between gap-2 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] group disabled:opacity-50"
             >
               {passkeyLoading ? (
-                <>
-                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Prompting Sensor...</span>
-                </>
+                <div className="w-full flex items-center justify-center gap-2 py-0.5">
+                  <span className="w-3.5 h-3.5 border-2 border-amber-400/40 border-t-amber-400 rounded-full animate-spin shrink-0" />
+                  <span className="text-amber-200 text-xs truncate">Awaiting Sensor Response...</span>
+                </div>
               ) : (
                 <>
-                  <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                  </svg>
-                  <span>Continue with Passkey</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-normal">Touch ID / Security Key</span>
+                  <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                    <div className="w-6 h-6 sm:w-7 sm:h-7 shrink-0 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 group-hover:bg-amber-500/20 transition-colors">
+                      <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                      </svg>
+                    </div>
+                    <span className="font-medium text-slate-100 text-xs whitespace-nowrap">
+                      Sign in with Passkey
+                    </span>
+                  </div>
+                  <span className="text-[9.5px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-300/90 font-mono whitespace-nowrap shrink-0">
+                    Touch ID / Key
+                  </span>
                 </>
               )}
             </button>
 
-            <div className="relative flex items-center">
-              <div className="flex-grow border-t border-slate-800"></div>
-              <span className="flex-shrink mx-3 text-[11px] uppercase tracking-wider text-slate-500">
+            {/* Divider */}
+            <div className="relative flex items-center my-4">
+              <div className="flex-grow border-t border-white/[0.08]" />
+              <span className="flex-shrink mx-3 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500">
                 or password
               </span>
-              <div className="flex-grow border-t border-slate-800"></div>
+              <div className="flex-grow border-t border-white/[0.08]" />
             </div>
 
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div>
-                <label htmlFor="email-address" className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">
+                <label htmlFor="email-address" className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider block mb-1.5">
                   Email Address
                 </label>
-                <input
-                  id="email-address"
-                  name="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full px-4 py-2.5 rounded-xl border border-slate-800 bg-slate-950 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs transition-all"
-                  placeholder="admin@platform.com"
-                />
+                <div className="relative">
+                  <input
+                    id="email-address"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    style={{
+                      WebkitBoxShadow: "0 0 0 1000px #090d15 inset",
+                      WebkitTextFillColor: "#ffffff",
+                    }}
+                    className="block w-full px-4 py-2.5 rounded-xl border border-white/[0.1] bg-[#090d15] text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/70 focus:ring-2 focus:ring-amber-500/20 text-xs transition-all font-sans"
+                    placeholder="admin@restobird.com"
+                  />
+                </div>
               </div>
 
               <div>
-                <label htmlFor="password" className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">
+                <label htmlFor="password" className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider block mb-1.5">
                   Password
                 </label>
                 <div className="relative">
@@ -248,16 +288,21 @@ export default function PlatformAdminLoginPage() {
                     id="password"
                     name="password"
                     type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full px-4 py-2.5 pr-12 rounded-xl border border-slate-800 bg-slate-950 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs transition-all"
-                    placeholder="••••••••"
+                    style={{
+                      WebkitBoxShadow: "0 0 0 1000px #090d15 inset",
+                      WebkitTextFillColor: "#ffffff",
+                    }}
+                    className="block w-full px-4 py-2.5 pr-11 rounded-xl border border-white/[0.1] bg-[#090d15] text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/70 focus:ring-2 focus:ring-amber-500/20 text-xs transition-all font-sans"
+                    placeholder="••••••••••••"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
                   >
                     <EyeIcon open={showPassword} />
                   </button>
@@ -267,9 +312,16 @@ export default function PlatformAdminLoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition shadow-sm cursor-pointer disabled:opacity-50 mt-2"
+                className="w-full py-3 px-4 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 transition-all shadow-[0_4px_20px_rgba(245,158,11,0.25)] hover:shadow-[0_6px_25px_rgba(245,158,11,0.35)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-2 active:scale-[0.99] flex items-center justify-center gap-2"
               >
-                {loading ? "Verifying..." : "Sign In with Password"}
+                {loading ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-slate-950/40 border-t-slate-950 rounded-full animate-spin" />
+                    <span>Verifying Credentials...</span>
+                  </>
+                ) : (
+                  <span>Sign In with Password</span>
+                )}
               </button>
             </form>
           </div>
@@ -278,13 +330,15 @@ export default function PlatformAdminLoginPage() {
         {/* STEP 2: 2FA CHALLENGE */}
         {step === "2FA" && (
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-[#090d15] border border-white/[0.08] text-xs">
               {hasPasskeys && (
                 <button
                   type="button"
                   onClick={() => { setMfaMethod("PASSKEY"); setError(""); }}
-                  className={`py-1.5 px-2 rounded-lg font-medium transition cursor-pointer text-center ${
-                    mfaMethod === "PASSKEY" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
+                  className={`py-2 px-2 rounded-lg font-medium transition cursor-pointer text-center ${
+                    mfaMethod === "PASSKEY"
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-xs"
+                      : "text-slate-400 hover:text-white"
                   }`}
                 >
                   Passkey
@@ -293,8 +347,10 @@ export default function PlatformAdminLoginPage() {
               <button
                 type="button"
                 onClick={() => { setMfaMethod("TOTP"); setError(""); }}
-                className={`py-1.5 px-2 rounded-lg font-medium transition cursor-pointer text-center ${
-                  mfaMethod === "TOTP" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
+                className={`py-2 px-2 rounded-lg font-medium transition cursor-pointer text-center ${
+                  mfaMethod === "TOTP"
+                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-xs"
+                    : "text-slate-400 hover:text-white"
                 }`}
               >
                 Authenticator
@@ -302,8 +358,10 @@ export default function PlatformAdminLoginPage() {
               <button
                 type="button"
                 onClick={() => { setMfaMethod("RECOVERY"); setError(""); }}
-                className={`py-1.5 px-2 rounded-lg font-medium transition cursor-pointer text-center ${
-                  mfaMethod === "RECOVERY" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
+                className={`py-2 px-2 rounded-lg font-medium transition cursor-pointer text-center ${
+                  mfaMethod === "RECOVERY"
+                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-xs"
+                    : "text-slate-400 hover:text-white"
                 }`}
               >
                 Recovery
@@ -312,14 +370,14 @@ export default function PlatformAdminLoginPage() {
 
             {mfaMethod === "PASSKEY" && (
               <div className="space-y-3 py-2 text-center">
-                <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
-                  Scan Touch ID, Face ID, or your hardware security key.
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300/90 leading-relaxed">
+                  Scan Touch ID, Face ID, or insert your hardware security key.
                 </div>
                 <button
                   type="button"
                   onClick={handlePasskeySignIn}
                   disabled={passkeyLoading}
-                  className="w-full py-3 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition shadow-sm cursor-pointer"
+                  className="w-full py-3 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 transition-all shadow-[0_4px_20px_rgba(245,158,11,0.25)] cursor-pointer"
                 >
                   {passkeyLoading ? "Prompting Sensor..." : "Verify with Passkey"}
                 </button>
@@ -329,7 +387,7 @@ export default function PlatformAdminLoginPage() {
             {mfaMethod === "TOTP" && (
               <form className="space-y-4" onSubmit={handle2FASubmit}>
                 <div>
-                  <label htmlFor="otp" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 text-center">
+                  <label htmlFor="otp" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 text-center">
                     6-Digit Authenticator Code
                   </label>
                   <input
@@ -343,24 +401,28 @@ export default function PlatformAdminLoginPage() {
                     placeholder="000000"
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    className="w-full rounded-xl px-4 py-3 text-center font-mono text-xl tracking-[0.4em] font-bold border border-slate-800 bg-slate-950 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    style={{
+                      WebkitBoxShadow: "0 0 0 1000px #090d15 inset",
+                      WebkitTextFillColor: "#ffffff",
+                    }}
+                    className="w-full rounded-xl px-4 py-3 text-center font-mono text-xl tracking-[0.4em] font-bold border border-white/[0.1] bg-[#090d15] text-white focus:outline-none focus:border-amber-500/70 focus:ring-2 focus:ring-amber-500/20"
                   />
                 </div>
 
-                <label className="flex items-center gap-2 text-xs cursor-pointer select-none text-slate-300">
+                <label className="flex items-center gap-2.5 text-xs cursor-pointer select-none text-slate-300">
                   <input
                     type="checkbox"
                     checked={trustDevice}
                     onChange={(e) => setTrustDevice(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500"
+                    className="w-4 h-4 rounded border-white/20 bg-[#090d15] text-amber-500 focus:ring-amber-500/40 accent-amber-500"
                   />
-                  <span>Trust this device for 30 days (bypass OTP)</span>
+                  <span className="text-slate-400 text-[11.5px]">Trust this device for 30 days (bypass OTP)</span>
                 </label>
 
                 <button
                   type="submit"
                   disabled={verifying2fa || otpCode.length !== 6}
-                  className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition shadow-sm cursor-pointer disabled:opacity-50"
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-bold transition-all shadow-[0_4px_20px_rgba(245,158,11,0.25)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {verifying2fa ? "Verifying Code..." : "Verify & Complete Sign In"}
                 </button>
@@ -370,7 +432,7 @@ export default function PlatformAdminLoginPage() {
             {mfaMethod === "RECOVERY" && (
               <form className="space-y-4" onSubmit={handle2FASubmit}>
                 <div>
-                  <label htmlFor="recovery-code" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  <label htmlFor="recovery-code" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                     Backup Recovery Code
                   </label>
                   <input
@@ -381,44 +443,56 @@ export default function PlatformAdminLoginPage() {
                     placeholder="RB-XXXX-XXXX"
                     value={recoveryCode}
                     onChange={(e) => setRecoveryCode(e.target.value.toUpperCase())}
-                    className="w-full rounded-xl px-4 py-2.5 text-center font-mono text-xs tracking-widest font-bold border border-slate-800 bg-slate-950 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    style={{
+                      WebkitBoxShadow: "0 0 0 1000px #090d15 inset",
+                      WebkitTextFillColor: "#ffffff",
+                    }}
+                    className="w-full rounded-xl px-4 py-2.5 text-center font-mono text-xs tracking-widest font-bold border border-white/[0.1] bg-[#090d15] text-amber-300 focus:outline-none focus:border-amber-500/70 focus:ring-2 focus:ring-amber-500/20"
                   />
                 </div>
 
-                <label className="flex items-center gap-2 text-xs cursor-pointer select-none text-slate-300">
+                <label className="flex items-center gap-2.5 text-xs cursor-pointer select-none text-slate-300">
                   <input
                     type="checkbox"
                     checked={trustDevice}
                     onChange={(e) => setTrustDevice(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500"
+                    className="w-4 h-4 rounded border-white/20 bg-[#090d15] text-amber-500 focus:ring-amber-500/40 accent-amber-500"
                   />
-                  <span>Trust this device for 30 days (bypass OTP)</span>
+                  <span className="text-slate-400 text-[11.5px]">Trust this device for 30 days (bypass OTP)</span>
                 </label>
 
                 <button
                   type="submit"
                   disabled={verifying2fa || !recoveryCode.trim()}
-                  className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition shadow-sm cursor-pointer disabled:opacity-50"
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-bold transition-all shadow-[0_4px_20px_rgba(245,158,11,0.25)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {verifying2fa ? "Verifying..." : "Submit Recovery Code"}
                 </button>
               </form>
             )}
 
-            <div className="pt-2 text-center border-t border-slate-800">
+            <div className="pt-2 text-center border-t border-white/[0.08]">
               <button
                 type="button"
                 onClick={() => {
                   setStep("CREDENTIALS");
                   setError("");
                 }}
-                className="text-[11px] text-slate-400 hover:underline cursor-pointer"
+                className="text-[11px] text-slate-400 hover:text-amber-400 transition-colors cursor-pointer"
               >
                 &larr; Back to password sign in
               </button>
             </div>
           </div>
         )}
+
+        {/* Footer Security Badge */}
+        <div className="pt-5 mt-6 border-t border-white/[0.06] flex items-center justify-center gap-2 text-[11px] text-slate-500 font-medium">
+          <svg className="w-3.5 h-3.5 text-amber-400/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          <span>Resto Bird Enterprise Multi-Tenant Security</span>
+        </div>
       </div>
     </main>
   );

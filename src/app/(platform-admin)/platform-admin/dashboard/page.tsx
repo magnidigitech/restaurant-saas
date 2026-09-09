@@ -167,6 +167,53 @@ export const UNIFIED_CORE_MODULES = [
   },
 ];
 
+export function buildSubdomainActivationUrl(subdomain: string, token: string, email?: string): string {
+  const emailParam = email ? `&email=${encodeURIComponent(email)}` : "";
+  if (typeof window === "undefined") {
+    return `/activate?token=${token}&subdomain=${subdomain}${emailParam}`;
+  }
+
+  const host = window.location.host; // e.g. "admin.localhost:3000", "localhost:3000", "admin.restobird.com"
+  const protocol = window.location.protocol; // "http:" or "https:"
+
+  if (host.startsWith("admin.")) {
+    const tenantHost = host.replace(/^admin\./, `${subdomain}.`);
+    return `${protocol}//${tenantHost}/activate?token=${token}${emailParam}`;
+  }
+
+  if (host.includes("localhost") || host.includes("127.0.0.1")) {
+    const port = window.location.port ? `:${window.location.port}` : "";
+    return `${protocol}//${subdomain}.localhost${port}/activate?token=${token}${emailParam}`;
+  }
+
+  const port = window.location.port ? `:${window.location.port}` : "";
+  const hostname = window.location.hostname;
+  return `${protocol}//${subdomain}.${hostname}${port}/activate?token=${token}${emailParam}`;
+}
+
+export function buildSubdomainUrl(subdomain: string, path: string = "/dashboard"): string {
+  if (typeof window === "undefined") {
+    return `/restaurant/${subdomain}${path}`;
+  }
+
+  const host = window.location.host;
+  const protocol = window.location.protocol;
+
+  if (host.startsWith("admin.")) {
+    const tenantHost = host.replace(/^admin\./, `${subdomain}.`);
+    return `${protocol}//${tenantHost}${path}`;
+  }
+
+  if (host.includes("localhost") || host.includes("127.0.0.1")) {
+    const port = window.location.port ? `:${window.location.port}` : "";
+    return `${protocol}//${subdomain}.localhost${port}${path}`;
+  }
+
+  const port = window.location.port ? `:${window.location.port}` : "";
+  const hostname = window.location.hostname;
+  return `${protocol}//${subdomain}.${hostname}${port}${path}`;
+}
+
 export default function ApplePlatformAdminDashboard() {
   const router = useRouter();
 
@@ -211,6 +258,18 @@ export default function ApplePlatformAdminDashboard() {
   const [inviteLoadingId, setInviteLoadingId] = useState<string | null>(null);
   const [inviteUrls, setInviteUrls] = useState<Record<string, string>>({});
   const [inviteEmailStatus, setInviteEmailStatus] = useState<Record<string, { email: string; sent: boolean; error?: string }>>({});
+  const [inviteDetails, setInviteDetails] = useState<
+    Record<
+      string,
+      {
+        token: string;
+        email: string;
+        subdomain: string;
+        restaurantName: string;
+        adminName: string;
+      }
+    >
+  >({});
   const [toast, setToast] = useState<{ message: string; type?: "success" | "error" } | null>(null);
 
   // Password Reset Modal
@@ -269,11 +328,68 @@ export default function ApplePlatformAdminDashboard() {
   ]);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState("");
-  const [createdInvite, setCreatedInvite] = useState<{ url: string; subdomain: string } | null>(null);
+  const [createdInvite, setCreatedInvite] = useState<{
+    url: string;
+    subdomain: string;
+    restaurantId: string;
+    restaurantName: string;
+    adminEmail: string;
+    adminName: string;
+    token: string;
+    emailSent?: boolean;
+  } | null>(null);
+
+  // Trigger Email Confirmation Modal State
+  const [emailConfirmModal, setEmailConfirmModal] = useState<{
+    isOpen: boolean;
+    restaurantId: string;
+    restaurantName: string;
+    subdomain: string;
+    adminEmail: string;
+    adminName: string;
+    token: string;
+  } | null>(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
+  };
+
+  const handleTriggerActivationEmail = async () => {
+    if (!emailConfirmModal) return;
+    setSendingEmail(true);
+    try {
+      const res = await fetch("/api/platform-admin/restaurants/send-activation-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          restaurantId: emailConfirmModal.restaurantId,
+          token: emailConfirmModal.token,
+          adminEmail: emailConfirmModal.adminEmail,
+          adminName: emailConfirmModal.adminName,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to dispatch activation email");
+
+      showToast(`Activation email sent to ${emailConfirmModal.adminEmail}`);
+      if (createdInvite && createdInvite.restaurantId === emailConfirmModal.restaurantId) {
+        setCreatedInvite((prev) => (prev ? { ...prev, emailSent: true } : null));
+      }
+      setInviteEmailStatus((prev) => ({
+        ...prev,
+        [emailConfirmModal.restaurantId]: {
+          email: emailConfirmModal.adminEmail,
+          sent: true,
+        },
+      }));
+      setEmailConfirmModal(null);
+    } catch (err: any) {
+      showToast(err.message, "error");
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   const fetchData = async () => {
@@ -421,21 +537,24 @@ export default function ApplePlatformAdminDashboard() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to generate invite token");
 
-      const rootOrigin = window.location.origin.includes("admin.")
-        ? window.location.origin.replace("admin.", "")
-        : window.location.origin;
-      const fullUrl = `${rootOrigin}/activate?token=${data.token}&subdomain=${data.subdomain}`;
+      const fullUrl = buildSubdomainActivationUrl(data.subdomain, data.token, data.email);
       setInviteUrls((prev) => ({ ...prev, [restaurantId]: fullUrl }));
+      setInviteDetails((prev) => ({
+        ...prev,
+        [restaurantId]: {
+          token: data.token,
+          email: data.email,
+          subdomain: data.subdomain,
+          restaurantName: data.restaurantName,
+          adminName: data.adminName,
+        },
+      }));
       setInviteEmailStatus((prev) => ({
         ...prev,
-        [restaurantId]: { email: data.email, sent: !!data.emailSent, error: data.emailError },
+        [restaurantId]: { email: data.email, sent: false },
       }));
       await navigator.clipboard.writeText(fullUrl);
-      if (data.emailSent) {
-        showToast(`Invite generated & onboarding email sent to ${data.email}`);
-      } else {
-        showToast("Activation link copied to clipboard");
-      }
+      showToast("Activation link generated & copied to clipboard");
       fetchData();
     } catch (err: any) {
       showToast(err.message, "error");
@@ -635,16 +754,18 @@ export default function ApplePlatformAdminDashboard() {
       if (!res.ok) throw new Error(data.error || "Onboarding failed");
 
       const targetSubdomain = data.subdomain || data.restaurant?.subdomain || formData.subdomain;
-      const rootOrigin = window.location.origin.includes("admin.")
-        ? window.location.origin.replace("admin.", "")
-        : window.location.origin;
-      const targetUrl =
-        data.activationUrl ||
-        `${rootOrigin}/activate?token=${data.invitationToken || data.token}&subdomain=${targetSubdomain}`;
+      const targetAdminEmail = data.adminEmail || formData.primaryAdminEmail;
+      const fullUrl = buildSubdomainActivationUrl(targetSubdomain, data.invitationToken || data.token, targetAdminEmail);
 
       setCreatedInvite({
-        url: targetUrl.startsWith("http") ? targetUrl : `${rootOrigin}${targetUrl}`,
+        url: fullUrl,
         subdomain: targetSubdomain,
+        restaurantId: data.restaurantId || data.restaurant?.id || "",
+        restaurantName: data.restaurantName || formData.name,
+        adminEmail: data.adminEmail || formData.primaryAdminEmail,
+        adminName: data.adminName || formData.primaryAdminName,
+        token: data.invitationToken || data.token,
+        emailSent: false,
       });
       fetchData();
     } catch (err: any) {
@@ -1066,7 +1187,7 @@ export default function ApplePlatformAdminDashboard() {
                                 isDark ? "text-[#8F95A3]" : "text-slate-500"
                               }`}
                             >
-                              {restaurant.subdomain}.yourplatform.com{" "}
+                              {restaurant.subdomain}.restobird.com{" "}
                               <span className={`font-sans ${isDark ? "text-[#555C6D]" : "text-slate-400"}`}>
                                 • {primaryAdminEmail}
                               </span>
@@ -1364,7 +1485,7 @@ export default function ApplePlatformAdminDashboard() {
                               </button>
 
                               <a
-                                href={`/restaurant/${restaurant.subdomain}/dashboard`}
+                                href={buildSubdomainUrl(restaurant.subdomain, "/dashboard")}
                                 target="_blank"
                                 rel="noreferrer"
                                 className={`px-3 py-1.5 text-xs font-medium rounded-xl border transition ${
@@ -1379,94 +1500,77 @@ export default function ApplePlatformAdminDashboard() {
                           </div>
 
                           {inviteUrls[restaurant.id] && (
-                            <div className="space-y-2 mt-1">
-                              {inviteEmailStatus[restaurant.id] && (
+                            <div className="space-y-2 mt-2">
+                              {inviteEmailStatus[restaurant.id]?.sent && (
                                 <div
-                                  className={`px-3 py-2 rounded-xl text-xs flex items-center justify-between font-sans ${
-                                    inviteEmailStatus[restaurant.id].sent
-                                      ? isDark
-                                        ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
-                                        : "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                                      : isDark
-                                      ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
-                                      : "bg-amber-50 text-amber-800 border border-amber-200"
+                                  className={`px-3.5 py-2 rounded-xl text-xs flex items-center justify-between font-sans ${
+                                    isDark
+                                      ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
+                                      : "bg-emerald-50 text-emerald-800 border border-emerald-200"
                                   }`}
                                 >
                                   <div className="flex items-center gap-2">
-                                    <span className="text-sm">{inviteEmailStatus[restaurant.id].sent ? "✉️" : "⚠️"}</span>
+                                    <span className="text-emerald-400 font-bold">✓</span>
                                     <span>
-                                      {inviteEmailStatus[restaurant.id].sent
-                                        ? `Onboarding invitation email sent to ${inviteEmailStatus[restaurant.id].email}`
-                                        : `Link generated for ${inviteEmailStatus[restaurant.id].email} (Email status: ${inviteEmailStatus[restaurant.id].error || "pending/unconfigured"})`}
+                                      Onboarding invitation email sent to{" "}
+                                      <strong className="underline">{inviteEmailStatus[restaurant.id].email}</strong>
                                     </span>
                                   </div>
                                 </div>
                               )}
+
                               <div
-                                className={`p-3 rounded-xl border flex items-center justify-between text-xs font-mono ${
+                                className={`p-3 rounded-xl border flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-xs font-mono ${
                                   isDark
                                     ? "bg-[#0A0C12] border-white/[0.08] text-emerald-400"
                                     : "bg-emerald-50 border-emerald-200 text-emerald-800"
                                 }`}
                               >
-                                <span className="truncate mr-3">{inviteUrls[restaurant.id]}</span>
-                                <button
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(inviteUrls[restaurant.id]);
-                                    showToast("Copied to clipboard");
-                                  }}
-                                  className={`px-2.5 py-1 rounded-lg text-[11px] font-sans font-medium ${
-                                    isDark ? "bg-white/[0.08] text-white hover:bg-white/[0.15]" : "bg-emerald-600 text-white hover:bg-emerald-700"
-                                  }`}
-                                >
-                                  Copy
-                                </button>
+                                <span className="truncate mr-2 select-all font-mono text-xs">{inviteUrls[restaurant.id]}</span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(inviteUrls[restaurant.id]);
+                                      showToast("Copied to clipboard");
+                                    }}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-sans font-medium transition cursor-pointer flex items-center gap-1.5 ${
+                                      isDark ? "bg-white/[0.08] text-white hover:bg-white/[0.15]" : "bg-emerald-600 text-white hover:bg-emerald-700"
+                                    }`}
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                    <span>Copy</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const details = inviteDetails[restaurant.id];
+                                      const tokenMatch = inviteUrls[restaurant.id]?.match(/token=([a-zA-Z0-9-]+)/);
+                                      const extractedToken = details?.token || (tokenMatch ? tokenMatch[1] : "");
+                                      setEmailConfirmModal({
+                                        isOpen: true,
+                                        restaurantId: restaurant.id,
+                                        restaurantName: details?.restaurantName || restaurant.name,
+                                        subdomain: details?.subdomain || restaurant.subdomain,
+                                        adminEmail: details?.email || primaryAdminEmail,
+                                        adminName: details?.adminName || `${restaurant.name} Administrator`,
+                                        token: extractedToken,
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-sans font-bold rounded-lg transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                    </svg>
+                                    <span>{inviteEmailStatus[restaurant.id]?.sent ? "Resend Email" : "Send Activation Email"}</span>
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           )}
-
-                          {/* Danger Zone: Permanent Tenant Deletion */}
-                          <div
-                            className={`border p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${
-                              isDark
-                                ? "bg-rose-500/[0.04] border-rose-500/20"
-                                : "bg-rose-50/70 border-rose-200"
-                            }`}
-                          >
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className={`text-xs font-semibold ${isDark ? "text-rose-400" : "text-rose-700"}`}>
-                                  Danger Zone • Permanent Tenant Purge
-                                </span>
-                                <span
-                                  className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
-                                    isDark
-                                      ? "bg-rose-500/10 text-rose-300 border-rose-500/20"
-                                      : "bg-rose-100 text-rose-800 border-rose-300"
-                                  }`}
-                                >
-                                  Irreversible
-                                </span>
-                              </div>
-                              <p className={`text-xs mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                                Permanently wipe <strong className={isDark ? "text-white" : "text-slate-900"}>{restaurant.name}</strong> ({restaurant.subdomain}), all child outlets, user memberships, inventory, and system data.
-                              </p>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openDeleteModal(restaurant);
-                              }}
-                              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-semibold rounded-xl transition shadow-sm flex items-center gap-2 flex-shrink-0 cursor-pointer"
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                              <span>Delete Tenant</span>
-                            </button>
-                          </div>
                         </div>
                       )}
                     </div>
@@ -1495,33 +1599,124 @@ export default function ApplePlatformAdminDashboard() {
 
             {createdInvite ? (
               <div
-                className={`p-5 rounded-2xl border space-y-3 ${
+                className={`p-6 sm:p-7 rounded-2xl border space-y-5 ${
                   isDark
-                    ? "bg-emerald-500/[0.08] border-emerald-500/20"
-                    : "bg-emerald-50 border-emerald-200"
+                    ? "bg-emerald-500/[0.06] border-emerald-500/20"
+                    : "bg-emerald-50/70 border-emerald-200"
                 }`}
               >
-                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Tenant Provisioned Successfully</p>
-                <p className={`text-xs ${isDark ? "text-[#C5C9D3]" : "text-slate-700"}`}>
-                  Instance for <span className="font-semibold">{formData.name}</span> is live. Share the single-use activation link:
-                </p>
-                <div
-                  className={`p-3 rounded-xl border flex items-center justify-between text-xs font-mono ${
-                    isDark
-                      ? "bg-[#0A0C12] border-white/[0.08] text-emerald-400"
-                      : "bg-white border-emerald-200 text-emerald-800"
-                  }`}
-                >
-                  <span className="truncate mr-3">{`${window.location.origin}${createdInvite.url}`}</span>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}${createdInvite.url}`);
-                      showToast("Activation link copied");
-                    }}
-                    className="px-3 py-1 bg-[#0071E3] text-white rounded-lg text-xs font-medium hover:bg-[#0077ED]"
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                      Tenant Provisioned Successfully
+                    </p>
+                  </div>
+                  <span className="text-[11px] font-mono uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    Live
+                  </span>
+                </div>
+
+                <div className="text-xs space-y-1">
+                  <p className={isDark ? "text-slate-200" : "text-slate-800"}>
+                    Instance for <strong className="font-bold text-white">{createdInvite.restaurantName}</strong> ({createdInvite.subdomain}) is initialized and live.
+                  </p>
+                  <p className={isDark ? "text-[#8F95A3]" : "text-slate-500"}>
+                    Assigned Administrator: <span className="font-mono text-amber-400">{createdInvite.adminEmail}</span>
+                  </p>
+                </div>
+
+                {/* Subdomain-scoped Activation URL */}
+                <div className="space-y-1.5">
+                  <label className={`text-[11px] font-medium block ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Subdomain Activation Link (Single-Use)
+                  </label>
+                  <div
+                    className={`p-3 rounded-xl border flex items-center justify-between gap-3 text-xs font-mono ${
+                      isDark
+                        ? "bg-[#0A0C12] border-white/[0.08] text-emerald-400"
+                        : "bg-white border-emerald-200 text-emerald-800"
+                    }`}
                   >
-                    Copy
-                  </button>
+                    <span className="truncate select-all">{createdInvite.url}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(createdInvite.url);
+                        showToast("Activation link copied to clipboard");
+                      }}
+                      className="px-3 py-1.5 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-lg text-xs font-sans font-medium transition cursor-pointer shrink-0 flex items-center gap-1.5"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      <span>Copy</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Email Action & Status */}
+                <div className="pt-3 border-t border-emerald-500/20 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                  <div>
+                    {createdInvite.emailSent ? (
+                      <div className="flex items-center gap-2 text-xs text-emerald-400 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        <span>Activation email delivered to {createdInvite.adminEmail}</span>
+                      </div>
+                    ) : (
+                      <div className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                        Email not sent yet. Click button to verify and dispatch invitation.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmailConfirmModal({
+                          isOpen: true,
+                          restaurantId: createdInvite.restaurantId,
+                          restaurantName: createdInvite.restaurantName,
+                          subdomain: createdInvite.subdomain,
+                          adminEmail: createdInvite.adminEmail,
+                          adminName: createdInvite.adminName,
+                          token: createdInvite.token,
+                        });
+                      }}
+                      className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-2 cursor-pointer"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      <span>{createdInvite.emailSent ? "Resend Activation Email" : "Send Activation Email"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreatedInvite(null);
+                        setFormData({
+                          name: "",
+                          subdomain: "",
+                          subscriptionPlanId: plans[0]?.id || "",
+                          maxOutlets: 2,
+                          maxEmployees: 30,
+                          maxAdminUsers: 3,
+                          storageQuotaGb: 5,
+                          primaryAdminName: "",
+                          primaryAdminEmail: "",
+                        });
+                      }}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition cursor-pointer ${
+                        isDark
+                          ? "bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.08] text-slate-300"
+                          : "bg-white hover:bg-slate-50 border-slate-200 text-slate-700"
+                      }`}
+                    >
+                      + Onboard Another
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -2371,6 +2566,84 @@ export default function ApplePlatformAdminDashboard() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Triggering Email */}
+      {emailConfirmModal?.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
+          <div
+            className={`w-full max-w-md rounded-2xl p-6 space-y-5 border shadow-2xl ${
+              isDark ? "bg-[#0D111A] border-white/[0.1] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold">Send Activation Email</h3>
+                <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                  Verify tenant details before dispatching email
+                </p>
+              </div>
+            </div>
+
+            <div
+              className={`p-3.5 rounded-xl border text-xs space-y-2 ${
+                isDark ? "bg-[#07090E] border-white/[0.06]" : "bg-slate-50 border-slate-200"
+              }`}
+            >
+              <div className="flex justify-between">
+                <span className={isDark ? "text-slate-400" : "text-slate-500"}>Restaurant:</span>
+                <span className="font-semibold">{emailConfirmModal.restaurantName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className={isDark ? "text-slate-400" : "text-slate-500"}>Subdomain:</span>
+                <span className="font-mono text-amber-400">{emailConfirmModal.subdomain}.restobird.com</span>
+              </div>
+              <div className="flex justify-between">
+                <span className={isDark ? "text-slate-400" : "text-slate-500"}>Recipient Email:</span>
+                <span className={`font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {emailConfirmModal.adminEmail}
+                </span>
+              </div>
+            </div>
+
+            <p className={`text-xs leading-relaxed ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+              An official Resto Bird onboarding invitation will be sent to this administrator with their dedicated subdomain link.
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={sendingEmail}
+                onClick={() => setEmailConfirmModal(null)}
+                className={`px-4 py-2 rounded-xl text-xs font-medium border transition cursor-pointer ${
+                  isDark ? "bg-white/[0.05] hover:bg-white/[0.08] border-white/[0.08] text-slate-300" : "bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700"
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={sendingEmail}
+                onClick={handleTriggerActivationEmail}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow-sm cursor-pointer flex items-center gap-2 disabled:opacity-50"
+              >
+                {sendingEmail ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-slate-950/40 border-t-slate-950 rounded-full animate-spin" />
+                    <span>Sending Email...</span>
+                  </>
+                ) : (
+                  <span>Confirm & Send Email</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

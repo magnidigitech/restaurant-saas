@@ -3,7 +3,7 @@ import * as bcrypt from "bcryptjs";
 
 async function main() {
   const email = process.argv[2]?.trim() || "admin@platform.com";
-  const newPassword = process.argv[3]?.trim() || "Superadmin@123";
+  const newPassword = process.argv[3]?.trim() || "superadmin123";
 
   console.log(`Setting password for Platform Super Admin: ${email}`);
 

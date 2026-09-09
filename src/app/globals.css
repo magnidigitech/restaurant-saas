@@ -121,3 +121,36 @@ body {
   border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
+/* Autofill override for dark inputs to prevent browser light-blue background */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #090d15 inset !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  caret-color: #f8fafc !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+@keyframes ambientDrift {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(15px, -18px) scale(1.04); }
+  66% { transform: translate(-12px, 14px) scale(0.97); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+@keyframes ambientDriftReverse {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(-16px, 15px) scale(0.96); }
+  66% { transform: translate(14px, -10px) scale(1.05); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+.animate-ambient-drift {
+  animation: ambientDrift 18s ease-in-out infinite;
+}
+
+.animate-ambient-drift-reverse {
+  animation: ambientDriftReverse 22s ease-in-out infinite;
+}
+

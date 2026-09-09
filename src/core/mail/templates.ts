@@ -15,7 +15,7 @@ export interface TenantActivationEmailParams {
  */
 export function generateTenantActivationEmail(params: TenantActivationEmailParams) {
   const baseUrl = (params.baseUrl || getAppBaseUrl()).replace(/\/$/, "");
-  const activationUrl = `${baseUrl}/activate?token=${params.activationToken}&subdomain=${params.subdomain}`;
+  const activationUrl = `${baseUrl}/activate?token=${params.activationToken}&subdomain=${params.subdomain}&email=${encodeURIComponent(params.adminEmail)}`;
   const expirationText = params.expiresAt
     ? params.expiresAt.toLocaleDateString("en-US", {
         weekday: "short",

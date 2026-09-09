@@ -30,7 +30,7 @@ The system defines three distinct levels of users:
   * Enable/disable specific modules per restaurant.
   * Define subscription plans and physical/entity limits (e.g., maximum outlets, employees).
   * Access platform-level audit logs and support configurations.
-* **URL Scope**: Recommended `admin.yourplatform.com`.
+* **URL Scope**: Recommended `admin.restobird.com`.
 
 ### Level 2: Restaurant Administrator
 * Created automatically upon Super Admin onboarding of the restaurant.

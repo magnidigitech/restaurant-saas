@@ -6,9 +6,64 @@ import { createHash } from "node:crypto";
 
 const activateSchema = z.object({
   token: z.string().min(1),
-  name: z.string().min(2),
+  name: z.string().optional(),
   password: z.string().min(6),
 });
+
+// GET /api/restaurant/activate?token=...
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const token = searchParams.get("token");
+
+    if (!token) {
+      return NextResponse.json({ error: "Missing invitation token" }, { status: 400 });
+    }
+
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const invitation = await prisma.staffInvitation.findUnique({
+      where: { tokenHash },
+      include: {
+        restaurant: {
+          select: {
+            id: true,
+            name: true,
+            subdomain: true,
+          },
+        },
+      },
+    });
+
+    if (!invitation) {
+      return NextResponse.json({ error: "Invalid invitation link." }, { status: 404 });
+    }
+
+    if (invitation.status === "ACCEPTED") {
+      return NextResponse.json(
+        {
+          error: "This invitation link has already been used and activated.",
+          alreadyActivated: true,
+          subdomain: invitation.restaurant.subdomain,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (invitation.status !== "SENT" || new Date() > invitation.expiresAt) {
+      return NextResponse.json({ error: "This invitation link has expired." }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      valid: true,
+      email: invitation.email,
+      restaurantName: invitation.restaurant.name,
+      subdomain: invitation.restaurant.subdomain,
+    });
+  } catch (err: any) {
+    console.error("Error verifying invite token:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -63,11 +118,25 @@ export async function POST(req: NextRequest) {
         where: { email: invitation.email },
       });
 
+      // Compute display name if not explicitly provided
+      let resolvedName = name?.trim();
+      if (!resolvedName) {
+        if (user?.name) {
+          resolvedName = user.name;
+        } else {
+          const rawPrefix = invitation.email.split("@")[0].replace(/[._-]/g, " ");
+          resolvedName = rawPrefix
+            .split(" ")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
+        }
+      }
+
       if (!user) {
         user = await tx.user.create({
           data: {
             email: invitation.email,
-            name,
+            name: resolvedName,
             passwordHash,
           },
         });
@@ -75,7 +144,7 @@ export async function POST(req: NextRequest) {
         await tx.user.update({
           where: { id: user.id },
           data: {
-            name,
+            name: resolvedName,
             passwordHash,
           },
         });

@@ -70,7 +70,7 @@ Implement **Module-level Access Grants** mapped through a unified `access_grants
 ## ADR 04: Next.js Subdomain-Based Tenant Routing
 
 ### Context:
-Each restaurant has a dedicated workspace (e.g. `coyote.yourplatform.com` or custom domain `coyotegrill.com`).
+Each restaurant has a dedicated workspace (e.g. `coyote.restobird.com` or custom domain `coyotegrill.com`).
 
 ### Decision:
 Handle routing dynamically using Next.js Middleware and Next.js App Router subdirectories.
@@ -103,7 +103,7 @@ Support `timezone` and `currency` configurations at the individual branch/outlet
 ## ADR 06: App Service Layer Custom Domain SSL Termination
 
 ### Context:
-When tenants configure custom domains (e.g. `grill.com` mapping to `grill.yourplatform.com`), SSL certificates and proxy routing must be validated.
+When tenants configure custom domains (e.g. `grill.com` mapping to `grill.restobird.com`), SSL certificates and proxy routing must be validated.
 
 ### Decision:
 Manage SSL certificate routing and request termination directly at the App Service layer.

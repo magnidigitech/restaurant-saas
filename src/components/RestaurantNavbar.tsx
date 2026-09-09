@@ -36,9 +36,15 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const isSubdomain = typeof window !== "undefined" && (
+    window.location.host.startsWith(`${subdomain}.`) ||
+    (window.location.host.includes(".localhost") && !window.location.host.startsWith("admin."))
+  );
+  const p = (path: string) => (isSubdomain ? path : `/restaurant/${subdomain}${path}`);
+
   const handleLogout = async () => {
     await fetch("/api/restaurant/auth/logout", { method: "POST" });
-    router.push(`/restaurant/${subdomain}/login`);
+    router.push(isSubdomain ? "/login" : `/restaurant/${subdomain}/login`);
     router.refresh();
   };
 
@@ -126,134 +132,134 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
   }
 
   const allNavLinks: NavItem[] = [
-    { label: "Dashboard", href: `/restaurant/${subdomain}/dashboard` },
-    { label: "POS", href: `/restaurant/${subdomain}/pos`, moduleKey: "pos" },
+    { label: "Dashboard", href: p("/dashboard") },
+    { label: "POS", href: p("/pos"), moduleKey: "pos" },
     {
       label: "Attendance",
-      href: `/restaurant/${subdomain}/attendance`,
+      href: p("/attendance"),
       moduleKey: "attendance",
       children: [
         {
           label: "Live Board & Timesheets",
           desc: "Clocked-in presence, daily attendance & punch logs",
-          href: `/restaurant/${subdomain}/attendance`,
+          href: p("/attendance"),
         },
         {
           label: "Leave Management",
           desc: "Paid leaves, sick quotas & supervisor approvals",
-          href: `/restaurant/${subdomain}/attendance/leaves`,
+          href: p("/attendance/leaves"),
         },
         {
           label: "Tablet Kiosk Terminal",
           desc: "PIN-based clocking terminal for staff",
-          href: `/restaurant/${subdomain}/attendance/kiosk`,
+          href: p("/attendance/kiosk"),
         },
       ],
     },
     {
       label: "Inventory",
-      href: `/restaurant/${subdomain}/inventory`,
+      href: p("/inventory"),
       moduleKey: "inventory",
       children: [
         {
           label: "Item Master & SKUs",
           desc: "Raw ingredients, units, par levels & deficit alerts",
-          href: `/restaurant/${subdomain}/inventory/items`,
+          href: p("/inventory/items"),
         },
         {
           label: "Recipes & Costing",
           desc: "Dish formulation, plate cost & gross profit analysis",
-          href: `/restaurant/${subdomain}/inventory/recipes`,
+          href: p("/inventory/recipes"),
         },
         {
           label: "Vendor Management",
           desc: "Supplier directory, contacts & payment terms",
-          href: `/restaurant/${subdomain}/inventory/vendors`,
+          href: p("/inventory/vendors"),
         },
         {
           label: "Purchase Orders",
           desc: "Draft procurement orders & receive stock shipments",
-          href: `/restaurant/${subdomain}/inventory/purchase-orders`,
+          href: p("/inventory/purchase-orders"),
         },
         {
           label: "Stock Ledger & Wastage",
           desc: "Live branch stock ledger, audits & wastage logs",
-          href: `/restaurant/${subdomain}/inventory/stock`,
+          href: p("/inventory/stock"),
         },
         {
           label: "Categories Hierarchy",
           desc: "Organize ingredients into category tree tiers",
-          href: `/restaurant/${subdomain}/inventory/categories`,
+          href: p("/inventory/categories"),
         },
       ],
     },
-    { label: "Shifts", href: `/restaurant/${subdomain}/shifts/rosters`, moduleKey: "shift_management" },
+    { label: "Shifts", href: p("/shifts/rosters"), moduleKey: "shift_management" },
     {
       label: "Operations",
-      href: `/restaurant/${subdomain}/operations`,
+      href: p("/operations"),
       moduleKey: "shift_management",
       children: [
         {
           label: "Shift Checklists",
           desc: "Opening, closing, SOP duties & HACCP temperature logs",
-          href: `/restaurant/${subdomain}/operations`,
+          href: p("/operations"),
         },
       ],
     },
     {
       label: "Finance",
-      href: `/restaurant/${subdomain}/finance`,
+      href: p("/finance"),
       moduleKey: "finance",
       children: [
         {
           label: "Financial Performance",
           desc: "Executive P&L Statement, revenue, prime costs & general ledger",
-          href: `/restaurant/${subdomain}/finance`,
+          href: p("/finance"),
         },
         {
           label: "Bill Reminders",
           desc: "Vendor invoices, utilities, AMC, credit cards & payables",
-          href: `/restaurant/${subdomain}/finance/bill-reminders`,
+          href: p("/finance/bill-reminders"),
         },
       ],
     },
-    { label: "Analytics", href: `/restaurant/${subdomain}/analytics/menu-engineering`, moduleKey: "analytics" },
+    { label: "Analytics", href: p("/analytics/menu-engineering"), moduleKey: "analytics" },
     {
       label: "Workforce",
-      href: `/restaurant/${subdomain}/workforce/employees`,
+      href: p("/workforce/employees"),
       moduleKey: "hr_onboarding",
       children: [
         {
           label: "Employee Directory",
           desc: "Staff profiles, job grades & outlet assignments",
-          href: `/restaurant/${subdomain}/workforce/employees`,
+          href: p("/workforce/employees"),
         },
         {
           label: "Onboarding Portal",
           desc: "New hire checklists & compliance verification",
-          href: `/restaurant/${subdomain}/workforce/onboarding`,
+          href: p("/workforce/onboarding"),
         },
       ],
     },
     {
       label: "Catering",
-      href: `/restaurant/${subdomain}/catering`,
+      href: p("/catering"),
       moduleKey: "catering",
       children: [
         {
           label: "Event Orders Board",
           desc: "Manage quotes, bookings & active event orders",
-          href: `/restaurant/${subdomain}/catering`,
+          href: p("/catering"),
         },
         {
           label: "Ingredient Scaler",
           desc: "Calculate bulk raw materials based on Pax & linked recipes",
-          href: `/restaurant/${subdomain}/catering?tab=ingredients`,
+          href: p("/catering?tab=ingredients"),
         },
         {
           label: "Invoices & Deposits",
           desc: "Track client quotes, advance payments & final billing",
-          href: `/restaurant/${subdomain}/catering?tab=invoices`,
+          href: p("/catering?tab=invoices"),
         },
       ],
     },
@@ -293,51 +299,51 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
     {
       label: "Restaurant Profile",
       desc: "Branding colors, identity & subscriptions",
-      href: `/restaurant/${subdomain}/settings/profile`,
+      href: p("/settings/profile"),
     },
     {
       label: "Security & 2FA",
       desc: "Two-factor authentication & recovery codes",
-      href: `/restaurant/${subdomain}/settings/security`,
+      href: p("/settings/security"),
     },
     ...(activeModules === null || activeModules.includes("vault")
       ? [
         {
           label: "Zero-Knowledge Vault",
           desc: "Enterprise credentials, passwords & API keys",
-          href: `/restaurant/${subdomain}/vault`,
+          href: p("/vault"),
         },
       ]
       : []),
     {
       label: "Outlets & Branches",
       desc: "Physical locations & operational timezones",
-      href: `/restaurant/${subdomain}/settings/outlets`,
+      href: p("/settings/outlets"),
     },
     {
       label: "Master Data",
       desc: "Departments, designations, grades & cost centers",
-      href: `/restaurant/${subdomain}/settings/master-data`,
+      href: p("/settings/master-data"),
     },
     {
       label: "Roles & Permissions",
       desc: "Custom roles & matrix permission policies",
-      href: `/restaurant/${subdomain}/settings/roles-permissions`,
+      href: p("/settings/roles-permissions"),
     },
     {
       label: "Access Grants",
       desc: "Outlet and module-scoped entitlements",
-      href: `/restaurant/${subdomain}/settings/access-grants`,
+      href: p("/settings/access-grants"),
     },
     {
       label: "User Accounts & Logins",
       desc: "App user memberships & staff invitations",
-      href: `/restaurant/${subdomain}/workforce/users`,
+      href: p("/workforce/users"),
     },
     {
       label: "Onboarding Templates",
       desc: "Compliance verification checklists",
-      href: `/restaurant/${subdomain}/workforce/onboarding/templates`,
+      href: p("/workforce/onboarding/templates"),
     },
   ];
 
@@ -366,7 +372,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
         {/* Left: Brand & Breadcrumb */}
         <div className="flex items-center space-x-2.5 min-w-0">
           <div
-            onClick={() => router.push(`/restaurant/${subdomain}/dashboard`)}
+            onClick={() => router.push(p("/dashboard"))}
             className="flex items-center space-x-2 cursor-pointer group flex-shrink-0"
           >
             {effectiveBranding?.logoUrl ? (
@@ -413,6 +419,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
             const isParentActive =
               pathname === link.href ||
               (link.children && link.children.some((c) => pathname.startsWith(c.href))) ||
+              (link.label === "Dashboard" && (pathname === "/dashboard" || pathname === "/" || pathname.endsWith("/dashboard"))) ||
               (link.label === "Inventory" && pathname.includes("/inventory")) ||
               (link.label === "Attendance" && pathname.includes("/attendance")) ||
               (link.label === "Workforce" && pathname.includes("/workforce"));
@@ -647,7 +654,10 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
                 const isActive =
                   pathname === link.href ||
                   (link.children && link.children.some((c) => pathname.startsWith(c.href))) ||
-                  (link.label === "Inventory" && pathname.includes("/inventory"));
+                  (link.label === "Dashboard" && (pathname === "/dashboard" || pathname === "/" || pathname.endsWith("/dashboard"))) ||
+                  (link.label === "Inventory" && pathname.includes("/inventory")) ||
+                  (link.label === "Attendance" && pathname.includes("/attendance")) ||
+                  (link.label === "Workforce" && pathname.includes("/workforce"));
 
                 if (hasChildren) {
                   return (

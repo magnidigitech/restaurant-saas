@@ -66,7 +66,7 @@ Security scopes are strictly divided. Platform Super Admin rights are disjoint f
 
 ### Restaurant Creation Workflow (Super Admin)
 ```text
-  1. Super Admin logs in to admin.yourplatform.com
+  1. Super Admin logs in to admin.restobird.com
   2. Submits Form: Restaurant Details (Name, Subdomain, Contact)
   3. Configures Subscription: Selects Plan, Sets Limits (Outlets, Employees)
   4. Selects Enabled Modules: (e.g. Inventory, Shifts)

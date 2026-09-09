@@ -30,10 +30,13 @@ function createCleanRedirectUrl(targetPath: string, req: NextRequest, customHost
 
   const baseDomain = (process.env.ROOT_DOMAIN || "restobird.com").toLowerCase();
 
+  const search = !targetPath.includes("?") && req.nextUrl.search ? req.nextUrl.search : "";
+  const fullPath = `${targetPath}${search}`;
+
   // If local development on localhost, keep localhost URL and port
   if (isLocalHost(host)) {
     const port = rawPort ? `:${rawPort}` : ":3000";
-    return new URL(`http://${host}${port}${targetPath}`);
+    return new URL(`http://${host}${port}${fullPath}`);
   }
 
   let effectiveHost = customHost;
@@ -113,6 +116,14 @@ export async function proxy(req: NextRequest) {
     const pathSubdomain = pathParts[2];
 
     if (pathSubdomain) {
+      // If the current request is already on a subdomain matching this tenant,
+      // redirect to clean path so the URL doesn't redundantly repeat the subdomain.
+      // (e.g. http://magni.localhost:3000/restaurant/magni/dashboard -> http://magni.localhost:3000/dashboard)
+      if (subdomain && subdomain === pathSubdomain) {
+        const cleanPath = path.replace(`/restaurant/${pathSubdomain}`, "") || "/dashboard";
+        return NextResponse.redirect(createCleanRedirectUrl(cleanPath, req));
+      }
+
       const isPublicPath =
         path === `/restaurant/${pathSubdomain}/login` ||
         path === `/restaurant/${pathSubdomain}/activate` ||
