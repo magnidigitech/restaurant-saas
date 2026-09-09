@@ -524,13 +524,24 @@ export default function AppleEmployeeDirectoryPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+            <button
+              onClick={() => router.push(`/restaurant/${subdomain}/workforce/onboarding`)}
+              className={`w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl text-xs font-semibold border transition cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                isDark
+                  ? "bg-white/[0.04] text-white border-white/[0.08] hover:bg-white/[0.08]"
+                  : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50 shadow-xs"
+              }`}
+            >
+              <span>Onboarding Sessions →</span>
+            </button>
+
             <button
               onClick={() => {
                 setError("");
                 setShowModal(true);
               }}
-              className="w-full sm:w-auto px-5 py-2.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer text-center"
+              className="w-full sm:w-auto px-5 py-2.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer text-center whitespace-nowrap"
             >
               + Add Employee
             </button>
