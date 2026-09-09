@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import ModuleAccessGuard from "@/components/ModuleAccessGuard";
+import { CalendarOff, CheckCircle2, ArrowLeft } from "lucide-react";
 
 interface Employee {
   id: string;
@@ -272,39 +273,80 @@ export default function LeaveManagementPage({
 
         <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           {/* Executive Header Banner */}
-          <div
-            className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
-              isDark
-                ? "bg-[#121622]/60 border-white/[0.06]"
-                : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
-            }`}
-          >
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => router.push(`/restaurant/${subdomain}/attendance`)}
-                  className={`text-xs font-medium transition cursor-pointer ${
-                    isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
-                  }`}
-                >
-                  ← Attendance Hub
-                </button>
-                <span className={`text-xs ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
-                <span className="w-2 h-2 rounded-full bg-purple-500" />
-                <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                  Time-Off & Absence Control
-                </span>
-              </div>
+        <div
+          className={`p-4 sm:p-6 lg:p-7 rounded-2xl sm:rounded-3xl border transition relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6 ${
+            isDark
+              ? "bg-gradient-to-br from-[#121829] via-[#0E1320] to-[#0A0D14] border-white/[0.08] shadow-xl shadow-black/20"
+              : "bg-gradient-to-br from-blue-50/80 via-indigo-50/25 to-white border-blue-100/80 shadow-sm shadow-blue-500/5"
+          }`}
+        >
+          {/* Ambient Glow Orbs */}
+          <div className="absolute -right-16 -top-16 w-72 h-72 bg-blue-500/10 dark:bg-[#0071E3]/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute right-1/3 -bottom-16 w-60 h-60 bg-indigo-500/10 dark:bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
 
-              <h1 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-                Leave Management & Requests
-              </h1>
-              <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                Review employee vacation quotas, sick leaves, manager approvals, and absence schedules.
-              </p>
+          {/* Left: Nav & Title */}
+          <div className="relative z-10 space-y-2.5 sm:space-y-3 w-full md:w-auto min-w-0">
+            {/* Nav & Category Pills */}
+            <div className="flex items-center justify-between sm:justify-start gap-2 flex-wrap">
+              <button
+                onClick={() => router.push(`/restaurant/${subdomain}/dashboard`)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition cursor-pointer whitespace-nowrap ${
+                  isDark
+                    ? "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
+                    : "bg-white hover:bg-slate-100 text-slate-700 border-slate-200 shadow-2xs"
+                }`}
+              >
+                <ArrowLeft className="w-3 h-3" />
+                <span>Dashboard</span>
+              </button>
+              <span className="hidden sm:inline text-slate-300 dark:text-white/20">•</span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-[#0071E3] dark:text-blue-400 border border-blue-500/20 whitespace-nowrap">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#0071E3] animate-pulse" />
+                <span className="hidden sm:inline">Time-Off & Absence Control</span>
+                <span className="sm:hidden">Leaves & Absence</span>
+              </span>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            {/* Title with Squircle Icon */}
+            <div className="flex items-center gap-2.5 sm:gap-3.5">
+              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#0071E3] via-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0 border border-white/20">
+                <CalendarOff className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
+              <div className="min-w-0">
+                <h1 className={`text-base sm:text-2xl font-extrabold tracking-tight truncate ${isDark ? "text-white" : "text-slate-900"}`}>
+                  Leave Management & Requests
+                </h1>
+                <span className={`text-[10px] sm:text-xs block sm:hidden font-medium mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  {pendingCount} pending reviews • {onLeaveTodayCount} on leave today
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Actions & Status Capsule */}
+          <div className="relative z-10 flex flex-wrap items-center gap-3 shrink-0">
+            <div className={`hidden lg:flex p-3 rounded-2xl border items-center gap-3 ${
+              isDark
+                ? "bg-[#141A29]/80 border-white/[0.08] shadow-sm"
+                : "bg-white/90 backdrop-blur-xs border-slate-200/80 shadow-xs"
+            }`}>
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+              <div className="text-left">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-white">
+                    Absence Control Active
+                  </span>
+                </div>
+                <span className={`text-[10px] font-medium block mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  {onLeaveTodayCount} Away Today • {pendingCount} Pending Reviews
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={() => router.push(`/restaurant/${subdomain}/attendance`)}
                 className={`px-3.5 py-2 text-xs font-semibold rounded-xl border transition cursor-pointer ${
@@ -323,6 +365,7 @@ export default function LeaveManagementPage({
               </button>
             </div>
           </div>
+        </div>
 
           {error && (
             <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl">
