@@ -436,10 +436,6 @@ export default function MasterDataAndRolesPage({
               <h1 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
                 Users, Roles & Master Data
               </h1>
-
-              <p className={`text-xs sm:text-sm max-w-xl leading-relaxed ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                Unified management of staff logins, fine-grained access policies, kitchen stations, and restaurant designations.
-              </p>
             </div>
           </div>
 
