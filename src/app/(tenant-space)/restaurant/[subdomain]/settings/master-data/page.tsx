@@ -15,6 +15,7 @@ import {
   Shield,
   Users,
   UserPlus,
+  ArrowLeft,
 } from "lucide-react";
 
 interface MasterDataItem {
@@ -396,35 +397,74 @@ export default function MasterDataAndRolesPage({
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Executive Header Banner */}
         <div
-          className={`p-5 sm:p-7 rounded-3xl border transition ${
+          className={`p-6 sm:p-8 rounded-3xl border transition relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6 ${
             isDark
-              ? "bg-[#121622]/60 border-white/[0.06]"
-              : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
+              ? "bg-gradient-to-br from-[#121829] via-[#0E1320] to-[#0A0D14] border-white/[0.08] shadow-xl shadow-black/20"
+              : "bg-gradient-to-br from-blue-50/80 via-indigo-50/25 to-white border-blue-100/80 shadow-sm shadow-blue-500/5"
           }`}
         >
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => router.push(`/restaurant/${subdomain}/dashboard`)}
-                className={`text-xs font-medium transition cursor-pointer ${
-                  isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                ← Dashboard
-              </button>
-              <span className={`text-xs ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
-              <span className="w-2 h-2 rounded-full bg-[#0071E3]" />
-              <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                Administration & Access Hub
-              </span>
+          {/* Ambient Glow Orbs */}
+          <div className="absolute -right-16 -top-16 w-72 h-72 bg-blue-500/10 dark:bg-[#0071E3]/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute right-1/3 -bottom-16 w-60 h-60 bg-indigo-500/10 dark:bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Left: Hero Icon & Info */}
+          <div className="relative z-10 flex items-start sm:items-center gap-4 sm:gap-5">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-[#0071E3] via-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/25 shrink-0 border border-white/20">
+              <ShieldCheck className="w-6 h-6 sm:w-7 sm:h-7" />
             </div>
 
-            <h1 className={`text-xl sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-              Users, Roles & Master Data
-            </h1>
-            <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Manage user login accounts, customized authorization roles, kitchen stations, and job designations.
-            </p>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => router.push(`/restaurant/${subdomain}/dashboard`)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border transition cursor-pointer ${
+                    isDark
+                      ? "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
+                      : "bg-white hover:bg-slate-100 text-slate-700 border-slate-200 shadow-2xs"
+                  }`}
+                >
+                  <ArrowLeft className="w-3 h-3" />
+                  <span>Dashboard</span>
+                </button>
+                <span className="text-slate-300 dark:text-white/20">•</span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-[#0071E3] dark:text-blue-400 border border-blue-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#0071E3] animate-pulse" />
+                  Administration & Access Hub
+                </span>
+              </div>
+
+              <h1 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+                Users, Roles & Master Data
+              </h1>
+
+              <p className={`text-xs sm:text-sm max-w-xl leading-relaxed ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                Unified management of staff logins, fine-grained access policies, kitchen stations, and restaurant designations.
+              </p>
+            </div>
+          </div>
+
+          {/* Right: RBAC Status Capsule */}
+          <div className="relative z-10 flex items-center gap-3 w-full md:w-auto shrink-0">
+            <div className={`p-3 sm:p-4 rounded-2xl border flex items-center gap-3.5 w-full md:w-auto ${
+              isDark
+                ? "bg-[#141A29]/80 border-white/[0.08] shadow-sm"
+                : "bg-white/90 backdrop-blur-xs border-slate-200/80 shadow-xs"
+            }`}>
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                <Shield className="w-5 h-5" />
+              </div>
+              <div className="text-left">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-white">
+                    Access Governance Active
+                  </span>
+                </div>
+                <span className={`text-[11px] font-medium block mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  {usersCount} Staff Accounts • {rolesList.length} Roles Assigned
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
