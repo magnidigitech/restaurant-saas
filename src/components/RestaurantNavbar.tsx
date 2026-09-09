@@ -316,14 +316,9 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
       ]
       : []),
     {
-      label: "Master Data",
-      desc: "Departments, designations, grades & cost centers",
+      label: "Master Data & Roles",
+      desc: "Departments, designations & RBAC permission policies",
       href: p("/settings/master-data"),
-    },
-    {
-      label: "Roles & Permissions",
-      desc: "Custom roles & matrix permission policies",
-      href: p("/settings/roles-permissions"),
     },
     {
       label: "Access Grants",
