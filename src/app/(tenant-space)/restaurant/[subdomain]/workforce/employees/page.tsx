@@ -6,7 +6,7 @@ import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import ModuleAccessGuard from "@/components/ModuleAccessGuard";
 import OnboardingTab from "./OnboardingTab";
-import { Users, UserCheck, ArrowLeft } from "lucide-react";
+import { Users, UserCheck, ArrowLeft, Search, Filter, Plus, RotateCcw } from "lucide-react";
 
 interface Department {
   id: string;
@@ -293,6 +293,10 @@ export default function AppleEmployeeDirectoryPage() {
   const [selectedDept, setSelectedDept] = useState("");
   const [selectedOutlet, setSelectedOutlet] = useState("");
   const [selectedWorkerType, setSelectedWorkerType] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+
+  const activeFilterCount =
+    (selectedDept ? 1 : 0) + (selectedOutlet ? 1 : 0) + (selectedWorkerType ? 1 : 0);
 
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -748,17 +752,6 @@ export default function AppleEmployeeDirectoryPage() {
             </button>
           </div>
 
-          {activeTab === "directory" && (
-            <button
-              onClick={() => {
-                setError("");
-                setShowModal(true);
-              }}
-              className="px-5 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer text-center whitespace-nowrap self-end sm:self-auto"
-            >
-              + Add Employee
-            </button>
-          )}
         </div>
 
         {error && (
@@ -771,74 +764,171 @@ export default function AppleEmployeeDirectoryPage() {
           <OnboardingTab subdomain={subdomain} onCountChange={setOnboardingCount} />
         ) : (
           <>
-        {/* Search & Filter Toolbar */}
-        <div
-          className={`p-3.5 sm:p-4 rounded-2xl border transition flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 ${
-            isDark
-              ? "bg-[#121622]/60 border-white/[0.06]"
-              : "bg-white border-slate-200/80 shadow-xs"
-          }`}
-        >
-          <div className="flex-1 w-full">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, employee code, or email..."
-              className={`w-full px-3.5 py-2.5 sm:py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+        {/* Search & Action Bar with Add Employee & Filter Icon */}
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full">
+            {/* Search Input (order-2 on mobile, order-1 on desktop) */}
+            <div className="relative flex-1 order-2 sm:order-1">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name, employee code, or email..."
+                className={`w-full pl-10 pr-9 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                  isDark
+                    ? "bg-[#121622]/80 border-white/[0.08] text-white placeholder-[#555C6D] focus:bg-[#0A0C12]"
+                    : "bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white shadow-2xs"
+                }`}
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs p-1 cursor-pointer"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Same Row on Mobile: Add Employee (full width flex-1) & Filter button */}
+            <div className="flex items-center gap-2.5 w-full sm:w-auto order-1 sm:order-2">
+              <button
+                onClick={() => {
+                  setError("");
+                  setShowModal(true);
+                }}
+                className="flex-1 sm:flex-none px-4 sm:px-5 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-bold rounded-xl transition shadow-sm cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap h-10"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Employee</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowFilters((prev) => !prev)}
+                className={`h-10 px-3.5 rounded-xl border transition flex items-center justify-center gap-2 text-xs font-semibold cursor-pointer shrink-0 ${
+                  showFilters || activeFilterCount > 0
+                    ? "bg-[#0071E3]/10 border-[#0071E3]/40 text-[#0071E3] dark:text-blue-400"
+                    : isDark
+                    ? "bg-[#121622]/80 border-white/[0.08] text-slate-300 hover:bg-white/5"
+                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-2xs"
+                }`}
+                title="Toggle filters"
+              >
+                <Filter className="w-4 h-4" />
+                <span className="text-xs font-medium">Filter</span>
+                {activeFilterCount > 0 && (
+                  <span className="w-5 h-5 rounded-full bg-[#0071E3] text-white text-[10px] font-bold flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Collapsible Filter Panel (opens when Filter is clicked) */}
+          {showFilters && (
+            <div
+              className={`p-4 rounded-2xl border transition space-y-3 animate-in fade-in slide-in-from-top-2 duration-200 ${
                 isDark
-                  ? "bg-[#0A0C12] border-white/[0.08] text-white placeholder-[#555C6D]"
-                  : "bg-[#F5F5F7] border-slate-200 text-slate-900 placeholder-slate-400"
-              }`}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full sm:w-auto">
-            <select
-              value={selectedDept}
-              onChange={(e) => setSelectedDept(e.target.value)}
-              className={`w-full px-3 py-2 text-xs font-medium rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
-                isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                  ? "bg-[#121622]/90 border-white/[0.08] shadow-lg shadow-black/20"
+                  : "bg-white border-slate-200 shadow-sm"
               }`}
             >
-              <option value="">All Departments</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
+              <div className="flex items-center justify-between pb-2 border-b border-black/[0.06] dark:border-white/[0.06]">
+                <div className="flex items-center gap-2">
+                  <Filter className="w-3.5 h-3.5 text-[#0071E3]" />
+                  <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+                    Directory Filters
+                  </span>
+                  {activeFilterCount > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-[#0071E3] dark:text-blue-400">
+                      {activeFilterCount} active
+                    </span>
+                  )}
+                </div>
 
-            <select
-              value={selectedOutlet}
-              onChange={(e) => setSelectedOutlet(e.target.value)}
-              className={`w-full px-3 py-2 text-xs font-medium rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
-                isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-              }`}
-            >
-              <option value="">All Outlets</option>
-              {outlets.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name}
-                </option>
-              ))}
-            </select>
+                {activeFilterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDept("");
+                      setSelectedOutlet("");
+                      setSelectedWorkerType("");
+                    }}
+                    className="text-xs text-[#0071E3] dark:text-blue-400 hover:underline font-semibold cursor-pointer flex items-center gap-1"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reset Filters</span>
+                  </button>
+                )}
+              </div>
 
-            <select
-              value={selectedWorkerType}
-              onChange={(e) => setSelectedWorkerType(e.target.value)}
-              className={`w-full px-3 py-2 text-xs font-medium rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
-                isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-              }`}
-            >
-              <option value="">All Worker Types</option>
-              <option value="FULL_TIME">Full-Time (48h)</option>
-              <option value="PART_TIME">Part-Time (20h)</option>
-              <option value="CUSTOM">Custom Hours</option>
-              <option value="INTERN">Intern (20h)</option>
-              <option value="TEMPORARY">Temporary (25h)</option>
-              <option value="CONTRACT">Contract (40h)</option>
-            </select>
-          </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className={`block text-[11px] font-semibold mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Department
+                  </label>
+                  <select
+                    value={selectedDept}
+                    onChange={(e) => setSelectedDept(e.target.value)}
+                    className={`w-full px-3 py-2 text-xs font-medium rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  >
+                    <option value="">All Departments</option>
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={`block text-[11px] font-semibold mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Outlet / Location
+                  </label>
+                  <select
+                    value={selectedOutlet}
+                    onChange={(e) => setSelectedOutlet(e.target.value)}
+                    className={`w-full px-3 py-2 text-xs font-medium rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  >
+                    <option value="">All Outlets</option>
+                    {outlets.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={`block text-[11px] font-semibold mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Worker Type
+                  </label>
+                  <select
+                    value={selectedWorkerType}
+                    onChange={(e) => setSelectedWorkerType(e.target.value)}
+                    className={`w-full px-3 py-2 text-xs font-medium rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  >
+                    <option value="">All Worker Types</option>
+                    <option value="FULL_TIME">Full-Time (48h)</option>
+                    <option value="PART_TIME">Part-Time (20h)</option>
+                    <option value="CUSTOM">Custom Hours</option>
+                    <option value="INTERN">Intern (20h)</option>
+                    <option value="TEMPORARY">Temporary (25h)</option>
+                    <option value="CONTRACT">Contract (40h)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Employees View (Responsive: Mobile Cards + Desktop Table) */}
