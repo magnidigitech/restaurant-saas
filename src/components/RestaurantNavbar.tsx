@@ -297,8 +297,8 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
 
   const adminNavLinks = [
     {
-      label: "Restaurant Profile",
-      desc: "Branding colors, identity & subscriptions",
+      label: "Restaurant & Outlets",
+      desc: "Branding colors, identity & branch locations",
       href: p("/settings/profile"),
     },
     {
@@ -315,11 +315,6 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
         },
       ]
       : []),
-    {
-      label: "Outlets & Branches",
-      desc: "Physical locations & operational timezones",
-      href: p("/settings/outlets"),
-    },
     {
       label: "Master Data",
       desc: "Departments, designations, grades & cost centers",

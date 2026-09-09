@@ -1023,27 +1023,17 @@ export default function AppleTenantDashboard() {
               Administration, Master Data & Access Control
             </span>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {[
                 {
-                  label: "Restaurant Profile",
-                  category: "Branding",
-                  desc: "Branding colors, application title, logos, and restaurant identity details.",
+                  label: "Restaurant & Outlets",
+                  category: "Brand & Branches",
+                  desc: "Brand identity, logos, theme colors, and multi-branch physical locations, timezones & currencies.",
                   path: "/settings/profile",
-                  badge: "Branding",
+                  badge: `${metrics.totalOutlets} ${metrics.totalOutlets === 1 ? "Outlet" : "Outlets"} • Branding`,
                   icon: Store,
                   bgLight: "bg-blue-50 text-blue-600 border-blue-200/80",
                   bgDark: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-                },
-                {
-                  label: "Outlets & Branches",
-                  category: "Locations",
-                  desc: "Physical locations, timezones, tax identifiers, and branch operational zones.",
-                  path: "/settings/outlets",
-                  badge: `${metrics.totalOutlets} Outlets`,
-                  icon: MapPin,
-                  bgLight: "bg-emerald-50 text-emerald-600 border-emerald-200/80",
-                  bgDark: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
                 },
                 {
                   label: "Master Data",

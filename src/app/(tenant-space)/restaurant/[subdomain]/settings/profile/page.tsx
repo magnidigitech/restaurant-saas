@@ -4,6 +4,31 @@ import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
+import { WORLDWIDE_TIMEZONES, WORLDWIDE_CURRENCIES } from "@/core/constants/locales";
+import SearchableTimezoneSelect from "@/components/SearchableTimezoneSelect";
+import SearchableCurrencySelect from "@/components/SearchableCurrencySelect";
+import {
+  Store,
+  MapPin,
+  Plus,
+  Edit2,
+  Trash2,
+  Clock,
+  Coins,
+  Building2,
+  CheckCircle2,
+  AlertTriangle,
+  ArrowRight,
+} from "lucide-react";
+
+interface Outlet {
+  id: string;
+  name: string;
+  address: string | null;
+  timezone: string;
+  currency: string;
+  createdAt: string;
+}
 
 export default function RestaurantProfilePage({
   params,
@@ -14,10 +39,36 @@ export default function RestaurantProfilePage({
   const { subdomain } = use(params);
   const { isDark } = useTheme();
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [activeTab, setActiveTab] = useState<"profile" | "outlets">("profile");
+
+  // Read initial tab from URL if present
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const tab = new URLSearchParams(window.location.search).get("tab");
+      if (tab === "outlets") {
+        setActiveTab("outlets");
+      }
+    }
+  }, []);
+
+  const switchTab = (tab: "profile" | "outlets") => {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (tab === "outlets") {
+        url.searchParams.set("tab", "outlets");
+      } else {
+        url.searchParams.delete("tab");
+      }
+      window.history.replaceState(null, "", url.toString());
+    }
+  };
+
+  // Profile Form State
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileSuccess, setProfileSuccess] = useState("");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -29,11 +80,41 @@ export default function RestaurantProfilePage({
     supportEmail: "",
     supportPhone: "",
   });
-
   const [restaurantData, setRestaurantData] = useState<any>(null);
 
+  // Outlets State
+  const [outlets, setOutlets] = useState<Outlet[]>([]);
+  const [outletsLoading, setOutletsLoading] = useState(true);
+  const [outletError, setOutletError] = useState("");
+  const [outletSuccess, setOutletSuccess] = useState("");
+
+  // Create Modal
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creatingOutlet, setCreatingOutlet] = useState(false);
+  const [createFormData, setCreateFormData] = useState({
+    name: "",
+    address: "",
+    timezone: "UTC",
+    currency: "USD",
+  });
+
+  // Edit Modal
+  const [editingOutlet, setEditingOutlet] = useState<Outlet | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    address: "",
+    timezone: "UTC",
+    currency: "USD",
+  });
+  const [updatingOutlet, setUpdatingOutlet] = useState(false);
+
+  // Delete Modal
+  const [deletingOutlet, setDeletingOutlet] = useState<Outlet | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // Fetch Profile
   const fetchProfile = async () => {
-    setLoading(true);
+    setProfileLoading(true);
     try {
       const res = await fetch("/api/restaurant/profile");
       const data = await res.json();
@@ -52,24 +133,41 @@ export default function RestaurantProfilePage({
           supportPhone: b.supportPhone || "",
         });
       } else {
-        setError(data.error || "Failed to load profile");
+        setProfileError(data.error || "Failed to load profile");
       }
     } catch {
-      setError("Network error loading profile");
+      setProfileError("Network error loading profile");
     } finally {
-      setLoading(false);
+      setProfileLoading(false);
+    }
+  };
+
+  // Fetch Outlets
+  const fetchOutlets = async () => {
+    setOutletsLoading(true);
+    try {
+      const res = await fetch("/api/restaurant/outlets");
+      const data = await res.json();
+      if (res.ok) setOutlets(data.outlets || []);
+      else setOutletError(data.error || "Failed to load outlets");
+    } catch {
+      setOutletError("Network error loading outlets");
+    } finally {
+      setOutletsLoading(false);
     }
   };
 
   useEffect(() => {
     fetchProfile();
+    fetchOutlets();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Handle Profile Update
+  const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
-    setError("");
-    setSuccess("");
+    setSavingProfile(true);
+    setProfileError("");
+    setProfileSuccess("");
 
     try {
       const res = await fetch("/api/restaurant/profile", {
@@ -88,17 +186,122 @@ export default function RestaurantProfilePage({
         throw new Error(data.error || "Failed to update profile");
       }
 
-      setSuccess("Restaurant profile and branding updated successfully!");
+      setProfileSuccess("Restaurant profile and branding updated successfully!");
       fetchProfile();
-      setTimeout(() => setSuccess(""), 4000);
+      setTimeout(() => setProfileSuccess(""), 4000);
     } catch (err: any) {
-      setError(err.message || "Error updating profile");
+      setProfileError(err.message || "Error updating profile");
     } finally {
-      setSaving(false);
+      setSavingProfile(false);
     }
   };
 
-  if (loading) {
+  // Handle Outlet Create
+  const handleCreateOutlet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreatingOutlet(true);
+    setOutletError("");
+    setOutletSuccess("");
+
+    try {
+      const res = await fetch("/api/restaurant/outlets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(createFormData),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create outlet");
+
+      setShowCreateModal(false);
+      setCreateFormData({ name: "", address: "", timezone: "UTC", currency: "USD" });
+      setOutletSuccess(`Branch location "${createFormData.name}" created successfully.`);
+      fetchOutlets();
+      setTimeout(() => setOutletSuccess(""), 4000);
+    } catch (err: any) {
+      setOutletError(err.message || "Error creating outlet");
+    } finally {
+      setCreatingOutlet(false);
+    }
+  };
+
+  // Handle Outlet Edit Modal
+  const openEditModal = (outlet: Outlet) => {
+    setEditingOutlet(outlet);
+    setEditFormData({
+      name: outlet.name,
+      address: outlet.address || "",
+      timezone: outlet.timezone,
+      currency: outlet.currency,
+    });
+    setOutletError("");
+    setOutletSuccess("");
+  };
+
+  // Handle Outlet Update
+  const handleUpdateOutlet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingOutlet) return;
+    setUpdatingOutlet(true);
+    setOutletError("");
+    setOutletSuccess("");
+
+    try {
+      const res = await fetch(`/api/restaurant/outlets/${editingOutlet.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editFormData),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update outlet");
+
+      setEditingOutlet(null);
+      setOutletSuccess(`Branch location "${editFormData.name}" updated.`);
+      fetchOutlets();
+      setTimeout(() => setOutletSuccess(""), 4000);
+    } catch (err: any) {
+      setOutletError(err.message || "Error updating outlet");
+    } finally {
+      setUpdatingOutlet(false);
+    }
+  };
+
+  // Handle Outlet Delete
+  const handleDeleteOutlet = async () => {
+    if (!deletingOutlet) return;
+    setDeleting(true);
+    setOutletError("");
+    setOutletSuccess("");
+
+    try {
+      const res = await fetch(`/api/restaurant/outlets/${deletingOutlet.id}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to remove outlet");
+
+      const removedName = deletingOutlet.name;
+      setDeletingOutlet(null);
+      setOutletSuccess(`Branch location "${removedName}" has been removed.`);
+      fetchOutlets();
+      setTimeout(() => setOutletSuccess(""), 4000);
+    } catch (err: any) {
+      setOutletError(err.message || "Error removing outlet");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const isSubdomain =
+    typeof window !== "undefined" &&
+    (window.location.host.startsWith(`${subdomain}.`) ||
+      (window.location.host.includes(".localhost") && !window.location.host.startsWith("admin.")));
+
+  const p = (path: string) => (isSubdomain ? path : `/restaurant/${subdomain}${path}`);
+
+  if (profileLoading && outletsLoading) {
     return (
       <div
         className={`min-h-screen flex flex-col items-center justify-center font-sans antialiased ${
@@ -106,7 +309,7 @@ export default function RestaurantProfilePage({
         }`}
       >
         <div className="w-8 h-8 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-xs font-medium">Loading Restaurant Profile...</p>
+        <p className="text-xs font-medium">Loading Restaurant & Outlets...</p>
       </div>
     );
   }
@@ -119,21 +322,21 @@ export default function RestaurantProfilePage({
         isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
       }`}
     >
-      <RestaurantNavbar activeSection="Profile & Branding" />
+      <RestaurantNavbar activeSection="Restaurant & Outlets" />
 
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Executive Header Banner */}
         <div
           className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
             isDark
-              ? "bg-[#121622]/60 border-white/[0.06]"
+              ? "bg-[#121622]/60 border-white/[0.06] shadow-xl shadow-black/20"
               : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
           }`}
         >
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => router.push(`/restaurant/${subdomain}/dashboard`)}
+                onClick={() => router.push(p("/dashboard"))}
                 className={`text-xs font-medium transition cursor-pointer ${
                   isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-500 hover:text-slate-900"
                 }`}
@@ -142,253 +345,675 @@ export default function RestaurantProfilePage({
               </button>
               <span className={`text-xs ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
               <span className="w-2 h-2 rounded-full bg-[#0071E3]" />
-              <span className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                Administration
+              <span
+                className={`text-[11px] font-semibold uppercase tracking-wider ${
+                  isDark ? "text-[#8F95A3]" : "text-slate-500"
+                }`}
+              >
+                Administration & Setup
               </span>
             </div>
 
             <h1 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-              Restaurant Profile & Branding
+              Restaurant & Outlets
             </h1>
             <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Manage brand identity, theme accent colors, support contacts, and subscription limits.
+              Unified management of brand identity, theme accent colors, support contacts, and branch locations.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className={`text-xs font-mono uppercase px-3 py-1 rounded-full border ${
-              isDark ? "bg-white/[0.04] text-[#BAC0CD] border-white/[0.08]" : "bg-slate-100 text-slate-700 border-slate-200"
-            }`}>
+            <span
+              className={`text-xs font-mono uppercase px-3 py-1.5 rounded-full border ${
+                isDark
+                  ? "bg-white/[0.04] text-[#BAC0CD] border-white/[0.08]"
+                  : "bg-slate-100 text-slate-700 border-slate-200"
+              }`}
+            >
               Domain: {subdomain}
             </span>
           </div>
         </div>
 
-        {error && (
-          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl">
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-2xl">
-            {success}
-          </div>
-        )}
-
-        {/* Subscription Plan & Limits Overview */}
-        {activeSub && (
-          <div
-            className={`p-6 rounded-3xl border transition space-y-4 ${
-              isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+        {/* Tab Switcher: Brand Profile vs Outlets */}
+        <div className="flex items-center gap-2 border-b border-black/[0.06] dark:border-white/[0.06] pb-3">
+          <button
+            onClick={() => switchTab("profile")}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-2 ${
+              activeTab === "profile"
+                ? "bg-[#0071E3] text-white shadow-sm"
+                : isDark
+                ? "text-[#8F95A3] hover:text-white hover:bg-white/[0.04]"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
             }`}
           >
-            <div className="flex justify-between items-center">
-              <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
-                Active Subscription Plan
-              </h2>
-              <span className="text-xs font-bold uppercase px-3 py-1 bg-[#0071E3]/15 text-[#58A6FF] border border-[#0071E3]/25 rounded-full">
-                Plan: {activeSub.plan.name}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-              <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
-                <span className={`block text-[10px] uppercase font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                  Outlets Capacity
-                </span>
-                <span className={`font-bold text-lg ${isDark ? "text-white" : "text-slate-900"}`}>
-                  {activeSub.plan.maxOutlets}
-                </span>
-              </div>
-              <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
-                <span className={`block text-[10px] uppercase font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                  Staff Limit
-                </span>
-                <span className={`font-bold text-lg ${isDark ? "text-white" : "text-slate-900"}`}>
-                  {activeSub.plan.maxEmployees}
-                </span>
-              </div>
-              <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
-                <span className={`block text-[10px] uppercase font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                  Admin Logins
-                </span>
-                <span className={`font-bold text-lg ${isDark ? "text-white" : "text-slate-900"}`}>
-                  {activeSub.plan.maxAdminUsers}
-                </span>
-              </div>
-              <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
-                <span className={`block text-[10px] uppercase font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                  Cloud Storage
-                </span>
-                <span className={`font-bold text-lg ${isDark ? "text-white" : "text-slate-900"}`}>
-                  {activeSub.plan.storageQuotaGb} GB
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Profile Settings Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div
-            className={`p-6 sm:p-7 rounded-3xl border transition space-y-5 ${
-              isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+            <Store className="w-3.5 h-3.5" />
+            <span>Brand Profile & Identity</span>
+          </button>
+          <button
+            onClick={() => switchTab("outlets")}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-2 ${
+              activeTab === "outlets"
+                ? "bg-[#0071E3] text-white shadow-sm"
+                : isDark
+                ? "text-[#8F95A3] hover:text-white hover:bg-white/[0.04]"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
             }`}
           >
-            <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
-              General Identity & Branding
-            </h2>
+            <MapPin className="w-3.5 h-3.5" />
+            <span>Branch Outlets ({outlets.length})</span>
+          </button>
+        </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                  Organization Legal Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                    isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                  }`}
-                />
+        {/* TAB 1: Brand & Profile */}
+        {activeTab === "profile" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {profileError && (
+              <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{profileError}</span>
               </div>
+            )}
 
-              <div>
-                <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                  Application Display Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.applicationName}
-                  onChange={(e) => setFormData({ ...formData, applicationName: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                    isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                  }`}
-                />
+            {profileSuccess && (
+              <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-2xl flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{profileSuccess}</span>
               </div>
-            </div>
+            )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                  Logo Image URL
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://example.com/logo.png"
-                  value={formData.logoUrl}
-                  onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                    isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                  Favicon URL
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://example.com/favicon.ico"
-                  value={formData.faviconUrl}
-                  onChange={(e) => setFormData({ ...formData, faviconUrl: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                    isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                  }`}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                  Brand Accent Color
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={formData.primaryColor}
-                    onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
-                    className="w-10 h-10 p-0 border-0 rounded-xl cursor-pointer bg-transparent"
-                  />
-                  <input
-                    type="text"
-                    value={formData.primaryColor}
-                    onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
-                    className={`flex-1 px-3.5 py-2.5 text-xs font-mono rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                  Secondary Tone
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={formData.secondaryColor}
-                    onChange={(e) => setFormData({ ...formData, secondaryColor: e.target.value })}
-                    className="w-10 h-10 p-0 border-0 rounded-xl cursor-pointer bg-transparent"
-                  />
-                  <input
-                    type="text"
-                    value={formData.secondaryColor}
-                    onChange={(e) => setFormData({ ...formData, secondaryColor: e.target.value })}
-                    className={`flex-1 px-3.5 py-2.5 text-xs font-mono rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                    }`}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                  Support Email
-                </label>
-                <input
-                  type="email"
-                  value={formData.supportEmail}
-                  onChange={(e) => setFormData({ ...formData, supportEmail: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                    isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
-                  Support Phone
-                </label>
-                <input
-                  type="tel"
-                  value={formData.supportPhone}
-                  onChange={(e) => setFormData({ ...formData, supportPhone: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                    isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
-                  }`}
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-6 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer disabled:opacity-50"
+            {/* Subscription Plan & Limits Overview */}
+            {activeSub && (
+              <div
+                className={`p-6 rounded-3xl border transition space-y-4 ${
+                  isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+                }`}
               >
-                {saving ? "Saving Changes..." : "Save Profile & Branding"}
+                <div className="flex justify-between items-center">
+                  <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+                    Active Subscription Plan
+                  </h2>
+                  <span className="text-xs font-bold uppercase px-3 py-1 bg-[#0071E3]/15 text-[#58A6FF] border border-[#0071E3]/25 rounded-full">
+                    Plan: {activeSub.plan.name}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                  <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
+                    <span className={`block text-[10px] uppercase font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                      Outlets Capacity
+                    </span>
+                    <span className={`font-bold text-lg ${isDark ? "text-white" : "text-slate-900"}`}>
+                      {activeSub.plan.maxOutlets}
+                    </span>
+                  </div>
+                  <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
+                    <span className={`block text-[10px] uppercase font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                      Staff Limit
+                    </span>
+                    <span className={`font-bold text-lg ${isDark ? "text-white" : "text-slate-900"}`}>
+                      {activeSub.plan.maxEmployees}
+                    </span>
+                  </div>
+                  <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
+                    <span className={`block text-[10px] uppercase font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                      Admin Logins
+                    </span>
+                    <span className={`font-bold text-lg ${isDark ? "text-white" : "text-slate-900"}`}>
+                      {activeSub.plan.maxAdminUsers}
+                    </span>
+                  </div>
+                  <div className={`p-4 rounded-2xl border ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
+                    <span className={`block text-[10px] uppercase font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                      Cloud Storage
+                    </span>
+                    <span className={`font-bold text-lg ${isDark ? "text-white" : "text-slate-900"}`}>
+                      {activeSub.plan.storageQuotaGb} GB
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Profile Settings Form */}
+            <form onSubmit={handleProfileSubmit} className="space-y-6">
+              <div
+                className={`p-6 sm:p-7 rounded-3xl border transition space-y-5 ${
+                  isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+                }`}
+              >
+                <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+                  General Identity & Branding
+                </h2>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Organization Legal Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Application Display Name
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.applicationName}
+                      onChange={(e) => setFormData({ ...formData, applicationName: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Logo Image URL
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://example.com/logo.png"
+                      value={formData.logoUrl}
+                      onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Favicon URL
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://example.com/favicon.ico"
+                      value={formData.faviconUrl}
+                      onChange={(e) => setFormData({ ...formData, faviconUrl: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Brand Accent Color
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={formData.primaryColor}
+                        onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
+                        className="w-10 h-10 p-0 border-0 rounded-xl cursor-pointer bg-transparent"
+                      />
+                      <input
+                        type="text"
+                        value={formData.primaryColor}
+                        onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
+                        className={`flex-1 px-3.5 py-2.5 text-xs font-mono rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                          isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Secondary Tone
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={formData.secondaryColor}
+                        onChange={(e) => setFormData({ ...formData, secondaryColor: e.target.value })}
+                        className="w-10 h-10 p-0 border-0 rounded-xl cursor-pointer bg-transparent"
+                      />
+                      <input
+                        type="text"
+                        value={formData.secondaryColor}
+                        onChange={(e) => setFormData({ ...formData, secondaryColor: e.target.value })}
+                        className={`flex-1 px-3.5 py-2.5 text-xs font-mono rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                          isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                        }`}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Support Email
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.supportEmail}
+                      onChange={(e) => setFormData({ ...formData, supportEmail: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Support Phone
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.supportPhone}
+                      onChange={(e) => setFormData({ ...formData, supportPhone: e.target.value })}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+                  <button
+                    type="submit"
+                    disabled={savingProfile}
+                    className="px-6 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    {savingProfile ? "Saving Changes..." : "Save Profile & Branding"}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* TAB 2: Outlets & Branches */}
+        {activeTab === "outlets" && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {outletError && (
+              <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{outletError}</span>
+              </div>
+            )}
+
+            {outletSuccess && (
+              <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-2xl flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{outletSuccess}</span>
+              </div>
+            )}
+
+            {/* Outlets Action Bar */}
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className={`text-base font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+                  Branch Outlets
+                </h2>
+                <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  {outlets.length} active physical locations across this restaurant entity.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Branch Location</span>
               </button>
             </div>
+
+            {/* Outlets Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {outlets.map((outlet) => (
+                <div
+                  key={outlet.id}
+                  className={`p-5 rounded-3xl border transition flex flex-col justify-between space-y-4 ${
+                    isDark
+                      ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.12]"
+                      : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300"
+                  }`}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center border ${
+                            isDark
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                              : "bg-emerald-50 text-emerald-600 border-emerald-200"
+                          }`}
+                        >
+                          <Building2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h3 className={`text-sm font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+                            {outlet.name}
+                          </h3>
+                          <span
+                            className={`inline-block text-[10px] px-2 py-0.5 rounded-full font-medium mt-0.5 ${
+                              isDark ? "bg-white/[0.04] text-[#8F95A3]" : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            ID: {outlet.id.slice(0, 8)}...
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => openEditModal(outlet)}
+                          className={`p-1.5 rounded-lg text-xs transition cursor-pointer ${
+                            isDark
+                              ? "text-[#8F95A3] hover:text-white hover:bg-white/[0.06]"
+                              : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                          }`}
+                          title="Edit Outlet"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeletingOutlet(outlet)}
+                          className="p-1.5 rounded-lg text-xs text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
+                          title="Delete Outlet"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 text-xs">
+                      <div>
+                        <span className={`block text-[10px] uppercase font-semibold tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                          Physical Address
+                        </span>
+                        <p className={`mt-0.5 ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+                          {outlet.address || "No address provided"}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-black/[0.04] dark:border-white/[0.04]">
+                        <div>
+                          <span className={`block text-[10px] uppercase font-semibold tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                            Timezone
+                          </span>
+                          <span className={`flex items-center gap-1 mt-0.5 font-mono text-[11px] ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+                            <Clock className="w-3 h-3 text-sky-400" />
+                            {outlet.timezone}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className={`block text-[10px] uppercase font-semibold tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                            Currency
+                          </span>
+                          <span className={`flex items-center gap-1 mt-0.5 font-mono text-[11px] ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+                            <Coins className="w-3 h-3 text-amber-400" />
+                            {outlet.currency}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        </form>
+        )}
+
+        {/* Create Outlet Modal */}
+        {showCreateModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+            <div
+              className={`w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
+                isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+              }`}
+            >
+              <div className="flex justify-between items-center pb-2 border-b border-black/[0.06] dark:border-white/[0.06]">
+                <h2 className="text-base font-bold tracking-tight">Add New Branch Location</h2>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className={`text-sm cursor-pointer ${isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-400 hover:text-slate-800"}`}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateOutlet} className="space-y-4">
+                <div>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Outlet Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Downtown Central"
+                    value={createFormData.name}
+                    onChange={(e) => setCreateFormData({ ...createFormData, name: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Physical Address
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Street, City, Postal Code"
+                    value={createFormData.address}
+                    onChange={(e) => setCreateFormData({ ...createFormData, address: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-3.5">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Timezone *
+                    </label>
+                    <SearchableTimezoneSelect
+                      value={createFormData.timezone}
+                      onChange={(val) => setCreateFormData({ ...createFormData, timezone: val })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Currency *
+                    </label>
+                    <SearchableCurrencySelect
+                      value={createFormData.currency}
+                      onChange={(val) => setCreateFormData({ ...createFormData, currency: val })}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                      isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creatingOutlet}
+                    className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
+                  >
+                    {creatingOutlet ? "Creating..." : "Create Branch"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Outlet Modal */}
+        {editingOutlet && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+            <div
+              className={`w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
+                isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+              }`}
+            >
+              <div className="flex justify-between items-center pb-2 border-b border-black/[0.06] dark:border-white/[0.06]">
+                <h2 className="text-base font-bold tracking-tight">Edit Branch Location</h2>
+                <button
+                  onClick={() => setEditingOutlet(null)}
+                  className={`text-sm cursor-pointer ${isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-400 hover:text-slate-800"}`}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateOutlet} className="space-y-4">
+                <div>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Outlet Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Physical Address
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Street, City, Postal Code"
+                    value={editFormData.address}
+                    onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-3.5">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Timezone *
+                    </label>
+                    <SearchableTimezoneSelect
+                      value={editFormData.timezone}
+                      onChange={(val) => setEditFormData({ ...editFormData, timezone: val })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                      Currency *
+                    </label>
+                    <SearchableCurrencySelect
+                      value={editFormData.currency}
+                      onChange={(val) => setEditFormData({ ...editFormData, currency: val })}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+                  <button
+                    type="button"
+                    onClick={() => setEditingOutlet(null)}
+                    className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                      isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updatingOutlet}
+                    className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
+                  >
+                    {updatingOutlet ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Outlet Modal */}
+        {deletingOutlet && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+            <div
+              className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 ${
+                isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+              }`}
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center justify-center flex-shrink-0">
+                  <Trash2 className="w-6 h-6" />
+                </div>
+
+                <div className="space-y-1 min-w-0 flex-1">
+                  <h2 className={`text-base font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+                    Remove Branch Location
+                  </h2>
+                  <p className={`text-xs leading-relaxed ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Are you sure you want to remove{" "}
+                    <span className={`font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                      {deletingOutlet.name}
+                    </span>
+                    ? This will delete this location. If active shifts or employee records are assigned to it, they must be reassigned first.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={() => setDeletingOutlet(null)}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                    isDark
+                      ? "bg-white/[0.04] text-[#8F95A3] hover:text-white hover:bg-white/[0.08]"
+                      : "bg-slate-100 text-slate-700 hover:text-slate-900 hover:bg-slate-200"
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={handleDeleteOutlet}
+                  className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm shadow-rose-600/20 cursor-pointer disabled:opacity-50"
+                >
+                  {deleting ? "Removing..." : "Remove Location"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
