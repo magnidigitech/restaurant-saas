@@ -18,6 +18,10 @@ export async function ensureTwoFactorTables(): Promise<void> {
 
   try {
     await pool.query(`
+      -- Ensure token_version column exists on user entities
+      ALTER TABLE "platform_users" ADD COLUMN IF NOT EXISTS "token_version" INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "token_version" INTEGER NOT NULL DEFAULT 0;
+
       CREATE TABLE IF NOT EXISTS "two_factor_auth" (
         "id" TEXT NOT NULL,
         "user_id" TEXT NOT NULL,
