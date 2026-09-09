@@ -4,6 +4,7 @@ import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
+import UsersTab from "./UsersTab";
 import {
   Building2,
   Briefcase,
@@ -12,9 +13,8 @@ import {
   Search,
   Sparkles,
   Shield,
-  Layers,
-  Lock,
   Users,
+  UserPlus,
 } from "lucide-react";
 
 interface MasterDataItem {
@@ -41,7 +41,7 @@ interface Role {
   permissions: Array<{ permissionId: string }>;
 }
 
-type TabType = "departments" | "designations" | "roles";
+type TabType = "users" | "roles" | "departments" | "designations";
 
 const DEPARTMENT_PRESETS = [
   { name: "Kitchen & Culinary (BOH)", code: "KITCHEN", desc: "Food prep, cooking line, stock handling & stewarding" },
@@ -72,7 +72,10 @@ export default function MasterDataAndRolesPage({
   const { subdomain } = use(params);
   const { isDark } = useTheme();
 
-  const [activeTab, setActiveTab] = useState<TabType>("departments");
+  const [activeTab, setActiveTab] = useState<TabType>("users");
+  const [usersCount, setUsersCount] = useState(0);
+  const [showGrantModal, setShowGrantModal] = useState(false);
+
   const [departmentsList, setDepartmentsList] = useState<MasterDataItem[]>([]);
   const [designationsList, setDesignationsList] = useState<MasterDataItem[]>([]);
   const [rolesList, setRolesList] = useState<Role[]>([]);
@@ -107,7 +110,9 @@ export default function MasterDataAndRolesPage({
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get("tab");
-      if (tabParam === "roles") {
+      if (tabParam === "users") {
+        setActiveTab("users");
+      } else if (tabParam === "roles") {
         setActiveTab("roles");
       } else if (tabParam === "designations") {
         setActiveTab("designations");
@@ -131,22 +136,25 @@ export default function MasterDataAndRolesPage({
     setLoading(true);
     setError("");
     try {
-      const [deptRes, desRes, rolesRes, permsRes] = await Promise.all([
+      const [deptRes, desRes, rolesRes, permsRes, usersRes] = await Promise.all([
         fetch("/api/restaurant/departments"),
         fetch("/api/restaurant/designations"),
         fetch("/api/restaurant/roles"),
         fetch("/api/restaurant/permissions"),
+        fetch("/api/restaurant/users"),
       ]);
 
       const deptData = deptRes.ok ? await deptRes.json() : {};
       const desData = desRes.ok ? await desRes.json() : {};
       const rolesData = rolesRes.ok ? await rolesRes.json() : {};
       const permsData = permsRes.ok ? await permsRes.json() : {};
+      const usersData = usersRes.ok ? await usersRes.json() : {};
 
       setDepartmentsList(deptData.departments || []);
       setDesignationsList(desData.designations || []);
       setRolesList(rolesData.roles || []);
       setPermissionsList(permsData.permissions || []);
+      setUsersCount((usersData.memberships || []).length);
     } catch {
       setError("Network error loading master data & roles");
     } finally {
@@ -264,10 +272,8 @@ export default function MasterDataAndRolesPage({
     const allSelected = permIds.every((id) => selectedPermissions.includes(id));
 
     if (allSelected) {
-      // Unselect all in module
       setSelectedPermissions((prev) => prev.filter((id) => !permIds.includes(id)));
     } else {
-      // Select all in module
       setSelectedPermissions((prev) => Array.from(new Set([...prev, ...permIds])));
     }
   };
@@ -337,18 +343,11 @@ export default function MasterDataAndRolesPage({
 
   const tabs = [
     {
-      key: "departments" as TabType,
-      desktopLabel: "Departments",
-      mobileLabel: "Departments",
-      count: departmentsList.length,
-      icon: Building2,
-    },
-    {
-      key: "designations" as TabType,
-      desktopLabel: "Designations",
-      mobileLabel: "Designations",
-      count: designationsList.length,
-      icon: Briefcase,
+      key: "users" as TabType,
+      desktopLabel: "Staff Logins",
+      mobileLabel: "Users",
+      count: usersCount,
+      icon: Users,
     },
     {
       key: "roles" as TabType,
@@ -357,9 +356,23 @@ export default function MasterDataAndRolesPage({
       count: rolesList.length,
       icon: ShieldCheck,
     },
+    {
+      key: "departments" as TabType,
+      desktopLabel: "Departments",
+      mobileLabel: "Depts",
+      count: departmentsList.length,
+      icon: Building2,
+    },
+    {
+      key: "designations" as TabType,
+      desktopLabel: "Designations",
+      mobileLabel: "Titles",
+      count: designationsList.length,
+      icon: Briefcase,
+    },
   ];
 
-  if (loading && departmentsList.length === 0 && designationsList.length === 0 && rolesList.length === 0) {
+  if (loading && departmentsList.length === 0 && designationsList.length === 0 && rolesList.length === 0 && usersCount === 0) {
     return (
       <div
         className={`min-h-screen flex flex-col items-center justify-center font-sans antialiased ${
@@ -367,7 +380,7 @@ export default function MasterDataAndRolesPage({
         }`}
       >
         <div className="w-8 h-8 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-xs font-medium">Loading Master Data & Roles...</p>
+        <p className="text-xs font-medium">Loading Users, Roles & Master Data...</p>
       </div>
     );
   }
@@ -378,7 +391,7 @@ export default function MasterDataAndRolesPage({
         isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
       }`}
     >
-      <RestaurantNavbar activeSection="Master Data & Roles" />
+      <RestaurantNavbar activeSection="Users, Roles & Master Data" />
 
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Executive Header Banner */}
@@ -407,10 +420,10 @@ export default function MasterDataAndRolesPage({
             </div>
 
             <h1 className={`text-xl sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-              Master Data & Roles
+              Users, Roles & Master Data
             </h1>
             <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Manage organizational departments, job designations, and granular role-based access control policies.
+              Manage user login accounts, customized authorization roles, kitchen stations, and job designations.
             </p>
           </div>
         </div>
@@ -439,13 +452,13 @@ export default function MasterDataAndRolesPage({
           </div>
         )}
 
-        {/* Interactive Stats Grid - Single line on mobile screen */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3.5">
-          {/* Card 1: Departments */}
+        {/* Interactive Stats Grid - Single line on mobile screen (4 columns) */}
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-3.5">
+          {/* Card 1: Users */}
           <div
-            onClick={() => switchTab("departments")}
-            className={`p-2.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition cursor-pointer flex flex-col justify-between sm:flex-row sm:items-center gap-1.5 sm:gap-2 ${
-              activeTab === "departments"
+            onClick={() => switchTab("users")}
+            className={`p-2 sm:p-5 rounded-2xl sm:rounded-3xl border transition cursor-pointer flex flex-col justify-between sm:flex-row sm:items-center gap-1 sm:gap-2 ${
+              activeTab === "users"
                 ? isDark
                   ? "bg-[#0071E3]/15 border-[#0071E3]/50 shadow-sm shadow-[#0071E3]/10"
                   : "bg-blue-50/80 border-blue-300 shadow-sm"
@@ -455,78 +468,37 @@ export default function MasterDataAndRolesPage({
             }`}
           >
             <div className="space-y-0.5 sm:space-y-1 min-w-0">
-              <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider block truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                <span className="hidden sm:inline">Departments & Stations</span>
-                <span className="sm:hidden">Departments</span>
+              <span className={`text-[8px] sm:text-[10px] font-bold uppercase tracking-wider block truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                <span className="hidden sm:inline">Staff Logins</span>
+                <span className="sm:hidden">Users</span>
               </span>
               <div className="flex items-baseline gap-1 sm:gap-2">
-                <span className={`text-base sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-                  {departmentsList.length}
+                <span className={`text-sm sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {usersCount}
                 </span>
-                <span className={`text-[9px] sm:text-xs truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                  <span className="hidden sm:inline">stations configured</span>
-                  <span className="sm:hidden">stations</span>
+                <span className={`text-[8px] sm:text-xs truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  <span className="hidden sm:inline">active logins</span>
+                  <span className="sm:hidden">logins</span>
                 </span>
               </div>
             </div>
             <div
               className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 border ${
-                activeTab === "departments"
+                activeTab === "users"
                   ? "bg-[#0071E3] text-white border-[#0071E3]"
                   : isDark
                   ? "bg-white/5 border-white/10 text-slate-400"
                   : "bg-slate-100 border-slate-200 text-slate-600"
               }`}
             >
-              <Building2 className="w-5 h-5" />
+              <Users className="w-5 h-5" />
             </div>
           </div>
 
-          {/* Card 2: Designations */}
-          <div
-            onClick={() => switchTab("designations")}
-            className={`p-2.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition cursor-pointer flex flex-col justify-between sm:flex-row sm:items-center gap-1.5 sm:gap-2 ${
-              activeTab === "designations"
-                ? isDark
-                  ? "bg-[#0071E3]/15 border-[#0071E3]/50 shadow-sm shadow-[#0071E3]/10"
-                  : "bg-blue-50/80 border-blue-300 shadow-sm"
-                : isDark
-                ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/10"
-                : "bg-white border-slate-200/80 hover:border-slate-300"
-            }`}
-          >
-            <div className="space-y-0.5 sm:space-y-1 min-w-0">
-              <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider block truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                <span className="hidden sm:inline">Staff Designations</span>
-                <span className="sm:hidden">Designations</span>
-              </span>
-              <div className="flex items-baseline gap-1 sm:gap-2">
-                <span className={`text-base sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-                  {designationsList.length}
-                </span>
-                <span className={`text-[9px] sm:text-xs truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                  <span className="hidden sm:inline">job titles active</span>
-                  <span className="sm:hidden">titles</span>
-                </span>
-              </div>
-            </div>
-            <div
-              className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 border ${
-                activeTab === "designations"
-                  ? "bg-[#0071E3] text-white border-[#0071E3]"
-                  : isDark
-                  ? "bg-white/5 border-white/10 text-slate-400"
-                  : "bg-slate-100 border-slate-200 text-slate-600"
-              }`}
-            >
-              <Briefcase className="w-5 h-5" />
-            </div>
-          </div>
-
-          {/* Card 3: Roles & Permissions */}
+          {/* Card 2: Roles */}
           <div
             onClick={() => switchTab("roles")}
-            className={`p-2.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition cursor-pointer flex flex-col justify-between sm:flex-row sm:items-center gap-1.5 sm:gap-2 ${
+            className={`p-2 sm:p-5 rounded-2xl sm:rounded-3xl border transition cursor-pointer flex flex-col justify-between sm:flex-row sm:items-center gap-1 sm:gap-2 ${
               activeTab === "roles"
                 ? isDark
                   ? "bg-[#0071E3]/15 border-[#0071E3]/50 shadow-sm shadow-[#0071E3]/10"
@@ -537,15 +509,15 @@ export default function MasterDataAndRolesPage({
             }`}
           >
             <div className="space-y-0.5 sm:space-y-1 min-w-0">
-              <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider block truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              <span className={`text-[8px] sm:text-[10px] font-bold uppercase tracking-wider block truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
                 <span className="hidden sm:inline">Security & Roles</span>
                 <span className="sm:hidden">Roles</span>
               </span>
               <div className="flex items-baseline gap-1 sm:gap-2">
-                <span className={`text-base sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+                <span className={`text-sm sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
                   {rolesList.length}
                 </span>
-                <span className={`text-[9px] sm:text-xs truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                <span className={`text-[8px] sm:text-xs truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
                   <span className="hidden sm:inline">access policies</span>
                   <span className="sm:hidden">roles</span>
                 </span>
@@ -563,12 +535,94 @@ export default function MasterDataAndRolesPage({
               <ShieldCheck className="w-5 h-5" />
             </div>
           </div>
+
+          {/* Card 3: Departments */}
+          <div
+            onClick={() => switchTab("departments")}
+            className={`p-2 sm:p-5 rounded-2xl sm:rounded-3xl border transition cursor-pointer flex flex-col justify-between sm:flex-row sm:items-center gap-1 sm:gap-2 ${
+              activeTab === "departments"
+                ? isDark
+                  ? "bg-[#0071E3]/15 border-[#0071E3]/50 shadow-sm shadow-[#0071E3]/10"
+                  : "bg-blue-50/80 border-blue-300 shadow-sm"
+                : isDark
+                ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/10"
+                : "bg-white border-slate-200/80 hover:border-slate-300"
+            }`}
+          >
+            <div className="space-y-0.5 sm:space-y-1 min-w-0">
+              <span className={`text-[8px] sm:text-[10px] font-bold uppercase tracking-wider block truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                <span className="hidden sm:inline">Departments</span>
+                <span className="sm:hidden">Depts</span>
+              </span>
+              <div className="flex items-baseline gap-1 sm:gap-2">
+                <span className={`text-sm sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {departmentsList.length}
+                </span>
+                <span className={`text-[8px] sm:text-xs truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  <span className="hidden sm:inline">stations</span>
+                  <span className="sm:hidden">stations</span>
+                </span>
+              </div>
+            </div>
+            <div
+              className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 border ${
+                activeTab === "departments"
+                  ? "bg-[#0071E3] text-white border-[#0071E3]"
+                  : isDark
+                  ? "bg-white/5 border-white/10 text-slate-400"
+                  : "bg-slate-100 border-slate-200 text-slate-600"
+              }`}
+            >
+              <Building2 className="w-5 h-5" />
+            </div>
+          </div>
+
+          {/* Card 4: Designations */}
+          <div
+            onClick={() => switchTab("designations")}
+            className={`p-2 sm:p-5 rounded-2xl sm:rounded-3xl border transition cursor-pointer flex flex-col justify-between sm:flex-row sm:items-center gap-1 sm:gap-2 ${
+              activeTab === "designations"
+                ? isDark
+                  ? "bg-[#0071E3]/15 border-[#0071E3]/50 shadow-sm shadow-[#0071E3]/10"
+                  : "bg-blue-50/80 border-blue-300 shadow-sm"
+                : isDark
+                ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/10"
+                : "bg-white border-slate-200/80 hover:border-slate-300"
+            }`}
+          >
+            <div className="space-y-0.5 sm:space-y-1 min-w-0">
+              <span className={`text-[8px] sm:text-[10px] font-bold uppercase tracking-wider block truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                <span className="hidden sm:inline">Designations</span>
+                <span className="sm:hidden">Titles</span>
+              </span>
+              <div className="flex items-baseline gap-1 sm:gap-2">
+                <span className={`text-sm sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {designationsList.length}
+                </span>
+                <span className={`text-[8px] sm:text-xs truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  <span className="hidden sm:inline">job titles</span>
+                  <span className="sm:hidden">titles</span>
+                </span>
+              </div>
+            </div>
+            <div
+              className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 border ${
+                activeTab === "designations"
+                  ? "bg-[#0071E3] text-white border-[#0071E3]"
+                  : isDark
+                  ? "bg-white/5 border-white/10 text-slate-400"
+                  : "bg-slate-100 border-slate-200 text-slate-600"
+              }`}
+            >
+              <Briefcase className="w-5 h-5" />
+            </div>
+          </div>
         </div>
 
         {/* Tab Switcher & Search / Create Row */}
         <div className="space-y-3">
-          {/* Segmented Control */}
-          <div className="p-1 sm:p-1.5 bg-slate-200/70 dark:bg-white/[0.06] rounded-2xl grid grid-cols-3 gap-1 w-full max-w-xl">
+          {/* Segmented Control - 4 Tabs clearly visible */}
+          <div className="p-1 sm:p-1.5 bg-slate-200/70 dark:bg-white/[0.06] rounded-2xl grid grid-cols-4 gap-1 w-full max-w-2xl">
             {tabs.map((tab) => {
               const TabIcon = tab.icon;
               const isActive = activeTab === tab.key;
@@ -576,7 +630,7 @@ export default function MasterDataAndRolesPage({
                 <button
                   key={tab.key}
                   onClick={() => switchTab(tab.key)}
-                  className={`py-2 px-1.5 sm:px-3 rounded-xl text-[11px] sm:text-xs font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center gap-1 sm:gap-2 whitespace-nowrap ${
+                  className={`py-2 px-1 sm:px-3 rounded-xl text-[10px] sm:text-xs font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center gap-1 sm:gap-2 whitespace-nowrap ${
                     isActive
                       ? "bg-white dark:bg-[#151A28] text-[#0071E3] dark:text-white shadow-sm font-bold"
                       : isDark
@@ -588,7 +642,7 @@ export default function MasterDataAndRolesPage({
                   <span className="hidden sm:inline">{tab.desktopLabel}</span>
                   <span className="sm:hidden">{tab.mobileLabel}</span>
                   <span
-                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full hidden sm:inline-block ${
+                    className={`text-[9px] font-mono px-1.5 py-0.2 rounded-full hidden sm:inline-block ${
                       isActive
                         ? "bg-blue-50 text-[#0071E3] dark:bg-white/10 dark:text-white"
                         : isDark
@@ -610,11 +664,13 @@ export default function MasterDataAndRolesPage({
               <input
                 type="text"
                 placeholder={`Search ${
-                  activeTab === "departments"
+                  activeTab === "users"
+                    ? "users, emails & roles..."
+                    : activeTab === "roles"
+                    ? "roles & policies..."
+                    : activeTab === "departments"
                     ? "departments..."
-                    : activeTab === "designations"
-                    ? "designations..."
-                    : "roles & policies..."
+                    : "designations..."
                 }`}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -635,7 +691,7 @@ export default function MasterDataAndRolesPage({
 
             {/* Action Buttons: Positioned under search on mobile */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-              {activeTab !== "roles" && departmentsList.length === 0 && designationsList.length === 0 && (
+              {activeTab !== "roles" && activeTab !== "users" && departmentsList.length === 0 && designationsList.length === 0 && (
                 <button
                   onClick={handleSeedPresets}
                   disabled={seeding}
@@ -646,7 +702,15 @@ export default function MasterDataAndRolesPage({
                 </button>
               )}
 
-              {activeTab === "roles" ? (
+              {activeTab === "users" ? (
+                <button
+                  onClick={() => setShowGrantModal(true)}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Grant App Access</span>
+                </button>
+              ) : activeTab === "roles" ? (
                 <button
                   onClick={handleOpenAddRole}
                   className="w-full sm:w-auto px-5 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
@@ -666,6 +730,17 @@ export default function MasterDataAndRolesPage({
             </div>
           </div>
         </div>
+
+        {/* TAB CONTENT: USERS & STAFF LOGINS */}
+        {activeTab === "users" && (
+          <UsersTab
+            subdomain={subdomain}
+            searchQuery={searchQuery}
+            showGrantModal={showGrantModal}
+            onCloseGrantModal={() => setShowGrantModal(false)}
+            onUsersCountChange={(count) => setUsersCount(count)}
+          />
+        )}
 
         {/* TAB CONTENT: DEPARTMENTS & DESIGNATIONS */}
         {(activeTab === "departments" || activeTab === "designations") && (

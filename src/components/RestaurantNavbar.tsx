@@ -316,19 +316,14 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
       ]
       : []),
     {
-      label: "Master Data & Roles",
-      desc: "Departments, designations & RBAC permission policies",
+      label: "Users, Roles & Master Data",
+      desc: "Staff accounts, custom roles & organizational master data",
       href: p("/settings/master-data"),
     },
     {
       label: "Access Grants",
       desc: "Outlet and module-scoped entitlements",
       href: p("/settings/access-grants"),
-    },
-    {
-      label: "User Accounts & Logins",
-      desc: "App user memberships & staff invitations",
-      href: p("/workforce/users"),
     },
     {
       label: "Onboarding Templates",
