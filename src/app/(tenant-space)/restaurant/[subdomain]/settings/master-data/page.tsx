@@ -335,22 +335,25 @@ export default function MasterDataAndRolesPage({
       (role.description && role.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const tabs: { key: TabType; label: string; count: number; icon: any }[] = [
+  const tabs = [
     {
-      key: "departments",
-      label: "Departments",
+      key: "departments" as TabType,
+      desktopLabel: "Departments",
+      mobileLabel: "Departments",
       count: departmentsList.length,
       icon: Building2,
     },
     {
-      key: "designations",
-      label: "Designations",
+      key: "designations" as TabType,
+      desktopLabel: "Designations",
+      mobileLabel: "Designations",
       count: designationsList.length,
       icon: Briefcase,
     },
     {
-      key: "roles",
-      label: "Roles & Permissions",
+      key: "roles" as TabType,
+      desktopLabel: "Roles & Permissions",
+      mobileLabel: "Roles",
       count: rolesList.length,
       icon: ShieldCheck,
     },
@@ -380,7 +383,7 @@ export default function MasterDataAndRolesPage({
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Executive Header Banner */}
         <div
-          className={`p-6 sm:p-7 rounded-3xl border transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+          className={`p-5 sm:p-7 rounded-3xl border transition ${
             isDark
               ? "bg-[#121622]/60 border-white/[0.06]"
               : "bg-white border-slate-200/80 shadow-sm shadow-slate-900/5"
@@ -403,43 +406,12 @@ export default function MasterDataAndRolesPage({
               </span>
             </div>
 
-            <h1 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+            <h1 className={`text-xl sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
               Master Data & Roles
             </h1>
             <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
               Manage organizational departments, job designations, and granular role-based access control policies.
             </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
-            {activeTab !== "roles" && departmentsList.length === 0 && designationsList.length === 0 && (
-              <button
-                onClick={handleSeedPresets}
-                disabled={seeding}
-                className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
-              >
-                <Sparkles className={`w-3.5 h-3.5 ${seeding ? "animate-spin" : ""}`} />
-                <span>{seeding ? "Initializing..." : "Auto-Seed Presets"}</span>
-              </button>
-            )}
-
-            {activeTab === "roles" ? (
-              <button
-                onClick={handleOpenAddRole}
-                className="w-full sm:w-auto px-5 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Create Custom Role</span>
-              </button>
-            ) : (
-              <button
-                onClick={handleOpenAddMaster}
-                className="w-full sm:w-auto px-5 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add {activeTab === "departments" ? "Department" : "Designation"}</span>
-              </button>
-            )}
           </div>
         </div>
 
@@ -467,12 +439,12 @@ export default function MasterDataAndRolesPage({
           </div>
         )}
 
-        {/* Interactive Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+        {/* Interactive Stats Grid - Single line on mobile screen */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-3.5">
           {/* Card 1: Departments */}
           <div
             onClick={() => switchTab("departments")}
-            className={`p-5 rounded-3xl border transition cursor-pointer flex items-center justify-between ${
+            className={`p-2.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition cursor-pointer flex flex-col justify-between sm:flex-row sm:items-center gap-1.5 sm:gap-2 ${
               activeTab === "departments"
                 ? isDark
                   ? "bg-[#0071E3]/15 border-[#0071E3]/50 shadow-sm shadow-[#0071E3]/10"
@@ -482,19 +454,23 @@ export default function MasterDataAndRolesPage({
                 : "bg-white border-slate-200/80 hover:border-slate-300"
             }`}
           >
-            <div className="space-y-1 min-w-0">
-              <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                Departments & Stations
+            <div className="space-y-0.5 sm:space-y-1 min-w-0">
+              <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider block truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                <span className="hidden sm:inline">Departments & Stations</span>
+                <span className="sm:hidden">Departments</span>
               </span>
-              <div className="flex items-baseline gap-2">
-                <span className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+              <div className="flex items-baseline gap-1 sm:gap-2">
+                <span className={`text-base sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
                   {departmentsList.length}
                 </span>
-                <span className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>stations configured</span>
+                <span className={`text-[9px] sm:text-xs truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  <span className="hidden sm:inline">stations configured</span>
+                  <span className="sm:hidden">stations</span>
+                </span>
               </div>
             </div>
             <div
-              className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border ${
+              className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 border ${
                 activeTab === "departments"
                   ? "bg-[#0071E3] text-white border-[#0071E3]"
                   : isDark
@@ -509,7 +485,7 @@ export default function MasterDataAndRolesPage({
           {/* Card 2: Designations */}
           <div
             onClick={() => switchTab("designations")}
-            className={`p-5 rounded-3xl border transition cursor-pointer flex items-center justify-between ${
+            className={`p-2.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition cursor-pointer flex flex-col justify-between sm:flex-row sm:items-center gap-1.5 sm:gap-2 ${
               activeTab === "designations"
                 ? isDark
                   ? "bg-[#0071E3]/15 border-[#0071E3]/50 shadow-sm shadow-[#0071E3]/10"
@@ -519,19 +495,23 @@ export default function MasterDataAndRolesPage({
                 : "bg-white border-slate-200/80 hover:border-slate-300"
             }`}
           >
-            <div className="space-y-1 min-w-0">
-              <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                Staff Designations
+            <div className="space-y-0.5 sm:space-y-1 min-w-0">
+              <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider block truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                <span className="hidden sm:inline">Staff Designations</span>
+                <span className="sm:hidden">Designations</span>
               </span>
-              <div className="flex items-baseline gap-2">
-                <span className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+              <div className="flex items-baseline gap-1 sm:gap-2">
+                <span className={`text-base sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
                   {designationsList.length}
                 </span>
-                <span className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>job titles active</span>
+                <span className={`text-[9px] sm:text-xs truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  <span className="hidden sm:inline">job titles active</span>
+                  <span className="sm:hidden">titles</span>
+                </span>
               </div>
             </div>
             <div
-              className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border ${
+              className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 border ${
                 activeTab === "designations"
                   ? "bg-[#0071E3] text-white border-[#0071E3]"
                   : isDark
@@ -546,7 +526,7 @@ export default function MasterDataAndRolesPage({
           {/* Card 3: Roles & Permissions */}
           <div
             onClick={() => switchTab("roles")}
-            className={`p-5 rounded-3xl border transition cursor-pointer flex items-center justify-between ${
+            className={`p-2.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition cursor-pointer flex flex-col justify-between sm:flex-row sm:items-center gap-1.5 sm:gap-2 ${
               activeTab === "roles"
                 ? isDark
                   ? "bg-[#0071E3]/15 border-[#0071E3]/50 shadow-sm shadow-[#0071E3]/10"
@@ -556,19 +536,23 @@ export default function MasterDataAndRolesPage({
                 : "bg-white border-slate-200/80 hover:border-slate-300"
             }`}
           >
-            <div className="space-y-1 min-w-0">
-              <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                Security & Roles
+            <div className="space-y-0.5 sm:space-y-1 min-w-0">
+              <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider block truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                <span className="hidden sm:inline">Security & Roles</span>
+                <span className="sm:hidden">Roles</span>
               </span>
-              <div className="flex items-baseline gap-2">
-                <span className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+              <div className="flex items-baseline gap-1 sm:gap-2">
+                <span className={`text-base sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
                   {rolesList.length}
                 </span>
-                <span className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>access policies</span>
+                <span className={`text-[9px] sm:text-xs truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  <span className="hidden sm:inline">access policies</span>
+                  <span className="sm:hidden">roles</span>
+                </span>
               </div>
             </div>
             <div
-              className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border ${
+              className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 border ${
                 activeTab === "roles"
                   ? "bg-[#0071E3] text-white border-[#0071E3]"
                   : isDark
@@ -581,8 +565,8 @@ export default function MasterDataAndRolesPage({
           </div>
         </div>
 
-        {/* Tab Switcher: Segmented Control & Search Row */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        {/* Tab Switcher & Search / Create Row */}
+        <div className="space-y-3">
           {/* Segmented Control */}
           <div className="p-1 sm:p-1.5 bg-slate-200/70 dark:bg-white/[0.06] rounded-2xl grid grid-cols-3 gap-1 w-full max-w-xl">
             {tabs.map((tab) => {
@@ -592,7 +576,7 @@ export default function MasterDataAndRolesPage({
                 <button
                   key={tab.key}
                   onClick={() => switchTab(tab.key)}
-                  className={`py-2 px-2.5 sm:px-3 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 sm:gap-2 ${
+                  className={`py-2 px-1.5 sm:px-3 rounded-xl text-[11px] sm:text-xs font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center gap-1 sm:gap-2 whitespace-nowrap ${
                     isActive
                       ? "bg-white dark:bg-[#151A28] text-[#0071E3] dark:text-white shadow-sm font-bold"
                       : isDark
@@ -601,7 +585,8 @@ export default function MasterDataAndRolesPage({
                   }`}
                 >
                   <TabIcon className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">{tab.label}</span>
+                  <span className="hidden sm:inline">{tab.desktopLabel}</span>
+                  <span className="sm:hidden">{tab.mobileLabel}</span>
                   <span
                     className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full hidden sm:inline-block ${
                       isActive
@@ -618,32 +603,67 @@ export default function MasterDataAndRolesPage({
             })}
           </div>
 
-          {/* Search Box */}
-          <div className="relative flex-1 sm:max-w-xs">
-            <input
-              type="text"
-              placeholder={`Search ${
-                activeTab === "departments"
-                  ? "departments..."
-                  : activeTab === "designations"
-                  ? "designations..."
-                  : "roles & policies..."
-              }`}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full pl-9 pr-8 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
-                isDark ? "bg-[#121622]/60 border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
-              }`}
-            />
-            <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-2.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-white p-1"
-              >
-                ✕
-              </button>
-            )}
+          {/* Search Box & Actions (Create Button Below Search on Mobile, Alongside on Desktop) */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            {/* Search Box */}
+            <div className="relative flex-1 sm:max-w-md">
+              <input
+                type="text"
+                placeholder={`Search ${
+                  activeTab === "departments"
+                    ? "departments..."
+                    : activeTab === "designations"
+                    ? "designations..."
+                    : "roles & policies..."
+                }`}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={`w-full pl-9 pr-8 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                  isDark ? "bg-[#121622]/60 border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                }`}
+              />
+              <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-2.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-white p-1"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Action Buttons: Positioned under search on mobile */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+              {activeTab !== "roles" && departmentsList.length === 0 && designationsList.length === 0 && (
+                <button
+                  onClick={handleSeedPresets}
+                  disabled={seeding}
+                  className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <Sparkles className={`w-3.5 h-3.5 ${seeding ? "animate-spin" : ""}`} />
+                  <span>{seeding ? "Initializing..." : "Auto-Seed Presets"}</span>
+                </button>
+              )}
+
+              {activeTab === "roles" ? (
+                <button
+                  onClick={handleOpenAddRole}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Create Custom Role</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handleOpenAddMaster}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add {activeTab === "departments" ? "Department" : "Designation"}</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
