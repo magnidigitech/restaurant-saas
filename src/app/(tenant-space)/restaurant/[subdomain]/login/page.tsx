@@ -131,7 +131,12 @@ export default function AppleTenantLoginPage() {
       window.location.host.startsWith(`${subdomain}.`) ||
       (window.location.host.includes(".localhost") && !window.location.host.startsWith("admin."))
     );
-    router.push(isSubdomain ? "/dashboard" : `/restaurant/${subdomain}/dashboard`);
+    const target = isSubdomain ? "/dashboard" : `/restaurant/${subdomain}/dashboard`;
+    if (typeof window !== "undefined") {
+      window.location.href = target;
+    } else {
+      router.push(target);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -149,7 +154,7 @@ export default function AppleTenantLoginPage() {
       const data = await res.json();
 
       if (res.ok) {
-        if (data.requires2FA) {
+        if ((data.requiresTwoFactor || data.requires2FA) && data.challengeToken) {
           setChallengeToken(data.challengeToken);
           setHasPasskeys(Boolean(data.hasPasskeys));
           setHasTotp(Boolean(data.hasTotp));
@@ -176,26 +181,31 @@ export default function AppleTenantLoginPage() {
     setVerifying2fa(true);
 
     try {
-      const payload: any = {
-        subdomain,
-        challengeToken,
-        method: mfaMethod,
-        trustDevice,
-      };
+      const isRecovery = mfaMethod === "RECOVERY";
+      const codeToVerify = isRecovery ? recoveryCode.trim() : otpCode.trim();
 
       if (mfaMethod === "TOTP") {
         if (otpCode.length !== 6) {
           throw new Error("Please enter a 6-digit authentication code.");
         }
-        payload.otpCode = otpCode;
-      } else if (mfaMethod === "RECOVERY") {
+      } else if (isRecovery) {
         if (!recoveryCode.trim()) {
           throw new Error("Please enter your backup recovery code.");
         }
-        payload.recoveryCode = recoveryCode.trim();
       }
 
-      const res = await fetch("/api/restaurant/auth/verify-2fa", {
+      const payload: any = {
+        subdomain,
+        challengeToken,
+        code: codeToVerify,
+        otpCode: codeToVerify,
+        recoveryCode: codeToVerify,
+        isRecoveryCode: isRecovery,
+        method: mfaMethod,
+        trustDevice,
+      };
+
+      const res = await fetch("/api/restaurant/auth/2fa/challenge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

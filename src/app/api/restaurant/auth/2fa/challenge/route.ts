@@ -27,13 +27,17 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { challengeToken, code, isRecoveryCode, trustDevice } = body;
+    const challengeToken = body.challengeToken;
+    const isRecoveryCode = Boolean(body.isRecoveryCode || body.method === "RECOVERY");
+    const rawCode = body.code || (isRecoveryCode ? body.recoveryCode : body.otpCode) || "";
+    const code = typeof rawCode === "string" ? rawCode.trim() : "";
+    const trustDevice = Boolean(body.trustDevice);
 
     if (!challengeToken || typeof challengeToken !== "string") {
       return NextResponse.json({ error: "Missing or invalid challenge token" }, { status: 400 });
     }
 
-    if (!code || typeof code !== "string") {
+    if (!code) {
       return NextResponse.json({ error: "Authentication code is required" }, { status: 400 });
     }
 

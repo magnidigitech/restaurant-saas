@@ -139,9 +139,10 @@ export async function POST(req: NextRequest) {
     const isTrusted = await isCurrentDeviceTrusted(user.id, restaurant.id);
 
     // Require 2FA challenge if:
-    // (a) user has 2FA configured OR policy mandates it
-    // AND device is not currently trusted
-    if ((mfaConfigured || requiredByPolicy) && !isTrusted) {
+    // (a) user actually has 2FA configured (TOTP or Passkey)
+    // AND (b) device is not currently trusted
+    // (If policy mandates MFA but user has not enrolled yet, they log in via password and configure MFA in settings)
+    if (mfaConfigured && !isTrusted) {
       const challengeToken = await sign2FAChallenge({
         userId: user.id,
         email: user.email,
@@ -153,6 +154,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         requiresTwoFactor: true,
+        requires2FA: true,
         challengeToken,
         hasPasskeys: hasPasskeys > 0,
         hasTotp: !!twoFactor?.enabled,
