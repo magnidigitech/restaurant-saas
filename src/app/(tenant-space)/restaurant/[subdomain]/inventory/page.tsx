@@ -247,10 +247,10 @@ export default function InventoryDashboard({
       >
         <RestaurantNavbar activeSection="Inventory" />
 
-      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5 space-y-4 sm:space-y-5">
         {/* Executive Header Banner */}
         <div
-          className={`p-4 sm:p-6 lg:p-7 rounded-2xl sm:rounded-3xl border transition relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6 ${
+          className={`p-4 sm:p-5 rounded-2xl border transition relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4 ${
             isDark
               ? "bg-gradient-to-br from-[#121829] via-[#0E1320] to-[#0A0D14] border-white/[0.08] shadow-xl shadow-black/20"
               : "bg-gradient-to-br from-blue-50/80 via-indigo-50/25 to-white border-blue-100/80 shadow-sm shadow-blue-500/5"
@@ -261,7 +261,7 @@ export default function InventoryDashboard({
           <div className="absolute right-1/3 -bottom-16 w-60 h-60 bg-indigo-500/10 dark:bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
 
           {/* Left: Nav & Title */}
-          <div className="relative z-10 space-y-2.5 sm:space-y-3 w-full md:w-auto min-w-0">
+          <div className="relative z-10 space-y-2 sm:space-y-2.5 w-full md:w-auto min-w-0">
             {/* Nav & Category Pills */}
             <div className="flex items-center justify-between sm:justify-start gap-2 flex-wrap">
               <button
@@ -284,12 +284,12 @@ export default function InventoryDashboard({
             </div>
 
             {/* Title with Squircle Icon */}
-            <div className="flex items-center gap-2.5 sm:gap-3.5">
-              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#0071E3] via-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0 border border-white/20">
-                <Boxes className="w-5 h-5 sm:w-6 sm:h-6" />
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#0071E3] via-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0 border border-white/20">
+                <Boxes className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <h1 className={`text-base sm:text-2xl font-extrabold tracking-tight truncate ${isDark ? "text-white" : "text-slate-900"}`}>
+                <h1 className={`text-base sm:text-xl font-extrabold tracking-tight truncate ${isDark ? "text-white" : "text-slate-900"}`}>
                   Inventory & Supply Chain
                 </h1>
                 <span className={`text-[10px] sm:text-xs block sm:hidden font-medium mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
@@ -300,14 +300,14 @@ export default function InventoryDashboard({
           </div>
 
           {/* Right: Actions & Status Capsule */}
-          <div className="relative z-10 flex flex-wrap items-center gap-3 shrink-0">
-            <div className={`hidden lg:flex p-3 rounded-2xl border items-center gap-3 ${
+          <div className="relative z-10 flex flex-wrap items-center gap-2.5 shrink-0">
+            <div className={`hidden lg:flex p-2.5 px-3 rounded-xl border items-center gap-2.5 ${
               isDark
                 ? "bg-[#141A29]/80 border-white/[0.08] shadow-sm"
                 : "bg-white/90 backdrop-blur-xs border-slate-200/80 shadow-xs"
             }`}>
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
-                <PackageCheck className="w-4 h-4" />
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                <PackageCheck className="w-3.5 h-3.5" />
               </div>
               <div className="text-left">
                 <div className="flex items-center gap-1.5">
@@ -325,13 +325,13 @@ export default function InventoryDashboard({
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={() => router.push(`/restaurant/${subdomain}/inventory/items`)}
-                className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
+                className="px-3.5 py-1.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
               >
                 + New Item
               </button>
               <button
                 onClick={() => router.push(`/restaurant/${subdomain}/inventory/purchase-orders`)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                className={`px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
                   isDark
                     ? "bg-white/[0.04] text-white border-white/[0.08] hover:bg-white/[0.08]"
                     : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50 shadow-xs"
@@ -344,67 +344,67 @@ export default function InventoryDashboard({
         </div>
 
         {/* Executive KPI Summary Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
           <div
             onClick={() => router.push(`/restaurant/${subdomain}/inventory/items`)}
-            className={`p-5 rounded-2xl border transition-all duration-200 cursor-pointer group ${
+            className={`p-3 sm:p-3.5 rounded-xl border transition-all duration-200 cursor-pointer group flex flex-col justify-between ${
               isDark
                 ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.14] hover:bg-[#121622]/80"
-                : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300 hover:shadow-md"
+                : "bg-white border-slate-200/80 shadow-xs hover:border-slate-300 hover:shadow-sm"
             }`}
           >
-            <div className="flex justify-between items-start">
+            <div className="flex justify-between items-center">
               <span
-                className={`text-[11px] font-semibold uppercase tracking-wider ${
+                className={`text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider ${
                   isDark ? "text-[#8F95A3]" : "text-slate-500"
                 }`}
               >
                 Catalog Items
               </span>
               <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center transition ${
+                className={`w-6 h-6 rounded-md flex items-center justify-center transition shrink-0 ${
                   isDark ? "bg-blue-500/10 text-blue-400" : "bg-blue-50 text-blue-600"
                 }`}
               >
-                <Package className="w-3.5 h-3.5" />
+                <Package className="w-3 h-3" />
               </div>
             </div>
-            <p className={`text-2xl font-bold tracking-tight mt-2 ${isDark ? "text-white" : "text-slate-900"}`}>
+            <p className={`text-lg sm:text-xl font-bold tracking-tight mt-1 truncate ${isDark ? "text-white" : "text-slate-900"}`}>
               {stats.totalItems}{" "}
-              <span className={`text-xs font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>SKUs</span>
+              <span className={`text-[11px] font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>SKUs</span>
             </p>
-            <div className="flex justify-between items-center mt-2 text-[11px]">
-              <span className={isDark ? "text-[#8F95A3]" : "text-slate-500"}>
-                Across {stats.totalCategories} {stats.totalCategories === 1 ? "category" : "categories"}
+            <div className="flex justify-between items-center mt-1 pt-1 border-t border-slate-100/80 dark:border-white/[0.04] text-[10px] sm:text-[11px]">
+              <span className={`truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                {stats.totalCategories} Categories
               </span>
-              <span className="text-[#0071E3] font-medium group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                Manage <ArrowRight className="w-3 h-3 inline" />
+              <span className="text-[#0071E3] font-medium group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5 shrink-0 ml-1">
+                Manage <ArrowRight className="w-2.5 h-2.5 inline" />
               </span>
             </div>
           </div>
 
           <div
             onClick={() => router.push(`/restaurant/${subdomain}/inventory/alerts`)}
-            className={`p-5 rounded-2xl border transition-all duration-200 cursor-pointer group ${
+            className={`p-3 sm:p-3.5 rounded-xl border transition-all duration-200 cursor-pointer group flex flex-col justify-between ${
               stats.lowStockCount > 0
                 ? isDark
                   ? "bg-amber-500/[0.05] border-amber-500/30 hover:border-amber-500/50 hover:bg-amber-500/[0.08]"
-                  : "bg-amber-50/50 border-amber-200 shadow-sm hover:border-amber-300 hover:shadow-md"
+                  : "bg-amber-50/50 border-amber-200 shadow-xs hover:border-amber-300 hover:shadow-sm"
                 : isDark
                 ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.14] hover:bg-[#121622]/80"
-                : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300 hover:shadow-md"
+                : "bg-white border-slate-200/80 shadow-xs hover:border-slate-300 hover:shadow-sm"
             }`}
           >
-            <div className="flex justify-between items-start">
+            <div className="flex justify-between items-center">
               <span
-                className={`text-[11px] font-semibold uppercase tracking-wider ${
+                className={`text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider ${
                   stats.lowStockCount > 0 ? "text-amber-500" : isDark ? "text-[#8F95A3]" : "text-slate-500"
                 }`}
               >
                 Low Stock Alerts
               </span>
               <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center transition ${
+                className={`w-6 h-6 rounded-md flex items-center justify-center transition shrink-0 ${
                   stats.lowStockCount > 0
                     ? isDark
                       ? "bg-amber-500/10 text-amber-400"
@@ -414,11 +414,11 @@ export default function InventoryDashboard({
                     : "bg-emerald-50 text-emerald-600"
                 }`}
               >
-                <AlertTriangle className="w-3.5 h-3.5" />
+                <AlertTriangle className="w-3 h-3" />
               </div>
             </div>
             <p
-              className={`text-2xl font-bold tracking-tight mt-2 ${
+              className={`text-lg sm:text-xl font-bold tracking-tight mt-1 truncate ${
                 stats.lowStockCount > 0
                   ? "text-amber-500"
                   : isDark
@@ -428,115 +428,106 @@ export default function InventoryDashboard({
             >
               {stats.lowStockCount > 0 ? `${stats.lowStockCount} Deficits` : "Optimal"}
             </p>
-            <div className="flex justify-between items-center mt-2 text-[11px]">
-              <span className={isDark ? "text-[#8F95A3]" : "text-slate-500"}>
-                {stats.lowStockCount > 0 ? "Requires reordering" : "All levels healthy"}
+            <div className="flex justify-between items-center mt-1 pt-1 border-t border-slate-100/80 dark:border-white/[0.04] text-[10px] sm:text-[11px]">
+              <span className={`truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                {stats.lowStockCount > 0 ? "Reorder needed" : "All healthy"}
               </span>
-              <span className="text-[#0071E3] font-medium group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                Alerts <ArrowRight className="w-3 h-3 inline" />
+              <span className="text-[#0071E3] font-medium group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5 shrink-0 ml-1">
+                Alerts <ArrowRight className="w-2.5 h-2.5 inline" />
               </span>
             </div>
           </div>
 
           <div
             onClick={() => router.push(`/restaurant/${subdomain}/inventory/vendors`)}
-            className={`p-5 rounded-2xl border transition-all duration-200 cursor-pointer group ${
+            className={`p-3 sm:p-3.5 rounded-xl border transition-all duration-200 cursor-pointer group flex flex-col justify-between ${
               isDark
                 ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.14] hover:bg-[#121622]/80"
-                : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300 hover:shadow-md"
+                : "bg-white border-slate-200/80 shadow-xs hover:border-slate-300 hover:shadow-sm"
             }`}
           >
-            <div className="flex justify-between items-start">
+            <div className="flex justify-between items-center">
               <span
-                className={`text-[11px] font-semibold uppercase tracking-wider ${
+                className={`text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider ${
                   isDark ? "text-[#8F95A3]" : "text-slate-500"
                 }`}
               >
                 Active Suppliers
               </span>
               <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center transition ${
+                className={`w-6 h-6 rounded-md flex items-center justify-center transition shrink-0 ${
                   isDark ? "bg-purple-500/10 text-purple-400" : "bg-purple-50 text-purple-600"
                 }`}
               >
-                <Building2 className="w-3.5 h-3.5" />
+                <Building2 className="w-3 h-3" />
               </div>
             </div>
-            <p className={`text-2xl font-bold tracking-tight mt-2 ${isDark ? "text-white" : "text-slate-900"}`}>
+            <p className={`text-lg sm:text-xl font-bold tracking-tight mt-1 truncate ${isDark ? "text-white" : "text-slate-900"}`}>
               {stats.totalVendors}{" "}
-              <span className={`text-xs font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>Vendors</span>
+              <span className={`text-[11px] font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>Vendors</span>
             </p>
-            <div className="flex justify-between items-center mt-2 text-[11px]">
-              <span className={isDark ? "text-[#8F95A3]" : "text-slate-500"}>
-                Registered vendor profiles
+            <div className="flex justify-between items-center mt-1 pt-1 border-t border-slate-100/80 dark:border-white/[0.04] text-[10px] sm:text-[11px]">
+              <span className={`truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                Registered profiles
               </span>
-              <span className="text-[#0071E3] font-medium group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                Directory <ArrowRight className="w-3 h-3 inline" />
+              <span className="text-[#0071E3] font-medium group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5 shrink-0 ml-1">
+                Directory <ArrowRight className="w-2.5 h-2.5 inline" />
               </span>
             </div>
           </div>
 
           <div
             onClick={() => router.push(`/restaurant/${subdomain}/inventory/stock`)}
-            className={`p-5 rounded-2xl border transition-all duration-200 cursor-pointer group ${
+            className={`p-3 sm:p-3.5 rounded-xl border transition-all duration-200 cursor-pointer group flex flex-col justify-between ${
               isDark
                 ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/[0.14] hover:bg-[#121622]/80"
-                : "bg-white border-slate-200/80 shadow-sm hover:border-slate-300 hover:shadow-md"
+                : "bg-white border-slate-200/80 shadow-xs hover:border-slate-300 hover:shadow-sm"
             }`}
           >
-            <div className="flex justify-between items-start">
+            <div className="flex justify-between items-center">
               <span
-                className={`text-[11px] font-semibold uppercase tracking-wider ${
+                className={`text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider ${
                   isDark ? "text-[#8F95A3]" : "text-slate-500"
                 }`}
               >
                 Wastage (MTD)
               </span>
               <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center transition ${
+                className={`w-6 h-6 rounded-md flex items-center justify-center transition shrink-0 ${
                   isDark ? "bg-rose-500/10 text-rose-400" : "bg-rose-50 text-rose-600"
                 }`}
               >
-                <History className="w-3.5 h-3.5" />
+                <History className="w-3 h-3" />
               </div>
             </div>
-            <p className={`text-2xl font-bold tracking-tight mt-2 ${isDark ? "text-white" : "text-slate-900"}`}>
+            <p className={`text-lg sm:text-xl font-bold tracking-tight mt-1 truncate ${isDark ? "text-white" : "text-slate-900"}`}>
               {stats.wastageThisMonth}{" "}
-              <span className={`text-xs font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>Logs</span>
+              <span className={`text-[11px] font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>Logs</span>
             </p>
-            <div className="flex justify-between items-center mt-2 text-[11px]">
-              <span className={isDark ? "text-[#8F95A3]" : "text-slate-500"}>
-                Incidents logged this month
+            <div className="flex justify-between items-center mt-1 pt-1 border-t border-slate-100/80 dark:border-white/[0.04] text-[10px] sm:text-[11px]">
+              <span className={`truncate ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                This month
               </span>
-              <span className="text-[#0071E3] font-medium group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                Ledger <ArrowRight className="w-3 h-3 inline" />
+              <span className="text-[#0071E3] font-medium group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5 shrink-0 ml-1">
+                Ledger <ArrowRight className="w-2.5 h-2.5 inline" />
               </span>
             </div>
           </div>
         </div>
 
         {/* Operational Business Modules Grid */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
             <span
               className={`text-[11px] font-semibold uppercase tracking-wider ${
                 isDark ? "text-[#8F95A3]" : "text-slate-500"
               }`}
             >
-              Inventory Submodules & Control
-            </span>
-            <span
-              className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
-                isDark
-                  ? "bg-white/[0.04] text-[#8F95A3] border-white/[0.06]"
-                  : "bg-slate-100 text-slate-600 border-slate-200"
-              }`}
-            >
-              {navCards.length} Submodules Available
+              Inventory Submodules
             </span>
           </div>
 
-          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-2.5 sm:gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {navCards.map((card) => {
               const IconComponent = card.icon;
 
@@ -544,7 +535,7 @@ export default function InventoryDashboard({
                 <div
                   key={card.path}
                   onClick={() => router.push(card.path)}
-                  className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer group flex flex-col justify-between gap-3 ${
+                  className={`p-3 sm:p-3.5 rounded-xl border transition-all duration-200 cursor-pointer group flex flex-col justify-between gap-2.5 ${
                     isDark
                       ? "bg-[#121622]/60 border-white/[0.06] hover:bg-[#121622]/90 hover:border-white/[0.14] hover:shadow-lg hover:shadow-black/20"
                       : "bg-white border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-md hover:border-slate-300"
@@ -552,24 +543,24 @@ export default function InventoryDashboard({
                 >
                   {/* Header Row: Icon + Name + Badge + Tooltip */}
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 duration-200 ${
+                        className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 duration-200 ${
                           isDark ? card.bgDark : card.bgLight
                         }`}
                       >
-                        <IconComponent className="w-5 h-5" />
+                        <IconComponent className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
                         <span
-                          className={`block text-[10px] font-semibold uppercase tracking-wider truncate ${
+                          className={`block text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider truncate ${
                             isDark ? "text-[#8F95A3]" : "text-slate-400"
                           }`}
                         >
                           {card.category}
                         </span>
                         <h4
-                          className={`text-sm font-semibold tracking-tight truncate group-hover:text-[#0071E3] dark:group-hover:text-blue-400 transition-colors ${
+                          className={`text-xs sm:text-sm font-semibold tracking-tight truncate group-hover:text-[#0071E3] dark:group-hover:text-blue-400 transition-colors ${
                             isDark ? "text-white" : "text-slate-900"
                           }`}
                         >
@@ -582,7 +573,7 @@ export default function InventoryDashboard({
                     <div className="flex items-center gap-1.5 shrink-0">
                       {card.badge && (
                         <span
-                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${
+                          className={`text-[9px] sm:text-[10px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${
                             card.badgeType === "warning"
                               ? isDark
                                 ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
@@ -610,12 +601,12 @@ export default function InventoryDashboard({
                   </div>
 
                   {/* Footer Row: Feature tag & sleek launch CTA */}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-white/[0.04] text-xs">
-                    <span className={`text-[11px] font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                  <div className="flex items-center justify-between pt-1.5 sm:pt-2 border-t border-slate-100 dark:border-white/[0.04] text-[10px] sm:text-[11px]">
+                    <span className={`truncate ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
                       {card.featureTag}
                     </span>
-                    <span className="font-semibold text-[#0071E3] dark:text-blue-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform text-[11px]">
-                      Launch <ArrowRight className="w-3 h-3" />
+                    <span className="font-semibold text-[#0071E3] dark:text-blue-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform shrink-0 ml-1">
+                      Launch <ArrowRight className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                     </span>
                   </div>
                 </div>
