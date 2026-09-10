@@ -1,24 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantSession } from "@/core/auth/session";
 import { verifyAccess } from "@/core/permissions/check";
-import { InventoryService } from "@/modules/inventory/service";
+import { VendorService } from "@/modules/inventory/vendor-service";
 import { z } from "zod";
 
-const bulkRowSchema = z.object({
+const bulkVendorRowSchema = z.object({
   rowNumber: z.number().optional(),
   name: z.string().optional(),
-  sku: z.string().optional(),
-  category: z.string().optional(),
-  unitOfMeasure: z.string().optional(),
-  costPerUnit: z.union([z.number(), z.string()]).optional(),
-  reorderPoint: z.union([z.number(), z.string()]).optional(),
-  parLevel: z.union([z.number(), z.string()]).optional(),
+  code: z.string().optional(),
+  contactPerson: z.string().optional(),
+  email: z.string().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  taxId: z.string().optional(),
+  paymentTerms: z.string().optional(),
+  status: z.string().optional(),
+  notes: z.string().optional(),
   action: z.enum(["CREATE", "UPDATE", "SKIP"]).optional(),
-  existingItemId: z.string().optional(),
+  existingVendorId: z.string().optional(),
 });
 
-const bulkImportSchema = z.object({
-  items: z.array(bulkRowSchema),
+const bulkImportVendorsSchema = z.object({
+  vendors: z.array(bulkVendorRowSchema),
   updateExisting: z.boolean().optional().default(true),
 });
 
@@ -41,7 +44,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const result = bulkImportSchema.safeParse(body);
+    const result = bulkImportVendorsSchema.safeParse(body);
 
     if (!result.success) {
       return NextResponse.json(
@@ -50,9 +53,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const report = await InventoryService.bulkImportItems(
+    const report = await VendorService.bulkImportVendors(
       session.activeRestaurantId,
-      result.data.items,
+      result.data.vendors,
       { updateExisting: result.data.updateExisting }
     );
 
@@ -61,7 +64,7 @@ export async function POST(req: NextRequest) {
       report,
     });
   } catch (error: any) {
-    console.error("Bulk Import Inventory Items Error:", error);
+    console.error("Bulk Import Vendors Error:", error);
     return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
   }
 }

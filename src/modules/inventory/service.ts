@@ -37,15 +37,132 @@ export const InventoryService = {
     data: { name?: string; description?: string; parentId?: string | null }
   ) {
     await prisma.inventoryCategory.findFirstOrThrow({ where: { id, restaurantId } });
+    if (data.parentId && data.parentId === id) {
+      throw new Error("Category cannot be its own parent");
+    }
     return prisma.inventoryCategory.update({
       where: { id },
-      data,
+      data: {
+        ...data,
+        parentId: data.parentId === "" ? null : data.parentId,
+      },
     });
   },
 
   async deleteCategory(restaurantId: string, id: string) {
     await prisma.inventoryCategory.findFirstOrThrow({ where: { id, restaurantId } });
     return prisma.inventoryCategory.delete({ where: { id } });
+  },
+
+  async moveItemsCategory(
+    restaurantId: string,
+    itemIds: string[],
+    targetCategoryId: string | null
+  ) {
+    if (targetCategoryId) {
+      await prisma.inventoryCategory.findFirstOrThrow({
+        where: { id: targetCategoryId, restaurantId },
+      });
+    }
+    return prisma.inventoryItem.updateMany({
+      where: {
+        id: { in: itemIds },
+        restaurantId,
+      },
+      data: {
+        categoryId: targetCategoryId,
+      },
+    });
+  },
+
+  async bulkImportCategories(
+    restaurantId: string,
+    rows: Array<{
+      rowNumber?: number;
+      name?: string;
+      parentCategory?: string;
+      description?: string;
+    }>
+  ) {
+    const existingCats = await prisma.inventoryCategory.findMany({
+      where: { restaurantId },
+      select: { id: true, name: true, parentId: true },
+    });
+
+    const catNameToIdMap = new Map<string, string>();
+    existingCats.forEach((c) => catNameToIdMap.set(c.name.trim().toLowerCase(), c.id));
+
+    const added: Array<{ row: number; name: string; parentCategory?: string }> = [];
+    const skipped: Array<{ row: number; name: string; reason: string }> = [];
+    const failed: Array<{ row: number; name: string; reason: string }> = [];
+
+    for (let index = 0; index < rows.length; index++) {
+      const r = rows[index];
+      const rowNum = r.rowNumber || index + 1;
+      const name = (r.name || "").trim();
+      const parentName = (r.parentCategory || "").trim();
+      const description = (r.description || "").trim();
+
+      if (!name) {
+        failed.push({
+          row: rowNum,
+          name: "Unnamed Category",
+          reason: "Category name is required",
+        });
+        continue;
+      }
+
+      const nameLower = name.toLowerCase();
+      if (catNameToIdMap.has(nameLower)) {
+        skipped.push({
+          row: rowNum,
+          name,
+          reason: `Category "${name}" already exists in taxonomy`,
+        });
+        continue;
+      }
+
+      let parentId: string | null = null;
+      if (parentName) {
+        const parentLower = parentName.toLowerCase();
+        if (catNameToIdMap.has(parentLower)) {
+          parentId = catNameToIdMap.get(parentLower)!;
+        } else {
+          // Auto-create parent category if it doesn't exist yet
+          const newParent = await prisma.inventoryCategory.create({
+            data: {
+              restaurantId,
+              name: parentName,
+            },
+          });
+          parentId = newParent.id;
+          catNameToIdMap.set(parentLower, newParent.id);
+          added.push({
+            row: rowNum,
+            name: parentName,
+            parentCategory: "Root (Auto-created)",
+          });
+        }
+      }
+
+      const created = await prisma.inventoryCategory.create({
+        data: {
+          restaurantId,
+          name,
+          description: description || null,
+          parentId,
+        },
+      });
+
+      catNameToIdMap.set(nameLower, created.id);
+      added.push({
+        row: rowNum,
+        name,
+        parentCategory: parentName || undefined,
+      });
+    }
+
+    return { added, skipped, failed };
   },
 
   // ── Items ────────────────────────────────────────────────────────────────
@@ -181,17 +298,27 @@ export const InventoryService = {
       reorderPoint?: number | string;
       parLevel?: number | string;
       description?: string;
-    }>
+      action?: "CREATE" | "UPDATE" | "SKIP";
+      existingItemId?: string;
+    }>,
+    options?: { updateExisting?: boolean }
   ) {
     const existingItems = await prisma.inventoryItem.findMany({
       where: { restaurantId, archivedAt: null },
-      select: { id: true, name: true, sku: true, categoryId: true, description: true },
+      include: {
+        category: { select: { id: true, name: true } },
+      },
     });
 
-    const existingNameMap = new Map(existingItems.map((i) => [i.name.trim().toLowerCase(), i]));
-    const existingSkuMap = new Map(
-      existingItems.filter((i) => i.sku).map((i) => [i.sku!.trim().toLowerCase(), i])
-    );
+    const existingIdMap = new Map<string, any>();
+    const existingNameMap = new Map<string, any>();
+    const existingSkuMap = new Map<string, any>();
+
+    existingItems.forEach((i: any) => {
+      existingIdMap.set(i.id, i);
+      if (i.name) existingNameMap.set(i.name.trim().toLowerCase(), i);
+      if (i.sku) existingSkuMap.set(i.sku.trim().toLowerCase(), i);
+    });
 
     const categories = await prisma.inventoryCategory.findMany({
       where: { restaurantId },
@@ -207,8 +334,16 @@ export const InventoryService = {
     ]);
 
     const added: Array<{ row: number; name: string; sku?: string }> = [];
+    const updated: Array<{
+      row: number;
+      name: string;
+      sku?: string;
+      overrides: Array<{ field: string; label: string; oldValue: string; newValue: string }>;
+    }> = [];
     const skipped: Array<{ row: number; name: string; sku?: string; reason: string }> = [];
     const failed: Array<{ row: number; name: string; reason: string }> = [];
+
+    const shouldUpdateExisting = options?.updateExisting !== false;
 
     for (let index = 0; index < rows.length; index++) {
       const r = rows[index];
@@ -219,7 +354,17 @@ export const InventoryService = {
       const uomRaw = (r.unitOfMeasure || "PIECES").trim().toUpperCase();
       const description = (r.description || "").trim();
 
-      if (!name) {
+      if (r.action === "SKIP") {
+        skipped.push({
+          row: rowNum,
+          name: name || "Unnamed Item",
+          sku: sku || undefined,
+          reason: "Skipped by user selection",
+        });
+        continue;
+      }
+
+      if (!name && !r.existingItemId && !sku) {
         failed.push({
           row: rowNum,
           name: "Unnamed Item",
@@ -228,8 +373,8 @@ export const InventoryService = {
         continue;
       }
 
-      const nameLower = name.toLowerCase();
-      const skuLower = sku.toLowerCase();
+      const nameLower = name ? name.toLowerCase() : "";
+      const skuLower = sku ? sku.toLowerCase() : "";
 
       // Parse numeric fields safely
       const costRaw = r.costPerUnit;
@@ -237,7 +382,7 @@ export const InventoryService = {
       if (isNaN(costPerUnit) || costPerUnit < 0) {
         failed.push({
           row: rowNum,
-          name,
+          name: name || "Unnamed Item",
           reason: "Cost per unit must be a valid non-negative number",
         });
         continue;
@@ -291,32 +436,178 @@ export const InventoryService = {
         }
       }
 
-      try {
-        const existingByName = existingNameMap.get(nameLower);
-        const existingBySku = skuLower ? existingSkuMap.get(skuLower) : null;
-        const existingItem = existingByName || existingBySku;
+      // Match existing item: by ID first, then by SKU, then by name
+      let matchedItem: any = null;
+      if (r.existingItemId && existingIdMap.has(r.existingItemId)) {
+        matchedItem = existingIdMap.get(r.existingItemId);
+      } else if (skuLower && existingSkuMap.has(skuLower)) {
+        matchedItem = existingSkuMap.get(skuLower);
+      } else if (nameLower && existingNameMap.has(nameLower)) {
+        matchedItem = existingNameMap.get(nameLower);
+      }
 
-        if (existingItem) {
-          await prisma.inventoryItem.update({
-            where: { id: existingItem.id },
-            data: {
-              name,
-              sku: sku || existingItem.sku,
-              description: description || existingItem.description,
-              categoryId: categoryId || existingItem.categoryId,
-              unitOfMeasure: unitOfMeasure as any,
-              costPerUnit,
-              reorderPoint,
-              parLevel,
-            },
-          });
+      if (matchedItem) {
+        const canUpdate = r.action === "UPDATE" || (shouldUpdateExisting && r.action !== "CREATE");
 
-          added.push({
+        if (!canUpdate) {
+          skipped.push({
             row: rowNum,
-            name: `${name} (Updated)`,
-            sku: sku || undefined,
+            name: matchedItem.name,
+            sku: matchedItem.sku || undefined,
+            reason: `Item already exists in catalog (Override not selected)`,
           });
+          continue;
+        }
+
+        // Compute diff across ALL 8 item fields
+        const overrides: Array<{ field: string; label: string; oldValue: string; newValue: string }> = [];
+        const updateData: any = {};
+
+        // 1. Name
+        if (name && name !== matchedItem.name) {
+          overrides.push({
+            field: "name",
+            label: "Item Name",
+            oldValue: matchedItem.name,
+            newValue: name,
+          });
+          updateData.name = name;
+        }
+
+        // 2. SKU
+        if (sku && sku !== (matchedItem.sku || "")) {
+          overrides.push({
+            field: "sku",
+            label: "SKU Code",
+            oldValue: matchedItem.sku || "—",
+            newValue: sku,
+          });
+          updateData.sku = sku;
+        }
+
+        // 3. Category
+        const currentCatName = matchedItem.category?.name || "";
+        if (catName && catName.toLowerCase() !== currentCatName.toLowerCase()) {
+          overrides.push({
+            field: "category",
+            label: "Category",
+            oldValue: currentCatName || "—",
+            newValue: catName,
+          });
+          updateData.categoryId = categoryId || null;
+        }
+
+        // 4. Unit of Measure
+        if (unitOfMeasure && unitOfMeasure !== matchedItem.unitOfMeasure) {
+          overrides.push({
+            field: "unitOfMeasure",
+            label: "Unit of Measure",
+            oldValue: matchedItem.unitOfMeasure || "PIECES",
+            newValue: unitOfMeasure,
+          });
+          updateData.unitOfMeasure = unitOfMeasure as any;
+        }
+
+        // 5. Cost Per Unit
+        const currentCost = Number(matchedItem.costPerUnit || 0);
+        if (costRaw !== undefined && costRaw !== "" && Math.abs(costPerUnit - currentCost) > 0.0001) {
+          overrides.push({
+            field: "costPerUnit",
+            label: "Cost Per Unit",
+            oldValue: `$${currentCost.toFixed(2)}`,
+            newValue: `$${costPerUnit.toFixed(2)}`,
+          });
+          updateData.costPerUnit = costPerUnit;
+        }
+
+        // 6. Reorder Point
+        const currentReorder = Number(matchedItem.reorderPoint || 0);
+        if (r.reorderPoint !== undefined && r.reorderPoint !== "" && Math.abs(reorderPoint - currentReorder) > 0.0001) {
+          overrides.push({
+            field: "reorderPoint",
+            label: "Reorder Point",
+            oldValue: currentReorder.toString(),
+            newValue: reorderPoint.toString(),
+          });
+          updateData.reorderPoint = reorderPoint;
+        }
+
+        // 7. Par Level
+        const currentPar = Number(matchedItem.parLevel || 0);
+        if (r.parLevel !== undefined && r.parLevel !== "" && Math.abs(parLevel - currentPar) > 0.0001) {
+          overrides.push({
+            field: "parLevel",
+            label: "Par Level",
+            oldValue: currentPar.toString(),
+            newValue: parLevel.toString(),
+          });
+          updateData.parLevel = parLevel;
+        }
+
+        // 8. Description
+        const currentDesc = matchedItem.description || "";
+        if (description && description !== currentDesc) {
+          overrides.push({
+            field: "description",
+            label: "Description",
+            oldValue: currentDesc || "—",
+            newValue: description,
+          });
+          updateData.description = description;
+        }
+
+        if (overrides.length > 0) {
+          try {
+            const updatedItem = await prisma.inventoryItem.update({
+              where: { id: matchedItem.id },
+              data: updateData,
+              include: {
+                category: { select: { id: true, name: true } },
+              },
+            });
+
+            // Update in-memory cache
+            if (matchedItem.name) existingNameMap.delete(matchedItem.name.toLowerCase());
+            if (updatedItem.name) existingNameMap.set(updatedItem.name.toLowerCase(), updatedItem);
+
+            if (matchedItem.sku) existingSkuMap.delete(matchedItem.sku.toLowerCase());
+            if (updatedItem.sku) existingSkuMap.set(updatedItem.sku.toLowerCase(), updatedItem);
+
+            existingIdMap.set(matchedItem.id, updatedItem);
+
+            updated.push({
+              row: rowNum,
+              name: updatedItem.name,
+              sku: updatedItem.sku || undefined,
+              overrides,
+            });
+          } catch (err: any) {
+            failed.push({
+              row: rowNum,
+              name: name || matchedItem.name,
+              reason: err.message || "Failed to update item record",
+            });
+          }
         } else {
+          skipped.push({
+            row: rowNum,
+            name: matchedItem.name,
+            sku: matchedItem.sku || undefined,
+            reason: "Identical record (all fields match existing catalog)",
+          });
+        }
+      } else {
+        // Not existing: create new item
+        if (!name) {
+          failed.push({
+            row: rowNum,
+            name: "Unnamed Item",
+            reason: "Item name is required for new items",
+          });
+          continue;
+        }
+
+        try {
           const newItem = await prisma.inventoryItem.create({
             data: {
               restaurantId,
@@ -329,27 +620,31 @@ export const InventoryService = {
               reorderPoint,
               parLevel,
             },
+            include: {
+              category: { select: { id: true, name: true } },
+            },
           });
 
-          existingNameMap.set(nameLower, newItem as any);
+          if (nameLower) existingNameMap.set(nameLower, newItem as any);
           if (skuLower) existingSkuMap.set(skuLower, newItem as any);
+          existingIdMap.set(newItem.id, newItem as any);
 
           added.push({
             row: rowNum,
             name,
             sku: sku || undefined,
           });
+        } catch (err: any) {
+          failed.push({
+            row: rowNum,
+            name,
+            reason: err.message || "Database creation error",
+          });
         }
-      } catch (err: any) {
-        failed.push({
-          row: rowNum,
-          name,
-          reason: err.message || "Database creation error",
-        });
       }
     }
 
-    return { added, skipped, failed };
+    return { added, updated, skipped, failed };
   },
 
   // ── Stock Ledger ────────────────────────────────────────────────────────

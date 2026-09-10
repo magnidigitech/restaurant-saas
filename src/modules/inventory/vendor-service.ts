@@ -261,6 +261,256 @@ export const VendorService = {
     });
   },
 
+  async bulkImportVendors(
+    restaurantId: string,
+    rows: Array<{
+      rowNumber?: number;
+      name?: string;
+      code?: string;
+      contactPerson?: string;
+      email?: string;
+      phone?: string;
+      address?: string;
+      taxId?: string;
+      paymentTerms?: string;
+      status?: string;
+      notes?: string;
+      action?: "CREATE" | "UPDATE" | "SKIP";
+      existingVendorId?: string;
+    }>,
+    options?: { updateExisting?: boolean }
+  ) {
+    const db = getPrisma();
+    const existingVendors = await db.vendor.findMany({
+      where: { restaurantId, archivedAt: null },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        contactPerson: true,
+        email: true,
+        phone: true,
+        address: true,
+        taxId: true,
+        paymentTerms: true,
+        status: true,
+        notes: true,
+      },
+    });
+
+    const existingIdMap = new Map<string, any>();
+    const existingNameMap = new Map<string, any>();
+    const existingCodeMap = new Map<string, any>();
+
+    existingVendors.forEach((v: any) => {
+      existingIdMap.set(v.id, v);
+      if (v.name) existingNameMap.set(v.name.trim().toLowerCase(), v);
+      if (v.code) existingCodeMap.set(v.code.trim().toLowerCase(), v);
+    });
+
+    const normalizePaymentTerms = (raw: string) => {
+      const upper = (raw || "NET30").trim().toUpperCase().replace(/\s+/g, "");
+      if (upper === "PREPAID") return "IMMEDIATE";
+      const valid = new Set(["COD", "IMMEDIATE", "NET7", "NET15", "NET30", "NET60"]);
+      return valid.has(upper) ? upper : "NET30";
+    };
+
+    const normalizeStatus = (raw: string) => {
+      const upper = (raw || "ACTIVE").trim().toUpperCase();
+      const valid = new Set(["ACTIVE", "INACTIVE", "BLOCKED"]);
+      return valid.has(upper) ? upper : "ACTIVE";
+    };
+
+    const added: Array<{ row: number; name: string; code?: string }> = [];
+    const updated: Array<{
+      row: number;
+      name: string;
+      code?: string;
+      overrides: Array<{ field: string; label: string; oldValue: string; newValue: string }>;
+    }> = [];
+    const skipped: Array<{ row: number; name: string; code?: string; reason: string }> = [];
+    const failed: Array<{ row: number; name: string; reason: string }> = [];
+
+    const shouldUpdateExisting = options?.updateExisting !== false;
+
+    for (let index = 0; index < rows.length; index++) {
+      const r = rows[index];
+      const rowNum = r.rowNumber || index + 1;
+      const name = (r.name || "").trim();
+      const code = (r.code || "").trim();
+      const contactPerson = (r.contactPerson || "").trim();
+      const email = (r.email || "").trim();
+      const phone = (r.phone || "").trim();
+      const address = (r.address || "").trim();
+      const taxId = (r.taxId || "").trim();
+      const paymentTerms = normalizePaymentTerms(r.paymentTerms || "");
+      const status = normalizeStatus(r.status || "");
+      const notes = (r.notes || "").trim();
+
+      if (r.action === "SKIP") {
+        skipped.push({
+          row: rowNum,
+          name: name || "Unnamed Supplier",
+          code: code || undefined,
+          reason: "Skipped by user selection",
+        });
+        continue;
+      }
+
+      if (!name && !r.existingVendorId && !code) {
+        failed.push({
+          row: rowNum,
+          name: "Unnamed Supplier",
+          reason: "Vendor name or code is required",
+        });
+        continue;
+      }
+
+      const nameLower = name ? name.toLowerCase() : "";
+      const codeLower = code ? code.toLowerCase() : "";
+
+      // Match existing vendor: by ID first, then by code, then by name
+      let matchedVendor: any = null;
+      if (r.existingVendorId && existingIdMap.has(r.existingVendorId)) {
+        matchedVendor = existingIdMap.get(r.existingVendorId);
+      } else if (codeLower && existingCodeMap.has(codeLower)) {
+        matchedVendor = existingCodeMap.get(codeLower);
+      } else if (nameLower && existingNameMap.has(nameLower)) {
+        matchedVendor = existingNameMap.get(nameLower);
+      }
+
+      if (matchedVendor) {
+        const canUpdate = r.action === "UPDATE" || (shouldUpdateExisting && r.action !== "CREATE");
+
+        if (!canUpdate) {
+          skipped.push({
+            row: rowNum,
+            name: matchedVendor.name,
+            code: matchedVendor.code || undefined,
+            reason: `Supplier already exists in directory (Override not selected)`,
+          });
+          continue;
+        }
+
+        // Compute diff across ALL fields
+        const fieldChecks: Array<{
+          key: "name" | "code" | "contactPerson" | "email" | "phone" | "address" | "taxId" | "paymentTerms" | "status" | "notes";
+          label: string;
+          currentVal: string;
+          newVal: string;
+        }> = [
+          { key: "name", label: "Supplier Name", currentVal: matchedVendor.name || "", newVal: name || matchedVendor.name },
+          { key: "code", label: "Vendor Code", currentVal: matchedVendor.code || "", newVal: code },
+          { key: "contactPerson", label: "Representative", currentVal: matchedVendor.contactPerson || "", newVal: contactPerson },
+          { key: "email", label: "Email Address", currentVal: matchedVendor.email || "", newVal: email },
+          { key: "phone", label: "Phone Number", currentVal: matchedVendor.phone || "", newVal: phone },
+          { key: "address", label: "Address", currentVal: matchedVendor.address || "", newVal: address },
+          { key: "taxId", label: "Tax ID / GST", currentVal: matchedVendor.taxId || "", newVal: taxId },
+          { key: "paymentTerms", label: "Payment Terms", currentVal: matchedVendor.paymentTerms || "NET30", newVal: paymentTerms },
+          { key: "status", label: "Status", currentVal: matchedVendor.status || "ACTIVE", newVal: status },
+          { key: "notes", label: "Notes", currentVal: matchedVendor.notes || "", newVal: notes },
+        ];
+
+        const overrides: Array<{ field: string; label: string; oldValue: string; newValue: string }> = [];
+        const updatePayload: any = {};
+
+        for (const item of fieldChecks) {
+          const currentTrimmed = item.currentVal.trim();
+          const newTrimmed = item.newVal.trim();
+
+          // If the spreadsheet provided a value and it differs from what is in the DB
+          if (newTrimmed && newTrimmed !== currentTrimmed) {
+            overrides.push({
+              field: item.key,
+              label: item.label,
+              oldValue: item.currentVal || "—",
+              newValue: item.newVal,
+            });
+            updatePayload[item.key] = item.newVal;
+          }
+        }
+
+        if (overrides.length > 0) {
+          try {
+            const updatedVendor = await this.updateVendor(restaurantId, matchedVendor.id, updatePayload);
+
+            // Update in-memory lookup maps
+            if (matchedVendor.name) existingNameMap.delete(matchedVendor.name.toLowerCase());
+            if (updatedVendor.name) existingNameMap.set(updatedVendor.name.toLowerCase(), updatedVendor);
+
+            if (matchedVendor.code) existingCodeMap.delete(matchedVendor.code.toLowerCase());
+            if (updatedVendor.code) existingCodeMap.set(updatedVendor.code.toLowerCase(), updatedVendor);
+
+            existingIdMap.set(matchedVendor.id, updatedVendor);
+
+            updated.push({
+              row: rowNum,
+              name: updatedVendor.name,
+              code: updatedVendor.code || undefined,
+              overrides,
+            });
+          } catch (err: any) {
+            failed.push({
+              row: rowNum,
+              name: name || matchedVendor.name,
+              reason: err.message || "Failed to update supplier record",
+            });
+          }
+        } else {
+          skipped.push({
+            row: rowNum,
+            name: matchedVendor.name,
+            code: matchedVendor.code || undefined,
+            reason: "Identical record (all fields match existing directory)",
+          });
+        }
+      } else {
+        // Not existing: create new vendor
+        if (!name) {
+          failed.push({
+            row: rowNum,
+            name: "Unnamed Supplier",
+            reason: "Supplier name is required for new suppliers",
+          });
+          continue;
+        }
+
+        try {
+          const created = await this.createVendor(restaurantId, {
+            name,
+            code: code || undefined,
+            contactPerson: contactPerson || undefined,
+            email: email || undefined,
+            phone: phone || undefined,
+            address: address || undefined,
+            taxId: taxId || undefined,
+            paymentTerms,
+            status,
+            notes: notes || undefined,
+          });
+
+          if (nameLower) existingNameMap.set(nameLower, created);
+          if (codeLower) existingCodeMap.set(codeLower, created);
+          existingIdMap.set(created.id, created);
+
+          added.push({
+            row: rowNum,
+            name,
+            code: code || undefined,
+          });
+        } catch (err: any) {
+          failed.push({
+            row: rowNum,
+            name,
+            reason: err.message || "Failed to create vendor record",
+          });
+        }
+      }
+    }
+
+    return { added, updated, skipped, failed };
+  },
+
   // Vendor-Item Mappings
   async getVendorItems(restaurantId: string, vendorId?: string, itemId?: string) {
     let db = getPrisma();

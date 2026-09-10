@@ -4,22 +4,15 @@ import { verifyAccess } from "@/core/permissions/check";
 import { InventoryService } from "@/modules/inventory/service";
 import { z } from "zod";
 
-const bulkRowSchema = z.object({
+const bulkCategoryRowSchema = z.object({
   rowNumber: z.number().optional(),
   name: z.string().optional(),
-  sku: z.string().optional(),
-  category: z.string().optional(),
-  unitOfMeasure: z.string().optional(),
-  costPerUnit: z.union([z.number(), z.string()]).optional(),
-  reorderPoint: z.union([z.number(), z.string()]).optional(),
-  parLevel: z.union([z.number(), z.string()]).optional(),
-  action: z.enum(["CREATE", "UPDATE", "SKIP"]).optional(),
-  existingItemId: z.string().optional(),
+  parentCategory: z.string().optional(),
+  description: z.string().optional(),
 });
 
-const bulkImportSchema = z.object({
-  items: z.array(bulkRowSchema),
-  updateExisting: z.boolean().optional().default(true),
+const bulkImportCategoriesSchema = z.object({
+  categories: z.array(bulkCategoryRowSchema),
 });
 
 export async function POST(req: NextRequest) {
@@ -41,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const result = bulkImportSchema.safeParse(body);
+    const result = bulkImportCategoriesSchema.safeParse(body);
 
     if (!result.success) {
       return NextResponse.json(
@@ -50,10 +43,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const report = await InventoryService.bulkImportItems(
+    const report = await InventoryService.bulkImportCategories(
       session.activeRestaurantId,
-      result.data.items,
-      { updateExisting: result.data.updateExisting }
+      result.data.categories
     );
 
     return NextResponse.json({
@@ -61,7 +53,7 @@ export async function POST(req: NextRequest) {
       report,
     });
   } catch (error: any) {
-    console.error("Bulk Import Inventory Items Error:", error);
+    console.error("Bulk Import Categories Error:", error);
     return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
   }
 }
