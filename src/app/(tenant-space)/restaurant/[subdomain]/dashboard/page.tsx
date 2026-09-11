@@ -956,7 +956,7 @@ export default function AppleTenantDashboard() {
                           router.push(p(item.path));
                         }
                       }}
-                      className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                         isParentActive
                           ? "font-bold text-white shadow-sm"
                           : "text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.06]"
@@ -970,7 +970,7 @@ export default function AppleTenantDashboard() {
                           : {}
                       }
                     >
-                      <IconComp className="w-5 h-5 shrink-0" />
+                      <IconComp className="w-4 h-4 shrink-0" />
                     </button>
                   </div>
                 );
@@ -1080,9 +1080,9 @@ export default function AppleTenantDashboard() {
                 type="button"
                 onClick={() => router.push(p("/settings/profile"))}
                 title="Settings"
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.06] transition cursor-pointer"
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.06] transition cursor-pointer"
               >
-                <Settings className="w-5 h-5" />
+                <Settings className="w-4 h-4" />
               </button>
 
               <div

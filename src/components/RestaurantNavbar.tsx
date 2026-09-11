@@ -497,7 +497,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
                       onClick={() => {
                         router.push(item.href);
                       }}
-                      className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                         isActive
                           ? "font-bold text-white shadow-sm"
                           : "text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.06]"
@@ -511,7 +511,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
                           : {}
                       }
                     >
-                      <IconComp className="w-5 h-5 shrink-0" />
+                      <IconComp className="w-4 h-4 shrink-0" />
                     </button>
                   </div>
                 );
@@ -626,9 +626,9 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
                 type="button"
                 onClick={() => router.push(p("/settings/profile"))}
                 title="Restaurant Settings"
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.06] transition cursor-pointer"
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.06] transition cursor-pointer"
               >
-                <Settings className="w-5 h-5" />
+                <Settings className="w-4 h-4" />
               </button>
 
               <div
