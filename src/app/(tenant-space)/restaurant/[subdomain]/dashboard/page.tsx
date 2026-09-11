@@ -56,6 +56,7 @@ import {
   LogOut,
   Menu,
   X,
+  Plus,
 } from "lucide-react";
 
 interface Module {
@@ -303,6 +304,9 @@ export default function AppleTenantDashboard() {
 
   // Sidebar toggle state on mobile/smaller viewports
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  // Single expanded accordion menu state in sidebar (auto-collapses when another expands)
+  const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
 
   // Tab switch: "operations" (Data-First Dashboard - Default) vs "modules" (Original Complete Modules Directory)
   const [activeTab, setActiveTab] = useState<"operations" | "modules">("operations");
@@ -699,20 +703,135 @@ export default function AppleTenantDashboard() {
   const hasFinanceAccess = allowedKeys.has("finance");
   const hasOperationsAccess = allowedKeys.has("operations");
 
-  // Left Sidebar Nav Items matching the reference screenshot layout
-  const sidebarNavItems = [
-    { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard, active: true },
-    { label: "POS", path: "/pos", icon: Store },
-    { label: "Orders", path: "/pos", icon: Receipt },
-    { label: "Inventory", path: "/inventory", icon: Package },
-    { label: "Shifts", path: "/shifts/rosters", icon: CalendarDays },
-    { label: "Workforce", path: "/workforce/employees", icon: Users },
-    { label: "Finance", path: "/finance", icon: Banknote },
-    { label: "Analytics", path: "/analytics/menu-engineering", icon: BarChart3 },
-    { label: "Catering", path: "/catering", icon: UtensilsCrossed },
-    { label: "Operations", path: "/operations", icon: ClipboardCheck },
-    { label: "Customers", path: "/settings/master-data", icon: UserCheck },
-    { label: "Reports", path: "/finance", icon: FileCheck2 },
+  interface SubNavItem {
+    label: string;
+    path: string;
+    badge?: string;
+    quickAction?: boolean;
+  }
+
+  interface NavItem {
+    id: string;
+    label: string;
+    path: string;
+    icon: React.ElementType;
+    active?: boolean;
+    subItems?: SubNavItem[];
+  }
+
+  // Left Sidebar Nav Items with rich submenus and Zoho Books styled accordion
+  const sidebarNavItems: NavItem[] = [
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      path: "/dashboard",
+      icon: LayoutDashboard,
+      active: activeTab === "operations",
+    },
+    {
+      id: "pos",
+      label: "POS & Orders",
+      path: "/pos",
+      icon: Store,
+      subItems: [
+        { label: "POS Terminal", path: "/pos", quickAction: true },
+        { label: "Kitchen Orders (KDS)", path: "/pos" },
+        { label: "Table Management", path: "/pos" },
+        { label: "Order History", path: "/pos" },
+      ],
+    },
+    {
+      id: "inventory",
+      label: "Inventory",
+      path: "/inventory",
+      icon: Package,
+      subItems: [
+        { label: "Items & Catalog", path: "/inventory/items", quickAction: true },
+        { label: "Categories", path: "/inventory/categories" },
+        { label: "Stock Levels", path: "/inventory/stock" },
+        { label: "Purchase Orders", path: "/inventory/purchase-orders" },
+        { label: "Vendors Directory", path: "/inventory/vendors" },
+        { label: "Recipes & Costing", path: "/inventory/recipes" },
+        { label: "Low Stock Alerts", path: "/inventory/alerts", badge: "5" },
+      ],
+    },
+    {
+      id: "shifts",
+      label: "Shifts & Rosters",
+      path: "/shifts/rosters",
+      icon: CalendarDays,
+      subItems: [
+        { label: "Staff Rosters", path: "/shifts/rosters", quickAction: true },
+        { label: "Schedule Templates", path: "/shifts/templates" },
+        { label: "Shift Swaps", path: "/shifts/swaps" },
+      ],
+    },
+    {
+      id: "workforce",
+      label: "Workforce & HR",
+      path: "/workforce/employees",
+      icon: Users,
+      subItems: [
+        { label: "Employees Directory", path: "/workforce/employees", quickAction: true },
+        { label: "Staff Onboarding", path: "/workforce/onboarding" },
+        { label: "Roles & Permissions", path: "/workforce/users" },
+        { label: "Live Attendance", path: "/attendance" },
+        { label: "Leave Requests", path: "/leaves" },
+      ],
+    },
+    {
+      id: "finance",
+      label: "Finance & Accounts",
+      path: "/finance",
+      icon: Banknote,
+      subItems: [
+        { label: "Financial Overview", path: "/finance" },
+        { label: "Bill Reminders", path: "/finance/bill-reminders" },
+        { label: "Payroll Processing", path: "/payroll/runs", quickAction: true },
+      ],
+    },
+    {
+      id: "analytics",
+      label: "Analytics & Intelligence",
+      path: "/analytics/menu-engineering",
+      icon: BarChart3,
+      subItems: [
+        { label: "Menu Engineering", path: "/analytics/menu-engineering" },
+        { label: "Sales & Revenue", path: "/analytics" },
+        { label: "Labor & Costs", path: "/analytics" },
+      ],
+    },
+    {
+      id: "catering",
+      label: "Catering & Banquets",
+      path: "/catering",
+      icon: UtensilsCrossed,
+      subItems: [
+        { label: "Event Bookings", path: "/catering", quickAction: true },
+        { label: "Catering Portal", path: "/catering/portal" },
+      ],
+    },
+    {
+      id: "operations",
+      label: "Kitchen Operations",
+      path: "/operations",
+      icon: ClipboardCheck,
+      subItems: [
+        { label: "Daily Checklists", path: "/operations" },
+        { label: "Kitchen SOPs & Tasks", path: "/operations" },
+      ],
+    },
+    {
+      id: "settings",
+      label: "Administration",
+      path: "/settings/profile",
+      icon: Sliders,
+      subItems: [
+        { label: "Restaurant Profile", path: "/settings/profile" },
+        { label: "Branch Outlets", path: "/settings/branches" },
+        { label: "Master Data & Taxes", path: "/settings/master-data" },
+      ],
+    },
   ];
 
   if (loading) {
@@ -737,10 +856,10 @@ export default function AppleTenantDashboard() {
       }`}
     >
       {/* ========================================================================= */}
-      {/* 1. LEFT SIDEBAR (COLLAPSIBLE / DESKTOP SIDE MENU)                          */}
+      {/* 1. LEFT SIDEBAR (COLLAPSIBLE / DESKTOP SIDE MENU WITH ACCORDION SUBMENUS) */}
       {/* ========================================================================= */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-56 flex flex-col justify-between border-r transition-transform duration-200 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 flex flex-col justify-between border-r transition-transform duration-200 lg:translate-x-0 ${
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         } ${
           isDark
@@ -749,8 +868,8 @@ export default function AppleTenantDashboard() {
         }`}
       >
         {/* Top: Brand Logo + Identity */}
-        <div>
-          <div className="h-16 flex items-center justify-between px-5 border-b border-black/[0.05] dark:border-white/[0.06]">
+        <div className="flex flex-col flex-1 min-h-0">
+          <div className="h-16 flex items-center justify-between px-5 border-b border-black/[0.05] dark:border-white/[0.06] shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
               {branding?.logoUrl ? (
                 <img
@@ -775,60 +894,133 @@ export default function AppleTenantDashboard() {
             <button
               type="button"
               onClick={() => setMobileSidebarOpen(false)}
-              className="lg:hidden p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white"
+              className="lg:hidden p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Navigation Items List */}
-          <nav className="p-3 space-y-1">
+          {/* Mobile Context Strip (Branch & Date inside drawer so header stays clean) */}
+          <div className="lg:hidden px-4 py-2 bg-slate-50 dark:bg-white/[0.02] border-b border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between text-xs text-slate-500 shrink-0">
+            <div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
+              <Store className="w-3.5 h-3.5 opacity-70" />
+              <span>All Branches ({metrics.totalOutlets})</span>
+            </div>
+            <span className="text-[10px] opacity-70">Today, 11 Sep</span>
+          </div>
+
+          {/* Scrollable Navigation Items List with Accordion */}
+          <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
             {sidebarNavItems.map((item) => {
               const IconComp = item.icon;
-              const isActive = item.active && activeTab === "operations";
+              const hasSubs = item.subItems && item.subItems.length > 0;
+              const isExpanded = expandedMenu === item.id;
+              const isParentActive = item.active && activeTab === "operations";
 
               return (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => {
-                    if (item.label === "Dashboard") {
-                      setActiveTab("operations");
-                    } else {
-                      router.push(p(item.path));
-                    }
-                    setMobileSidebarOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                    isActive
-                      ? "text-slate-900 dark:text-white font-bold"
-                      : "text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.04]"
-                  }`}
-                  style={
-                    isActive
-                      ? {
-                          backgroundColor: brandTint,
-                          color: isDark ? "#ffffff" : brandColor,
+                <div key={item.id} className="space-y-0.5">
+                  {/* Parent Nav Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (hasSubs) {
+                        // Accordion single-expansion rule: auto-collapses any previously open tab
+                        setExpandedMenu((prev) => (prev === item.id ? null : item.id));
+                      } else {
+                        if (item.id === "dashboard") {
+                          setActiveTab("operations");
+                        } else {
+                          router.push(p(item.path));
                         }
-                      : {}
-                  }
-                >
-                  <IconComp
-                    className="w-4 h-4 shrink-0"
-                    style={{ color: isActive ? brandColor : undefined }}
-                  />
-                  <span>{item.label}</span>
-                </button>
+                        setMobileSidebarOpen(false);
+                      }
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                      isParentActive
+                        ? "text-slate-900 dark:text-white font-bold"
+                        : isExpanded
+                        ? "text-slate-900 dark:text-white font-bold bg-slate-100/70 dark:bg-white/[0.06]"
+                        : "text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.04]"
+                    }`}
+                    style={
+                      isParentActive
+                        ? {
+                            backgroundColor: brandTint,
+                            color: isDark ? "#ffffff" : brandColor,
+                          }
+                        : {}
+                    }
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <IconComp
+                        className="w-4 h-4 shrink-0"
+                        style={{ color: isParentActive ? brandColor : undefined }}
+                      />
+                      <span className="truncate">{item.label}</span>
+                    </div>
+
+                    {/* Right Caret Indicator for expandable items */}
+                    {hasSubs && (
+                      <div className="shrink-0 text-slate-400 dark:text-slate-500">
+                        {isExpanded ? (
+                          <ChevronDown className="w-3.5 h-3.5 transition-transform duration-200" />
+                        ) : (
+                          <ChevronRight className="w-3.5 h-3.5 transition-transform duration-200" />
+                        )}
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Accordion Submenu Panel (styled after Zoho Books hierarchy with current brand aesthetic) */}
+                  {hasSubs && isExpanded && (
+                    <div className="pl-3.5 pr-1 py-1 space-y-0.5 border-l-2 ml-4 my-1 border-slate-200 dark:border-white/10 transition-all">
+                      {item.subItems!.map((sub) => (
+                        <button
+                          key={sub.label}
+                          type="button"
+                          onClick={() => {
+                            router.push(p(sub.path));
+                            setMobileSidebarOpen(false);
+                          }}
+                          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition cursor-pointer text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.05] group"
+                        >
+                          <span className="truncate">{sub.label}</span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {sub.badge && (
+                              <span
+                                className="px-1.5 py-0.2 rounded-full text-[9px] font-bold text-white"
+                                style={{ backgroundColor: brandColor }}
+                              >
+                                {sub.badge}
+                              </span>
+                            )}
+                            {sub.quickAction && (
+                              <span
+                                className="opacity-0 group-hover:opacity-100 transition p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10"
+                                title={`Quick action`}
+                              >
+                                <Plus className="w-3 h-3 text-slate-400 dark:text-slate-300" />
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </nav>
         </div>
 
         {/* Bottom Sidebar Controls: Settings & Tenant Profile Badge */}
-        <div className="p-3 border-t border-black/[0.05] dark:border-white/[0.06] space-y-2">
+        <div className="p-3 border-t border-black/[0.05] dark:border-white/[0.06] space-y-2 shrink-0">
           <button
             type="button"
-            onClick={() => router.push(p("/settings/profile"))}
+            onClick={() => {
+              router.push(p("/settings/profile"));
+              setMobileSidebarOpen(false);
+            }}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.04] transition cursor-pointer"
           >
             <Settings className="w-4 h-4 shrink-0" />
@@ -836,7 +1028,10 @@ export default function AppleTenantDashboard() {
           </button>
 
           <div
-            onClick={() => router.push(p("/settings/profile"))}
+            onClick={() => {
+              router.push(p("/settings/profile"));
+              setMobileSidebarOpen(false);
+            }}
             className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition ${
               isDark
                 ? "bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]"
@@ -871,39 +1066,48 @@ export default function AppleTenantDashboard() {
       )}
 
       {/* ========================================================================= */}
-      {/* 2. MAIN CONTENT AREA (OFFSET BY 56PX / W-56 ON LG SCREENS)                */}
+      {/* 2. MAIN CONTENT AREA (OFFSET BY 64PX / W-64 ON LG SCREENS)                */}
       {/* ========================================================================= */}
-      <div className="flex-1 flex flex-col min-w-0 lg:pl-56">
-        {/* Top Horizontal Bar (Global Controls & Action Row) */}
+      <div className="flex-1 flex flex-col min-w-0 lg:pl-64">
+        {/* Top Horizontal Bar (Global Controls & Action Row - No horizontal scroll on mobile!) */}
         <header
-          className={`h-16 px-4 sm:px-6 lg:px-8 border-b flex items-center justify-between gap-3 sticky top-0 z-30 ${
+          className={`h-16 px-3 sm:px-6 lg:px-8 border-b flex items-center justify-between gap-2 sm:gap-3 sticky top-0 z-30 overflow-hidden ${
             isDark
               ? "bg-[#090B10]/95 border-white/[0.08] backdrop-blur-xl"
               : "bg-white/95 border-slate-200/80 backdrop-blur-xl"
           }`}
         >
-          {/* Mobile hamburger menu toggle */}
-          <button
-            type="button"
-            onClick={() => setMobileSidebarOpen(true)}
-            className="lg:hidden p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
+          {/* Left Context: Hamburger + Brand Name on mobile / Operations Live on desktop */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={() => setMobileSidebarOpen(true)}
+              className="lg:hidden p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl cursor-pointer"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
 
-          {/* Left Context / Search indicator */}
-          <div className="hidden sm:flex items-center gap-3">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Operations Live
-            </span>
+            {/* Mobile Tenant Name Header */}
+            <div className="flex sm:hidden items-center gap-1.5 min-w-0">
+              <span className="font-bold text-xs truncate text-slate-900 dark:text-white">
+                {branding?.name || "Magni Digitech"}
+              </span>
+            </div>
+
+            {/* Desktop / Tablet Live Pulse Indicator */}
+            <div className="hidden sm:flex items-center gap-2.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Operations Live
+              </span>
+            </div>
           </div>
 
-          {/* Right Global Selectors & Action Buttons */}
-          <div className="flex items-center gap-2 sm:gap-2.5 overflow-x-auto">
-            {/* Branch Selector */}
+          {/* Right Global Selectors & Action Buttons (Clean flex, zero overflow scroll!) */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Branch Selector: Visible on sm+ */}
             <div
-              className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              className={`hidden sm:flex px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-semibold items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                 isDark
                   ? "bg-white/[0.04] border-white/[0.08] text-slate-200"
                   : "bg-slate-50 border-slate-200 text-slate-700"
@@ -914,7 +1118,7 @@ export default function AppleTenantDashboard() {
               <ChevronDown className="w-3 h-3 opacity-60" />
             </div>
 
-            {/* Date Selector */}
+            {/* Date Selector: Visible on md+ */}
             <div
               className={`hidden md:flex px-3 py-1.5 rounded-xl border text-xs font-semibold items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                 isDark
@@ -923,7 +1127,7 @@ export default function AppleTenantDashboard() {
               }`}
             >
               <Calendar className="w-3.5 h-3.5 opacity-60" />
-              <span>Today, 11 Sep 2026</span>
+              <span>Today, 11 Sep</span>
               <ChevronDown className="w-3 h-3 opacity-60" />
             </div>
 
@@ -945,7 +1149,7 @@ export default function AppleTenantDashboard() {
             {/* User Profile Avatar */}
             <div
               onClick={() => router.push(p("/settings/profile"))}
-              className={`px-2.5 py-1 rounded-xl border flex items-center gap-1.5 cursor-pointer ${
+              className={`px-2 sm:px-2.5 py-1 rounded-xl border flex items-center gap-1.5 cursor-pointer ${
                 isDark ? "bg-white/[0.04] border-white/[0.08]" : "bg-slate-50 border-slate-200"
               }`}
             >
@@ -955,22 +1159,23 @@ export default function AppleTenantDashboard() {
               >
                 MD
               </div>
-              <ChevronDown className="w-3 h-3 opacity-60" />
+              <ChevronDown className="hidden sm:inline w-3 h-3 opacity-60" />
             </div>
 
-            {/* Primary Action Button: + New Order (styled with dynamic brand color) */}
+            {/* Primary Action Button: + New Order on desktop, + Order on mobile */}
             {hasPosAccess && (
               <button
                 type="button"
                 onClick={() => router.push(p("/pos"))}
-                className="px-3.5 py-1.5 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0 hover:brightness-110 active:scale-[0.98]"
+                className="px-2.5 sm:px-3.5 py-1.5 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1 shadow-sm shrink-0 hover:brightness-110 active:scale-[0.98]"
                 style={{ backgroundColor: brandColor }}
               >
-                <span>+ New Order</span>
+                <span className="hidden sm:inline">+ New Order</span>
+                <span className="sm:hidden">+ Order</span>
               </button>
             )}
 
-            {/* Schedule Shift Button */}
+            {/* Schedule Shift Button (Desktop lg+) */}
             {hasShiftAccess && (
               <button
                 type="button"
@@ -986,7 +1191,7 @@ export default function AppleTenantDashboard() {
               </button>
             )}
 
-            {/* Run Payroll Button */}
+            {/* Run Payroll Button (Desktop xl+) */}
             {hasPayrollAccess && (
               <button
                 type="button"
@@ -1006,7 +1211,7 @@ export default function AppleTenantDashboard() {
             <button
               type="button"
               onClick={() => setActiveTab((prev) => (prev === "operations" ? "modules" : "operations"))}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+              className={`p-1.5 sm:px-3 sm:py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                 activeTab === "modules"
                   ? "text-white"
                   : isDark
@@ -1014,9 +1219,12 @@ export default function AppleTenantDashboard() {
                   : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200"
               }`}
               style={activeTab === "modules" ? { backgroundColor: brandColor } : {}}
+              title={activeTab === "operations" ? "Switch to Modules Hub" : "Back to Live Ops"}
             >
               <Grid className="w-3.5 h-3.5" />
-              <span>{activeTab === "operations" ? "Modules Hub" : "Back to Live Ops"}</span>
+              <span className="hidden md:inline">
+                {activeTab === "operations" ? "Modules Hub" : "Back to Live Ops"}
+              </span>
             </button>
           </div>
         </header>
