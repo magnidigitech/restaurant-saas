@@ -22,6 +22,8 @@ import {
   Settings,
   LogOut,
   Utensils,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 interface RestaurantNavbarProps {
@@ -56,17 +58,13 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
   const params = useParams();
   const pathname = usePathname();
   const subdomain = (params?.subdomain as string) || "";
-  const { isDark } = useTheme();
+  const { isDark, toggleTheme } = useTheme();
 
   // Slide-out Drawer state on mobile
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   // Desktop Hover-to-expand state: collapses to icon-only rail when hover is lost
   const [isHovered, setIsHovered] = useState(false);
-
-  // Profile dropdown menu state
-  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-  const profileDropdownRef = useRef<HTMLDivElement>(null);
 
   // Auto-expand current active module accordion tab based on pathname
   const initialExpandedMenu = useMemo(() => {
@@ -100,16 +98,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
     };
   }, []);
 
-  // Close profile dropdown on outside click
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
-        setProfileDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+
 
   // Close mobile drawer on Escape key
   useEffect(() => {
@@ -468,6 +457,36 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
             )}
           </div>
 
+          {/* Quick POS Action: + New Order */}
+          <div className="p-2 border-b border-black/[0.05] dark:border-white/[0.06] shrink-0">
+            {!isExpandedView ? (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => router.push(p("/pos"))}
+                  title="+ New Order (POS)"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold transition shadow-sm hover:brightness-110 active:scale-95 cursor-pointer"
+                  style={{ backgroundColor: brandColor }}
+                >
+                  <Plus className="w-4 h-4 shrink-0" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  router.push(p("/pos"));
+                  setMobileDrawerOpen(false);
+                }}
+                className="w-full py-2 px-3 text-white text-xs font-bold rounded-xl transition shadow-sm hover:brightness-110 active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5 animate-in fade-in duration-150"
+                style={{ backgroundColor: brandColor }}
+              >
+                <Plus className="w-4 h-4 shrink-0" />
+                <span>+ New Order</span>
+              </button>
+            )}
+          </div>
+
           {/* Context Strip (Shown only when expanded) */}
           {isExpandedView && (
             <div className="px-5 py-2 bg-slate-50 dark:bg-white/[0.02] border-b border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between text-xs text-slate-500 shrink-0 animate-in fade-in duration-150">
@@ -618,10 +637,19 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
           </nav>
         </div>
 
-        {/* Bottom Footer Section: Compact icon buttons when collapsed, Full card when hovered */}
+        {/* Bottom Footer Section: Compact icon buttons when collapsed, Full controls when hovered */}
         <div className="p-2.5 border-t border-black/[0.05] dark:border-white/[0.06] space-y-2 shrink-0">
           {!isExpandedView ? (
-            <div className="space-y-1.5 flex flex-col items-center">
+            <div className="space-y-2 flex flex-col items-center">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.06] transition cursor-pointer"
+              >
+                {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
+              </button>
+
               <button
                 type="button"
                 onClick={() => router.push(p("/settings/profile"))}
@@ -633,7 +661,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
 
               <div
                 onClick={() => router.push(p("/settings/profile"))}
-                title={effectiveBranding?.name || "Magni Digitech"}
+                title={`${effectiveBranding?.name || "Magni Digitech"} (Tenant: ${subdomain})`}
                 className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs cursor-pointer shadow-sm hover:brightness-110 transition"
                 style={{ backgroundColor: brandColor }}
               >
@@ -642,6 +670,14 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
             </div>
           ) : (
             <div className="space-y-2 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-100/70 dark:bg-white/[0.04]">
+                <span className="text-xs font-semibold text-slate-700 dark:text-[#8F95A3] flex items-center gap-2">
+                  {isDark ? <Moon className="w-4 h-4 text-blue-300" /> : <Sun className="w-4 h-4 text-amber-500" />}
+                  <span>Appearance</span>
+                </span>
+                <AppleThemeToggle />
+              </div>
+
               <button
                 type="button"
                 onClick={() => {
@@ -651,21 +687,24 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.04] transition cursor-pointer"
               >
                 <Settings className="w-4 h-4" />
-                <span>Settings</span>
+                <span>Restaurant Settings</span>
               </button>
 
               <div
-                onClick={() => {
-                  router.push(p("/settings/profile"));
-                  setMobileDrawerOpen(false);
-                }}
-                className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition ${
+                className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition ${
                   isDark
-                    ? "bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]"
-                    : "bg-slate-50 border-slate-200/80 hover:bg-slate-100"
+                    ? "bg-white/[0.03] border-white/[0.06]"
+                    : "bg-slate-50 border-slate-200/80"
                 }`}
               >
-                <div className="flex items-center gap-2 min-w-0">
+                <div
+                  onClick={() => {
+                    router.push(p("/settings/profile"));
+                    setMobileDrawerOpen(false);
+                  }}
+                  className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer hover:opacity-80 transition"
+                  title="Tenant settings"
+                >
                   <div
                     className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0"
                     style={{ backgroundColor: brandColor }}
@@ -679,148 +718,30 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
                     <div className="text-[10px] opacity-60 truncate">Tenant: {subdomain}</div>
                   </div>
                 </div>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  title="Sign Out"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition cursor-pointer shrink-0"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
               </div>
             </div>
           )}
         </div>
       </aside>
 
-      {/* ========================================================================= */}
-      {/* 2. CLEAN TOP HEADER BAR (NO HORIZONTAL MODULE ROW! ZERO OVERFLOW!)         */}
-      {/* ========================================================================= */}
-      <header
-        className={`sticky top-0 z-30 backdrop-blur-2xl border-b h-14 sm:h-16 px-4 sm:px-6 lg:px-8 transition-colors overflow-hidden ${
-          isDark
-            ? "bg-[#090B10]/95 border-white/[0.08]"
-            : "bg-white/95 border-slate-200/80 shadow-xs shadow-slate-900/5"
-        }`}
+      {/* Floating mobile navigation toggle (visible only on mobile/tablet < 1024px) */}
+      <button
+        type="button"
+        onClick={() => setMobileDrawerOpen(true)}
+        aria-label="Open navigation menu"
+        className="lg:hidden fixed top-3 left-3 z-40 w-9 h-9 rounded-xl flex items-center justify-center bg-white/95 dark:bg-[#0A0D14]/95 backdrop-blur-md border border-slate-200/80 dark:border-white/[0.08] text-slate-700 dark:text-slate-200 shadow-md hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer"
       >
-        <div className="h-full flex items-center justify-between gap-3">
-          {/* Left Context: Mobile Hamburger (☰) + Active Section Breadcrumb */}
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            {/* Mobile Hamburger toggle (visible ONLY on mobile/tablet < 1024px) */}
-            <button
-              type="button"
-              onClick={() => setMobileDrawerOpen(true)}
-              className="lg:hidden p-1.5 -ml-1 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl cursor-pointer shrink-0"
-              aria-label="Open navigation menu"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-
-            {/* Breadcrumb indicator */}
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="font-bold text-xs sm:text-sm truncate text-slate-900 dark:text-white">
-                {effectiveBranding?.name || "Magni Digitech"}
-              </span>
-              {activeSection && (
-                <>
-                  <span className="text-xs text-slate-400 dark:text-slate-600">/</span>
-                  <span
-                    className="text-xs sm:text-sm font-bold truncate"
-                    style={{ color: brandColor }}
-                  >
-                    {activeSection}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Right Controls: Quick Action (+ New Order), Theme Toggle, User Profile Avatar */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {/* Quick POS Order Button */}
-            <button
-              type="button"
-              onClick={() => router.push(p("/pos"))}
-              className="px-2.5 sm:px-3.5 py-1.5 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1 shadow-sm shrink-0 hover:brightness-110 active:scale-[0.98]"
-              style={{ backgroundColor: brandColor }}
-            >
-              <span className="hidden sm:inline">+ New Order</span>
-              <span className="sm:hidden">+ Order</span>
-            </button>
-
-            {/* Dark / Light Theme Mode Switcher */}
-            <AppleThemeToggle />
-
-            {/* Profile Avatar with Dropdown */}
-            <div className="relative" ref={profileDropdownRef}>
-              <button
-                type="button"
-                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                className={`px-2 py-1 rounded-xl border flex items-center gap-1.5 cursor-pointer transition ${
-                  isDark ? "bg-white/[0.04] border-white/[0.08]" : "bg-slate-50 border-slate-200"
-                }`}
-                aria-label="User profile menu"
-              >
-                <div
-                  className="w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: brandColor }}
-                >
-                  {effectiveBranding?.name ? effectiveBranding.name.charAt(0).toUpperCase() : "M"}
-                </div>
-                <ChevronDown className="hidden sm:inline w-3 h-3 opacity-60" />
-              </button>
-
-              {/* Profile Dropdown Menu */}
-              {profileDropdownOpen && (
-                <div
-                  className={`absolute right-0 mt-2 w-60 p-2 rounded-2xl border shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 ${
-                    isDark
-                      ? "bg-[#11141F] border-white/[0.08] text-white shadow-black/60"
-                      : "bg-white border-slate-200 text-slate-900 shadow-slate-900/15"
-                  }`}
-                >
-                  <div className="px-3 py-2 border-b border-black/[0.06] dark:border-white/[0.06] mb-1">
-                    <div className="text-xs font-bold truncate">
-                      {effectiveBranding?.name || "Magni Digitech"}
-                    </div>
-                    <div className="text-[10px] opacity-60 truncate">Tenant: {subdomain}</div>
-                  </div>
-
-                  <div className="space-y-0.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setProfileDropdownOpen(false);
-                        router.push(p("/dashboard"));
-                      }}
-                      className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium hover:bg-slate-100 dark:hover:bg-white/[0.05] transition cursor-pointer flex items-center gap-2"
-                    >
-                      <LayoutDashboard className="w-4 h-4 opacity-70" />
-                      <span>Executive Dashboard</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setProfileDropdownOpen(false);
-                        router.push(p("/settings/profile"));
-                      }}
-                      className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium hover:bg-slate-100 dark:hover:bg-white/[0.05] transition cursor-pointer flex items-center gap-2"
-                    >
-                      <Settings className="w-4 h-4 opacity-70" />
-                      <span>Restaurant Settings</span>
-                    </button>
-
-                    <div className="border-t border-black/[0.06] dark:border-white/[0.06] my-1 pt-1">
-                      <button
-                        type="button"
-                        onClick={handleLogout}
-                        className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition cursor-pointer flex items-center gap-2"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        <span>Sign Out</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+        <Menu className="w-4 h-4" />
+      </button>
     </>
   );
 }
