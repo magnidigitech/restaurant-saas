@@ -22,7 +22,6 @@ import {
   Settings,
   LogOut,
   Utensils,
-  ArrowRight,
 } from "lucide-react";
 
 interface RestaurantNavbarProps {
@@ -62,6 +61,9 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
   // Slide-out Drawer state on mobile
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
+  // Desktop Hover-to-expand state: collapses to icon-only rail when hover is lost
+  const [isHovered, setIsHovered] = useState(false);
+
   // Profile dropdown menu state
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
@@ -90,7 +92,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
     }
   }, [initialExpandedMenu]);
 
-  // Apply layout class so the desktop body gets offset by the permanent 16rem (256px) sidebar
+  // Apply layout class so desktop content is offset by the 68px icon rail
   useEffect(() => {
     document.documentElement.classList.add("has-tenant-sidebar");
     return () => {
@@ -292,6 +294,17 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
         ],
       },
       {
+        id: "analytics",
+        label: "Analytics & Intelligence",
+        href: p("/analytics/menu-engineering"),
+        icon: BarChart3,
+        moduleKey: "analytics",
+        children: [
+          { label: "Menu Engineering", desc: "BCG stars, plowhorses, puzzles & dogs matrix", href: p("/analytics/menu-engineering") },
+          { label: "Sales & Revenue", desc: "Channel sales, peak hours & customer trends", href: p("/analytics") },
+        ],
+      },
+      {
         id: "catering",
         label: "Catering & Banquets",
         href: p("/catering"),
@@ -311,17 +324,6 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
         children: [
           { label: "Daily Checklists", desc: "Opening, closing duties & HACCP hygiene audits", href: p("/operations") },
           { label: "Kitchen SOPs & Prep", desc: "Standard recipes, line prep & equipment logs", href: p("/operations") },
-        ],
-      },
-      {
-        id: "analytics",
-        label: "Analytics & Reports",
-        href: p("/analytics/menu-engineering"),
-        icon: BarChart3,
-        moduleKey: "analytics",
-        children: [
-          { label: "Menu Engineering", desc: "BCG stars, plowhorses, puzzles & dogs matrix", href: p("/analytics/menu-engineering") },
-          { label: "Sales & Revenue", desc: "Channel sales, peak hours & customer trends", href: p("/analytics") },
         ],
       },
       {
@@ -378,15 +380,17 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
     return false;
   };
 
+  const isExpandedView = isHovered || mobileDrawerOpen;
+
   return (
     <>
-      {/* Global CSS to permanently offset the main content on desktop (w-64 = 16rem = 256px) */}
+      {/* Global CSS to permanently offset the main content on desktop (w-[68px] = 68px) */}
       <style
         dangerouslySetInnerHTML={{
           __html: `
             @media (min-width: 1024px) {
               html.has-tenant-sidebar body {
-                padding-left: 16rem !important;
+                padding-left: 68px !important;
               }
             }
           `,
@@ -394,7 +398,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
       />
 
       {/* ========================================================================= */}
-      {/* 1. PERSISTENT ZOHO-STYLE LEFT SIDEBAR (DESKTOP FIXED & MOBILE DRAWER)     */}
+      {/* 1. COLLAPSIBLE ICON RAIL SIDEBAR (EXPANDS ON HOVER, COLLAPSES ON HOVER LOST) */}
       {/* ========================================================================= */}
       {/* Backdrop for mobile drawer */}
       {mobileDrawerOpen && (
@@ -405,8 +409,12 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 flex flex-col justify-between border-r transition-transform duration-200 lg:translate-x-0 ${
-          mobileDrawerOpen ? "translate-x-0" : "-translate-x-full"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col justify-between border-r transition-all duration-300 ease-in-out ${
+          mobileDrawerOpen ? "translate-x-0 w-64" : "-translate-x-full lg:translate-x-0"
+        } ${
+          isHovered ? "lg:w-64 shadow-2xl" : "lg:w-[68px]"
         } ${
           isDark
             ? "bg-[#0E121D] border-white/[0.08] text-white"
@@ -414,70 +422,109 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
         }`}
       >
         {/* Top: Brand Logo + Tenant Identity */}
-        <div className="flex flex-col flex-1 min-h-0">
-          <div className="h-16 flex items-center justify-between px-5 border-b border-black/[0.05] dark:border-white/[0.06] shrink-0">
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="h-16 flex items-center justify-between px-3.5 border-b border-black/[0.05] dark:border-white/[0.06] shrink-0">
             <div
               onClick={() => router.push(p("/dashboard"))}
-              className="flex items-center gap-2.5 min-w-0 cursor-pointer group"
+              className={`flex items-center gap-2.5 min-w-0 cursor-pointer group ${
+                !isExpandedView ? "mx-auto justify-center" : ""
+              }`}
             >
               {effectiveBranding?.logoUrl ? (
                 <img
                   src={effectiveBranding.logoUrl}
                   alt={effectiveBranding.name || "Brand Logo"}
-                  className="w-8 h-8 rounded-lg object-contain shrink-0"
+                  className="w-9 h-9 rounded-xl object-contain shrink-0 shadow-2xs"
                 />
               ) : (
                 <div
-                  className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0 shadow-sm group-hover:brightness-110 transition"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0 shadow-sm group-hover:brightness-110 transition"
                   style={{ backgroundColor: brandColor }}
                 >
                   <Utensils className="w-4 h-4" />
                 </div>
               )}
-              <div className="min-w-0">
-                <span className="font-bold text-sm tracking-tight truncate block text-slate-900 dark:text-white">
-                  {effectiveBranding?.name || "Magni Digitech"}
-                </span>
-                <span className="text-[10px] opacity-60 truncate block">Restaurant Operations</span>
-              </div>
+
+              {isExpandedView && (
+                <div className="min-w-0 animate-in fade-in duration-200">
+                  <span className="font-bold text-sm tracking-tight truncate block text-slate-900 dark:text-white">
+                    {effectiveBranding?.name || "Magni Digitech"}
+                  </span>
+                  <span className="text-[10px] opacity-60 truncate block">Restaurant Operations</span>
+                </div>
+              )}
             </div>
 
             {/* Mobile close button */}
-            <button
-              type="button"
-              onClick={() => setMobileDrawerOpen(false)}
-              className="lg:hidden p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
-              aria-label="Close navigation"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            {mobileDrawerOpen && (
+              <button
+                type="button"
+                onClick={() => setMobileDrawerOpen(false)}
+                className="lg:hidden p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                aria-label="Close navigation"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
-          {/* Context Strip (Branch & Mode info) */}
-          <div className="px-5 py-2 bg-slate-50 dark:bg-white/[0.02] border-b border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between text-xs text-slate-500 shrink-0">
-            <div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
-              <Store className="w-3.5 h-3.5 opacity-70" />
-              <span>Main Branch</span>
+          {/* Context Strip (Shown only when expanded) */}
+          {isExpandedView && (
+            <div className="px-5 py-2 bg-slate-50 dark:bg-white/[0.02] border-b border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between text-xs text-slate-500 shrink-0 animate-in fade-in duration-150">
+              <div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
+                <Store className="w-3.5 h-3.5 opacity-70" />
+                <span>Main Branch</span>
+              </div>
+              <span className="text-[10px] opacity-70">Live Suite</span>
             </div>
-            <span className="text-[10px] opacity-70">Live Suite</span>
-          </div>
+          )}
 
-          {/* Scrollable Navigation List with Zoho Books styled Single-Accordion rule */}
-          <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
+          {/* Scrollable Navigation List: Clean Icon Rail when collapsed, Full Accordion when hovered */}
+          <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
             {filteredNavLinks.map((item) => {
               const IconComp = item.icon;
               const hasSubs = item.children && item.children.length > 0;
               const isExpanded = expandedMenu === item.id;
               const isActive = isNavActive(item);
 
+              // 1. COLLAPSED VIEW (ICON-ONLY RAIL)
+              if (!isExpandedView) {
+                return (
+                  <div key={item.id} className="flex justify-center">
+                    <button
+                      type="button"
+                      title={item.label}
+                      onClick={() => {
+                        router.push(item.href);
+                      }}
+                      className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                        isActive
+                          ? "font-bold text-white shadow-sm"
+                          : "text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.06]"
+                      }`}
+                      style={
+                        isActive
+                          ? {
+                              backgroundColor: brandColor,
+                              color: "#ffffff",
+                            }
+                          : {}
+                      }
+                    >
+                      <IconComp className="w-5 h-5 shrink-0" />
+                    </button>
+                  </div>
+                );
+              }
+
+              // 2. EXPANDED VIEW (FULL ACCORDION ON HOVER)
               return (
-                <div key={item.id} className="space-y-0.5">
+                <div key={item.id} className="space-y-0.5 animate-in fade-in duration-150">
                   {/* Parent Menu Item */}
                   <button
                     type="button"
                     onClick={() => {
                       if (hasSubs) {
-                        // Accordion single-expansion rule: auto-collapses any previously open tab
                         setExpandedMenu((prev) => (prev === item.id ? null : item.id));
                       } else {
                         router.push(item.href);
@@ -571,47 +618,71 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
           </nav>
         </div>
 
-        {/* Bottom Footer Section: Settings & Tenant Card */}
-        <div className="p-3 border-t border-black/[0.05] dark:border-white/[0.06] space-y-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              router.push(p("/settings/profile"));
-              setMobileDrawerOpen(false);
-            }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.04] transition cursor-pointer"
-          >
-            <Settings className="w-4 h-4 shrink-0" />
-            <span>Settings</span>
-          </button>
+        {/* Bottom Footer Section: Compact icon buttons when collapsed, Full card when hovered */}
+        <div className="p-2.5 border-t border-black/[0.05] dark:border-white/[0.06] space-y-2 shrink-0">
+          {!isExpandedView ? (
+            <div className="space-y-1.5 flex flex-col items-center">
+              <button
+                type="button"
+                onClick={() => router.push(p("/settings/profile"))}
+                title="Restaurant Settings"
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.06] transition cursor-pointer"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
 
-          <div
-            onClick={() => {
-              router.push(p("/settings/profile"));
-              setMobileDrawerOpen(false);
-            }}
-            className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition ${
-              isDark
-                ? "bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]"
-                : "bg-slate-50 border-slate-200/80 hover:bg-slate-100"
-            }`}
-          >
-            <div className="flex items-center gap-2 min-w-0">
               <div
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0"
+                onClick={() => router.push(p("/settings/profile"))}
+                title={effectiveBranding?.name || "Magni Digitech"}
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs cursor-pointer shadow-sm hover:brightness-110 transition"
                 style={{ backgroundColor: brandColor }}
               >
                 {effectiveBranding?.name ? effectiveBranding.name.charAt(0).toUpperCase() : "M"}
               </div>
-              <div className="min-w-0">
-                <div className="text-xs font-bold truncate text-slate-900 dark:text-white leading-tight">
-                  {effectiveBranding?.name || "Magni Digitech"}
+            </div>
+          ) : (
+            <div className="space-y-2 animate-in fade-in duration-150">
+              <button
+                type="button"
+                onClick={() => {
+                  router.push(p("/settings/profile"));
+                  setMobileDrawerOpen(false);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.04] transition cursor-pointer"
+              >
+                <Settings className="w-4 h-4" />
+                <span>Settings</span>
+              </button>
+
+              <div
+                onClick={() => {
+                  router.push(p("/settings/profile"));
+                  setMobileDrawerOpen(false);
+                }}
+                className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition ${
+                  isDark
+                    ? "bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]"
+                    : "bg-slate-50 border-slate-200/80 hover:bg-slate-100"
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <div
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    {effectiveBranding?.name ? effectiveBranding.name.charAt(0).toUpperCase() : "M"}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold truncate text-slate-900 dark:text-white leading-tight">
+                      {effectiveBranding?.name || "Magni Digitech"}
+                    </div>
+                    <div className="text-[10px] opacity-60 truncate">Tenant: {subdomain}</div>
+                  </div>
                 </div>
-                <div className="text-[10px] opacity-60 truncate">Tenant: {subdomain}</div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               </div>
             </div>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          </div>
+          )}
         </div>
       </aside>
 

@@ -305,6 +305,9 @@ export default function AppleTenantDashboard() {
   // Sidebar toggle state on mobile/smaller viewports
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
+  // Desktop Hover-to-expand state: collapses to icon-only rail when hover is lost
+  const [isHovered, setIsHovered] = useState(false);
+
   // Single expanded accordion menu state in sidebar (auto-collapses when another expands)
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
 
@@ -856,11 +859,15 @@ export default function AppleTenantDashboard() {
       }`}
     >
       {/* ========================================================================= */}
-      {/* 1. LEFT SIDEBAR (COLLAPSIBLE / DESKTOP SIDE MENU WITH ACCORDION SUBMENUS) */}
+      {/* 1. LEFT SIDEBAR (COLLAPSIBLE / ICON-RAIL WHEN HOVER LOST)                 */}
       {/* ========================================================================= */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 flex flex-col justify-between border-r transition-transform duration-200 lg:translate-x-0 ${
-          mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col justify-between border-r transition-all duration-300 ease-in-out ${
+          mobileSidebarOpen ? "translate-x-0 w-64" : "-translate-x-full lg:translate-x-0"
+        } ${
+          isHovered ? "lg:w-64 shadow-2xl" : "lg:w-[68px]"
         } ${
           isDark
             ? "bg-[#0E121D] border-white/[0.08]"
@@ -868,63 +875,115 @@ export default function AppleTenantDashboard() {
         }`}
       >
         {/* Top: Brand Logo + Identity */}
-        <div className="flex flex-col flex-1 min-h-0">
-          <div className="h-16 flex items-center justify-between px-5 border-b border-black/[0.05] dark:border-white/[0.06] shrink-0">
-            <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="h-16 flex items-center justify-between px-3.5 border-b border-black/[0.05] dark:border-white/[0.06] shrink-0">
+            <div
+              onClick={() => {
+                setActiveTab("operations");
+              }}
+              className={`flex items-center gap-2.5 min-w-0 cursor-pointer group ${
+                !isHovered && !mobileSidebarOpen ? "mx-auto justify-center" : ""
+              }`}
+            >
               {branding?.logoUrl ? (
                 <img
                   src={branding.logoUrl}
                   alt={branding.name || "Brand Logo"}
-                  className="w-8 h-8 rounded-lg object-contain"
+                  className="w-9 h-9 rounded-xl object-contain shrink-0 shadow-2xs"
                 />
               ) : (
                 <div
-                  className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0 shadow-sm"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0 shadow-sm group-hover:brightness-110 transition"
                   style={{ backgroundColor: brandColor }}
                 >
                   <Utensils className="w-4 h-4" />
                 </div>
               )}
-              <span className="font-bold text-sm tracking-tight truncate text-slate-900 dark:text-white">
-                {branding?.name || "Magni Digitech"}
-              </span>
+
+              {(isHovered || mobileSidebarOpen) && (
+                <div className="min-w-0 animate-in fade-in duration-200">
+                  <span className="font-bold text-sm tracking-tight truncate block text-slate-900 dark:text-white">
+                    {branding?.name || "Magni Digitech"}
+                  </span>
+                  <span className="text-[10px] opacity-60 truncate block">Operations Suite</span>
+                </div>
+              )}
             </div>
 
             {/* Mobile close button */}
-            <button
-              type="button"
-              onClick={() => setMobileSidebarOpen(false)}
-              className="lg:hidden p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            {mobileSidebarOpen && (
+              <button
+                type="button"
+                onClick={() => setMobileSidebarOpen(false)}
+                className="lg:hidden p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                aria-label="Close navigation"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
-          {/* Mobile Context Strip (Branch & Date inside drawer so header stays clean) */}
-          <div className="lg:hidden px-4 py-2 bg-slate-50 dark:bg-white/[0.02] border-b border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between text-xs text-slate-500 shrink-0">
-            <div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
-              <Store className="w-3.5 h-3.5 opacity-70" />
-              <span>All Branches ({metrics.totalOutlets})</span>
+          {/* Mobile Context Strip (Shown only when expanded) */}
+          {(isHovered || mobileSidebarOpen) && (
+            <div className="px-5 py-2 bg-slate-50 dark:bg-white/[0.02] border-b border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between text-xs text-slate-500 shrink-0 animate-in fade-in duration-150">
+              <div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
+                <Store className="w-3.5 h-3.5 opacity-70" />
+                <span>All Branches ({metrics.totalOutlets})</span>
+              </div>
+              <span className="text-[10px] opacity-70">Today, 11 Sep</span>
             </div>
-            <span className="text-[10px] opacity-70">Today, 11 Sep</span>
-          </div>
+          )}
 
-          {/* Scrollable Navigation Items List with Accordion */}
-          <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
+          {/* Scrollable Navigation List: Clean Icon Rail when collapsed, Full Accordion when hovered */}
+          <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
             {sidebarNavItems.map((item) => {
               const IconComp = item.icon;
               const hasSubs = item.subItems && item.subItems.length > 0;
               const isExpanded = expandedMenu === item.id;
               const isParentActive = item.active && activeTab === "operations";
 
+              // 1. COLLAPSED VIEW (ICON-ONLY RAIL)
+              if (!isHovered && !mobileSidebarOpen) {
+                return (
+                  <div key={item.id} className="flex justify-center">
+                    <button
+                      type="button"
+                      title={item.label}
+                      onClick={() => {
+                        if (item.id === "dashboard") {
+                          setActiveTab("operations");
+                        } else {
+                          router.push(p(item.path));
+                        }
+                      }}
+                      className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                        isParentActive
+                          ? "font-bold text-white shadow-sm"
+                          : "text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.06]"
+                      }`}
+                      style={
+                        isParentActive
+                          ? {
+                              backgroundColor: brandColor,
+                              color: "#ffffff",
+                            }
+                          : {}
+                      }
+                    >
+                      <IconComp className="w-5 h-5 shrink-0" />
+                    </button>
+                  </div>
+                );
+              }
+
+              // 2. EXPANDED VIEW (FULL ACCORDION ON HOVER)
               return (
-                <div key={item.id} className="space-y-0.5">
+                <div key={item.id} className="space-y-0.5 animate-in fade-in duration-150">
                   {/* Parent Nav Button */}
                   <button
                     type="button"
                     onClick={() => {
                       if (hasSubs) {
-                        // Accordion single-expansion rule: auto-collapses any previously open tab
                         setExpandedMenu((prev) => (prev === item.id ? null : item.id));
                       } else {
                         if (item.id === "dashboard") {
@@ -971,7 +1030,7 @@ export default function AppleTenantDashboard() {
                     )}
                   </button>
 
-                  {/* Accordion Submenu Panel (styled after Zoho Books hierarchy with current brand aesthetic) */}
+                  {/* Accordion Submenu Panel */}
                   {hasSubs && isExpanded && (
                     <div className="pl-3.5 pr-1 py-1 space-y-0.5 border-l-2 ml-4 my-1 border-slate-200 dark:border-white/10 transition-all">
                       {item.subItems!.map((sub) => (
@@ -1014,46 +1073,70 @@ export default function AppleTenantDashboard() {
         </div>
 
         {/* Bottom Sidebar Controls: Settings & Tenant Profile Badge */}
-        <div className="p-3 border-t border-black/[0.05] dark:border-white/[0.06] space-y-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              router.push(p("/settings/profile"));
-              setMobileSidebarOpen(false);
-            }}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.04] transition cursor-pointer"
-          >
-            <Settings className="w-4 h-4 shrink-0" />
-            <span>Settings</span>
-          </button>
+        <div className="p-2.5 border-t border-black/[0.05] dark:border-white/[0.06] space-y-2 shrink-0">
+          {!isHovered && !mobileSidebarOpen ? (
+            <div className="space-y-1.5 flex flex-col items-center">
+              <button
+                type="button"
+                onClick={() => router.push(p("/settings/profile"))}
+                title="Settings"
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.06] transition cursor-pointer"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
 
-          <div
-            onClick={() => {
-              router.push(p("/settings/profile"));
-              setMobileSidebarOpen(false);
-            }}
-            className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition ${
-              isDark
-                ? "bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]"
-                : "bg-slate-50 border-slate-200/80 hover:bg-slate-100"
-            }`}
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
               <div
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0"
+                onClick={() => router.push(p("/settings/profile"))}
+                title={branding?.name || "Magni Digitech"}
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs cursor-pointer shadow-sm hover:brightness-110 transition"
                 style={{ backgroundColor: brandColor }}
               >
                 MD
               </div>
-              <div className="min-w-0">
-                <div className="text-xs font-bold truncate text-slate-900 dark:text-white leading-tight">
-                  {branding?.name || "Magni Digitech"}
+            </div>
+          ) : (
+            <div className="space-y-2 animate-in fade-in duration-150">
+              <button
+                type="button"
+                onClick={() => {
+                  router.push(p("/settings/profile"));
+                  setMobileSidebarOpen(false);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.04] transition cursor-pointer"
+              >
+                <Settings className="w-4 h-4" />
+                <span>Settings</span>
+              </button>
+
+              <div
+                onClick={() => {
+                  router.push(p("/settings/profile"));
+                  setMobileSidebarOpen(false);
+                }}
+                className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition ${
+                  isDark
+                    ? "bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]"
+                    : "bg-slate-50 border-slate-200/80 hover:bg-slate-100"
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <div
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    MD
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold truncate text-slate-900 dark:text-white leading-tight">
+                      {branding?.name || "Magni Digitech"}
+                    </div>
+                    <div className="text-[10px] opacity-60 truncate">2 Branches</div>
+                  </div>
                 </div>
-                <div className="text-[10px] opacity-60 truncate">2 Branches</div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               </div>
             </div>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          </div>
+          )}
         </div>
       </aside>
 
@@ -1066,9 +1149,9 @@ export default function AppleTenantDashboard() {
       )}
 
       {/* ========================================================================= */}
-      {/* 2. MAIN CONTENT AREA (OFFSET BY 64PX / W-64 ON LG SCREENS)                */}
+      {/* 2. MAIN CONTENT AREA (OFFSET BY 68PX / ICON RAIL ON LG SCREENS)           */}
       {/* ========================================================================= */}
-      <div className="flex-1 flex flex-col min-w-0 lg:pl-64">
+      <div className="flex-1 flex flex-col min-w-0 lg:pl-[68px]">
         {/* Top Horizontal Bar (Global Controls & Action Row - No horizontal scroll on mobile!) */}
         <header
           className={`h-16 px-3 sm:px-6 lg:px-8 border-b flex items-center justify-between gap-2 sm:gap-3 sticky top-0 z-30 overflow-hidden ${
