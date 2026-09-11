@@ -24,6 +24,7 @@ import {
   Utensils,
   Sun,
   Moon,
+  Search,
 } from "lucide-react";
 
 interface RestaurantNavbarProps {
@@ -66,6 +67,11 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
   // Desktop Hover-to-expand state: collapses to icon-only rail when hover is lost
   const [isHovered, setIsHovered] = useState(false);
 
+  // Quick instant search state across all modules and child features
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   // Auto-expand current active module accordion tab based on pathname
   const initialExpandedMenu = useMemo(() => {
     if (pathname.includes("/inventory")) return "inventory";
@@ -100,16 +106,32 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
 
 
 
-  // Close mobile drawer on Escape key
+  // Close mobile drawer on Escape key & global search shortcut listener
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      const activeTag = document.activeElement?.tagName;
+      const isTyping = activeTag === "INPUT" || activeTag === "TEXTAREA";
+
+      if ((event.key === "/" || ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k")) && !isTyping) {
+        event.preventDefault();
+        setIsHovered(true);
+        setIsSearchFocused(true);
+        setTimeout(() => searchInputRef.current?.focus(), 80);
+      }
+
       if (event.key === "Escape") {
-        setMobileDrawerOpen(false);
+        if (searchQuery) {
+          setSearchQuery("");
+        } else {
+          setIsSearchFocused(false);
+          searchInputRef.current?.blur();
+          setMobileDrawerOpen(false);
+        }
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [searchQuery]);
 
   const isSubdomain =
     typeof window !== "undefined" &&
@@ -369,7 +391,68 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
     return false;
   };
 
-  const isExpandedView = isHovered || mobileDrawerOpen;
+  // Instant search results indexing all modules and sub-pages
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+
+    const list: Array<{
+      id: string;
+      moduleLabel: string;
+      moduleIcon: React.ElementType;
+      label: string;
+      desc?: string;
+      href: string;
+      badge?: string;
+      isSubItem: boolean;
+    }> = [];
+
+    filteredNavLinks.forEach((mod) => {
+      const modMatches =
+        mod.label.toLowerCase().includes(q) ||
+        mod.id.toLowerCase().includes(q);
+
+      if (modMatches) {
+        list.push({
+          id: `${mod.id}-main`,
+          moduleLabel: mod.label,
+          moduleIcon: mod.icon,
+          label: mod.label,
+          desc: `Main ${mod.label} Module`,
+          href: mod.href,
+          isSubItem: false,
+        });
+      }
+
+      if (mod.children) {
+        mod.children.forEach((sub, sIdx) => {
+          const labelMatches = sub.label.toLowerCase().includes(q);
+          const descMatches = sub.desc ? sub.desc.toLowerCase().includes(q) : false;
+          const parentMatches = mod.label.toLowerCase().includes(q);
+
+          if (labelMatches || descMatches || parentMatches) {
+            const exists = list.some((item) => item.href === sub.href && item.label === sub.label);
+            if (!exists) {
+              list.push({
+                id: `${mod.id}-sub-${sIdx}`,
+                moduleLabel: mod.label,
+                moduleIcon: mod.icon,
+                label: sub.label,
+                desc: sub.desc,
+                href: sub.href,
+                badge: sub.badge,
+                isSubItem: true,
+              });
+            }
+          }
+        });
+      }
+    });
+
+    return list;
+  }, [searchQuery, filteredNavLinks]);
+
+  const isExpandedView = isHovered || mobileDrawerOpen || Boolean(searchQuery.trim()) || isSearchFocused;
 
   return (
     <>
@@ -487,6 +570,72 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
             )}
           </div>
 
+          {/* Quick Search in Sidebar (Instant On-Typing Ajax/Filter) */}
+          {!isExpandedView ? (
+            <div className="p-2 border-b border-black/[0.05] dark:border-white/[0.06] shrink-0 flex justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsHovered(true);
+                  setIsSearchFocused(true);
+                  setTimeout(() => searchInputRef.current?.focus(), 100);
+                }}
+                title="Quick Search Modules (Press / or ⌘K)"
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.06] transition cursor-pointer"
+              >
+                <Search className="w-4 h-4 shrink-0" />
+              </button>
+            </div>
+          ) : (
+            <div className="p-2.5 border-b border-black/[0.05] dark:border-white/[0.06] shrink-0 animate-in fade-in duration-150">
+              <div className="relative flex items-center">
+                <Search className="w-3.5 h-3.5 absolute left-3 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setIsSearchFocused(true)}
+                  onBlur={() => {
+                    setTimeout(() => setIsSearchFocused(false), 200);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && searchResults.length > 0) {
+                      router.push(searchResults[0].href);
+                      setSearchQuery("");
+                      setIsSearchFocused(false);
+                      setMobileDrawerOpen(false);
+                    }
+                  }}
+                  placeholder="Quick search modules..."
+                  className={`w-full pl-8 pr-7 py-1.5 rounded-xl text-xs font-medium transition placeholder:text-slate-400 focus:outline-none ${
+                    isDark
+                      ? "bg-white/[0.05] border border-white/[0.08] text-white focus:border-white/20"
+                      : "bg-slate-100/80 border border-slate-200/80 text-slate-900 focus:bg-white focus:border-slate-300 shadow-2xs"
+                  }`}
+                  style={{ caretColor: brandColor }}
+                />
+                {searchQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      searchInputRef.current?.focus();
+                    }}
+                    className="absolute right-2 p-0.5 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                    aria-label="Clear search"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                ) : (
+                  <kbd className="hidden sm:inline-block absolute right-2 text-[10px] font-mono px-1 py-0.2 rounded bg-black/5 dark:bg-white/10 text-slate-400 select-none">
+                    /
+                  </kbd>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Context Strip (Shown only when expanded) */}
           {isExpandedView && (
             <div className="px-5 py-2 bg-slate-50 dark:bg-white/[0.02] border-b border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between text-xs text-slate-500 shrink-0 animate-in fade-in duration-150">
@@ -498,9 +647,80 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
             </div>
           )}
 
-          {/* Scrollable Navigation List: Clean Icon Rail when collapsed, Full Accordion when hovered */}
+          {/* Scrollable Navigation List: Instant Search Results OR Clean Accordion Nav */}
           <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
-            {filteredNavLinks.map((item) => {
+            {searchQuery.trim() ? (
+              <div className="space-y-1 animate-in fade-in duration-150">
+                <div className="px-2 py-1 flex items-center justify-between text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
+                  <span>Results ({searchResults.length})</span>
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="text-[10px] hover:underline cursor-pointer lowercase tracking-normal text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                  >
+                    clear
+                  </button>
+                </div>
+
+                {searchResults.length === 0 ? (
+                  <div className="py-8 px-3 text-center">
+                    <div className="w-8 h-8 mx-auto mb-2 rounded-xl bg-slate-100 dark:bg-white/[0.05] flex items-center justify-center text-slate-400">
+                      <Search className="w-3.5 h-3.5" />
+                    </div>
+                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">No matching pages</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
+                      Try &quot;items&quot;, &quot;shifts&quot;, &quot;roster&quot;, &quot;payroll&quot;, &quot;alerts&quot;, &quot;catering&quot;
+                    </p>
+                  </div>
+                ) : (
+                  searchResults.map((res) => {
+                    const IconComp = res.moduleIcon;
+                    return (
+                      <button
+                        key={res.id}
+                        type="button"
+                        onClick={() => {
+                          router.push(res.href);
+                          setSearchQuery("");
+                          setIsSearchFocused(false);
+                          setMobileDrawerOpen(false);
+                        }}
+                        className="w-full p-2 rounded-xl text-left transition flex items-start gap-2.5 hover:bg-slate-100/80 dark:hover:bg-white/[0.06] group cursor-pointer"
+                      >
+                        <div
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0 mt-0.5 shadow-2xs"
+                          style={{ backgroundColor: brandColor }}
+                        >
+                          <IconComp className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-xs font-bold text-slate-900 dark:text-white truncate group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                              {res.label}
+                            </span>
+                            {res.badge && (
+                              <span className="px-1.5 py-0.2 text-[9px] font-bold rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0">
+                                {res.badge}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate flex items-center gap-1">
+                            <span>{res.moduleLabel}</span>
+                            {res.isSubItem && <span>› {res.label}</span>}
+                          </div>
+                          {res.desc && (
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate opacity-80 mt-0.5">
+                              {res.desc}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            ) : (
+              filteredNavLinks.map((item) => {
               const IconComp = item.icon;
               const hasSubs = item.children && item.children.length > 0;
               const isExpanded = expandedMenu === item.id;
@@ -633,7 +853,8 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
                   )}
                 </div>
               );
-            })}
+            })
+          )}
           </nav>
         </div>
 

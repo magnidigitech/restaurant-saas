@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import {
@@ -57,6 +57,7 @@ import {
   Menu,
   X,
   Plus,
+  Search,
 } from "lucide-react";
 
 interface Module {
@@ -310,6 +311,11 @@ export default function AppleTenantDashboard() {
 
   // Single expanded accordion menu state in sidebar (auto-collapses when another expands)
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
+
+  // Instant on-typing search within sidebar
+  const [sidebarSearch, setSidebarSearch] = useState("");
+  const [isSidebarSearchFocused, setIsSidebarSearchFocused] = useState(false);
+  const sidebarSearchInputRef = useRef<HTMLInputElement>(null);
 
   // Tab switch: "operations" (Data-First Dashboard - Default) vs "modules" (Original Complete Modules Directory)
   const [activeTab, setActiveTab] = useState<"operations" | "modules">("operations");
@@ -837,6 +843,90 @@ export default function AppleTenantDashboard() {
     },
   ];
 
+  // Quick keyboard shortcut for instant sidebar search (/ or ⌘K)
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const activeTag = document.activeElement?.tagName;
+      const isTyping = activeTag === "INPUT" || activeTag === "TEXTAREA";
+
+      if ((event.key === "/" || ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k")) && !isTyping) {
+        event.preventDefault();
+        setIsHovered(true);
+        setIsSidebarSearchFocused(true);
+        setTimeout(() => sidebarSearchInputRef.current?.focus(), 80);
+      }
+
+      if (event.key === "Escape") {
+        if (sidebarSearch) {
+          setSidebarSearch("");
+        } else {
+          setIsSidebarSearchFocused(false);
+          sidebarSearchInputRef.current?.blur();
+          setMobileSidebarOpen(false);
+        }
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [sidebarSearch]);
+
+  // Instant search results indexing all dashboard sidebar items & sub-pages
+  const sidebarSearchResults = useMemo(() => {
+    const q = sidebarSearch.trim().toLowerCase();
+    if (!q) return [];
+
+    const list: Array<{
+      id: string;
+      moduleLabel: string;
+      moduleIcon: React.ElementType;
+      label: string;
+      path: string;
+      badge?: string;
+      isSubItem: boolean;
+    }> = [];
+
+    sidebarNavItems.forEach((mod) => {
+      const modMatches =
+        mod.label.toLowerCase().includes(q) ||
+        mod.id.toLowerCase().includes(q);
+
+      if (modMatches) {
+        list.push({
+          id: `${mod.id}-main`,
+          moduleLabel: mod.label,
+          moduleIcon: mod.icon,
+          label: mod.label,
+          path: mod.path,
+          isSubItem: false,
+        });
+      }
+
+      if (mod.subItems) {
+        mod.subItems.forEach((sub, sIdx) => {
+          const labelMatches = sub.label.toLowerCase().includes(q);
+          const parentMatches = mod.label.toLowerCase().includes(q);
+
+          if (labelMatches || parentMatches) {
+            const exists = list.some((item) => item.path === sub.path && item.label === sub.label);
+            if (!exists) {
+              list.push({
+                id: `${mod.id}-sub-${sIdx}`,
+                moduleLabel: mod.label,
+                moduleIcon: mod.icon,
+                label: sub.label,
+                path: sub.path,
+                badge: sub.badge,
+                isSubItem: true,
+              });
+            }
+          }
+        });
+      }
+    });
+
+    return list;
+  }, [sidebarSearch, sidebarNavItems]);
+
   if (loading) {
     return (
       <main
@@ -867,7 +957,7 @@ export default function AppleTenantDashboard() {
         className={`fixed inset-y-0 left-0 z-50 flex flex-col justify-between border-r transition-all duration-300 ease-in-out ${
           mobileSidebarOpen ? "translate-x-0 w-64" : "-translate-x-full lg:translate-x-0"
         } ${
-          isHovered ? "lg:w-64 shadow-2xl" : "lg:w-[68px]"
+          isHovered || Boolean(sidebarSearch.trim()) || isSidebarSearchFocused ? "lg:w-64 shadow-2xl" : "lg:w-[68px]"
         } ${
           isDark
             ? "bg-[#0E121D] border-white/[0.08]"
@@ -934,9 +1024,141 @@ export default function AppleTenantDashboard() {
             </div>
           )}
 
+          {/* Quick Instant Search */}
+          {!(isHovered || mobileSidebarOpen || Boolean(sidebarSearch.trim()) || isSidebarSearchFocused) ? (
+            <div className="p-2 border-b border-black/[0.05] dark:border-white/[0.06] shrink-0 flex justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsHovered(true);
+                  setIsSidebarSearchFocused(true);
+                  setTimeout(() => sidebarSearchInputRef.current?.focus(), 100);
+                }}
+                title="Quick Search Modules (Press / or ⌘K)"
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.06] transition cursor-pointer"
+              >
+                <Search className="w-4 h-4 shrink-0" />
+              </button>
+            </div>
+          ) : (
+            <div className="p-2.5 border-b border-black/[0.05] dark:border-white/[0.06] shrink-0 animate-in fade-in duration-150">
+              <div className="relative flex items-center">
+                <Search className="w-3.5 h-3.5 absolute left-3 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                <input
+                  ref={sidebarSearchInputRef}
+                  type="text"
+                  value={sidebarSearch}
+                  onChange={(e) => setSidebarSearch(e.target.value)}
+                  onFocus={() => setIsSidebarSearchFocused(true)}
+                  onBlur={() => {
+                    setTimeout(() => setIsSidebarSearchFocused(false), 200);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && sidebarSearchResults.length > 0) {
+                      router.push(p(sidebarSearchResults[0].path));
+                      setSidebarSearch("");
+                      setIsSidebarSearchFocused(false);
+                      setMobileSidebarOpen(false);
+                    }
+                  }}
+                  placeholder="Quick search modules..."
+                  className={`w-full pl-8 pr-7 py-1.5 rounded-xl text-xs font-medium transition placeholder:text-slate-400 focus:outline-none ${
+                    isDark
+                      ? "bg-white/[0.05] border border-white/[0.08] text-white focus:border-white/20"
+                      : "bg-slate-100/80 border border-slate-200/80 text-slate-900 focus:bg-white focus:border-slate-300 shadow-2xs"
+                  }`}
+                  style={{ caretColor: brandColor }}
+                />
+                {sidebarSearch ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSidebarSearch("");
+                      sidebarSearchInputRef.current?.focus();
+                    }}
+                    className="absolute right-2 p-0.5 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                    aria-label="Clear search"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                ) : (
+                  <kbd className="hidden sm:inline-block absolute right-2 text-[10px] font-mono px-1 py-0.2 rounded bg-black/5 dark:bg-white/10 text-slate-400 select-none">
+                    /
+                  </kbd>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Scrollable Navigation List: Clean Icon Rail when collapsed, Full Accordion when hovered */}
           <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
-            {sidebarNavItems.map((item) => {
+            {sidebarSearch.trim() ? (
+              <div className="space-y-1 animate-in fade-in duration-150">
+                <div className="px-2 py-1 flex items-center justify-between text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
+                  <span>Results ({sidebarSearchResults.length})</span>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarSearch("")}
+                    className="text-[10px] hover:underline cursor-pointer lowercase tracking-normal text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                  >
+                    clear
+                  </button>
+                </div>
+
+                {sidebarSearchResults.length === 0 ? (
+                  <div className="py-8 px-3 text-center">
+                    <div className="w-8 h-8 mx-auto mb-2 rounded-xl bg-slate-100 dark:bg-white/[0.05] flex items-center justify-center text-slate-400">
+                      <Search className="w-3.5 h-3.5" />
+                    </div>
+                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">No matching pages</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
+                      Try &quot;items&quot;, &quot;shifts&quot;, &quot;roster&quot;, &quot;payroll&quot;, &quot;alerts&quot;, &quot;catering&quot;
+                    </p>
+                  </div>
+                ) : (
+                  sidebarSearchResults.map((res) => {
+                    const IconComp = res.moduleIcon;
+                    return (
+                      <button
+                        key={res.id}
+                        type="button"
+                        onClick={() => {
+                          router.push(p(res.path));
+                          setSidebarSearch("");
+                          setIsSidebarSearchFocused(false);
+                          setMobileSidebarOpen(false);
+                        }}
+                        className="w-full p-2 rounded-xl text-left transition flex items-start gap-2.5 hover:bg-slate-100/80 dark:hover:bg-white/[0.06] group cursor-pointer"
+                      >
+                        <div
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0 mt-0.5 shadow-2xs"
+                          style={{ backgroundColor: brandColor }}
+                        >
+                          <IconComp className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-xs font-bold text-slate-900 dark:text-white truncate group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                              {res.label}
+                            </span>
+                            {res.badge && (
+                              <span className="px-1.5 py-0.2 text-[9px] font-bold rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0">
+                                {res.badge}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate flex items-center gap-1">
+                            <span>{res.moduleLabel}</span>
+                            {res.isSubItem && <span>› {res.label}</span>}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            ) : (
+              sidebarNavItems.map((item) => {
               const IconComp = item.icon;
               const hasSubs = item.subItems && item.subItems.length > 0;
               const isExpanded = expandedMenu === item.id;
@@ -1068,7 +1290,8 @@ export default function AppleTenantDashboard() {
                   )}
                 </div>
               );
-            })}
+            })
+          )}
           </nav>
         </div>
 
