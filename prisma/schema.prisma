@@ -1895,15 +1895,19 @@ model PosIntegration {
   restaurantId         String                 @map("restaurant_id")
   outletId             String                 @map("outlet_id")
   provider             PosIntegrationProvider
-  providerLocationId   String                 @map("provider_location_id")
+  providerLocationId   String?                @map("provider_location_id")
   providerLocationName String?                @map("provider_location_name")
   providerMerchantId   String?                @map("provider_merchant_id")
   status               PosIntegrationStatus   @default(ACTIVE)
+  environment          String                 @default("SANDBOX")
   isTestMode           Boolean                @default(true) @map("is_test_mode")
+  credentials          Json?                  @map("credentials")
   credentialsEncrypted String?                @map("credentials_encrypted")
   syncFrequency        String                 @default("15_MIN") @map("sync_frequency")
   lastSyncAt           DateTime?              @map("last_sync_at")
+  lastSyncStatus       String?                @map("last_sync_status")
   syncError            String?                @map("sync_error")
+  errorMessage         String?                @map("error_message")
   importedOrdersCount  Int                    @default(0) @map("imported_orders_count")
   createdAt            DateTime               @default(now()) @map("created_at")
   updatedAt            DateTime               @updatedAt @map("updated_at")
@@ -1912,9 +1916,9 @@ model PosIntegration {
   restaurant           Restaurant             @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   outlet               RestaurantOutlet       @relation(fields: [outletId], references: [id], onDelete: Cascade)
 
-  @@unique([restaurantId, provider, providerLocationId])
   @@index([restaurantId])
   @@index([outletId])
+  @@index([restaurantId, provider, providerLocationId])
   @@map("pos_integrations")
 }
 
