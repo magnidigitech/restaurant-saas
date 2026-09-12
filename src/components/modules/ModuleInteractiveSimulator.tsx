@@ -54,251 +54,277 @@ export default function ModuleInteractiveSimulator({ moduleSlug }: SimulatorProp
 }
 
 /* -------------------------------------------------------------
-   1. POS & KDS SIMULATOR
+   1. POS INTEGRATIONS & ORDERS HUB SIMULATOR
 ------------------------------------------------------------- */
 function POSSimulator() {
-  const [selectedTable, setSelectedTable] = useState<string>("T3");
-  const [tableData, setTableData] = useState<
-    Record<
-      string,
-      {
-        name: string;
-        covers: number;
-        time: string;
-        server: string;
-        course: string;
-        items: { name: string; qty: number; price: number; course: string }[];
-        status: "dining" | "fired" | "ready" | "billed";
-      }
-    >
-  >({
-    T1: {
-      name: "Table 01",
-      covers: 2,
-      time: "18m",
-      server: "Sarah L.",
-      course: "Mains Fired",
-      status: "fired",
-      items: [
-        { name: "Crispy Calamari", qty: 1, price: 16.0, course: "Starter" },
-        { name: "Ribeye Steak 10oz", qty: 2, price: 76.0, course: "Main" },
-      ],
+  const [selectedProvider, setSelectedProvider] = useState<string>("ALL");
+  const [simulatedOrders, setSimulatedOrders] = useState<
+    Array<{
+      id: string;
+      orderNumber: string;
+      provider: "TOAST" | "SQUARE" | "CLOVER";
+      outlet: string;
+      items: string;
+      modifiers: string;
+      total: number;
+      net: number;
+      tax: number;
+      tip: number;
+      time: string;
+      status: "COMPLETED" | "REFUNDED";
+    }>
+  >([
+    {
+      id: "ord-1",
+      orderNumber: "TST-4102",
+      provider: "TOAST",
+      outlet: "Downtown Bistro",
+      items: "Dry-Aged Ribeye 12oz + Craft IPA",
+      modifiers: "Medium Rare, Truffle Glaze",
+      total: 68.5,
+      net: 53.02,
+      tax: 5.48,
+      tip: 10.0,
+      time: "2m ago",
+      status: "COMPLETED",
     },
-    T2: {
-      name: "Table 02",
-      covers: 4,
-      time: "42m",
-      server: "Marcus V.",
-      course: "Dessert & Coffee",
-      status: "ready",
-      items: [
-        { name: "Burrata Salad", qty: 2, price: 32.0, course: "Starter" },
-        { name: "Pan-Seared Salmon", qty: 3, price: 96.0, course: "Main" },
-        { name: "Tiramisu della Casa", qty: 2, price: 22.0, course: "Dessert" },
-      ],
+    {
+      id: "ord-2",
+      orderNumber: "SQ-8910",
+      provider: "SQUARE",
+      outlet: "Express Kiosk SFO",
+      items: "2x Oat Flat White, Almond Croissant",
+      modifiers: "Oat Milk, Extra Shot, Warmed",
+      total: 22.85,
+      net: 18.0,
+      tax: 1.85,
+      tip: 3.0,
+      time: "6m ago",
+      status: "COMPLETED",
     },
-    T3: {
-      name: "Table 03 (Active)",
-      covers: 6,
-      time: "24m",
-      server: "Elena R.",
-      course: "Course 2 (Entrees Fired)",
-      status: "dining",
-      items: [
-        { name: "Truffle Arancini", qty: 2, price: 28.0, course: "Starter" },
-        { name: "Wood-Fired Margherita", qty: 1, price: 21.0, course: "Main" },
-        { name: "Chicken Dum Biryani", qty: 3, price: 72.0, course: "Main" },
-        { name: "Garlic Herb Butter Naan", qty: 4, price: 18.0, course: "Side" },
-      ],
+    {
+      id: "ord-3",
+      orderNumber: "CLV-7041",
+      provider: "CLOVER",
+      outlet: "Downtown Bistro",
+      items: "2x Grilled Chilean Sea Bass",
+      modifiers: "Lemon Herb Beurre Blanc",
+      total: 94.5,
+      net: 71.94,
+      tax: 7.56,
+      tip: 15.0,
+      time: "14m ago",
+      status: "COMPLETED",
     },
-    T4: {
-      name: "Table 04",
-      covers: 2,
-      time: "55m",
-      server: "Liam K.",
-      course: "Bill Printed",
-      status: "billed",
-      items: [
-        { name: "Signature Cocktails", qty: 3, price: 45.0, course: "Bar" },
-        { name: "Handmade Tagliatelle", qty: 2, price: 54.0, course: "Main" },
-      ],
+    {
+      id: "ord-4",
+      orderNumber: "TST-4098",
+      provider: "TOAST",
+      outlet: "Downtown Bistro",
+      items: "Double Smash Burger Combo",
+      modifiers: "Gluten-Free Bun",
+      total: 45.0,
+      net: 0,
+      tax: 3.6,
+      tip: 0,
+      time: "32m ago",
+      status: "REFUNDED",
     },
-  });
+  ]);
 
   const [notification, setNotification] = useState<string | null>(null);
 
-  const active = tableData[selectedTable] || tableData["T3"];
-  const subtotal = active.items.reduce((sum, item) => sum + item.price, 0);
-  const tax = subtotal * 0.0825;
-  const total = subtotal + tax;
+  const simulateIncomingOrder = (prov: "TOAST" | "SQUARE" | "CLOVER") => {
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const orderPrefix = prov === "TOAST" ? "TST" : prov === "SQUARE" ? "SQ" : "CLV";
+    const sampleItems =
+      prov === "TOAST"
+        ? { items: "Truffle Arancini + Margherita Pizza", mod: "Extra Mozzarella", total: 42.5, net: 34.1, tax: 3.4, tip: 5.0 }
+        : prov === "SQUARE"
+        ? { items: "Matcha Latte + Avocado Toast", mod: "Add Smoked Salmon", total: 24.5, net: 19.5, tax: 2.0, tip: 3.0 }
+        : { items: "Prime Filet Mignon + Pinot Noir", mod: "Rare, Herb Butter", total: 88.0, net: 67.2, tax: 6.8, tip: 14.0 };
 
-  const triggerAction = (action: string) => {
-    setNotification(action);
-    setTimeout(() => setNotification(null), 3000);
+    const newOrder = {
+      id: `sim-${Date.now()}`,
+      orderNumber: `${orderPrefix}-${randomSuffix}`,
+      provider: prov,
+      outlet: "Downtown Bistro",
+      items: sampleItems.items,
+      modifiers: sampleItems.mod,
+      total: sampleItems.total,
+      net: sampleItems.net,
+      tax: sampleItems.tax,
+      tip: sampleItems.tip,
+      time: "Just now",
+      status: "COMPLETED" as const,
+    };
+
+    setSimulatedOrders((prev) => [newOrder, ...prev.slice(0, 5)]);
+    setNotification(`[POS Webhook] Ingested new ticket ${newOrder.orderNumber} from ${prov} API!`);
+    setTimeout(() => setNotification(null), 4000);
   };
+
+  const filtered =
+    selectedProvider === "ALL"
+      ? simulatedOrders
+      : simulatedOrders.filter((o) => o.provider === selectedProvider);
+
+  const totalGross = filtered.reduce((s, o) => s + (o.status === "COMPLETED" ? o.total : 0), 0);
+  const totalTips = filtered.reduce((s, o) => s + o.tip, 0);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-6 text-slate-800 font-sans">
-      {/* Mesh Header */}
+      {/* Integrations Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
         <div className="flex items-center space-x-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
           <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">
-            Peer-to-Peer Offline Mesh: Active
+            POS Connectors: 3 Healthy & Polling
           </span>
           <span className="text-slate-300">|</span>
-          <span className="text-xs text-slate-500 font-mono">Terminal #02 • Dining Room</span>
+          <span className="text-xs text-slate-500 font-mono">Toast • Square • Clover</span>
         </div>
-        <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-mono font-medium">
-          <Zap className="w-3 h-3 text-amber-600" />
-          <span>KDS Latency: 32ms</span>
+        <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-mono font-medium">
+          <Shield className="w-3 h-3 text-emerald-600" />
+          <span>Idempotent Ingestion Active</span>
         </div>
       </div>
 
-      {/* Main Grid: Floor Tables on Left, Live Bill / Course Control on Right */}
+      {/* Main Container */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-5 pt-4">
-        {/* Table Selector */}
-        <div className="md:col-span-5 space-y-3">
+        {/* Left: Provider Selector & Simulator Triggers */}
+        <div className="md:col-span-4 space-y-3">
           <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider flex justify-between">
-            <span>Dining Room Floor Plan</span>
-            <span>4 Tables Active</span>
+            <span>Filter Stream</span>
+            <span>{filtered.length} Orders</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5">
-            {Object.entries(tableData).map(([key, t]) => {
-              const isSelected = key === selectedTable;
-              return (
-                <button
-                  key={key}
-                  onClick={() => setSelectedTable(key)}
-                  className={`p-3 rounded-xl text-left border transition-all ${
-                    isSelected
-                      ? "bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-900/10"
-                      : "bg-slate-50/70 hover:bg-slate-100/80 text-slate-700 border-slate-200"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-sm">{key}</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                        isSelected ? "bg-white/20 text-white" : "bg-slate-200 text-slate-600"
-                      }`}
-                    >
-                      {t.covers} PAX
-                    </span>
-                  </div>
-                  <div className={`text-xs truncate ${isSelected ? "text-slate-300" : "text-slate-500"}`}>
-                    {t.course}
-                  </div>
-                  <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-current/10 text-[11px] font-mono">
-                    <span className={isSelected ? "text-amber-300" : "text-amber-700 font-semibold"}>
-                      ${t.items.reduce((s, i) => s + i.price, 0).toFixed(0)}
-                    </span>
-                    <span className={isSelected ? "text-slate-300" : "text-slate-400"}>{t.time}</span>
-                  </div>
-                </button>
-              );
-            })}
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { id: "ALL", label: "Unified (All)", color: "text-slate-700" },
+              { id: "TOAST", label: "Toast POS", color: "text-orange-600" },
+              { id: "SQUARE", label: "Square POS", color: "text-blue-600" },
+              { id: "CLOVER", label: "Clover POS", color: "text-emerald-600" },
+            ].map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setSelectedProvider(p.id)}
+                className={`py-2 px-3 rounded-xl text-left border text-xs font-medium transition-all ${
+                  selectedProvider === p.id
+                    ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                    : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
 
-          {/* Quick Stats Banner */}
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs space-y-1">
-            <div className="flex justify-between text-slate-500">
-              <span>Average Turnaround</span>
-              <span className="font-mono font-bold text-slate-800">34 minutes</span>
+          {/* Simulate Incoming Tickets */}
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Simulate Ingesting POS Ticket
+            </p>
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                onClick={() => simulateIncomingOrder("TOAST")}
+                className="py-1.5 px-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-semibold transition-all"
+              >
+                + Toast
+              </button>
+              <button
+                onClick={() => simulateIncomingOrder("SQUARE")}
+                className="py-1.5 px-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold transition-all"
+              >
+                + Square
+              </button>
+              <button
+                onClick={() => simulateIncomingOrder("CLOVER")}
+                className="py-1.5 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold transition-all"
+              >
+                + Clover
+              </button>
             </div>
-            <div className="flex justify-between text-slate-500">
-              <span>Kitchen Fire Latency</span>
-              <span className="font-mono font-bold text-emerald-600">&lt; 0.04s</span>
+          </div>
+
+          {/* Quick Telemetry */}
+          <div className="p-3 rounded-xl bg-emerald-50/50 border border-emerald-200/60 text-xs space-y-1">
+            <div className="flex justify-between text-slate-600">
+              <span>Gross Ingested</span>
+              <span className="font-mono font-bold text-slate-900">${totalGross.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>Tips Reconciled</span>
+              <span className="font-mono font-bold text-indigo-600">+${totalTips.toFixed(2)}</span>
             </div>
           </div>
         </div>
 
-        {/* Live Bill & KDS Pacing Panel */}
-        <div className="md:col-span-7 bg-slate-50/50 rounded-xl border border-slate-200/80 p-4 flex flex-col justify-between">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+        {/* Right: Consolidated Live Stream */}
+        <div className="md:col-span-8 bg-slate-50/50 rounded-xl border border-slate-200/80 p-4 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 mb-3">
               <div>
-                <h4 className="font-bold text-slate-900 text-sm">{active.name}</h4>
+                <h4 className="font-bold text-slate-900 text-sm">Consolidated Orders Feed</h4>
                 <p className="text-[11px] text-slate-500">
-                  Server: <span className="font-medium text-slate-700">{active.server}</span> • Seated{" "}
-                  {active.time} ago
+                  Imported directly from restaurant POS devices • Read-only
                 </p>
               </div>
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-800 uppercase">
-                {active.status}
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800">
+                LIVE POLLING
               </span>
             </div>
 
-            {/* Items List */}
-            <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
-              {active.items.map((item, idx) => (
+            {/* Orders Feed */}
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              {filtered.map((ord) => (
                 <div
-                  key={idx}
-                  className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200/60 text-xs"
+                  key={ord.id}
+                  className="p-2.5 rounded-xl bg-white border border-slate-200/70 text-xs flex items-center justify-between shadow-xs hover:border-slate-300 transition-colors"
                 >
-                  <div className="flex items-center space-x-2">
-                    <span className="w-5 h-5 rounded bg-slate-100 text-slate-600 font-mono font-bold flex items-center justify-center text-[10px]">
-                      {item.qty}x
-                    </span>
-                    <span className="font-medium text-slate-800">{item.name}</span>
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-slate-900">{ord.orderNumber}</span>
+                      <span
+                        className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                          ord.provider === "TOAST"
+                            ? "bg-orange-100 text-orange-700"
+                            : ord.provider === "SQUARE"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-emerald-100 text-emerald-700"
+                        }`}
+                      >
+                        {ord.provider}
+                      </span>
+                      <span className="text-[10px] text-slate-400">• {ord.outlet}</span>
+                    </div>
+                    <p className="text-slate-700 font-medium">{ord.items}</p>
+                    <p className="text-[10px] text-slate-400 italic">{ord.modifiers}</p>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <span className="text-[10px] text-slate-400 font-mono">{item.course}</span>
-                    <span className="font-mono font-semibold text-slate-900">${item.price.toFixed(2)}</span>
+
+                  <div className="text-right">
+                    <p className="font-mono font-bold text-slate-900">${ord.total.toFixed(2)}</p>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                        ord.status === "COMPLETED"
+                          ? "bg-emerald-50 text-emerald-600"
+                          : "bg-rose-50 text-rose-600"
+                      }`}
+                    >
+                      {ord.status}
+                    </span>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{ord.time}</p>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Subtotal & Actions */}
-          <div className="pt-3 border-t border-slate-200 mt-3 space-y-3">
-            <div className="space-y-1 text-xs font-mono">
-              <div className="flex justify-between text-slate-500">
-                <span>Subtotal ({active.items.length} items)</span>
-                <span>${subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-slate-500">
-                <span>Estimated Tax (8.25%)</span>
-                <span>${tax.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between font-bold text-slate-900 text-sm pt-1 border-t border-slate-200">
-                <span>Total Balance</span>
-                <span className="text-amber-700">${total.toFixed(2)}</span>
-              </div>
+          {notification && (
+            <div className="mt-3 p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs text-center font-medium animate-fadeIn">
+              {notification}
             </div>
-
-            {/* Action Buttons */}
-            <div className="grid grid-cols-3 gap-2 pt-1">
-              <button
-                onClick={() => triggerAction("KDS Notification: Course 2 Fired to Grill & Curry line in 28ms!")}
-                className="py-2 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold text-[11px] transition-all flex items-center justify-center space-x-1 shadow-sm active:scale-95"
-              >
-                <Flame className="w-3.5 h-3.5 text-amber-400" />
-                <span>Fire Next</span>
-              </button>
-              <button
-                onClick={() => triggerAction("Check Split: Divided equally among 6 seats ($25.04/guest)")}
-                className="py-2 px-2 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-semibold text-[11px] transition-all active:scale-95"
-              >
-                Split Check
-              </button>
-              <button
-                onClick={() => triggerAction("Thermal Chit Dispatched to Epson 80mm Network Printer")}
-                className="py-2 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] transition-all flex items-center justify-center space-x-1 shadow-sm active:scale-95"
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>Print Bill</span>
-              </button>
-            </div>
-
-            {notification && (
-              <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs text-center font-medium animate-fadeIn">
-                {notification}
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
     </div>

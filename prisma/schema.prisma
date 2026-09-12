@@ -163,6 +163,7 @@ model Restaurant {
   payslips             Payslip[]
   recipes              Recipe[]
   posOrders            PosOrder[]
+  posIntegrations      PosIntegration[]
   vaultFolders         VaultFolder[]
   vaultItems           VaultItem[]
   vaultAuditLogs       VaultAuditLog[]
@@ -255,6 +256,7 @@ model RestaurantOutlet {
   shiftAssignments  ShiftAssignment[]
   payrollRuns          PayrollRun[]
   posOrders            PosOrder[]
+  posIntegrations      PosIntegration[]
   attendanceRecords    AttendanceRecord[]
   timePunches          TimePunch[]
   financialTransactions FinancialTransaction[]
@@ -1872,35 +1874,87 @@ enum PosPaymentStatus {
   PENDING
   PAID
   REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PosIntegrationProvider {
+  TOAST
+  SQUARE
+  CLOVER
+}
+
+enum PosIntegrationStatus {
+  ACTIVE
+  NEEDS_REAUTH
+  DISCONNECTED
+  ERROR
+}
+
+model PosIntegration {
+  id                   String                 @id @default(uuid())
+  restaurantId         String                 @map("restaurant_id")
+  outletId             String                 @map("outlet_id")
+  provider             PosIntegrationProvider
+  providerLocationId   String                 @map("provider_location_id")
+  providerLocationName String?                @map("provider_location_name")
+  providerMerchantId   String?                @map("provider_merchant_id")
+  status               PosIntegrationStatus   @default(ACTIVE)
+  isTestMode           Boolean                @default(true) @map("is_test_mode")
+  credentialsEncrypted String?                @map("credentials_encrypted")
+  syncFrequency        String                 @default("15_MIN") @map("sync_frequency")
+  lastSyncAt           DateTime?              @map("last_sync_at")
+  syncError            String?                @map("sync_error")
+  importedOrdersCount  Int                    @default(0) @map("imported_orders_count")
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant           Restaurant             @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet               RestaurantOutlet       @relation(fields: [outletId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, provider, providerLocationId])
+  @@index([restaurantId])
+  @@index([outletId])
+  @@map("pos_integrations")
 }
 
 model PosOrder {
-  id             String           @id @default(uuid())
-  restaurantId   String           @map("restaurant_id")
-  outletId       String           @map("outlet_id")
-  orderNumber    String           @map("order_number")
-  tableNumber    String?          @map("table_number")
-  orderType      PosOrderType     @default(DINE_IN) @map("order_type")
-  status         PosOrderStatus   @default(COMPLETED)
-  totalAmount    Decimal          @map("total_amount")
-  taxAmount      Decimal          @default(0) @map("tax_amount")
-  discountAmount Decimal          @default(0) @map("discount_amount")
-  finalAmount    Decimal          @map("final_amount")
-  paymentStatus  PosPaymentStatus @default(PAID) @map("payment_status")
-  paymentMethod  String?          @map("payment_method")
-  depletedAt     DateTime?        @map("depleted_at")
-  notes          String?
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
+  id                 String           @id @default(uuid())
+  restaurantId       String           @map("restaurant_id")
+  outletId           String           @map("outlet_id")
+  orderNumber        String           @map("order_number")
+  tableNumber        String?          @map("table_number")
+  orderType          PosOrderType     @default(DINE_IN) @map("order_type")
+  status             PosOrderStatus   @default(COMPLETED)
+  totalAmount        Decimal          @map("total_amount")
+  taxAmount          Decimal          @default(0) @map("tax_amount")
+  discountAmount     Decimal          @default(0) @map("discount_amount")
+  tipAmount          Decimal          @default(0) @map("tip_amount")
+  refundAmount       Decimal          @default(0) @map("refund_amount")
+  finalAmount        Decimal          @map("final_amount")
+  paymentStatus      PosPaymentStatus @default(PAID) @map("payment_status")
+  paymentMethod      String?          @map("payment_method")
+  provider           String           @default("MANUAL") // TOAST, SQUARE, CLOVER, MANUAL
+  providerOrderId    String?          @map("provider_order_id")
+  providerLocationId String?          @map("provider_location_id")
+  customerName       String?          @map("customer_name")
+  customerPhone      String?          @map("customer_phone")
+  rawPayload         Json?            @map("raw_payload")
+  depletedAt         DateTime?        @map("depleted_at")
+  notes              String?
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
 
   // Relations
-  restaurant     Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  outlet         RestaurantOutlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
-  items          PosOrderItem[]
+  restaurant         Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet             RestaurantOutlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  items              PosOrderItem[]
 
+  @@index([restaurantId, provider, providerOrderId])
   @@index([restaurantId])
   @@index([outletId])
   @@index([orderNumber])
+  @@index([provider])
   @@map("pos_orders")
 }
 
@@ -1912,6 +1966,7 @@ model PosOrderItem {
   quantity   Int      @default(1)
   unitPrice  Decimal  @map("unit_price")
   totalPrice Decimal  @map("total_price")
+  modifiers  Json?
   notes      String?
   createdAt  DateTime @default(now()) @map("created_at")
 

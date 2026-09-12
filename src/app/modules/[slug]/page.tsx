@@ -62,6 +62,7 @@ import {
   Grid2x2,
   Award,
   Compass,
+  Store,
 } from "lucide-react";
 
 interface PageProps {
@@ -103,6 +104,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 // Dynamic Icon Resolver
 function FeatureIcon({ name }: { name: string }) {
   const iconMap: Record<string, React.ReactNode> = {
+    Store: <Store className="w-5 h-5 text-emerald-600" />,
     WifiOff: <WifiOff className="w-5 h-5 text-amber-600" />,
     Flame: <Flame className="w-5 h-5 text-amber-600" />,
     LayoutGrid: <LayoutGrid className="w-5 h-5 text-amber-600" />,

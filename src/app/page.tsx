@@ -237,7 +237,7 @@ export default function RestoBirdMainLandingPage() {
               <ul className="space-y-2 text-rose-900/80">
                 <li className="flex items-start gap-2">
                   <X className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
-                  <span>Separate POS that crashes when internet goes down</span>
+                  <span>Fragmented POS data siloed across separate location logins</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <X className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
@@ -275,7 +275,7 @@ export default function RestoBirdMainLandingPage() {
               <ul className="space-y-2 text-emerald-950">
                 <li className="flex items-start gap-2">
                   <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>Sub-second KDS with offline peer-to-peer mesh resilience</span>
+                  <span>Connect Toast, Square & Clover POS into one unified live orders feed</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
@@ -368,12 +368,12 @@ export default function RestoBirdMainLandingPage() {
               <ul className="space-y-2">
                 <li>
                   <Link href="/pos" className="hover:text-slate-900 transition-colors">
-                    Point of Sale (POS)
+                    POS Integrations (Toast, Square, Clover)
                   </Link>
                 </li>
                 <li>
                   <Link href="/pos" className="hover:text-slate-900 transition-colors">
-                    Sub-second KDS Kitchen
+                    Unified Orders Stream
                   </Link>
                 </li>
                 <li>

@@ -3,6 +3,7 @@ import { prisma } from "@/core/database/client";
 import { getTenantSession } from "@/core/auth/session";
 import { verifyAccess } from "@/core/permissions/check";
 import { depleteOrderInventory } from "@/core/inventory/depletionEngine";
+import { getUnifiedOrdersDashboard } from "@/modules/pos-integrations/service";
 import { z } from "zod";
 
 const createOrderItemSchema = z.object({
@@ -40,28 +41,32 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const outletId = searchParams.get("outletId");
+    const outletId = searchParams.get("outletId") || undefined;
+    const provider = searchParams.get("provider") || undefined;
+    const status = searchParams.get("status") || undefined;
+    const search = searchParams.get("search") || undefined;
+    const startDate = searchParams.get("startDate") || undefined;
+    const endDate = searchParams.get("endDate") || undefined;
     const limit = parseInt(searchParams.get("limit") || "30");
+    const offset = parseInt(searchParams.get("offset") || "0");
 
-    const whereClause: any = {
-      restaurantId: session.activeRestaurantId,
-    };
-
-    if (outletId) {
-      whereClause.outletId = outletId;
-    }
-
-    const orders = await prisma.posOrder.findMany({
-      where: whereClause,
-      include: {
-        outlet: { select: { id: true, name: true } },
-        items: true,
-      },
-      orderBy: { createdAt: "desc" },
-      take: limit,
+    const result = await getUnifiedOrdersDashboard(session.activeRestaurantId, {
+      outletId,
+      provider,
+      status,
+      search,
+      startDate,
+      endDate,
+      limit,
+      offset,
     });
 
-    return NextResponse.json({ success: true, orders });
+    return NextResponse.json({
+      success: true,
+      orders: result.orders,
+      pagination: result.pagination,
+      metrics: result.metrics,
+    });
   } catch (error: any) {
     console.error("List POS Orders Error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

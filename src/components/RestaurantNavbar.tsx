@@ -240,14 +240,14 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
       },
       {
         id: "pos",
-        label: "POS & Orders",
+        label: "POS Integrations",
         href: p("/pos"),
         icon: Store,
         moduleKey: "pos",
         children: [
-          { label: "POS Terminal", desc: "Live billing, table ordering & takeaway", href: p("/pos"), quickAction: true },
-          { label: "Kitchen Display (KDS)", desc: "Real-time kitchen order tickets & prep times", href: p("/pos") },
-          { label: "Table Management", desc: "Floor layout, seating status & bill splitting", href: p("/pos") },
+          { label: "POS Integrations Hub", desc: "Toast, Square & Clover unified orders hub", href: p("/pos"), quickAction: true },
+          { label: "Synced Orders Stream", desc: "Real-time unified order stream & line items", href: p("/pos") },
+          { label: "Connection Settings", desc: "Manage POS credentials, sync & mappings", href: p("/pos?tab=settings") },
         ],
       },
       {
