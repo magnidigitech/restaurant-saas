@@ -473,7 +473,7 @@ export default function PosHubPage({
   const activeIntegrationsCount = integrations.filter((i) => i.status === "ACTIVE").length;
 
   return (
-    <ModuleAccessGuard requiredModule="pos">
+    <ModuleAccessGuard moduleKey="pos" moduleName="POS Integrations & Orders" activeSection="pos">
       <div className={`min-h-screen ${isDark ? "bg-[#0B0F17] text-slate-100" : "bg-slate-50 text-slate-900"}`}>
         <RestaurantNavbar activeSection="pos" />
 

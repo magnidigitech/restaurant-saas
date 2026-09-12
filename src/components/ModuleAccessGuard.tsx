@@ -6,18 +6,22 @@ import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 
 interface ModuleAccessGuardProps {
-  moduleKey: string;
-  moduleName: string;
+  moduleKey?: string;
+  requiredModule?: string;
+  moduleName?: string;
   activeSection?: string;
   children: React.ReactNode;
 }
 
 export default function ModuleAccessGuard({
   moduleKey,
+  requiredModule,
   moduleName,
   activeSection,
   children,
 }: ModuleAccessGuardProps) {
+  const effectiveKey = (moduleKey || requiredModule || "").trim();
+  const effectiveName = moduleName || (effectiveKey ? effectiveKey.toUpperCase() : "Operational Module");
   const router = useRouter();
   const params = useParams();
   const subdomain = (params?.subdomain as string) || "";
@@ -44,18 +48,20 @@ export default function ModuleAccessGuard({
         const data = await res.json();
         const activeKeys: string[] = (data.modules || []).map((m: any) => m.key.toLowerCase());
 
-        const targetKey = moduleKey.toLowerCase();
+        const targetKey = effectiveKey.toLowerCase();
         const shiftKeys = ["shifts", "shift_management"];
         const inventoryKeys = ["inventory", "vendor_management", "purchase_management"];
         const attendanceKeys = ["attendance", "leave_management"];
         const workforceKeys = ["workforce", "hr_onboarding"];
+        const posKeys = ["pos", "point_of_sale", "pos_orders", "pos_integrations"];
 
         const isEntitled =
           activeKeys.includes(targetKey) ||
           (shiftKeys.includes(targetKey) && activeKeys.some((k) => shiftKeys.includes(k))) ||
           (inventoryKeys.includes(targetKey) && activeKeys.some((k) => inventoryKeys.includes(k))) ||
           (attendanceKeys.includes(targetKey) && activeKeys.some((k) => attendanceKeys.includes(k))) ||
-          (workforceKeys.includes(targetKey) && activeKeys.some((k) => workforceKeys.includes(k)));
+          (workforceKeys.includes(targetKey) && activeKeys.some((k) => workforceKeys.includes(k))) ||
+          (posKeys.includes(targetKey) && activeKeys.some((k) => posKeys.includes(k)));
 
         if (isMounted) {
           setHasAccess(isEntitled);
@@ -72,10 +78,10 @@ export default function ModuleAccessGuard({
     if (subdomain) {
       checkEntitlement();
     }
-  }, [subdomain, moduleKey]);
+  }, [subdomain, effectiveKey]);
 
   const handleCopyModuleKey = () => {
-    navigator.clipboard.writeText(moduleKey);
+    navigator.clipboard.writeText(effectiveKey);
     setCopiedKey(true);
     setTimeout(() => setCopiedKey(false), 2000);
   };
@@ -161,7 +167,7 @@ export default function ModuleAccessGuard({
               </div>
 
               <h1 className={`text-2xl sm:text-[26px] font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-                No Access to {moduleName}
+                No Access to {effectiveName}
               </h1>
 
               <p className={`text-xs sm:text-sm leading-relaxed max-w-md mx-auto ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
@@ -196,7 +202,7 @@ export default function ModuleAccessGuard({
                     : "bg-white border-slate-200 text-[#0071E3] hover:bg-blue-50"
                     }`}
                 >
-                  <span>{moduleKey}</span>
+                  <span>{effectiveKey}</span>
                   <span className="text-[10px] opacity-75">{copiedKey ? "✓ Copied" : "⧉"}</span>
                 </button>
               </div>
