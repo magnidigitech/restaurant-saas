@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 
 interface RestaurantModule {
   id: string;
@@ -375,10 +376,19 @@ export default function ModulesShowcaseScrollSection() {
                 </div>
 
                 {/* Card Footer: The Hero Takeaway (Toast Style) */}
-                <div className="pt-3.5 border-t border-white/[0.08] relative z-10 space-y-1.5">
-                  <p className="text-base sm:text-xl font-bold text-white tracking-tight leading-snug">
-                    &ldquo;{activeModule.takeaway}&rdquo;
-                  </p>
+                <div className="pt-3.5 border-t border-white/[0.08] relative z-10 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <p className="text-base sm:text-lg font-bold text-white tracking-tight leading-snug">
+                      &ldquo;{activeModule.takeaway}&rdquo;
+                    </p>
+                    <Link
+                      href={`/${activeModule.id}`}
+                      className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-[11px] uppercase tracking-wider shrink-0 transition-all shadow-md active:scale-95 w-fit"
+                    >
+                      <span>Explore Module Page</span>
+                      <span>→</span>
+                    </Link>
+                  </div>
                   <p className="text-stone-400 text-xs sm:text-sm leading-relaxed max-w-xl">
                     {activeModule.description}
                   </p>
