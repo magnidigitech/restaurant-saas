@@ -245,45 +245,49 @@ export default function InventoryAlertsPage({
               <div
                 key={idx}
                 className={`p-5 rounded-3xl border transition space-y-4 flex flex-col justify-between ${
-                  isDark ? "bg-amber-500/[0.04] border-amber-500/30" : "bg-amber-50/40 border-amber-200 shadow-xs"
+                  isDark ? "bg-amber-500/[0.04] border-amber-500/30" : "bg-white border-amber-200/90 shadow-xs hover:border-amber-300"
                 }`}
               >
                 <div className="space-y-2">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-[9px] font-bold uppercase px-2 py-0.2 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25">
+                      <span className={`text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${
+                        isDark ? "bg-amber-500/15 text-amber-400 border-amber-500/25" : "bg-amber-100 text-amber-900 border-amber-300"
+                      }`}>
                         Deficit Alert
                       </span>
-                      <h3 className={`text-base font-bold tracking-tight mt-1 ${isDark ? "text-white" : "text-slate-900"}`}>
+                      <h3 className={`text-base font-bold tracking-tight mt-1.5 ${isDark ? "text-white" : "text-slate-900"}`}>
                         {a.itemName}
                       </h3>
-                      <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                      <p className={`text-[11px] font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                         {outlets.find((o) => o.id === a.outletId)?.name ?? "Branch Location"}
                       </p>
                     </div>
 
                     <div className="text-right">
-                      <p className="text-2xl font-black text-amber-500">
+                      <p className={`text-2xl font-black ${isDark ? "text-amber-400" : "text-amber-600"}`}>
                         {a.currentStock}
                       </p>
-                      <p className={`text-[11px] font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                      <p className={`text-[11px] font-mono font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                         {UOM_LABELS[a.unitOfMeasure] ?? a.unitOfMeasure}
                       </p>
                     </div>
                   </div>
 
-                  <div className={`p-3 rounded-2xl border text-xs space-y-1 ${
-                    isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-white border-slate-200"
+                  <div className={`p-3 rounded-2xl border text-xs space-y-1.5 ${
+                    isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50/80 border-slate-200"
                   }`}>
                     <div className="flex justify-between">
-                      <span className={isDark ? "text-[#8F95A3]" : "text-slate-500"}>Reorder Threshold:</span>
-                      <span className="font-semibold">{a.reorderPoint}</span>
+                      <span className={isDark ? "text-[#8F95A3]" : "text-slate-600 font-medium"}>Reorder Threshold:</span>
+                      <span className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}>{a.reorderPoint}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className={isDark ? "text-[#8F95A3]" : "text-slate-500"}>Target Par Level:</span>
-                      <span className="font-semibold">{a.parLevel}</span>
+                      <span className={isDark ? "text-[#8F95A3]" : "text-slate-600 font-medium"}>Target Par Level:</span>
+                      <span className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}>{a.parLevel}</span>
                     </div>
-                    <div className="flex justify-between text-[#0071E3] font-bold pt-1 border-t border-black/[0.04] dark:border-white/[0.04]">
+                    <div className={`flex justify-between font-bold pt-1.5 border-t border-black/[0.06] dark:border-white/[0.06] ${
+                      isDark ? "text-blue-400" : "text-blue-600"
+                    }`}>
                       <span>Suggested Order:</span>
                       <span>+{a.suggestedOrder} {UOM_LABELS[a.unitOfMeasure] ?? a.unitOfMeasure}</span>
                     </div>

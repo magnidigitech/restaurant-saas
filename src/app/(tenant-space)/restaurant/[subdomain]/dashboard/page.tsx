@@ -995,7 +995,7 @@ export default function AppleTenantDashboard() {
                   <span className="font-bold text-sm tracking-tight truncate block text-slate-900 dark:text-white">
                     {branding?.name || "Magni Digitech"}
                   </span>
-                  <span className="text-[10px] opacity-60 truncate block">Operations Suite</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate block">Operations Suite</span>
                 </div>
               )}
             </div>
@@ -1015,12 +1015,12 @@ export default function AppleTenantDashboard() {
 
           {/* Mobile Context Strip (Shown only when expanded) */}
           {(isHovered || mobileSidebarOpen) && (
-            <div className="px-5 py-2 bg-slate-50 dark:bg-white/[0.02] border-b border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between text-xs text-slate-500 shrink-0 animate-in fade-in duration-150">
-              <div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
+            <div className="px-5 py-2 bg-slate-50 dark:bg-white/[0.02] border-b border-black/[0.04] dark:border-white/[0.04] flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 shrink-0 animate-in fade-in duration-150 font-medium">
+              <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
                 <Store className="w-3.5 h-3.5 opacity-70" />
                 <span>All Branches ({metrics.totalOutlets})</span>
               </div>
-              <span className="text-[10px] opacity-70">Today, 11 Sep</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">Today, 11 Sep</span>
             </div>
           )}
 
@@ -1181,7 +1181,7 @@ export default function AppleTenantDashboard() {
                       className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                         isParentActive
                           ? "font-bold text-white shadow-sm"
-                          : "text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.06]"
+                          : "text-slate-700 dark:text-[#8F95A3] hover:text-slate-950 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-white/[0.06]"
                       }`}
                       style={
                         isParentActive
@@ -1218,10 +1218,10 @@ export default function AppleTenantDashboard() {
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                       isParentActive
-                        ? "text-slate-900 dark:text-white font-bold"
+                        ? "text-slate-950 dark:text-white font-bold"
                         : isExpanded
-                        ? "text-slate-900 dark:text-white font-bold bg-slate-100/70 dark:bg-white/[0.06]"
-                        : "text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.04]"
+                        ? "text-slate-950 dark:text-white font-bold bg-slate-100 dark:bg-white/[0.06]"
+                        : "text-slate-700 dark:text-[#8F95A3] hover:text-slate-950 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-white/[0.04]"
                     }`}
                     style={
                       isParentActive
@@ -1263,7 +1263,7 @@ export default function AppleTenantDashboard() {
                             router.push(p(sub.path));
                             setMobileSidebarOpen(false);
                           }}
-                          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition cursor-pointer text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.05] group"
+                          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition cursor-pointer text-slate-700 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-white/[0.05] group"
                         >
                           <span className="truncate">{sub.label}</span>
                           <div className="flex items-center gap-1.5 shrink-0">
@@ -1325,7 +1325,7 @@ export default function AppleTenantDashboard() {
                   router.push(p("/settings/profile"));
                   setMobileSidebarOpen(false);
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.04] transition cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-[#8F95A3] hover:text-slate-950 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-white/[0.04] transition cursor-pointer"
               >
                 <Settings className="w-4 h-4" />
                 <span>Settings</span>
@@ -1339,21 +1339,21 @@ export default function AppleTenantDashboard() {
                 className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition ${
                   isDark
                     ? "bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]"
-                    : "bg-slate-50 border-slate-200/80 hover:bg-slate-100"
+                    : "bg-slate-50 border-slate-200 shadow-2xs hover:bg-slate-100/80"
                 }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-2xs"
                     style={{ backgroundColor: brandColor }}
                   >
                     MD
                   </div>
                   <div className="min-w-0">
-                    <div className="text-xs font-bold truncate text-slate-900 dark:text-white leading-tight">
+                    <div className="text-xs font-bold truncate text-slate-950 dark:text-white leading-tight">
                       {branding?.name || "Magni Digitech"}
                     </div>
-                    <div className="text-[10px] opacity-60 truncate">2 Branches</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">2 Branches</div>
                   </div>
                 </div>
                 <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
