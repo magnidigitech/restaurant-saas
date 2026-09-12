@@ -21,23 +21,21 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "Resto Bird | See Your Restaurant Differently",
+    default: "Restaurant Management Software for POS & Operations | Resto Bird",
     template: "%s | Resto Bird",
   },
   description:
-    "See your restaurant differently. Resto Bird is the intelligent restaurant operating system providing real-time bird's-eye visibility across dining room, kitchen line, and inventory operations.",
+    "Unified restaurant management software and POS operating system. Real-time table floor management, sub-second kitchen display, recipe inventory depletion, and automated payroll.",
   applicationName: "Resto Bird",
   keywords: [
-    "Resto Bird",
-    "See your restaurant differently",
-    "restaurant management system",
-    "restaurant operating intelligence",
+    "restaurant management software",
+    "restaurant POS software",
     "kitchen display system",
-    "restaurant POS",
-    "inventory depletion",
-    "recipe costing",
-    "multi-outlet restaurant software",
-    "restaurant ERP",
+    "restaurant inventory software",
+    "recipe costing software",
+    "restaurant scheduling software",
+    "restaurant payroll software",
+    "Resto Bird",
   ],
   authors: [{ name: "Resto Bird" }],
   creator: "Resto Bird",
@@ -54,9 +52,9 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "Resto Bird | See Your Restaurant Differently",
+    title: "Restaurant Management Software for POS & Operations | Resto Bird",
     description:
-      "See your restaurant differently. Real-time operating intelligence and unified bird's-eye visibility across floor, kitchen, and inventory.",
+      "Unified restaurant management software and POS operating system with real-time floor management, sub-second KDS, and recipe depletion.",
     url: "/",
     siteName: "Resto Bird",
     images: [
@@ -64,7 +62,7 @@ export const metadata: Metadata = {
         url: "/resto-bird-logo.png",
         width: 1200,
         height: 630,
-        alt: "Resto Bird - See Your Restaurant Differently",
+        alt: "Resto Bird - Restaurant Management Software",
       },
     ],
     locale: "en_US",
@@ -72,9 +70,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Resto Bird | See Your Restaurant Differently",
+    title: "Restaurant Management Software for POS & Operations | Resto Bird",
     description:
-      "See your restaurant differently. Unified restaurant operating system with bird's-eye intelligence across floor, kitchen, and inventory.",
+      "Unified restaurant management software with sub-second KDS, recipe depletion, shift scheduling, and automated payroll.",
     images: ["/resto-bird-logo.png"],
     creator: "@restobird",
   },
@@ -107,14 +105,23 @@ const jsonLd = {
       "name": "Resto Bird",
       "applicationCategory": "BusinessApplication",
       "operatingSystem": "Web, iOS, Android",
-      "headline": "See Your Restaurant Differently",
+      "headline": "Restaurant Management Software for POS & Operations",
       "description":
-        "The intelligent restaurant operating system that gives you a complete bird's-eye view across kitchen, inventory, and floor operations.",
+        "Unified restaurant management software providing real-time POS, sub-second kitchen display routing, recipe inventory depletion, staff scheduling, and payroll.",
       "url": "https://restobird.com",
       "offers": {
-        "@type": "Offer",
-        "price": "0",
+        "@type": "AggregateOffer",
         "priceCurrency": "USD",
+        "lowPrice": "49",
+        "highPrice": "199",
+        "offerCount": "3",
+        "priceSpecification": {
+          "@type": "UnitPriceSpecification",
+          "price": "49",
+          "priceCurrency": "USD",
+          "unitText": "MONTH",
+          "name": "Single Outlet Core Operations",
+        },
       },
     },
     {
@@ -129,7 +136,7 @@ const jsonLd = {
       "@type": "WebSite",
       "name": "Resto Bird",
       "url": "https://restobird.com",
-      "description": "See your restaurant differently with Resto Bird",
+      "description": "Restaurant Management Software for POS & Operations",
     },
   ],
 };

@@ -18,6 +18,7 @@ export interface ModuleData {
   categoryLabel: string;
   tagline: string;
   heroBadge: string;
+  seoTitle?: string;
   description: string;
   primaryStat: string;
   primaryStatLabel: string;
@@ -49,6 +50,7 @@ export const RESTO_BIRD_MODULES: Record<string, ModuleData> = {
     categoryLabel: "Front of House",
     tagline: "Sub-second order routing with peer-to-peer offline mesh resilience.",
     heroBadge: "OFFLINE MESH & KDS DISPATCH",
+    seoTitle: "Restaurant POS Software & Kitchen Display System",
     description:
       "A blazing-fast, crash-proof floor management and billing engine. Resto Bird POS keeps your dining room turning tables faster, splits checks seamlessly, and fires tickets to kitchen stations in under 45 milliseconds—even when your internet connection cuts out completely.",
     primaryStat: "< 45ms",
@@ -156,6 +158,7 @@ export const RESTO_BIRD_MODULES: Record<string, ModuleData> = {
     categoryLabel: "Back of House",
     tagline: "Every billed dish depletes raw stock down to the gram.",
     heroBadge: "CENTRAL STORE & GRAM-LEVEL DEPLETION",
+    seoTitle: "Restaurant Inventory & Recipe Costing Software",
     description:
       "Transform your walk-in cooler from a black box into a live financial ledger. Resto Bird links your POS menu items directly to multi-level Bills of Materials (BOM). Track raw proteins, dairy, produce, and dry goods down to grams and milliliters, while automated par-levels prevent embarrassing 86'd dishes.",
     primaryStat: "99.8%",
@@ -263,6 +266,7 @@ export const RESTO_BIRD_MODULES: Record<string, ModuleData> = {
     categoryLabel: "Front of House",
     tagline: "Scale 500-guest banquets and bulk raw material purchase orders in seconds.",
     heroBadge: "BANQUETS & PAX SCALING",
+    seoTitle: "Catering & Banquet Management Software",
     description:
       "Eliminate spreadsheet chaos for large events. Manage wedding receptions, corporate galas, and banquet halls with per-pax tiered packages, automated raw ingredient multipliers, milestone deposit invoicing, and professional BEO (Banquet Event Order) printing.",
     primaryStat: "10x",
@@ -370,6 +374,7 @@ export const RESTO_BIRD_MODULES: Record<string, ModuleData> = {
     categoryLabel: "Workforce & HR",
     tagline: "Auto-balance overtime and let staff swap shifts in two taps.",
     heroBadge: "AI SCHEDULING & ROSTERS",
+    seoTitle: "Restaurant Staff Scheduling Software",
     description:
       "Say goodbye to messy WhatsApp scheduling groups. Build conflict-free weekly rosters in minutes, respect employee availability, enforce statutory overtime limits, and empower servers and line cooks to trade shifts peer-to-peer with one-tap manager approvals.",
     primaryStat: "0%",
@@ -477,6 +482,7 @@ export const RESTO_BIRD_MODULES: Record<string, ModuleData> = {
     categoryLabel: "Workforce & HR",
     tagline: "PIN-verified terminal punch with live floor attendance board.",
     heroBadge: "PIN & KIOSK CLOCK-IN",
+    seoTitle: "Restaurant Time Clock & Attendance Software",
     description:
       "Eliminate buddy punching and time theft permanently. Resto Bird turns any budget tablet into a sleek, tamper-proof time clock kiosk with secure 4-digit PIN verification, photo audit verification, geofenced mobile check-ins, and a live manager floor presence board.",
     primaryStat: "100%",
@@ -584,6 +590,7 @@ export const RESTO_BIRD_MODULES: Record<string, ModuleData> = {
     categoryLabel: "Financials & HR",
     tagline: "Fair tip pool distribution and 1-click monthly salary disbursements.",
     heroBadge: "AUTOMATED PAYROLL & TIPS",
+    seoTitle: "Restaurant Payroll & Tip Pooling Software",
     description:
       "Automate your most sensitive operational workflow. Calculate fair, transparent front-of-house and back-of-house tip pools based on hours or points, automate statutory tax and benefit deductions, and disburse staff salaries with 1-click payslip generation.",
     primaryStat: "1-Click",
@@ -691,6 +698,7 @@ export const RESTO_BIRD_MODULES: Record<string, ModuleData> = {
     categoryLabel: "Financials",
     tagline: "Automated expense aggregation with zero manual bookkeeping.",
     heroBadge: "REAL-TIME EBITDA & BILL REMINDERS",
+    seoTitle: "Restaurant Expense Tracking & P&L Software",
     description:
       "Stop waiting for an accountant to tell you how last month went. Resto Bird unifies daily POS sales, food supplier purchase orders, utility bills, and labor payroll into a live, real-time Profit & Loss statement with predictive EBITDA visibility.",
     primaryStat: "Real-time",
@@ -798,6 +806,7 @@ export const RESTO_BIRD_MODULES: Record<string, ModuleData> = {
     categoryLabel: "Security & Ops",
     tagline: "Enterprise zero-knowledge security for aggregator & banking credentials.",
     heroBadge: "ZERO-KNOWLEDGE CREDENTIAL VAULT",
+    seoTitle: "Restaurant Password Vault & Access Management",
     description:
       "Protect your restaurant from catastrophic account takeovers. Securely store and share delivery aggregator logins (UberEats, DoorDash, Swiggy, Zomato), banking portals, POS admin keys, and Wi-Fi credentials with client-side AES-256 zero-knowledge encryption and built-in 2FA TOTP code generation.",
     primaryStat: "AES-256",
@@ -905,6 +914,7 @@ export const RESTO_BIRD_MODULES: Record<string, ModuleData> = {
     categoryLabel: "Intelligence",
     tagline: "Identify Stars, Plowhorses, Puzzles, and Dogs in real time.",
     heroBadge: "BCG MATRIX & PROFIT EXPANSION",
+    seoTitle: "Menu Engineering & Food Cost Analytics",
     description:
       "Transform your menu into a high-margin profit engine. Resto Bird cross-references live POS sales volume against raw ingredient recipe costs to map every dish on the classic BCG Boston Consulting Group matrix: Stars, Plowhorses, Puzzles, and Dogs.",
     primaryStat: "+14.8%",

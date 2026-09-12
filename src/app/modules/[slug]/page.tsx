@@ -84,11 +84,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
+  const titleText = module.seoTitle || module.name;
+
   return {
-    title: `${module.name} | Resto Bird Operating Intelligence`,
+    title: titleText,
     description: module.description,
+    alternates: {
+      canonical: `/${module.slug}`,
+    },
     openGraph: {
-      title: `${module.name} - Resto Bird`,
+      title: `${titleText} | Resto Bird`,
       description: module.tagline,
       url: `/${module.slug}`,
     },

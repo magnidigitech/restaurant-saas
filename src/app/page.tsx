@@ -106,10 +106,10 @@ export default function RestoBirdMainLandingPage() {
           </div>
 
           {/* Headline */}
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-slate-900 leading-[1.12] sm:leading-[1.08] max-w-3xl mx-auto">
-            Every station. Every shift.{" "}
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-slate-900 leading-[1.12] sm:leading-[1.08] max-w-4xl mx-auto">
+            Restaurant Management Software for{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 block sm:inline">
-              One operating system.
+              Every Station & Shift.
             </span>
           </h1>
 
@@ -287,7 +287,7 @@ export default function RestoBirdMainLandingPage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>100% time theft elimination with PIN & camera-verified tablet kiosk</span>
+                  <span>Eliminate buddy punching with PIN & camera-verified tablet kiosk</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
