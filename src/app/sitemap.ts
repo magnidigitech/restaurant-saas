@@ -1,9 +1,10 @@
 import type { MetadataRoute } from "next";
+import { BLOG_POSTS } from "@/lib/blogData";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://restobird.com";
   // Meaningful content update timestamp for indexable pages
-  const releaseDate = new Date("2026-09-12T00:00:00.000Z");
+  const releaseDate = new Date("2026-09-14T00:00:00.000Z");
 
   const moduleSlugs = [
     "pos",
@@ -22,11 +23,21 @@ export default function sitemap(): MetadataRoute.Sitemap {
     lastModified: releaseDate,
   }));
 
+  const blogEntries: MetadataRoute.Sitemap = BLOG_POSTS.map((post) => ({
+    url: `${baseUrl}/blog/${post.slug}`,
+    lastModified: releaseDate,
+  }));
+
   return [
     {
       url: baseUrl,
       lastModified: releaseDate,
     },
+    {
+      url: `${baseUrl}/blog`,
+      lastModified: releaseDate,
+    },
     ...moduleEntries,
+    ...blogEntries,
   ];
 }

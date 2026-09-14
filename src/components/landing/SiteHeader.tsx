@@ -21,8 +21,14 @@ export default function SiteHeader({ onOpenDemo }: SiteHeaderProps) {
           />
         </Link>
 
-        {/* Header CTAs: ONLY Book a Demo (Sign In button removed as requested) */}
-        <div className="flex items-center space-x-3">
+        {/* Navigation & CTAs */}
+        <div className="flex items-center space-x-4">
+          <Link
+            href="/blog"
+            className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors px-2 py-1"
+          >
+            Blog
+          </Link>
           <button
             onClick={onOpenDemo}
             className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-full transition-all shadow-sm active:scale-95 flex items-center space-x-1.5"

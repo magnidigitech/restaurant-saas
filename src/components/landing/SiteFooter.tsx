@@ -243,6 +243,9 @@ export default function SiteFooter({ onOpenDemo }: SiteFooterProps) {
             <Link href="/" className="hover:text-slate-900 transition-colors font-semibold text-slate-800">
               Resto Bird Home
             </Link>
+            <Link href="/blog" className="hover:text-slate-900 transition-colors font-semibold text-amber-700">
+              Blog & Insights
+            </Link>
             <a href="mailto:getrestobird@gmail.com" className="hover:text-slate-900 transition-colors">
               getrestobird@gmail.com
             </a>
