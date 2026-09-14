@@ -84,6 +84,14 @@ export async function proxy(req: NextRequest) {
 
   let subdomain = "";
 
+  // 2. Canonical www. -> non-www 301 redirect for production SEO
+  if (domain.startsWith("www.") && !isLocalHost(domain)) {
+    const cleanHost = domain.replace(/^www\./, "");
+    const search = req.nextUrl.search || "";
+    const redirectUrl = new URL(`https://${cleanHost}${path}${search}`);
+    return NextResponse.redirect(redirectUrl, { status: 301 });
+  }
+
   if (domain.endsWith(".sslip.io")) {
     const sslipParts = domain.replace(".sslip.io", "").split(".");
     if (sslipParts.length > 5) {
@@ -91,19 +99,24 @@ export async function proxy(req: NextRequest) {
     }
   } else if (isLocalHost(domain)) {
     const domainParts = domain.split(".");
-    if (domainParts.length > 1 && domainParts[0] !== "localhost") {
+    if (domainParts.length > 1 && domainParts[0] !== "localhost" && domainParts[0] !== "www") {
       subdomain = domainParts[0];
     }
   } else if (domain.endsWith(baseDomain)) {
-    if (domain !== baseDomain) {
+    if (domain !== baseDomain && domain !== `www.${baseDomain}`) {
       subdomain = domain.replace(`.${baseDomain}`, "");
     }
   } else {
     const domainParts = domain.split(".");
-    if (domainParts.length > 2) {
+    if (domainParts.length > 2 && domainParts[0] !== "www") {
       subdomain = domainParts[0];
     }
   }
+
+  if (subdomain === "www") {
+    subdomain = "";
+  }
+
 
   // 3. Global Public Routes (e.g. /activate, /onboarding/portal)
   if (path === "/activate" || path.startsWith("/activate/") || path.startsWith("/onboarding/portal")) {
