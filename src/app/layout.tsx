@@ -59,6 +59,10 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "https://restobird.com",
   },
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
+  },
+
   openGraph: {
     title: "Resto Bird (@getrestobird) | Restaurant Management Software & Operating System",
     description:
