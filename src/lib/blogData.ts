@@ -217,4 +217,189 @@ export const BLOG_POSTS: BlogPost[] = [
         "Applying continuous menu engineering data ensures your menu remains profitable, relevant, and optimized for maximum yield.",
     },
   },
+  {
+    slug: "catering-and-banquet-event-management-for-restaurants",
+    title: "Streamlining Large-Scale Banquet Catering & Deposit Tracking for Multi-Outlet Groups",
+    excerpt:
+      "How high-volume restaurant groups manage BEO event orders, kitchen prep schedules, and advance deposit tracking with Resto Bird Catering.",
+    category: "operations",
+    categoryLabel: "Hospitality Operations",
+    publishDate: "September 06, 2026",
+    readTime: "6 min read",
+    author: {
+      name: "Resto Bird Events & Banquets Team",
+      role: "Catering & Event Operations Specialist",
+      avatar: "/resto-bird-flaticon.png",
+    },
+    featuredImage: "/resto-bird-logo.png",
+    keywords: [
+      "getrestobird catering",
+      "Resto Bird banquet software",
+      "BEO banquet event order software",
+      "restaurant event deposit tracking",
+      "catering kitchen prep schedules",
+      "multi outlet banquet management",
+    ],
+    content: {
+      intro:
+        "Catering and private event dining offer high profit margins, but managing Banquet Event Orders (BEOs) alongside daily dining room operations requires specialized coordination. Resto Bird (@getrestobird) simplifies event booking, advance deposit schedules, and bulk kitchen prep routing.",
+      sections: [
+        {
+          heading: "The Challenge of Managing Private Events on Paper",
+          body: "When private party bookings, allergen notes, and deposit payments are stored across email threads and paper binders, kitchen prep teams risk miscalculating bulk portioning or missing key dietary restrictions.",
+          callout: "BEO miscommunication accounts for over 60% of catering order delays and guest dissatisfaction during holiday banquet seasons.",
+          bulletPoints: [
+            "Lost track of multi-stage customer deposit schedules (30% booking, 50% week-of, 20% post-event).",
+            "Double-booking dining rooms or private banquet halls.",
+            "Inaccurate kitchen prep sheets resulting in food shortages during large galas.",
+          ],
+        },
+        {
+          heading: "Automated BEO Generation & Prep Station Sync",
+          body: "Resto Bird Catering generates standardized BEO documents directly from customer inquiries. Confirmed banquet items sync automatically to prep station monitors 48 hours prior to the event, ensuring prep cooks thaw and marinate exact quantities.",
+        },
+        {
+          heading: "PCI-Compliant Deposit & Invoicing Integration",
+          body: "Resto Bird automates credit card deposit billing, sending automated payment reminders to event hosts and updating financial ledger entries in real time.",
+        },
+      ],
+      conclusion:
+        "Centralizing banquet catering orders into Resto Bird empowers restaurant managers to scale high-margin private event sales while keeping kitchen teams calm and organized.",
+    },
+  },
+  {
+    slug: "securing-multi-outlet-restaurant-credentials-with-secrets-vault",
+    title: "Protecting Multi-Outlet Restaurant Credentials & POS API Keys with Encrypted Vaults",
+    excerpt:
+      "Why sharing Wi-Fi passwords, delivery app logins, and payment gateway keys in spreadsheets risks security breaches, and how Resto Bird Secrets Vault locks them down.",
+    category: "operations",
+    categoryLabel: "Hospitality Operations",
+    publishDate: "September 04, 2026",
+    readTime: "5 min read",
+    author: {
+      name: "Resto Bird Security & IT Lead",
+      role: "Cybersecurity & Data Privacy Specialist",
+      avatar: "/resto-bird-logo.png",
+    },
+    featuredImage: "/resto-bird-logo.png",
+    keywords: [
+      "getrestobird vault",
+      "Resto Bird secrets vault",
+      "restaurant password security",
+      "multi location POS API key management",
+      "2FA restaurant access control",
+      "restaurant cybersecurity guidelines",
+    ],
+    content: {
+      intro:
+        "Hospitality chains manage dozens of digital access points: POS admin credentials, food delivery merchant logins, guest Wi-Fi router keys, and payment gateway API secrets. Storing these passwords in shared spreadsheets or sticky notes exposes multi-outlet brands to unauthorized access. Resto Bird (@getrestobird) protects your digital infrastructure with an enterprise Secrets Vault.",
+      sections: [
+        {
+          heading: "The Security Risks Facing Modern Restaurant Chains",
+          body: "High employee turnover means former staff members often retain access to sensitive corporate logins long after leaving. Without central credential revocation, compromised passwords can lead to unauthorized refunds, price tampering, or data leakage.",
+          bulletPoints: [
+            "Unencrypted password sheets shared across manager group chats.",
+            "Lack of Multi-Factor Authentication (MFA/2FA) on critical merchant accounts.",
+            "Failure to rotate POS admin passcodes after manager offboarding.",
+          ],
+        },
+        {
+          heading: "Bank-Grade Encryption & Role-Based Access",
+          body: "Resto Bird Secrets Vault encrypts all store API keys, database credentials, and service tokens with AES-256 encryption. Access is strictly scoped by role, requiring 2FA or biometric passkey verification for high-privilege administrative actions.",
+        },
+      ],
+      conclusion:
+        "Implementing Resto Bird Secrets Vault gives multi-location restaurant operators complete peace of mind that corporate systems remain secure, compliant, and protected.",
+    },
+  },
+  {
+    slug: "offline-resilience-and-kitchen-line-reliability",
+    title: "Why Offline-First Architecture Prevents Kitchen Chaos During Internet Outages",
+    excerpt:
+      "When your internet drops on a Saturday evening, order routing shouldn't stop. Learn how Resto Bird local caching ensures sub-second kitchen ticket dispatch.",
+    category: "pos",
+    categoryLabel: "POS Integrations",
+    publishDate: "September 02, 2026",
+    readTime: "6 min read",
+    author: {
+      name: "Resto Bird Systems Team",
+      role: "Infrastructure Reliability Engineer",
+      avatar: "/resto-bird-flaticon.png",
+    },
+    featuredImage: "/resto-bird-logo.png",
+    keywords: [
+      "getrestobird offline KDS",
+      "Resto Bird offline resilience",
+      "offline POS kitchen display system",
+      "restaurant internet outage protection",
+      "local mesh network KDS",
+    ],
+    content: {
+      intro:
+        "During peak weekend dinner rush, a momentary internet outage can throw an entire restaurant kitchen into chaos if your KDS depends strictly on cloud servers. Resto Bird (@getrestobird) is engineered with an offline-first architecture to keep tickets flowing without interruption.",
+      sections: [
+        {
+          heading: "The Vulnerability of Cloud-Only Kitchen Display Systems",
+          body: "When internet connectivity stutters or drops, cloud-only systems stall order routing. Waiters cannot send tickets, kitchen displays freeze, and orders get delayed or lost.",
+          callout: "A 15-minute internet drop during Friday dinner rush can cost up to $3,500 in lost revenue and refunded guest bills.",
+          bulletPoints: [
+            "Frozen kitchen screens leave line cooks guessing ticket order and table urgency.",
+            "Duplicate orders fired when staff re-open tickets post-reconnection.",
+            "Delayed ticket printouts flooding kitchen stations simultaneously.",
+          ],
+        },
+        {
+          heading: "Local Network Ticket Dispatch & Auto-Resync",
+          body: "Resto Bird maintains a resilient local network mesh between FOH registers and kitchen displays. When external internet drops, orders route across the internal network with zero lag. Once internet restores, Resto Bird syncs all transactions automatically with zero data loss.",
+        },
+      ],
+      conclusion:
+        "Equipping your restaurant with Resto Bird's offline-first KDS guarantees unbroken kitchen operations regardless of internet conditions.",
+    },
+  },
+  {
+    slug: "automating-vendor-invoice-reconciliation-and-ap-tracking",
+    title: "Automating Food Vendor AP Invoice Reconciliation to Catch Invoice Inflation",
+    excerpt:
+      "Discover how automated line-item scanning matches vendor invoices directly against purchase orders to block overbilling before payment.",
+    category: "inventory",
+    categoryLabel: "Inventory & Recipe Depletion",
+    publishDate: "August 30, 2026",
+    readTime: "7 min read",
+    author: {
+      name: "Resto Bird Financial Audit Team",
+      role: "Accounts Payable & Cost Controller",
+      avatar: "/resto-bird-logo.png",
+    },
+    featuredImage: "/resto-bird-logo.png",
+    keywords: [
+      "getrestobird AP invoice",
+      "Resto Bird vendor reconciliation",
+      "restaurant accounts payable automation",
+      "catch food price inflation",
+      "automated invoice scanning",
+      "restaurant vendor billing accuracy",
+    ],
+    content: {
+      intro:
+        "Food supplier pricing fluctuates constantly. When vendors substitute items or increase prices per pound without notice, manual Accounts Payable (AP) processing rarely catches the discrepancy before invoices get paid. Resto Bird (@getrestobird) automates vendor invoice reconciliation to protect your profit margins.",
+      sections: [
+        {
+          heading: "The Hidden Cost of Unchecked Vendor Invoices",
+          body: "Restaurant kitchens receive dozens of vendor delivery invoices every week. When busy receiving staff sign paper invoices without auditing unit costs against negotiated contract rates, unauthorized price increases slip through unnoticed.",
+          bulletPoints: [
+            "Vendor price hikes of 4% to 12% on key ingredients like cheese, poultry, and cooking oils.",
+            "Short-shipments where billed quantities exceed actual delivered weight.",
+            "Duplicate invoices submitted across different accounting periods.",
+          ],
+        },
+        {
+          heading: "Line-Item OCR Scanning & Purchase Order Matching",
+          body: "Resto Bird scans paper or PDF supplier invoices using intelligent line-item OCR. It compares delivered quantities and unit prices against original Purchase Orders, flagging price variances over 1% for manager review before payment approval.",
+        },
+      ],
+      conclusion:
+        "Automating invoice auditing with Resto Bird blocks vendor overbilling, saves hours of manual accounting work, and ensures every dollar spent aligns with agreed contract rates.",
+    },
+  },
 ];
