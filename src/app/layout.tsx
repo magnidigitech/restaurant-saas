@@ -207,9 +207,78 @@ const jsonLd = {
         "https://in.pinterest.com/getrestobird/",
         "https://www.producthunt.com/@getrestobird"
       ]
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://restobird.com/#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is Resto Bird (@getrestobird)?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Resto Bird (@getrestobird / restobird.com) is the unified restaurant management software and operating system. It connects POS integrations (Toast, Square, Clover), sub-second KDS kitchen display routing, gram-level recipe inventory depletion, shift scheduling with buddy-punching prevention, and automated payroll."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does Resto Bird integrate with Toast, Square, and Clover POS?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Resto Bird connects via real-time webhooks & APIs to Toast, Square, and Clover POS systems, streaming live order tickets into a unified kitchen display system and automatically depleting raw ingredients."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Resto Bird support multi-outlet restaurant chain management?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, Resto Bird provides centralized multi-outlet dashboards enabling operators to manage menus, inventory, vendor purchase orders, employee shift rosters, and payroll across multiple locations."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I schedule a 1-on-1 walkthrough demo of Resto Bird?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "You can schedule a personalized 15-minute walkthrough directly on restobird.com or by emailing getrestobird@gmail.com or calling +1-818-497-4588."
+          }
+        }
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://restobird.com/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://restobird.com"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "POS Integrations",
+          "item": "https://restobird.com/pos"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Inventory & Recipe Depletion",
+          "item": "https://restobird.com/inventory"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Payroll & Tip Pooling",
+          "item": "https://restobird.com/payroll"
+        }
+      ]
     }
   ],
 };
+
 
 export default function RootLayout({
   children,
