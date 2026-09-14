@@ -21,13 +21,21 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "Restaurant Management Software for POS & Operations | Resto Bird",
-    template: "%s | Resto Bird",
+    default: "Resto Bird (@getrestobird) | Restaurant Management Software & Operating System",
+    template: "%s | Resto Bird (@getrestobird)",
   },
   description:
-    "Unified restaurant management software and POS operating system. Real-time table floor management, sub-second kitchen display, recipe inventory depletion, and automated payroll.",
+    "Resto Bird (@getrestobird / getrestobird.com) is the unified restaurant management software & operating system. POS integrations (Toast, Square, Clover), sub-second KDS, recipe inventory depletion, shift scheduling, automated payroll & menu engineering analytics.",
   applicationName: "Resto Bird",
   keywords: [
+    "getrestobird",
+    "@getrestobird",
+    "Resto Bird",
+    "RestoBird",
+    "restobird.com",
+    "get restobird",
+    "getrestobird gmail",
+    "getrestobird phone",
     "restaurant management software",
     "restaurant POS software",
     "kitchen display system",
@@ -35,11 +43,11 @@ export const metadata: Metadata = {
     "recipe costing software",
     "restaurant scheduling software",
     "restaurant payroll software",
-    "Resto Bird",
+    "unified restaurant operating system",
   ],
-  authors: [{ name: "Resto Bird" }],
-  creator: "Resto Bird",
-  publisher: "Resto Bird",
+  authors: [{ name: "Resto Bird Inc.", url: "https://restobird.com" }],
+  creator: "@getrestobird",
+  publisher: "Resto Bird Inc.",
   formatDetection: {
     email: false,
     address: false,
@@ -49,20 +57,20 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_APP_URL || "https://restobird.com"
   ),
   alternates: {
-    canonical: "/",
+    canonical: "https://restobird.com",
   },
   openGraph: {
-    title: "Restaurant Management Software for POS & Operations | Resto Bird",
+    title: "Resto Bird (@getrestobird) | Restaurant Management Software & Operating System",
     description:
-      "Unified restaurant management software and POS operating system with real-time floor management, sub-second KDS, and recipe depletion.",
-    url: "/",
-    siteName: "Resto Bird",
+      "Resto Bird (@getrestobird) is the unified restaurant operating system. Front-of-house POS integrations (Toast, Square, Clover), sub-second KDS, gram-level recipe depletion & automated payroll.",
+    url: "https://restobird.com",
+    siteName: "Resto Bird - @getrestobird",
     images: [
       {
         url: "/resto-bird-logo.png",
         width: 1200,
         height: 630,
-        alt: "Resto Bird - Restaurant Management Software",
+        alt: "Resto Bird (@getrestobird) - Unified Restaurant Management Software",
       },
     ],
     locale: "en_US",
@@ -70,11 +78,12 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Restaurant Management Software for POS & Operations | Resto Bird",
+    title: "Resto Bird (@getrestobird) | Restaurant Management Software",
     description:
-      "Unified restaurant management software with sub-second KDS, recipe depletion, shift scheduling, and automated payroll.",
+      "Unified restaurant operating system by Resto Bird (@getrestobird). Connect POS, sub-second KDS, recipe inventory depletion & automated payroll.",
     images: ["/resto-bird-logo.png"],
-    creator: "@restobird",
+    creator: "@getrestobird",
+    site: "@getrestobird",
   },
   robots: {
     index: true,
@@ -102,13 +111,23 @@ const jsonLd = {
   "@graph": [
     {
       "@type": "SoftwareApplication",
+      "@id": "https://restobird.com/#software",
       "name": "Resto Bird",
-      "applicationCategory": "BusinessApplication",
-      "operatingSystem": "Web, iOS, Android",
-      "headline": "Restaurant Management Software for POS & Operations",
+      "alternateName": ["RestoBird", "getrestobird", "@getrestobird", "Resto Bird OS"],
+      "applicationCategory": "BusinessApplication, RestaurantManagementSoftware",
+      "operatingSystem": "Web, iOS, Android, POS Tablets",
+      "headline": "Restaurant Management Software & Unified Operating System",
       "description":
-        "Unified restaurant management software providing real-time POS, sub-second kitchen display routing, recipe inventory depletion, staff scheduling, and payroll.",
+        "Resto Bird (@getrestobird) is the unified restaurant operating system connecting Toast, Square, and Clover POS with sub-second kitchen display routing, gram-level recipe depletion, shift scheduling, and automated payroll.",
       "url": "https://restobird.com",
+      "logo": "https://restobird.com/resto-bird-logo.png",
+      "sameAs": [
+        "https://www.facebook.com/getrestobird",
+        "https://www.instagram.com/getrestobird/",
+        "https://x.com/getrestobird",
+        "https://in.pinterest.com/getrestobird/",
+        "https://www.producthunt.com/@getrestobird"
+      ],
       "offers": {
         "@type": "AggregateOffer",
         "priceCurrency": "USD",
@@ -123,21 +142,68 @@ const jsonLd = {
           "name": "Single Outlet Core Operations",
         },
       },
+      "publisher": {
+        "@type": "Organization",
+        "@id": "https://restobird.com/#organization"
+      }
     },
     {
       "@type": "Organization",
+      "@id": "https://restobird.com/#organization",
       "name": "Resto Bird",
+      "legalName": "Resto Bird Inc.",
+      "alternateName": ["getrestobird", "@getrestobird", "RestoBird"],
       "url": "https://restobird.com",
       "logo": "https://restobird.com/resto-bird-logo.png",
       "image": "https://restobird.com/resto-bird-flaticon.png",
       "slogan": "See your restaurant differently",
+      "email": "getrestobird@gmail.com",
+      "telephone": "+1-818-497-4588",
+      "contactPoint": [
+        {
+          "@type": "ContactPoint",
+          "telephone": "+1-818-497-4588",
+          "email": "getrestobird@gmail.com",
+          "contactType": "customer service",
+          "contactOption": "TollFree",
+          "availableLanguage": ["English", "Spanish", "Hindi"]
+        }
+      ],
+      "sameAs": [
+        "https://www.facebook.com/getrestobird",
+        "https://www.instagram.com/getrestobird/",
+        "https://x.com/getrestobird",
+        "https://in.pinterest.com/getrestobird/",
+        "https://www.producthunt.com/@getrestobird"
+      ]
     },
     {
       "@type": "WebSite",
+      "@id": "https://restobird.com/#website",
       "name": "Resto Bird",
+      "alternateName": ["getrestobird", "getrestobird.com", "@getrestobird"],
       "url": "https://restobird.com",
-      "description": "Restaurant Management Software for POS & Operations",
+      "description": "Resto Bird (@getrestobird) Official Website - Restaurant Management Software for POS & Operations",
+      "publisher": {
+        "@type": "Organization",
+        "@id": "https://restobird.com/#organization"
+      }
     },
+    {
+      "@type": "Brand",
+      "@id": "https://restobird.com/#brand",
+      "name": "Resto Bird",
+      "alternateName": ["getrestobird", "@getrestobird", "RestoBird"],
+      "url": "https://restobird.com",
+      "logo": "https://restobird.com/resto-bird-logo.png",
+      "sameAs": [
+        "https://www.facebook.com/getrestobird",
+        "https://www.instagram.com/getrestobird/",
+        "https://x.com/getrestobird",
+        "https://in.pinterest.com/getrestobird/",
+        "https://www.producthunt.com/@getrestobird"
+      ]
+    }
   ],
 };
 
@@ -168,3 +234,4 @@ export default function RootLayout({
     </html>
   );
 }
+

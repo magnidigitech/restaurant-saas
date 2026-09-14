@@ -29,7 +29,23 @@ html {
   color-scheme: light dark;
 }
 
+/* Bulletproof Browser Autofill Override (Forces light background & dark text on autofilled input fields) */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+  transition: background-color 50000s ease-in-out 0s !important;
+}
+
 body {
+
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;

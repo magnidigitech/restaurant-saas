@@ -944,3 +944,227 @@ This invitation link is cryptographically signed and expires in 7 days.
 
   return { subject, html, text };
 }
+
+export interface BookDemoEmailParams {
+  fullName: string;
+  restaurantName: string;
+  email: string;
+  country: string;
+  phone: string;
+  outletCount: string;
+  restaurantType: string;
+  currentPos?: string;
+  goals?: string[];
+  notes?: string;
+  submittedAt?: Date;
+}
+
+/**
+ * 10. BOOK DEMO REQUEST EMAIL TEMPLATE (SENT TO GETRESTOBIRD@GMAIL.COM)
+ */
+export function generateBookDemoEmail(params: BookDemoEmailParams) {
+  const submittedDateStr = (params.submittedAt || new Date()).toLocaleString("en-US", {
+    dateStyle: "full",
+    timeStyle: "short",
+  });
+
+  const subject = `🔥 New Resto Bird Demo Lead: ${params.restaurantName} (${params.fullName} - ${params.outletCount})`;
+
+  const goalsHtml = params.goals && params.goals.length > 0
+    ? params.goals.map((g) => `<span style="display: inline-block; background: #1e293b; color: #f59e0b; border: 1px solid #334155; padding: 4px 10px; border-radius: 6px; font-size: 12px; margin: 2px 4px 2px 0;">✓ ${g}</span>`).join(" ")
+    : "<span style='color: #64748b;'>None specified</span>";
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+  <style>
+    body { margin: 0; padding: 0; background-color: #090d16; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #cbd5e1; }
+    table { border-collapse: collapse; }
+    .email-container { max-width: 640px; margin: 20px auto; background-color: #0f172a; border: 1px solid #1e293b; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+    .header { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); padding: 32px 28px; text-align: left; border-b: 1px solid #1e293b; }
+    .badge { display: inline-block; padding: 4px 12px; background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #fbbf24; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+    .title { color: #ffffff; font-size: 22px; font-weight: 800; margin: 0 0 6px 0; }
+    .subtitle { color: #94a3b8; font-size: 13px; margin: 0; }
+    .content { padding: 28px; }
+    .detail-card { background: #182234; border: 1px solid #28354d; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+    .row { display: table; width: 100%; border-bottom: 1px solid #243044; padding: 10px 0; }
+    .row:last-child { border-bottom: none; }
+    .label { display: table-cell; width: 35%; color: #94a3b8; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; vertical-align: top; }
+    .value { display: table-cell; width: 65%; color: #ffffff; font-size: 14px; font-weight: 600; vertical-align: top; }
+    .highlight-value { color: #38bdf8; font-weight: 700; }
+    .amber-value { color: #fbbf24; font-weight: 700; }
+    .notes-box { background: #111827; border: 1px dashed #374151; border-radius: 8px; padding: 14px; color: #e5e7eb; font-size: 13px; line-height: 1.5; margin-top: 8px; }
+    .cta-container { text-align: center; padding: 20px 0 10px 0; }
+    .btn { display: inline-block; padding: 12px 24px; background: #f59e0b; color: #000000; font-weight: 800; font-size: 13px; text-decoration: none; border-radius: 8px; margin: 0 6px 8px 6px; }
+    .btn-secondary { display: inline-block; padding: 12px 24px; background: #334155; color: #ffffff; font-weight: 700; font-size: 13px; text-decoration: none; border-radius: 8px; margin: 0 6px 8px 6px; }
+    .footer { background: #0b1120; padding: 20px 28px; text-align: center; border-top: 1px solid #1e293b; color: #64748b; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="header">
+      <div class="badge">🔥 High Intent Lead — 1-on-1 Walkthrough</div>
+      <h1 class="title">${params.restaurantName}</h1>
+      <p class="subtitle">Requested by <strong>${params.fullName}</strong> on ${submittedDateStr}</p>
+    </div>
+
+    <div class="content">
+      <div class="detail-card">
+        <div class="row">
+          <div class="label">Contact Name</div>
+          <div class="value">${params.fullName}</div>
+        </div>
+        <div class="row">
+          <div class="label">Restaurant / Brand</div>
+          <div class="value highlight-value">${params.restaurantName}</div>
+        </div>
+        <div class="row">
+          <div class="label">Email Address</div>
+          <div class="value">
+            <a href="mailto:${params.email}" style="color: #38bdf8; text-decoration: underline;">${params.email}</a>
+          </div>
+        </div>
+        <div class="row">
+          <div class="label">Phone / WhatsApp</div>
+          <div class="value amber-value">
+            <a href="tel:${params.phone.replace(/\s+/g, '')}" style="color: #fbbf24; text-decoration: none;">📞 ${params.phone}</a> (${params.country})
+          </div>
+        </div>
+        <div class="row">
+          <div class="label">Locations / Outlets</div>
+          <div class="value">${params.outletCount}</div>
+        </div>
+        <div class="row">
+          <div class="label">Concept / Type</div>
+          <div class="value">${params.restaurantType}</div>
+        </div>
+        <div class="row">
+          <div class="label">Current POS System</div>
+          <div class="value">${params.currentPos || "Not specified"}</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <div style="color: #94a3b8; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Key Operational Focus Areas</div>
+        <div>${goalsHtml}</div>
+      </div>
+
+      ${params.notes ? `
+      <div style="margin-bottom: 24px;">
+        <div style="color: #94a3b8; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Notes / Preferred Time</div>
+        <div class="notes-box">"${params.notes}"</div>
+      </div>
+      ` : ""}
+
+      <div class="cta-container">
+        <a href="mailto:${params.email}?subject=Resto%20Bird%20Demo%20Walkthrough%20-%20${encodeURIComponent(params.restaurantName)}&body=Hi%20${encodeURIComponent(params.fullName)},%0A%0AThank%20you%20for%20requesting%20a%20demo%20walkthrough%20of%20Resto%20Bird%20for%20${encodeURIComponent(params.restaurantName)}!%0A%0AI%20would%20love%20to%20schedule%20a%2015-minute%20personalized%20session." class="btn">Reply via Email →</a>
+        <a href="tel:${params.phone.replace(/\s+/g, '')}" class="btn-secondary">Call ${params.phone}</a>
+      </div>
+    </div>
+
+    <div class="footer">
+      This notification was generated automatically from the Resto Bird website demo request form.<br>
+      © ${new Date().getFullYear()} Resto Bird Inc. | <a href="https://restobird.com" style="color: #94a3b8;">restobird.com</a>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+  const text = `
+================================================================================
+NEW RESTO BIRD DEMO REQUEST
+================================================================================
+Restaurant Name: ${params.restaurantName}
+Contact Name:    ${params.fullName}
+Email:           ${params.email}
+Phone:           ${params.phone} (${params.country})
+Outlets:         ${params.outletCount}
+Restaurant Type: ${params.restaurantType}
+Current POS:     ${params.currentPos || "N/A"}
+Goals:           ${(params.goals || []).join(", ") || "N/A"}
+Notes:           ${params.notes || "None"}
+Submitted:       ${submittedDateStr}
+================================================================================
+`;
+
+  return { subject, html, text };
+}
+
+/**
+ * 11. DEMO CONFIRMATION EMAIL SENT TO PROSPECT
+ */
+export function generateBookDemoUserConfirmationEmail(params: { fullName: string; restaurantName: string; email: string }) {
+  const subject = `Resto Bird Demo Request Received - ${params.restaurantName} 🚀`;
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${subject}</title>
+  <style>
+    body { margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155; }
+    .container { max-width: 580px; margin: 30px auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+    .header { padding: 32px; background: #0f172a; text-align: center; }
+    .logo { height: 36px; margin-bottom: 12px; }
+    .body { padding: 32px; font-size: 14px; line-height: 1.6; }
+    .highlight-card { background: #f1f5f9; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 20px 0; }
+    .footer { padding: 20px 32px; background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center; font-size: 12px; color: #64748b; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://restobird.com/resto-bird-logo.png" alt="Resto Bird" class="logo" />
+      <div style="color: #fbbf24; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Demo Request Confirmed</div>
+    </div>
+    <div class="body">
+      <h2 style="color: #0f172a; margin-top: 0;">Hi ${params.fullName},</h2>
+      <p>Thank you for your interest in <strong>Resto Bird</strong>! We have received your request for a 1-on-1 operational walkthrough tailored for <strong>${params.restaurantName}</strong>.</p>
+      
+      <div class="highlight-card">
+        <strong style="color: #0f172a;">What happens next?</strong><br>
+        A Resto Bird hospitality operations specialist will contact you shortly via email or phone to confirm a time that fits your schedule.
+      </div>
+
+      <p>During the 15-minute walkthrough, we will demonstrate:</p>
+      <ul>
+        <li>Gram-level recipe depletion & automatic purchase ordering</li>
+        <li>Unified POS stream across all your locations</li>
+        <li>Shift rosters, peer trade board & buddy-punching prevention</li>
+        <li>Menu engineering margin analytics</li>
+      </ul>
+
+      <p>If you have any urgent questions, feel free to reply directly to this email or reach us at <a href="mailto:getrestobird@gmail.com" style="color: #0284c7;">getrestobird@gmail.com</a>.</p>
+      
+      <p style="margin-bottom: 0;">Warm regards,<br><strong>The Resto Bird Team</strong></p>
+    </div>
+    <div class="footer">
+      © ${new Date().getFullYear()} Resto Bird Inc. | All rights reserved.<br>
+      <a href="https://restobird.com" style="color: #64748b;">www.restobird.com</a>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+  const text = `
+Hi ${params.fullName},
+
+Thank you for your interest in Resto Bird! We have received your request for a 1-on-1 walkthrough for ${params.restaurantName}.
+
+A Resto Bird specialist will contact you shortly to confirm your session.
+
+Best regards,
+The Resto Bird Team
+getrestobird@gmail.com
+`;
+
+  return { subject, html, text };
+}
+
