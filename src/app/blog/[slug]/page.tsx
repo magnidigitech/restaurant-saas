@@ -4,14 +4,15 @@ import { BLOG_POSTS, BlogPost } from "@/lib/blogData";
 import BlogPostClient from "@/components/blog/BlogPostClient";
 
 interface Props {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
 // Generate dynamic metadata for SEO
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const post = BLOG_POSTS.find((p) => p.slug === params.slug);
+  const { slug } = await params;
+  const post = BLOG_POSTS.find((p) => p.slug === slug);
   if (!post) {
     return {
       title: "Article Not Found | Resto Bird",
@@ -58,8 +59,9 @@ export async function generateStaticParams() {
   }));
 }
 
-export default function BlogPostPage({ params }: Props) {
-  const post = BLOG_POSTS.find((p) => p.slug === params.slug);
+export default async function BlogPostPage({ params }: Props) {
+  const { slug } = await params;
+  const post = BLOG_POSTS.find((p) => p.slug === slug);
 
   if (!post) {
     notFound();
