@@ -41,7 +41,7 @@ export async function POST(
     const since = body.since ? new Date(body.since) : undefined;
 
     const result = await executeSync(id, since);
-    return NextResponse.json({ success: true, ...result });
+    return NextResponse.json({ ...result });
   } catch (error: any) {
     console.error("Execute POS Sync Error:", error);
     return NextResponse.json(

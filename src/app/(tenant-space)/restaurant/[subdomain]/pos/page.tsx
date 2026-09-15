@@ -15,6 +15,7 @@ import {
   Clock,
   Search,
   ChevronRight,
+  ChevronLeft,
   ShieldCheck,
   ArrowRight,
   ArrowLeft,
@@ -216,9 +217,206 @@ export default function PosHubPage({
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [dateRange, setDateRange] = useState<string>("all");
+  const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
+  const [customEndDate, setCustomEndDate] = useState<Date | null>(null);
+  const [isDateModalOpen, setIsDateModalOpen] = useState<boolean>(false);
+  const [calendarTab, setCalendarTab] = useState<"day" | "week" | "month" | "year" | "custom">("custom");
+  const [pickingTarget, setPickingTarget] = useState<"start" | "end">("start");
+  const [calendarViewMonth, setCalendarViewMonth] = useState<number>(new Date().getMonth());
+  const [calendarViewYear, setCalendarViewYear] = useState<number>(new Date().getFullYear());
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(20);
   const [totalOrders, setTotalOrders] = useState<number>(0);
+
+  // Date Filter & Calendar Helper Functions
+  const MONTH_NAMES = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const formatDateDisplay = (date: Date | null, fallback: string) => {
+    if (!date) return fallback;
+    return date.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const isSameDay = (d1: Date | null, d2: Date | null) => {
+    if (!d1 || !d2) return false;
+    return (
+      d1.getFullYear() === d2.getFullYear() &&
+      d1.getMonth() === d2.getMonth() &&
+      d1.getDate() === d2.getDate()
+    );
+  };
+
+  const isDateInRange = (date: Date, start: Date | null, end: Date | null) => {
+    if (!start || !end) return false;
+    const t = date.getTime();
+    const s = new Date(start).setHours(0, 0, 0, 0);
+    const e = new Date(end).setHours(23, 59, 59, 999);
+    return t >= s && t <= e;
+  };
+
+  const getCalendarGridDays = (year: number, month: number) => {
+    const firstDayIndex = new Date(year, month, 1).getDay(); // 0 = Sunday
+    const daysInCurrentMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    const daysList: Array<{
+      day: number;
+      month: number;
+      year: number;
+      isCurrentMonth: boolean;
+      dateObj: Date;
+    }> = [];
+
+    // Previous month trailing days
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const prevM = month === 0 ? 11 : month - 1;
+      const prevY = month === 0 ? year - 1 : year;
+      const dNum = daysInPrevMonth - i;
+      daysList.push({
+        day: dNum,
+        month: prevM,
+        year: prevY,
+        isCurrentMonth: false,
+        dateObj: new Date(prevY, prevM, dNum),
+      });
+    }
+
+    // Current month days
+    for (let d = 1; d <= daysInCurrentMonth; d++) {
+      daysList.push({
+        day: d,
+        month,
+        year,
+        isCurrentMonth: true,
+        dateObj: new Date(year, month, d),
+      });
+    }
+
+    // Next month leading days to complete grid
+    const targetLength = daysList.length > 35 ? 42 : 35;
+    const remainingCells = targetLength - daysList.length;
+    for (let d = 1; d <= remainingCells; d++) {
+      const nextM = month === 11 ? 0 : month + 1;
+      const nextY = month === 11 ? year + 1 : year;
+      daysList.push({
+        day: d,
+        month: nextM,
+        year: nextY,
+        isCurrentMonth: false,
+        dateObj: new Date(nextY, nextM, d),
+      });
+    }
+
+    return daysList;
+  };
+
+  const handleCalendarDateClick = (dateObj: Date) => {
+    if (calendarTab === "day") {
+      const start = new Date(dateObj);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(dateObj);
+      end.setHours(23, 59, 59, 999);
+      setCustomStartDate(start);
+      setCustomEndDate(end);
+    } else if (calendarTab === "week") {
+      const dayOfWeek = dateObj.getDay();
+      const start = new Date(dateObj);
+      start.setDate(dateObj.getDate() - dayOfWeek);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+      setCustomStartDate(start);
+      setCustomEndDate(end);
+    } else {
+      if (pickingTarget === "start") {
+        const start = new Date(dateObj);
+        start.setHours(0, 0, 0, 0);
+        setCustomStartDate(start);
+        if (customEndDate && customEndDate < start) {
+          setCustomEndDate(null);
+        }
+        setPickingTarget("end");
+      } else {
+        const end = new Date(dateObj);
+        end.setHours(23, 59, 59, 999);
+        if (customStartDate && end < customStartDate) {
+          setCustomEndDate(customStartDate);
+          setCustomStartDate(end);
+        } else {
+          setCustomEndDate(end);
+        }
+        setPickingTarget("start");
+      }
+    }
+  };
+
+  const handlePresetSelect = (presetKey: string) => {
+    const now = new Date();
+    if (presetKey === "today") {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      setCustomStartDate(start);
+      setCustomEndDate(end);
+      setDateRange("today");
+    } else if (presetKey === "7d") {
+      const start = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const end = new Date();
+      setCustomStartDate(start);
+      setCustomEndDate(end);
+      setDateRange("7d");
+    } else if (presetKey === "30d") {
+      const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const end = new Date();
+      setCustomStartDate(start);
+      setCustomEndDate(end);
+      setDateRange("30d");
+    } else if (presetKey === "ytd") {
+      const start = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
+      const end = new Date();
+      setCustomStartDate(start);
+      setCustomEndDate(end);
+      setDateRange("ytd");
+    } else if (presetKey === "all") {
+      setCustomStartDate(null);
+      setCustomEndDate(null);
+      setDateRange("all");
+    }
+  };
+
+  const handleApplyCalendarFilter = () => {
+    if (customStartDate || customEndDate) {
+      setDateRange("custom");
+    }
+    setIsDateModalOpen(false);
+    setCurrentPage(1);
+    fetchOrdersList(1);
+  };
+
+  const getDateFilterLabel = () => {
+    if (dateRange === "today") return "Today";
+    if (dateRange === "7d") return "Last 7 Days";
+    if (dateRange === "30d") return "Last 30 Days";
+    if (dateRange === "ytd") return "Year to Date (YTD)";
+    if (dateRange === "all") return "All Time (Full History)";
+    if (dateRange === "custom") {
+      if (customStartDate && customEndDate) {
+        return `${formatDateDisplay(customStartDate, "")} - ${formatDateDisplay(customEndDate, "")}`;
+      } else if (customStartDate) {
+        return `From ${formatDateDisplay(customStartDate, "")}`;
+      } else if (customEndDate) {
+        return `Until ${formatDateDisplay(customEndDate, "")}`;
+      }
+      return "Custom Date Range";
+    }
+    return "All Time";
+  };
 
   // Navigation tabs: 'orders' | 'integrations'
   const [activeTab, setActiveTab] = useState<"orders" | "integrations">("orders");
@@ -321,6 +519,17 @@ export default function PosHubPage({
       } else if (dateRange === "ytd") {
         const start = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
         q.set("startDate", start.toISOString());
+      } else if (dateRange === "custom") {
+        if (customStartDate) {
+          const s = new Date(customStartDate);
+          s.setHours(0, 0, 0, 0);
+          q.set("startDate", s.toISOString());
+        }
+        if (customEndDate) {
+          const e = new Date(customEndDate);
+          e.setHours(23, 59, 59, 999);
+          q.set("endDate", e.toISOString());
+        }
       } else if (dateRange === "all") {
         // No startDate filter applied to query all-time history
       }
@@ -353,7 +562,7 @@ export default function PosHubPage({
       setCurrentPage(1);
       fetchOrdersList(1);
     }
-  }, [selectedOutlet, selectedProvider, selectedStatus, dateRange, pageSize]);
+  }, [selectedOutlet, selectedProvider, selectedStatus, dateRange, customStartDate, customEndDate, pageSize]);
 
   useEffect(() => {
     if (!loading) {
@@ -870,18 +1079,16 @@ export default function PosHubPage({
                         <option value="CANCELLED">Cancelled</option>
                       </select>
 
-                      {/* Date Range */}
-                      <select
-                        value={dateRange}
-                        onChange={(e) => setDateRange(e.target.value)}
-                        className="text-xs rounded-xl bg-slate-100 dark:bg-slate-800 border-none px-3 py-2 text-slate-700 dark:text-slate-300 font-medium focus:ring-2 focus:ring-emerald-500 shrink-0"
+                      {/* Date Range Picker Trigger */}
+                      <button
+                        type="button"
+                        onClick={() => setIsDateModalOpen(true)}
+                        className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors border border-slate-200/60 dark:border-slate-700/60 shrink-0"
                       >
-                        <option value="today">Today</option>
-                        <option value="7d">Last 7 Days</option>
-                        <option value="30d">Last 30 Days</option>
-                        <option value="ytd">Year to Date (YTD)</option>
-                        <option value="all">All Time (Full History)</option>
-                      </select>
+                        <Calendar className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span>{getDateFilterLabel()}</span>
+                        <ChevronDown className="w-3 h-3 text-slate-400" />
+                      </button>
                     </div>
 
                     {/* Search Input */}
@@ -2009,6 +2216,299 @@ export default function PosHubPage({
                       </div>
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Calendar Style Date Range Filter Modal (Image 2 Layout with Restobird Emerald Theme) */}
+          {isDateModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[92vh]">
+                {/* Modal Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                      Filter by
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setIsDateModalOpen(false)}
+                    className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto space-y-5">
+                  {/* Presets Tab Bar (Image 2 Style) */}
+                  <div className="p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl flex items-center gap-1 text-xs font-semibold">
+                    {[
+                      { id: "day", label: "Day" },
+                      { id: "week", label: "Week" },
+                      { id: "month", label: "Month" },
+                      { id: "year", label: "Year" },
+                      { id: "custom", label: "Custom" },
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setCalendarTab(tab.id as any)}
+                        className={`flex-1 py-2 px-2.5 rounded-xl transition-all text-center ${
+                          calendarTab === tab.id
+                            ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20 font-bold"
+                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Custom Start & End Date Input Boxes (Image 2 Style) */}
+                  {(calendarTab === "custom" || calendarTab === "day" || calendarTab === "week") && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setPickingTarget("start")}
+                        className={`p-3 rounded-2xl border text-left transition-all ${
+                          pickingTarget === "start"
+                            ? "border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200"
+                            : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300"
+                        }`}
+                      >
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                          Start Date
+                        </span>
+                        <span className="text-xs font-bold block truncate">
+                          {formatDateDisplay(customStartDate, "Select Start Date")}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setPickingTarget("end")}
+                        className={`p-3 rounded-2xl border text-left transition-all ${
+                          pickingTarget === "end"
+                            ? "border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200"
+                            : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300"
+                        }`}
+                      >
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                          End Date
+                        </span>
+                        <span className="text-xs font-bold block truncate">
+                          {formatDateDisplay(customEndDate, "Select End Date")}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Month & Year Navigation Header */}
+                  {(calendarTab === "custom" || calendarTab === "day" || calendarTab === "week") && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between px-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (calendarViewMonth === 0) {
+                              setCalendarViewMonth(11);
+                              setCalendarViewYear(calendarViewYear - 1);
+                            } else {
+                              setCalendarViewMonth(calendarViewMonth - 1);
+                            }
+                          }}
+                          className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">
+                          {MONTH_NAMES[calendarViewMonth]} {calendarViewYear}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (calendarViewMonth === 11) {
+                              setCalendarViewMonth(0);
+                              setCalendarViewYear(calendarViewYear + 1);
+                            } else {
+                              setCalendarViewMonth(calendarViewMonth + 1);
+                            }
+                          }}
+                          className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* Days of Week Header */}
+                      <div className="grid grid-cols-7 text-center text-xs font-semibold text-slate-400 dark:text-slate-500">
+                        {["S", "M", "T", "W", "T", "F", "S"].map((dayStr, idx) => (
+                          <div key={idx} className="py-1">
+                            {dayStr}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Interactive Calendar Days Grid */}
+                      <div className="grid grid-cols-7 gap-1 text-center">
+                        {getCalendarGridDays(calendarViewYear, calendarViewMonth).map((cell, idx) => {
+                          const isStart = isSameDay(cell.dateObj, customStartDate);
+                          const isEnd = isSameDay(cell.dateObj, customEndDate);
+                          const inRange = isDateInRange(cell.dateObj, customStartDate, customEndDate);
+                          const isToday = isSameDay(cell.dateObj, new Date());
+
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => handleCalendarDateClick(cell.dateObj)}
+                              className={`h-9 w-full rounded-xl text-xs font-semibold flex items-center justify-center transition-all ${
+                                isStart || isEnd
+                                  ? "bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/30 rounded-full"
+                                  : inRange
+                                  ? "bg-emerald-500/15 dark:bg-emerald-500/25 text-emerald-800 dark:text-emerald-200 font-bold"
+                                  : isToday
+                                  ? "border border-emerald-500 text-emerald-600 font-bold"
+                                  : cell.isCurrentMonth
+                                  ? "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                  : "text-slate-300 dark:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                              }`}
+                            >
+                              {cell.day}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Month Selection Grid (When 'Month' tab active) */}
+                  {calendarTab === "month" && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between px-2">
+                        <button
+                          type="button"
+                          onClick={() => setCalendarViewYear(calendarViewYear - 1)}
+                          className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">
+                          Year {calendarViewYear}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setCalendarViewYear(calendarViewYear + 1)}
+                          className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        {MONTH_NAMES.map((mName, mIdx) => {
+                          const isSelMonth =
+                            customStartDate &&
+                            customStartDate.getFullYear() === calendarViewYear &&
+                            customStartDate.getMonth() === mIdx;
+
+                          return (
+                            <button
+                              key={mName}
+                              type="button"
+                              onClick={() => {
+                                const start = new Date(calendarViewYear, mIdx, 1, 0, 0, 0);
+                                const end = new Date(calendarViewYear, mIdx + 1, 0, 23, 59, 59, 999);
+                                setCustomStartDate(start);
+                                setCustomEndDate(end);
+                              }}
+                              className={`py-3 px-2 rounded-xl text-xs font-semibold transition-all ${
+                                isSelMonth
+                                  ? "bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/30"
+                                  : "bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-600"
+                              }`}
+                            >
+                              {mName}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Year Selection Grid (When 'Year' tab active) */}
+                  {calendarTab === "year" && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {[2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015].map((yr) => {
+                        const isSelYear =
+                          customStartDate && customStartDate.getFullYear() === yr;
+
+                        return (
+                          <button
+                            key={yr}
+                            type="button"
+                            onClick={() => {
+                              const start = new Date(yr, 0, 1, 0, 0, 0);
+                              const end = new Date(yr, 11, 31, 23, 59, 59, 999);
+                              setCustomStartDate(start);
+                              setCustomEndDate(end);
+                            }}
+                            className={`py-3 px-2 rounded-xl text-xs font-semibold transition-all ${
+                              isSelYear
+                                ? "bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/30"
+                                : "bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-600"
+                            }`}
+                          >
+                            {yr}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Quick Range Shortcut Pills */}
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                      Quick Presets
+                    </span>
+                    <div className="flex flex-wrap gap-1.5 text-xs">
+                      {[
+                        { id: "today", label: "Today" },
+                        { id: "7d", label: "Last 7 Days" },
+                        { id: "30d", label: "Last 30 Days" },
+                        { id: "ytd", label: "YTD" },
+                        { id: "all", label: "All History" },
+                      ].map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => handlePresetSelect(p.id)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            dateRange === p.id && !customStartDate
+                              ? "bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30"
+                              : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modal Sticky Footer - Apply Button */}
+                <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                  <button
+                    type="button"
+                    onClick={handleApplyCalendarFilter}
+                    className="w-full py-3 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-bold text-sm shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Check className="w-4 h-4" />
+                    Apply Filter
+                  </button>
                 </div>
               </div>
             </div>
