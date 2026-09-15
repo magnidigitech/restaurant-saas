@@ -824,15 +824,15 @@ export default function PosHubPage({
               {activeTab === "orders" ? (
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                   {/* Filters Bar */}
-                  <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
+                  <div className="p-3 sm:p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2 overflow-x-auto max-w-full pb-1 md:pb-0">
                       {/* Provider Tabs */}
-                      <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
+                      <div className="inline-flex shrink-0 rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
                         {["ALL", "TOAST", "SQUARE", "CLOVER"].map((prov) => (
                           <button
                             key={prov}
                             onClick={() => setSelectedProvider(prov)}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
                               selectedProvider === prov
                                 ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm font-semibold"
                                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -847,7 +847,7 @@ export default function PosHubPage({
                       <select
                         value={selectedOutlet}
                         onChange={(e) => setSelectedOutlet(e.target.value)}
-                        className="text-xs rounded-xl bg-slate-100 dark:bg-slate-800 border-none px-3 py-2 text-slate-700 dark:text-slate-300 font-medium focus:ring-2 focus:ring-emerald-500"
+                        className="text-xs rounded-xl bg-slate-100 dark:bg-slate-800 border-none px-3 py-2 text-slate-700 dark:text-slate-300 font-medium focus:ring-2 focus:ring-emerald-500 shrink-0"
                       >
                         <option value="ALL">All Outlets</option>
                         {outlets.map((o) => (
@@ -861,7 +861,7 @@ export default function PosHubPage({
                       <select
                         value={selectedStatus}
                         onChange={(e) => setSelectedStatus(e.target.value)}
-                        className="text-xs rounded-xl bg-slate-100 dark:bg-slate-800 border-none px-3 py-2 text-slate-700 dark:text-slate-300 font-medium focus:ring-2 focus:ring-emerald-500"
+                        className="text-xs rounded-xl bg-slate-100 dark:bg-slate-800 border-none px-3 py-2 text-slate-700 dark:text-slate-300 font-medium focus:ring-2 focus:ring-emerald-500 shrink-0"
                       >
                         <option value="ALL">All Statuses</option>
                         <option value="COMPLETED">Completed</option>
@@ -874,7 +874,7 @@ export default function PosHubPage({
                       <select
                         value={dateRange}
                         onChange={(e) => setDateRange(e.target.value)}
-                        className="text-xs rounded-xl bg-slate-100 dark:bg-slate-800 border-none px-3 py-2 text-slate-700 dark:text-slate-300 font-medium focus:ring-2 focus:ring-emerald-500"
+                        className="text-xs rounded-xl bg-slate-100 dark:bg-slate-800 border-none px-3 py-2 text-slate-700 dark:text-slate-300 font-medium focus:ring-2 focus:ring-emerald-500 shrink-0"
                       >
                         <option value="today">Today</option>
                         <option value="7d">Last 7 Days</option>
@@ -885,7 +885,7 @@ export default function PosHubPage({
                     </div>
 
                     {/* Search Input */}
-                    <div className="relative min-w-[240px]">
+                    <div className="relative w-full md:w-auto md:min-w-[240px]">
                       <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
@@ -898,157 +898,249 @@ export default function PosHubPage({
                     </div>
                   </div>
 
-                  {/* Orders Table */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-slate-800">
-                        <tr>
-                          <th className="px-5 py-3">Order Ref</th>
-                          <th className="px-4 py-3">Provider</th>
-                          <th className="px-4 py-3">Outlet</th>
-                          <th className="px-4 py-3">Customer</th>
-                          <th className="px-4 py-3">Time</th>
-                          <th className="px-4 py-3">Items</th>
-                          <th className="px-4 py-3">Status</th>
-                          <th className="px-4 py-3 text-right">Tip</th>
-                          <th className="px-5 py-3 text-right">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {(() => {
-                          const displayOrders = orders.filter((o) => {
-                            const itemCount = o.items?.length || 0;
-                            const tot = Number(o.totalAmount || 0);
-                            const tip = Number(o.tipAmount || 0);
-                            const pId = String(o.providerOrderId || "");
-                            if ((itemCount === 0 && tot === 0 && tip === 0) || pId.startsWith("ord_") || pId === "undefined" || !pId) {
-                              return false;
-                            }
-                            return true;
-                          });
+                  {/* Orders List Container: Desktop Table vs Mobile Cards */}
+                  {(() => {
+                    const displayOrders = orders.filter((o) => {
+                      const itemCount = o.items?.length || 0;
+                      const tot = Number(o.totalAmount || 0);
+                      const tip = Number(o.tipAmount || 0);
+                      const pId = String(o.providerOrderId || "");
+                      if ((itemCount === 0 && tot === 0 && tip === 0) || pId.startsWith("ord_") || pId === "undefined" || !pId) {
+                        return false;
+                      }
+                      return true;
+                    });
 
-                          if (displayOrders.length === 0) {
-                            return (
-                              <tr>
-                                <td colSpan={9} className="px-6 py-12 text-center text-slate-500">
-                                  <ShoppingBag className="w-8 h-8 mx-auto mb-2 text-slate-400 opacity-60" />
-                                  <p className="font-semibold text-slate-700 dark:text-slate-300">No orders found</p>
-                                  <p className="text-xs mt-1">
-                                    Adjust your filters or trigger a sync to pull recent transactions.
-                                  </p>
-                                </td>
-                              </tr>
-                            );
-                          }
+                    if (displayOrders.length === 0) {
+                      return (
+                        <div className="px-6 py-12 text-center text-slate-500">
+                          <ShoppingBag className="w-8 h-8 mx-auto mb-2 text-slate-400 opacity-60" />
+                          <p className="font-semibold text-slate-700 dark:text-slate-300">No orders found</p>
+                          <p className="text-xs mt-1">
+                            Adjust your filters or trigger a sync to pull recent transactions.
+                          </p>
+                        </div>
+                      );
+                    }
 
-                          return displayOrders.map((order) => {
+                    return (
+                      <>
+                        {/* 1. Mobile Cards View (< md screens) */}
+                        <div className="block md:hidden p-3 space-y-3">
+                          {displayOrders.map((order) => {
                             const provDef = POS_PROVIDERS.find((p) => p.id === order.provider);
-                            
-                            // Format order ref to never show bare 10, 11
                             let displayRef = order.orderNumber;
                             if (!displayRef.startsWith("TST-") && !displayRef.startsWith("ORD-") && !displayRef.startsWith("SQ-") && !displayRef.startsWith("CLV-")) {
                               displayRef = `TST-${displayRef}`;
                             }
 
                             return (
-                              <tr
+                              <div
                                 key={order.id}
                                 onClick={() => setSelectedOrderDetails(order)}
-                                className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer transition-colors"
+                                className="p-4 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 shadow-sm active:scale-[0.99] transition-all cursor-pointer space-y-2.5"
                               >
-                                <td className="px-5 py-3.5">
-                                  <div className="font-bold text-slate-900 dark:text-white">
-                                    {displayRef}
-                                  </div>
-                                  <div className="text-[11px] text-slate-400 font-mono">
-                                    {order.providerOrderId || "Internal"}
-                                  </div>
-                                </td>
-
-                                <td className="px-4 py-3.5">
-                                  <span
-                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold"
-                                    style={{
-                                      backgroundColor: provDef?.accentBg || "rgba(100, 116, 139, 0.1)",
-                                      color: provDef?.color || "#64748B",
-                                    }}
-                                  >
-                                    {provDef?.name || order.provider || "Manual"}
-                                  </span>
-                                </td>
-
-                                <td className="px-4 py-3.5 text-slate-600 dark:text-slate-300 font-medium">
-                                  {order.outlet?.name}
-                                </td>
-
-                                <td className="px-4 py-3.5">
-                                  {order.customerName ? (
-                                    <div>
-                                      <p className="font-medium text-slate-800 dark:text-slate-200">
-                                        {order.customerName}
-                                      </p>
-                                      {order.customerPhone && (
-                                        <p className="text-[10px] text-slate-400">{order.customerPhone}</p>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <span className="text-slate-400 italic">Anonymous / Walk-in</span>
-                                  )}
-                                </td>
-
-                                <td className="px-4 py-3.5 text-slate-500 whitespace-nowrap">
-                                  {new Date(order.createdAt).toLocaleDateString([], {
-                                    month: "short",
-                                    day: "numeric",
-                                  })}{" "}
-                                  •{" "}
-                                  {new Date(order.createdAt).toLocaleTimeString([], {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </td>
-
-                                <td className="px-4 py-3.5 text-slate-600 dark:text-slate-300">
-                                  <span className="font-semibold">{order.items?.length || 0}</span> items
-                                </td>
-
-                                <td className="px-4 py-3.5">
-                                  <span
-                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                      order.status === "COMPLETED"
-                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                                        : order.status === "REFUNDED"
-                                        ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
-                                        : order.status === "CANCELLED"
-                                        ? "bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20"
-                                        : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                                    }`}
-                                  >
-                                    {order.status}
-                                  </span>
-                                </td>
-
-                                {/* Dedicated Tip Column */}
-                                <td className="px-4 py-3.5 text-right font-medium whitespace-nowrap">
-                                  {Number(order.tipAmount || 0) > 0 ? (
-                                    <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                                      +${Number(order.tipAmount).toFixed(2)}
+                                {/* Card Header: Ref, Provider, Total */}
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-sm text-slate-900 dark:text-white">
+                                      {displayRef}
                                     </span>
-                                  ) : (
-                                    <span className="text-slate-400">$0.00</span>
-                                  )}
-                                </td>
+                                    <span
+                                      className="px-2 py-0.5 rounded text-[10px] font-semibold"
+                                      style={{
+                                        backgroundColor: provDef?.accentBg || "rgba(100, 116, 139, 0.1)",
+                                        color: provDef?.color || "#64748B",
+                                      }}
+                                    >
+                                      {provDef?.name || order.provider || "Manual"}
+                                    </span>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="font-extrabold text-sm text-slate-900 dark:text-white">
+                                      ${Number(order.totalAmount || 0).toFixed(2)}
+                                    </span>
+                                  </div>
+                                </div>
 
-                                <td className="px-5 py-3.5 text-right font-bold text-slate-900 dark:text-white">
-                                  ${Number(order.totalAmount || 0).toFixed(2)}
-                                </td>
-                              </tr>
+                                {/* Customer & Outlet Info */}
+                                <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-700/50">
+                                  <div>
+                                    {order.customerName ? (
+                                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                        {order.customerName}
+                                      </span>
+                                    ) : (
+                                      <span className="italic text-slate-400">Anonymous / Walk-in</span>
+                                    )}
+                                    <span className="mx-1.5">•</span>
+                                    <span className="font-medium text-slate-600 dark:text-slate-300">{order.outlet?.name}</span>
+                                  </div>
+                                  <div className="text-[11px] text-slate-400 whitespace-nowrap">
+                                    {new Date(order.createdAt).toLocaleDateString([], { month: "short", day: "numeric" })},{" "}
+                                    {new Date(order.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                  </div>
+                                </div>
+
+                                {/* Status, Items, Tip & Chevron */}
+                                <div className="flex items-center justify-between text-xs pt-1">
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                        order.status === "COMPLETED"
+                                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                                          : order.status === "REFUNDED"
+                                          ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                                          : order.status === "CANCELLED"
+                                          ? "bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20"
+                                          : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                                      }`}
+                                    >
+                                      {order.status}
+                                    </span>
+                                    <span className="text-slate-600 dark:text-slate-300">
+                                      <span className="font-semibold">{order.items?.length || 0}</span> items
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    {Number(order.tipAmount || 0) > 0 && (
+                                      <span className="font-bold text-xs text-indigo-600 dark:text-indigo-400">
+                                        Tip: +${Number(order.tipAmount).toFixed(2)}
+                                      </span>
+                                    )}
+                                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                                  </div>
+                                </div>
+                              </div>
                             );
-                          });
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
+                          })}
+                        </div>
+
+                        {/* 2. Desktop Table View (>= md screens) */}
+                        <div className="hidden md:block overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-slate-800">
+                              <tr>
+                                <th className="px-5 py-3">Order Ref</th>
+                                <th className="px-4 py-3">Provider</th>
+                                <th className="px-4 py-3">Outlet</th>
+                                <th className="px-4 py-3">Customer</th>
+                                <th className="px-4 py-3">Time</th>
+                                <th className="px-4 py-3">Items</th>
+                                <th className="px-4 py-3">Status</th>
+                                <th className="px-4 py-3 text-right">Tip</th>
+                                <th className="px-5 py-3 text-right">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                              {displayOrders.map((order) => {
+                                const provDef = POS_PROVIDERS.find((p) => p.id === order.provider);
+                                let displayRef = order.orderNumber;
+                                if (!displayRef.startsWith("TST-") && !displayRef.startsWith("ORD-") && !displayRef.startsWith("SQ-") && !displayRef.startsWith("CLV-")) {
+                                  displayRef = `TST-${displayRef}`;
+                                }
+
+                                return (
+                                  <tr
+                                    key={order.id}
+                                    onClick={() => setSelectedOrderDetails(order)}
+                                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer transition-colors"
+                                  >
+                                    <td className="px-5 py-3.5">
+                                      <div className="font-bold text-slate-900 dark:text-white">
+                                        {displayRef}
+                                      </div>
+                                      <div className="text-[11px] text-slate-400 font-mono">
+                                        {order.providerOrderId || "Internal"}
+                                      </div>
+                                    </td>
+
+                                    <td className="px-4 py-3.5">
+                                      <span
+                                        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold"
+                                        style={{
+                                          backgroundColor: provDef?.accentBg || "rgba(100, 116, 139, 0.1)",
+                                          color: provDef?.color || "#64748B",
+                                        }}
+                                      >
+                                        {provDef?.name || order.provider || "Manual"}
+                                      </span>
+                                    </td>
+
+                                    <td className="px-4 py-3.5 text-slate-600 dark:text-slate-300 font-medium">
+                                      {order.outlet?.name}
+                                    </td>
+
+                                    <td className="px-4 py-3.5">
+                                      {order.customerName ? (
+                                        <div>
+                                          <p className="font-medium text-slate-800 dark:text-slate-200">
+                                            {order.customerName}
+                                          </p>
+                                          {order.customerPhone && (
+                                            <p className="text-[10px] text-slate-400">{order.customerPhone}</p>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <span className="text-slate-400 italic">Anonymous / Walk-in</span>
+                                      )}
+                                    </td>
+
+                                    <td className="px-4 py-3.5 text-slate-500 whitespace-nowrap">
+                                      {new Date(order.createdAt).toLocaleDateString([], {
+                                        month: "short",
+                                        day: "numeric",
+                                      })}{" "}
+                                      •{" "}
+                                      {new Date(order.createdAt).toLocaleTimeString([], {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </td>
+
+                                    <td className="px-4 py-3.5 text-slate-600 dark:text-slate-300">
+                                      <span className="font-semibold">{order.items?.length || 0}</span> items
+                                    </td>
+
+                                    <td className="px-4 py-3.5">
+                                      <span
+                                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                          order.status === "COMPLETED"
+                                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                                            : order.status === "REFUNDED"
+                                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                                            : order.status === "CANCELLED"
+                                            ? "bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20"
+                                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                                        }`}
+                                      >
+                                        {order.status}
+                                      </span>
+                                    </td>
+
+                                    <td className="px-4 py-3.5 text-right font-medium whitespace-nowrap">
+                                      {Number(order.tipAmount || 0) > 0 ? (
+                                        <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                                          +${Number(order.tipAmount).toFixed(2)}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-400">$0.00</span>
+                                      )}
+                                    </td>
+
+                                    <td className="px-5 py-3.5 text-right font-bold text-slate-900 dark:text-white">
+                                      ${Number(order.totalAmount || 0).toFixed(2)}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
+                    );
+                  })()}
 
                   {/* Pagination Footer */}
                   {totalOrders > 0 && (
