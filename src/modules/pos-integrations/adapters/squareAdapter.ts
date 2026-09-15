@@ -102,7 +102,7 @@ export class SquareAdapter implements PosProviderAdapter {
       const mockOrders: NormalizedOrder[] = [
         {
           provider: "SQUARE",
-          providerOrderId: `sq_ord_09bf1a_${Date.now() - 300000}`,
+          providerOrderId: "sq_ord_09bf1a",
           providerLocationId: options.locationId || "sq_loc_main_downtown",
           orderNumber: "SQ-8910",
           orderType: "TAKEAWAY",
@@ -116,7 +116,7 @@ export class SquareAdapter implements PosProviderAdapter {
           customerName: "Chloe Davenport",
           customerPhone: "+1 (415) 555-0819",
           notes: "Square Stand Terminal Counter",
-          createdAt: new Date(Date.now() - 15 * 60 * 1000),
+          createdAt: new Date("2026-09-15T18:15:00.000Z"),
           rawPayload: {
             source: "Square Register",
             state: "COMPLETED",
@@ -142,7 +142,7 @@ export class SquareAdapter implements PosProviderAdapter {
         },
         {
           provider: "SQUARE",
-          providerOrderId: `sq_ord_84cd02_${Date.now() - 1800000}`,
+          providerOrderId: "sq_ord_84cd02",
           providerLocationId: options.locationId || "sq_loc_main_downtown",
           orderNumber: "SQ-8909",
           orderType: "DINE_IN",
@@ -155,7 +155,7 @@ export class SquareAdapter implements PosProviderAdapter {
           paymentMethod: "CONTACTLESS",
           customerName: "Liam O'Connor",
           notes: "Table 8 - QR Code Order & Pay",
-          createdAt: new Date(Date.now() - 55 * 60 * 1000),
+          createdAt: new Date("2026-09-15T17:45:00.000Z"),
           rawPayload: {
             source: "Square Order & Pay",
             state: "COMPLETED",

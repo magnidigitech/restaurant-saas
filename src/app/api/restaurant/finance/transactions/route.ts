@@ -41,7 +41,11 @@ const createTransactionSchema = z.object({
   ]),
   title: z.string().min(1),
   description: z.string().optional(),
-  amount: z.number().min(0.01),
+  amount: z.number().optional(),
+  subtotal: z.number().min(0).optional(),
+  gstAmount: z.number().min(0).optional(),
+  otherFeesAmount: z.number().min(0).optional(),
+  otherFeeType: z.string().optional(),
   taxAmount: z.number().min(0).default(0),
   transactionDate: z.string().min(1),
   vendorOrPayer: z.string().optional(),
@@ -144,7 +148,16 @@ export async function POST(req: NextRequest) {
     }
 
     const data = result.data;
-    const netAmount = data.amount - data.taxAmount;
+    const subtotal = data.subtotal !== undefined ? data.subtotal : (data.amount || 0);
+    const gstAmount = data.gstAmount || data.taxAmount || 0;
+    const otherFeesAmount = data.otherFeesAmount || 0;
+    
+    // Total Bill Amount = Subtotal + GST + Other Fees
+    const totalAmount = data.amount && data.subtotal === undefined 
+      ? data.amount 
+      : (subtotal + gstAmount + otherFeesAmount);
+
+    const netAmount = totalAmount - gstAmount;
 
     const transaction = await prisma.financialTransaction.create({
       data: {
@@ -156,8 +169,12 @@ export async function POST(req: NextRequest) {
         source: "MANUAL_ENTRY",
         title: data.title,
         description: data.description || null,
-        amount: data.amount,
-        taxAmount: data.taxAmount,
+        amount: totalAmount,
+        subtotal: subtotal,
+        gstAmount: gstAmount,
+        otherFeesAmount: otherFeesAmount,
+        otherFeeType: data.otherFeeType || null,
+        taxAmount: gstAmount,
         netAmount,
         transactionDate: new Date(data.transactionDate),
         vendorOrPayer: data.vendorOrPayer || null,

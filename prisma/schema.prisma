@@ -174,6 +174,8 @@ model Restaurant {
   tipPoolRuns          TipPoolRun[]
   financialTransactions FinancialTransaction[]
   upcomingBills        UpcomingBill[]
+  dailyCashClosings    DailyCashClosing[]
+  cashAdjustments      CashAdjustment[]
   checklistTemplates   ShiftChecklistTemplate[]
   checklistExecutions  ShiftChecklistExecution[]
   cateringOrders       CateringOrder[]
@@ -261,6 +263,8 @@ model RestaurantOutlet {
   timePunches          TimePunch[]
   financialTransactions FinancialTransaction[]
   upcomingBills        UpcomingBill[]
+  dailyCashClosings    DailyCashClosing[]
+  cashAdjustments      CashAdjustment[]
   checklistExecutions  ShiftChecklistExecution[]
   cateringOrders       CateringOrder[]
 
@@ -2386,6 +2390,10 @@ model FinancialTransaction {
   title             String
   description       String?
   amount            Decimal
+  subtotal          Decimal           @default(0) @map("subtotal")
+  gstAmount         Decimal           @default(0) @map("gst_amount")
+  otherFeesAmount   Decimal           @default(0) @map("other_fees_amount")
+  otherFeeType      String?           @map("other_fee_type")
   taxAmount         Decimal           @default(0) @map("tax_amount")
   netAmount         Decimal           @default(0) @map("net_amount")
   transactionDate   DateTime          @map("transaction_date")
@@ -2738,6 +2746,93 @@ model CateringPackageItem {
   @@index([recipeId])
   @@map("catering_package_items")
 }
+
+// ----------------------------------------------------
+// 19. Daily Cash Closing & Cash Adjustments Entities
+// ----------------------------------------------------
+
+enum ClosingStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+}
+
+enum CashAdjustmentType {
+  CASH_IN
+  CASH_OUT
+}
+
+enum AdjustmentApprovalStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model DailyCashClosing {
+  id                  String        @id @default(uuid())
+  restaurantId        String        @map("restaurant_id")
+  outletId            String        @map("outlet_id")
+  closingDate         DateTime      @map("closing_date")
+  openingTillCash     Decimal       @default(0) @map("opening_till_cash")
+  cashSales           Decimal       @default(0) @map("cash_sales")
+  cashInTotal         Decimal       @default(0) @map("cash_in_total")
+  cashOutTotal        Decimal       @default(0) @map("cash_out_total")
+  expectedCash        Decimal       @default(0) @map("expected_cash")
+  actualCashCount     Decimal       @default(0) @map("actual_cash_count")
+  cashDifference      Decimal       @default(0) @map("cash_difference")
+  tomorrowOpeningCash Decimal       @default(0) @map("tomorrow_opening_cash")
+  safeDeposit         Decimal       @default(0) @map("safe_deposit")
+  notes               String?
+  receiptUrls         Json?         @map("receipt_urls")
+  status              ClosingStatus @default(SUBMITTED)
+  closedBy            String        @map("closed_by")
+  approvedBy          String?       @map("approved_by")
+  approvedAt          DateTime?     @map("approved_at")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant  Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet      RestaurantOutlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  adjustments CashAdjustment[]
+
+  @@unique([restaurantId, outletId, closingDate])
+  @@index([restaurantId])
+  @@index([outletId])
+  @@index([closingDate])
+  @@map("daily_cash_closings")
+}
+
+model CashAdjustment {
+  id             String                   @id @default(uuid())
+  restaurantId   String                   @map("restaurant_id")
+  outletId       String                   @map("outlet_id")
+  dailyClosingId String?                  @map("daily_closing_id")
+  adjustmentType CashAdjustmentType       @map("adjustment_type")
+  category       String                   // e.g., "Personal Use", "Vendor/Restaurant Bill", "Emergency Purchase", "Employee Expense", "Cash Returned", "Manager Addition", "Correction"
+  amount         Decimal                  @default(0)
+  reason         String                   // Mandatory reason
+  receiptUrl     String?                  @map("receipt_url")
+  enteredBy      String                   @map("entered_by")
+  approvedBy     String?                  @map("approved_by")
+  approvalStatus AdjustmentApprovalStatus @default(NOT_REQUIRED) @map("approval_status")
+  adjustmentDate DateTime                 @map("adjustment_date")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  updatedAt      DateTime                 @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant   Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet       RestaurantOutlet  @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  dailyClosing DailyCashClosing? @relation(fields: [dailyClosingId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId])
+  @@index([outletId])
+  @@index([dailyClosingId])
+  @@index([adjustmentDate])
+  @@map("cash_adjustments")
+}
+
 
 
 

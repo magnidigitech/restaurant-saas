@@ -207,12 +207,14 @@ export async function executeSync(integrationId: string, since?: Date) {
         },
       });
 
+      const dbStatus = order.status === "REFUNDED" ? "CANCELLED" : order.status;
+
       if (existingOrder) {
         // Reflect updates, cancellations, and refunds
         await prisma.posOrder.update({
           where: { id: existingOrder.id },
           data: {
-            status: order.status,
+            status: dbStatus,
             totalAmount: order.totalAmount,
             taxAmount: order.taxAmount,
             tipAmount: order.tipAmount,
@@ -227,6 +229,14 @@ export async function executeSync(integrationId: string, since?: Date) {
         });
         updatedOrdersCount++;
       } else {
+        const calculatedFinalAmount =
+          order.finalAmount ??
+          (Number(order.totalAmount || 0) +
+            Number(order.taxAmount || 0) +
+            Number(order.tipAmount || 0) -
+            Number(order.discountAmount || 0) -
+            Number(order.refundAmount || 0));
+
         // Create new synced order
         const createdOrder = await prisma.posOrder.create({
           data: {
@@ -237,12 +247,13 @@ export async function executeSync(integrationId: string, since?: Date) {
             providerLocationId: order.providerLocationId,
             orderNumber: order.orderNumber,
             orderType: order.orderType,
-            status: order.status,
+            status: dbStatus,
             totalAmount: order.totalAmount,
             taxAmount: order.taxAmount,
             tipAmount: order.tipAmount,
             discountAmount: order.discountAmount,
             refundAmount: order.refundAmount,
+            finalAmount: calculatedFinalAmount,
             paymentMethod: order.paymentMethod,
             customerName: order.customerName,
             customerPhone: order.customerPhone,
@@ -261,6 +272,7 @@ export async function executeSync(integrationId: string, since?: Date) {
                 name: item.name,
                 quantity: item.quantity,
                 unitPrice: item.unitPrice,
+                totalPrice: Number(item.quantity) * Number(item.unitPrice),
                 notes: item.notes,
                 modifiers: item.modifiers ? (item.modifiers as any) : undefined,
               },
@@ -412,10 +424,10 @@ export async function getUnifiedOrdersDashboard(restaurantId: string, filters: D
     }),
   ]);
 
-  const grossVolume = aggregateData._sum.totalAmount || 0;
-  const totalTax = aggregateData._sum.taxAmount || 0;
-  const totalTips = aggregateData._sum.tipAmount || 0;
-  const totalRefunds = aggregateData._sum.refundAmount || 0;
+  const grossVolume = Number(aggregateData._sum.totalAmount || 0);
+  const totalTax = Number(aggregateData._sum.taxAmount || 0);
+  const totalTips = Number(aggregateData._sum.tipAmount || 0);
+  const totalRefunds = Number(aggregateData._sum.refundAmount || 0);
   const netSales = Math.max(0, grossVolume - totalTax - totalRefunds);
   const orderCount = aggregateData._count.id || 0;
   const aov = orderCount > 0 ? grossVolume / orderCount : 0;

@@ -4,13 +4,26 @@ import React from "react";
 import Link from "next/link";
 import { Mail, Phone, ArrowUpRight } from "lucide-react";
 
+import BookDemoModal from "@/components/landing/BookDemoModal";
+
 export interface SiteFooterProps {
-  onOpenDemo: () => void;
+  onOpenDemo?: () => void;
 }
 
 export default function SiteFooter({ onOpenDemo }: SiteFooterProps) {
+  const [internalDemoOpen, setInternalDemoOpen] = React.useState(false);
+
+  const handleDemoClick = () => {
+    if (onOpenDemo) {
+      onOpenDemo();
+    } else {
+      setInternalDemoOpen(true);
+    }
+  };
+
   return (
-    <footer className="border-t border-slate-200 bg-white text-slate-600 py-16 text-xs">
+    <>
+      <footer className="border-t border-slate-200 bg-white text-slate-600 py-16 text-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {/* Main Footer Links & Bio Grid */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 pb-12 border-b border-slate-100">
@@ -131,7 +144,7 @@ export default function SiteFooter({ onOpenDemo }: SiteFooterProps) {
 
             <div className="pt-2">
               <button
-                onClick={onOpenDemo}
+                onClick={handleDemoClick}
                 className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs transition-colors flex items-center space-x-1"
               >
                 <span>Schedule 1-on-1 Demo</span>
@@ -140,98 +153,128 @@ export default function SiteFooter({ onOpenDemo }: SiteFooterProps) {
             </div>
           </div>
 
-          {/* Col 2: Front of House */}
+          {/* Col 2: Solutions by Concept */}
           <div className="space-y-2.5">
             <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
-              Front of House
+              Solutions
             </div>
             <ul className="space-y-2">
               <li>
-                <Link href="/pos" className="hover:text-slate-900 transition-colors">
-                  POS Integrations (Toast, Square, Clover)
+                <Link href="/solutions/restaurants" className="hover:text-slate-900 transition-colors">
+                  Fine & Casual Dining
                 </Link>
               </li>
               <li>
-                <Link href="/pos" className="hover:text-slate-900 transition-colors">
-                  Unified Orders Stream
+                <Link href="/solutions/cafes" className="hover:text-slate-900 transition-colors">
+                  Cafes & Bakeries
                 </Link>
               </li>
               <li>
-                <Link href="/catering" className="hover:text-slate-900 transition-colors">
-                  Catering & Banquets
+                <Link href="/solutions/quick-service-restaurants" className="hover:text-slate-900 transition-colors">
+                  QSR & Fast Casual
+                </Link>
+              </li>
+              <li>
+                <Link href="/solutions/cloud-kitchens" className="hover:text-slate-900 transition-colors">
+                  Cloud & Ghost Kitchens
+                </Link>
+              </li>
+              <li>
+                <Link href="/solutions/multi-location-restaurants" className="hover:text-slate-900 transition-colors font-medium text-amber-700">
+                  All Solutions →
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Col 3: Back of House */}
+          {/* Col 3: Use Cases & Solvers */}
           <div className="space-y-2.5">
             <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
-              Kitchen & Storage
+              Use Cases
             </div>
             <ul className="space-y-2">
               <li>
-                <Link href="/inventory" className="hover:text-slate-900 transition-colors">
-                  Inventory & Recipe BOM
+                <Link href="/use-cases/reduce-food-waste" className="hover:text-slate-900 transition-colors">
+                  Reduce Food Waste
                 </Link>
               </li>
               <li>
-                <Link href="/analytics" className="hover:text-slate-900 transition-colors">
-                  Menu Engineering Analytics
+                <Link href="/use-cases/control-food-costs" className="hover:text-slate-900 transition-colors">
+                  Control Food Costs
                 </Link>
               </li>
               <li>
-                <Link href="/inventory" className="hover:text-slate-900 transition-colors">
-                  Central Commissary
+                <Link href="/use-cases/prevent-stockouts" className="hover:text-slate-900 transition-colors">
+                  Prevent Stockouts
+                </Link>
+              </li>
+              <li>
+                <Link href="/use-cases/manage-restaurant-purchasing" className="hover:text-slate-900 transition-colors">
+                  Supplier Purchasing
+                </Link>
+              </li>
+              <li>
+                <Link href="/use-cases" className="hover:text-slate-900 transition-colors font-medium text-amber-700">
+                  All Use Cases →
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Col 4: Workforce */}
+          {/* Col 4: Comparisons & Tools */}
           <div className="space-y-2.5">
             <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
-              Workforce & HR
+              Tools & Comparisons
             </div>
             <ul className="space-y-2">
               <li>
-                <Link href="/shifts" className="hover:text-slate-900 transition-colors">
-                  Shift Rosters & Swaps
+                <Link href="/resources/calculators/food-cost-calculator" className="hover:text-slate-900 transition-colors">
+                  Food Cost Calculator
                 </Link>
               </li>
               <li>
-                <Link href="/attendance" className="hover:text-slate-900 transition-colors">
-                  Attendance & Kiosk Clock
+                <Link href="/resources/calculators/inventory-variance-calculator" className="hover:text-slate-900 transition-colors">
+                  Variance Loss Calculator
                 </Link>
               </li>
               <li>
-                <Link href="/payroll" className="hover:text-slate-900 transition-colors">
-                  Payroll & Tip Pooling
+                <Link href="/comparisons/restobird-vs-spreadsheets" className="hover:text-slate-900 transition-colors">
+                  RestoBird vs Spreadsheets
+                </Link>
+              </li>
+              <li>
+                <Link href="/resources/glossary/restaurant-inventory-variance" className="hover:text-slate-900 transition-colors">
+                  Restaurant Glossary
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Col 5: Financials & Security */}
+          {/* Col 5: Company & Pricing */}
           <div className="space-y-2.5">
             <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
-              Finance & Security
+              Company & Pricing
             </div>
             <ul className="space-y-2">
               <li>
-                <Link href="/finance" className="hover:text-slate-900 transition-colors">
-                  Finance & P&L Tracker
+                <Link href="/pricing" className="hover:text-slate-900 transition-colors font-medium text-slate-900">
+                  Plans & Pricing
                 </Link>
               </li>
               <li>
-                <Link href="/vault" className="hover:text-slate-900 transition-colors">
-                  Secrets Vault & 2FA
+                <Link href="/about" className="hover:text-slate-900 transition-colors">
+                  About RestoBird
                 </Link>
               </li>
               <li>
-                <Link href="/analytics" className="hover:text-slate-900 transition-colors font-medium text-amber-700">
-                  Menu Engineering →
+                <Link href="/blog" className="hover:text-slate-900 transition-colors">
+                  Blog & Operating Guides
                 </Link>
+              </li>
+              <li>
+                <button onClick={handleDemoClick} className="hover:text-amber-700 transition-colors text-left font-medium">
+                  Book a Demo →
+                </button>
               </li>
             </ul>
           </div>
@@ -239,12 +282,21 @@ export default function SiteFooter({ onOpenDemo }: SiteFooterProps) {
 
         {/* Bottom copyright & quick links */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
-          <div className="flex items-center space-x-6">
+          <div className="flex flex-wrap items-center gap-6">
             <Link href="/" className="hover:text-slate-900 transition-colors font-semibold text-slate-800">
-              Resto Bird Home
+              Home
+            </Link>
+            <Link href="/solutions" className="hover:text-slate-900 transition-colors font-semibold">
+              Solutions
+            </Link>
+            <Link href="/pricing" className="hover:text-slate-900 transition-colors font-semibold">
+              Pricing
             </Link>
             <Link href="/blog" className="hover:text-slate-900 transition-colors font-semibold text-amber-700">
-              Blog & Insights
+              Blog
+            </Link>
+            <Link href="/about" className="hover:text-slate-900 transition-colors font-semibold">
+              About
             </Link>
             <a href="mailto:getrestobird@gmail.com" className="hover:text-slate-900 transition-colors">
               getrestobird@gmail.com
@@ -253,9 +305,17 @@ export default function SiteFooter({ onOpenDemo }: SiteFooterProps) {
               8184974588
             </a>
           </div>
-          <div>© {new Date().getFullYear()} Resto Bird Inc. All rights reserved.</div>
+          <div>© {new Date().getFullYear()} RestoBird Inc. All rights reserved.</div>
         </div>
       </div>
     </footer>
+
+    {!onOpenDemo && (
+      <BookDemoModal
+        isOpen={internalDemoOpen}
+        onClose={() => setInternalDemoOpen(false)}
+      />
+    )}
+    </>
   );
 }

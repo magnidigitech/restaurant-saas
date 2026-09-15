@@ -105,7 +105,7 @@ export class ToastAdapter implements PosProviderAdapter {
       const mockOrders: NormalizedOrder[] = [
         {
           provider: "TOAST",
-          providerOrderId: `tst_ord_98a412_${Date.now() - 120000}`,
+          providerOrderId: "tst_ord_98a412",
           providerLocationId: options.locationId || restaurantGuid || "toast-loc-01",
           orderNumber: "TST-4102",
           orderType: "DINE_IN",
@@ -119,7 +119,7 @@ export class ToastAdapter implements PosProviderAdapter {
           customerName: "Alex Rivera",
           customerPhone: "+1 (617) 555-0142",
           notes: "Table 14 - Toast Handheld Terminal",
-          createdAt: new Date(Date.now() - 25 * 60 * 1000),
+          createdAt: new Date("2026-09-15T18:09:08.000Z"),
           rawPayload: {
             source: "Toast Go 2 Handheld",
             server: "Marcus L.",
@@ -151,7 +151,7 @@ export class ToastAdapter implements PosProviderAdapter {
         },
         {
           provider: "TOAST",
-          providerOrderId: `tst_ord_82c901_${Date.now() - 900000}`,
+          providerOrderId: "tst_ord_82c901",
           providerLocationId: options.locationId || restaurantGuid || "toast-loc-01",
           orderNumber: "TST-4101",
           orderType: "TAKEAWAY",
@@ -165,7 +165,7 @@ export class ToastAdapter implements PosProviderAdapter {
           customerName: "Sarah Jenkins",
           customerPhone: "+1 (617) 555-0198",
           notes: "Toast Online Ordering (Takeout)",
-          createdAt: new Date(Date.now() - 75 * 60 * 1000),
+          createdAt: new Date("2026-09-15T17:25:00.000Z"),
           rawPayload: {
             source: "Toast Online Ordering",
             guid: "772f-110a-33c8-112df",
@@ -187,7 +187,7 @@ export class ToastAdapter implements PosProviderAdapter {
         },
         {
           provider: "TOAST",
-          providerOrderId: `tst_ord_77f433_${Date.now() - 3600000}`,
+          providerOrderId: "tst_ord_77f433",
           providerLocationId: options.locationId || restaurantGuid || "toast-loc-01",
           orderNumber: "TST-4098",
           orderType: "DELIVERY",
@@ -201,7 +201,7 @@ export class ToastAdapter implements PosProviderAdapter {
           customerName: "David Kim",
           customerPhone: "+1 (617) 555-0312",
           notes: "Customer cancelled - item out of stock",
-          createdAt: new Date(Date.now() - 180 * 60 * 1000),
+          createdAt: new Date("2026-09-15T15:10:00.000Z"),
           rawPayload: {
             source: "Toast Third-Party Delivery Integration",
             refundReason: "Customer Request",

@@ -23,6 +23,8 @@ import {
   Users,
   Shield,
   Database,
+  QrCode,
+  MessageSquare,
 } from "lucide-react";
 
 interface Outlet {
@@ -404,7 +406,7 @@ export default function RestaurantProfilePage({
         </div>
 
         {/* Tab Switcher: Apple Segmented Control */}
-        <div className="p-1 sm:p-1.5 bg-slate-200/70 dark:bg-white/[0.06] rounded-2xl grid grid-cols-2 gap-1 w-full max-w-md">
+        <div className="p-1 sm:p-1.5 bg-slate-200/70 dark:bg-white/[0.06] rounded-2xl grid grid-cols-3 gap-1 w-full max-w-xl">
           <button
             onClick={() => switchTab("profile")}
             className={`py-2.5 px-3 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 ${activeTab === "profile"
@@ -428,6 +430,46 @@ export default function RestaurantProfilePage({
           >
             <MapPin className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Branch Outlets ({outlets.length})</span>
+          </button>
+          <button
+            onClick={() => router.push(`/restaurant/${subdomain}/settings/whatsapp`)}
+            className="py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30"
+          >
+            <QrCode className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+            <span className="truncate">WhatsApp QR Pair</span>
+          </button>
+        </div>
+
+        {/* WhatsApp Linked Device Quick Banner */}
+        <div className="p-5 sm:p-6 rounded-3xl bg-slate-900 text-white border border-emerald-500/40 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center space-x-4">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-400 flex items-center justify-center shrink-0">
+              <QrCode className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30">
+                  New Feature
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">
+                  Settings ➔ WhatsApp Linked Device
+                </span>
+              </div>
+              <h3 className="text-sm sm:text-base font-bold text-white mt-1">
+                Pair WhatsApp QR Code for Automatic PO & Alerts Dispatch
+              </h3>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Connect your restaurant&apos;s WhatsApp Web device to automatically send purchase orders to suppliers and stock warnings in the background without manual effort.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push(`/restaurant/${subdomain}/settings/whatsapp`)}
+            className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs rounded-xl transition-all shadow-md active:scale-95 shrink-0 flex items-center space-x-2 cursor-pointer"
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>Pair WhatsApp Web QR</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
 

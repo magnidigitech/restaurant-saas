@@ -101,7 +101,7 @@ export class CloverAdapter implements PosProviderAdapter {
       const mockOrders: NormalizedOrder[] = [
         {
           provider: "CLOVER",
-          providerOrderId: `clv_ord_3X9K0L_${Date.now() - 420000}`,
+          providerOrderId: "clv_ord_3X9K0L",
           providerLocationId: options.locationId || merchantId || "clv_m123",
           orderNumber: "CLV-7041",
           orderType: "DINE_IN",
@@ -114,7 +114,7 @@ export class CloverAdapter implements PosProviderAdapter {
           paymentMethod: "CLOVER_FLEX",
           customerName: "Elena Rostova",
           notes: "Server: Jessica R. (Clover Station Duo)",
-          createdAt: new Date(Date.now() - 20 * 60 * 1000),
+          createdAt: new Date("2026-09-15T18:20:00.000Z"),
           rawPayload: {
             device: "Clover Flex 3",
             orderTitle: "Table 4 Dinner",
@@ -135,7 +135,7 @@ export class CloverAdapter implements PosProviderAdapter {
         },
         {
           provider: "CLOVER",
-          providerOrderId: `clv_ord_5Y2M9P_${Date.now() - 2100000}`,
+          providerOrderId: "clv_ord_5Y2M9P",
           providerLocationId: options.locationId || merchantId || "clv_m123",
           orderNumber: "CLV-7040",
           orderType: "TAKEAWAY",
@@ -149,7 +149,7 @@ export class CloverAdapter implements PosProviderAdapter {
           customerName: "Robert Taylor",
           customerPhone: "+1 (408) 555-0922",
           notes: "Clover Online Ordering Takeout",
-          createdAt: new Date(Date.now() - 85 * 60 * 1000),
+          createdAt: new Date("2026-09-15T17:15:00.000Z"),
           rawPayload: {
             device: "Clover Mini 2",
             orderTitle: "Curbside Pickup",

@@ -337,116 +337,82 @@ export default function AppleTenantDashboard() {
   }, [brandColor]);
 
   // Live Operations Business Metrics
+  // Live Operations Business Metrics (Starts at zero, updated purely via live database API)
   const [liveOps, setLiveOps] = useState({
-    todaySales: 84520,
-    yesterdaySales: 74930,
-    salesGrowth: 12.8,
-    totalOrders: 428,
-    ordersGrowth: 8.2,
-    avgOrderValue: 197,
-    aovGrowth: 3.1,
-    grossProfit: 28410,
-    profitMargin: 33.6,
-    profitGrowth: 14.4,
-    foodCostPct: 31.4,
-    staffOnDuty: { present: 18, total: 21, late: 2, absent: 1 },
-    lowStockAlerts: 5,
-    pendingActions: 7,
+    todaySales: 0,
+    yesterdaySales: 0,
+    salesGrowth: 0,
+    totalOrders: 0,
+    ordersGrowth: 0,
+    avgOrderValue: 0,
+    aovGrowth: 0,
+    grossProfit: 0,
+    profitMargin: 0,
+    profitGrowth: 0,
+    foodCostPct: 0,
+    staffOnDuty: { present: 0, total: 0, late: 0, absent: 0 },
+    lowStockAlerts: 0,
+    pendingActions: 0,
     channelBreakdown: {
-      dineIn: { count: 186, percentage: 43.5, amount: 41200 },
-      delivery: { count: 148, percentage: 34.5, amount: 28920 },
-      takeaway: { count: 94, percentage: 22.0, amount: 14400 },
+      dineIn: { count: 0, percentage: 0, amount: 0 },
+      delivery: { count: 0, percentage: 0, amount: 0 },
+      takeaway: { count: 0, percentage: 0, amount: 0 },
     },
     fulfillment: {
-      completed: 391,
-      inProgress: 22,
-      cancelled: 15,
+      completed: 0,
+      inProgress: 0,
+      cancelled: 0,
     },
   });
 
-  // Hourly sales progression for bar chart
-  const hourlyBars = [
-    { time: "10 AM", sales: 2400, orders: 14, heightPct: 22 },
-    { time: "", sales: 3200, orders: 18, heightPct: 28 },
-    { time: "12 PM", sales: 6500, orders: 36, heightPct: 45 },
-    { time: "", sales: 7800, orders: 42, heightPct: 52 },
-    { time: "2 PM", sales: 9100, orders: 49, heightPct: 62 },
-    { time: "", sales: 11200, orders: 58, heightPct: 75 },
-    { time: "4 PM", sales: 12800, orders: 67, heightPct: 82 },
-    { time: "", sales: 8400, orders: 46, heightPct: 56 },
-    { time: "6 PM", sales: 9420, orders: 52, heightPct: 65 }, // Hovered by default
-    { time: "", sales: 13900, orders: 74, heightPct: 88 },
-    { time: "8 PM", sales: 15800, orders: 85, heightPct: 100 },
-    { time: "", sales: 12400, orders: 66, heightPct: 80 },
-    { time: "10 PM", sales: 8600, orders: 44, heightPct: 58 },
-  ];
+  // Hourly sales progression for bar chart (Bound to real POS order hours)
+  const [hourlyBars, setHourlyBars] = useState([
+    { time: "10 AM", sales: 0, orders: 0, heightPct: 15 },
+    { time: "", sales: 0, orders: 0, heightPct: 15 },
+    { time: "12 PM", sales: 0, orders: 0, heightPct: 15 },
+    { time: "", sales: 0, orders: 0, heightPct: 15 },
+    { time: "2 PM", sales: 0, orders: 0, heightPct: 15 },
+    { time: "", sales: 0, orders: 0, heightPct: 15 },
+    { time: "4 PM", sales: 0, orders: 0, heightPct: 15 },
+    { time: "", sales: 0, orders: 0, heightPct: 15 },
+    { time: "6 PM", sales: 0, orders: 0, heightPct: 15 },
+    { time: "", sales: 0, orders: 0, heightPct: 15 },
+    { time: "8 PM", sales: 0, orders: 0, heightPct: 15 },
+    { time: "", sales: 0, orders: 0, heightPct: 15 },
+    { time: "10 PM", sales: 0, orders: 0, heightPct: 15 },
+  ]);
 
-  const criticalInventoryList = [
-    { name: "Chicken Breast", qty: "1.2 kg left", status: "critical", dotColor: "bg-rose-500" },
-    { name: "Basmati Rice", qty: "2.0 L left", status: "low", dotColor: "bg-amber-500" },
-    { name: "Olive Oil Extra Virgin", qty: "2.5 L left", status: "low", dotColor: "bg-amber-500" },
-    { name: "Fresh Whole Milk", qty: "3.2 L left", status: "low", dotColor: "bg-amber-500" },
-    { name: "Tomato Puree", qty: "1.5 kg left", status: "low", dotColor: "bg-amber-500" },
-  ];
+  const [criticalInventoryList, setCriticalInventoryList] = useState<Array<{ name: string; qty: string; status: string; dotColor: string }>>([]);
 
-  const topSellingDishes = [
-    { id: 1, name: "Chicken Biryani", qty: 86, revenue: 21500, icon: "🍗" },
-    { id: 2, name: "Paneer Tikka", qty: 54, revenue: 12960, icon: "🧀" },
-    { id: 3, name: "Veg Fried Rice", qty: 48, revenue: 9600, icon: "🍚" },
-    { id: 4, name: "Butter Naan", qty: 46, revenue: 6900, icon: "🫓" },
-    { id: 5, name: "Chicken Tikka Masala", qty: 42, revenue: 11760, icon: "🥘" },
-  ];
+  const [topSellingDishes, setTopSellingDishes] = useState<Array<{ id: number; name: string; qty: number; revenue: number; icon: string }>>([]);
 
-  const recentActivities = [
-    {
-      time: "10:42 AM",
-      title: "Inventory Stock Inward",
-      desc: "Chicken Breast received from Metro Foods",
-      author: "Ravi K. (Inventory)",
-      badge: "+50 KG",
-      dot: "bg-rose-500",
-    },
-    {
-      time: "10:31 AM",
-      title: "Shift Schedule Published",
-      desc: "Dinner rush coverage for Kitchen & Dining",
-      author: "Admin Console",
-      badge: "Published",
-      dot: "bg-amber-500",
-    },
-    {
-      time: "10:12 AM",
-      title: "Monthly Payroll Initiated",
-      desc: "September payroll cycle started",
-      author: "Finance Lead",
-      badge: "In Progress",
-      dot: "bg-slate-700 dark:bg-slate-300",
-    },
-    {
-      time: "09:54 AM",
-      title: "Staff Onboarding Completed",
-      desc: "Rahul Sharma (Commis Chef II)",
-      author: "HR Desk",
-      badge: "Verified",
-      dot: "bg-emerald-500",
-    },
-    {
-      time: "09:15 AM",
-      title: "Opening HACCP Inspection",
-      desc: "Walk-in freezer temp log: 4.2°C",
-      author: "Head Chef Anand",
-      badge: "Passed",
-      dot: "bg-emerald-500",
-    },
-    {
-      time: "08:38 AM",
-      title: "POS Till #1 Float Opened",
-      desc: "Front counter cash verified at ₹5,000",
-      author: "Cashier Priya",
-      badge: "Ready",
-      dot: "bg-amber-500",
-    },
-  ];
+  const [todayShiftsData, setTodayShiftsData] = useState({
+    openPositions: 0,
+    morning: { filled: 0, total: 0 },
+    afternoon: { filled: 0, total: 0 },
+    evening: { filled: 0, total: 0 },
+  });
+
+  const [needsAttentionList, setNeedsAttentionList] = useState<Array<{
+    id: string;
+    type: string;
+    title: string;
+    desc: string;
+    actionText: string;
+    actionPath: string;
+    iconBg: string;
+    iconColor: string;
+    timeText: string;
+  }>>([]);
+
+  const [recentActivities, setRecentActivities] = useState<Array<{
+    time: string;
+    title: string;
+    desc: string;
+    author: string;
+    badge: string;
+    dot: string;
+  }>>([]);
 
   const isSubdomain =
     typeof window !== "undefined" &&
@@ -467,6 +433,7 @@ export default function AppleTenantDashboard() {
         resPos,
         resAttendance,
         resFinance,
+        resStats,
       ] = await Promise.all([
         fetch(`/api/restaurant/${subdomain}/branding`),
         fetch("/api/restaurant/modules"),
@@ -477,6 +444,7 @@ export default function AppleTenantDashboard() {
         fetch("/api/restaurant/pos/orders?limit=100").catch(() => null),
         fetch("/api/restaurant/attendance/live-board").catch(() => null),
         fetch("/api/restaurant/finance/pnl").catch(() => null),
+        fetch(`/api/restaurant/${subdomain}/dashboard/stats`).catch(() => null),
       ]);
 
       const dataBranding = await resBranding.json();
@@ -488,6 +456,7 @@ export default function AppleTenantDashboard() {
       const dataPos = resPos && resPos.ok ? await resPos.json() : null;
       const dataAttendance = resAttendance && resAttendance.ok ? await resAttendance.json() : null;
       const dataFinance = resFinance && resFinance.ok ? await resFinance.json() : null;
+      const dataStats = resStats && resStats.ok ? await resStats.json() : null;
 
       if (resModules.status === 401) {
         router.push(p("/login"));
@@ -515,57 +484,83 @@ export default function AppleTenantDashboard() {
         pendingSwaps: 0,
       });
 
-      // Synchronize live orders data if available
-      if (dataPos?.orders && dataPos.orders.length > 0) {
-        const ords = dataPos.orders;
-        const totalSales = ords.reduce((sum: number, o: any) => sum + Number(o.totalAmount || 0), 0);
-        const dineIn = ords.filter((o: any) => o.orderType === "DINE_IN").length;
-        const delivery = ords.filter((o: any) => o.orderType === "DELIVERY").length;
-        const takeaway = ords.filter((o: any) => o.orderType === "TAKEAWAY").length;
-        const completed = ords.filter((o: any) => o.status === "COMPLETED" || o.status === "SETTLED").length;
-        const inProg = ords.filter((o: any) => o.status === "PENDING" || o.status === "PREPARING").length;
-        const cancelled = ords.filter((o: any) => o.status === "CANCELLED").length;
-
+      // Synchronize aggregated live stats if API route returned success
+      if (dataStats?.success && dataStats?.liveOps) {
         setLiveOps((prev) => ({
           ...prev,
-          todaySales: totalSales > 0 ? Math.round(totalSales) : prev.todaySales,
-          totalOrders: ords.length > 0 ? ords.length : prev.totalOrders,
-          avgOrderValue: ords.length > 0 ? Math.round(totalSales / ords.length) : prev.avgOrderValue,
-          channelBreakdown: {
-            dineIn: { count: dineIn || 186, percentage: ords.length ? Math.round((dineIn / ords.length) * 1000) / 10 : 43.5, amount: Math.round(totalSales * 0.435) },
-            delivery: { count: delivery || 148, percentage: ords.length ? Math.round((delivery / ords.length) * 1000) / 10 : 34.5, amount: Math.round(totalSales * 0.345) },
-            takeaway: { count: takeaway || 94, percentage: ords.length ? Math.round((takeaway / ords.length) * 1000) / 10 : 22.0, amount: Math.round(totalSales * 0.22) },
-          },
-          fulfillment: {
-            completed: completed || 391,
-            inProgress: inProg || 22,
-            cancelled: cancelled || 15,
-          },
+          ...dataStats.liveOps,
         }));
-      }
+        if (dataStats.hourlyBars) {
+          setHourlyBars(dataStats.hourlyBars);
+        }
+        if (dataStats.criticalInventoryList) {
+          setCriticalInventoryList(dataStats.criticalInventoryList);
+        }
+        if (dataStats.todayShiftsData) {
+          setTodayShiftsData(dataStats.todayShiftsData);
+        }
+        if (dataStats.needsAttentionList) {
+          setNeedsAttentionList(dataStats.needsAttentionList);
+        }
+        if (dataStats.topSellingDishes) {
+          setTopSellingDishes(dataStats.topSellingDishes);
+        }
+        if (dataStats.recentActivities && dataStats.recentActivities.length > 0) {
+          setRecentActivities(dataStats.recentActivities);
+        }
+      } else {
+        // Fallback live sync without any dummy numbers
+        if (dataPos?.orders) {
+          const ords = dataPos.orders;
+          const totalSales = ords.reduce((sum: number, o: any) => sum + Number(o.totalAmount || 0), 0);
+          const dineIn = ords.filter((o: any) => o.orderType === "DINE_IN").length;
+          const delivery = ords.filter((o: any) => o.orderType === "DELIVERY").length;
+          const takeaway = ords.filter((o: any) => o.orderType === "TAKEAWAY").length;
+          const completed = ords.filter((o: any) => o.status === "COMPLETED" || o.status === "SETTLED").length;
+          const inProg = ords.filter((o: any) => o.status === "PENDING" || o.status === "PREPARING").length;
+          const cancelled = ords.filter((o: any) => o.status === "CANCELLED").length;
 
-      if (dataAttendance?.counts) {
-        const attCounts = dataAttendance.counts;
-        setLiveOps((prev) => ({
-          ...prev,
-          staffOnDuty: {
-            present: attCounts.present ?? 18,
-            total: totalEmp || 21,
-            late: attCounts.late ?? 2,
-            absent: attCounts.absent ?? 1,
-          },
-        }));
-      }
+          setLiveOps((prev) => ({
+            ...prev,
+            todaySales: Math.round(totalSales),
+            totalOrders: ords.length,
+            avgOrderValue: ords.length > 0 ? Math.round(totalSales / ords.length) : 0,
+            channelBreakdown: {
+              dineIn: { count: dineIn, percentage: ords.length ? Math.round((dineIn / ords.length) * 1000) / 10 : 0, amount: Math.round(totalSales * (ords.length ? dineIn / ords.length : 0)) },
+              delivery: { count: delivery, percentage: ords.length ? Math.round((delivery / ords.length) * 1000) / 10 : 0, amount: Math.round(totalSales * (ords.length ? delivery / ords.length : 0)) },
+              takeaway: { count: takeaway, percentage: ords.length ? Math.round((takeaway / ords.length) * 1000) / 10 : 0, amount: Math.round(totalSales * (ords.length ? takeaway / ords.length : 0)) },
+            },
+            fulfillment: {
+              completed,
+              inProgress: inProg,
+              cancelled,
+            },
+          }));
+        }
 
-      if (dataFinance?.pnl) {
-        const pnl = dataFinance.pnl;
-        const rev = Number(pnl.totalRevenue || 84520);
-        const gross = Number(pnl.grossProfit || 28410);
-        setLiveOps((prev) => ({
-          ...prev,
-          grossProfit: Math.round(gross),
-          profitMargin: rev > 0 ? Math.round((gross / rev) * 1000) / 10 : 33.6,
-        }));
+        if (dataAttendance?.counts) {
+          const attCounts = dataAttendance.counts;
+          setLiveOps((prev) => ({
+            ...prev,
+            staffOnDuty: {
+              present: attCounts.present ?? 0,
+              total: totalEmp ?? 0,
+              late: attCounts.late ?? 0,
+              absent: attCounts.absent ?? 0,
+            },
+          }));
+        }
+
+        if (dataFinance?.pnl) {
+          const pnl = dataFinance.pnl;
+          const rev = Number(pnl.totalRevenue || 0);
+          const gross = Number(pnl.grossProfit || 0);
+          setLiveOps((prev) => ({
+            ...prev,
+            grossProfit: Math.round(gross),
+            profitMargin: rev > 0 ? Math.round((gross / rev) * 1000) / 10 : 0,
+          }));
+        }
       }
     } catch {
       setError("Network error loading dashboard");
@@ -1090,11 +1085,11 @@ export default function AppleTenantDashboard() {
                       {liveOps.staffOnDuty.present} / {liveOps.staffOnDuty.total}
                     </div>
                     <div className="text-[11px] text-slate-400 mt-1">
-                      85.7%
+                      {liveOps.staffOnDuty.total > 0 ? (liveOps.staffOnDuty.present / liveOps.staffOnDuty.total * 100).toFixed(1) : "0.0"}%
                     </div>
                   </div>
                   <div className="w-full h-1.5 bg-slate-100 dark:bg-white/[0.08] rounded-full overflow-hidden mt-3">
-                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: "85.7%" }} />
+                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${liveOps.staffOnDuty.total > 0 ? Math.round((liveOps.staffOnDuty.present / liveOps.staffOnDuty.total) * 100) : 0}%` }} />
                   </div>
                 </div>
               </div>
@@ -1262,7 +1257,7 @@ export default function AppleTenantDashboard() {
                           />
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                          <span className="text-xl font-black text-slate-900 dark:text-white">428</span>
+                          <span className="text-xl font-black text-slate-900 dark:text-white">{liveOps.totalOrders}</span>
                           <span className="text-[10px] font-semibold text-slate-400">Orders</span>
                         </div>
                       </div>
@@ -1274,21 +1269,21 @@ export default function AppleTenantDashboard() {
                             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: brandColor }} />
                             Dine-in
                           </span>
-                          <span className="font-bold text-slate-900 dark:text-white">186 <span className="text-[10px] opacity-60">43.5%</span></span>
+                          <span className="font-bold text-slate-900 dark:text-white">{liveOps.channelBreakdown.dineIn.count} <span className="text-[10px] opacity-60">{liveOps.channelBreakdown.dineIn.percentage}%</span></span>
                         </div>
                         <div className="flex items-center justify-between gap-4 font-semibold">
                           <span className="flex items-center gap-1.5 text-slate-900 dark:text-white">
                             <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
                             Delivery
                           </span>
-                          <span className="font-bold text-slate-900 dark:text-white">148 <span className="text-[10px] opacity-60">34.5%</span></span>
+                          <span className="font-bold text-slate-900 dark:text-white">{liveOps.channelBreakdown.delivery.count} <span className="text-[10px] opacity-60">{liveOps.channelBreakdown.delivery.percentage}%</span></span>
                         </div>
                         <div className="flex items-center justify-between gap-4 font-semibold">
                           <span className="flex items-center gap-1.5 text-slate-900 dark:text-white">
                             <span className="w-2.5 h-2.5 rounded-full bg-slate-900 dark:bg-white/40 shrink-0" />
                             Takeaway
                           </span>
-                          <span className="font-bold text-slate-900 dark:text-white">94 <span className="text-[10px] opacity-60">22.0%</span></span>
+                          <span className="font-bold text-slate-900 dark:text-white">{liveOps.channelBreakdown.takeaway.count} <span className="text-[10px] opacity-60">{liveOps.channelBreakdown.takeaway.percentage}%</span></span>
                         </div>
                       </div>
                     </div>
@@ -1299,22 +1294,22 @@ export default function AppleTenantDashboard() {
                         <div className="w-4 h-4 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-bold mx-auto flex items-center justify-center">
                           ✓
                         </div>
-                        <div className="text-sm font-black mt-1 text-slate-900 dark:text-white">391</div>
-                        <div className="text-[10px] opacity-60">Completed 91.4%</div>
+                        <div className="text-sm font-black mt-1 text-slate-900 dark:text-white">{liveOps.fulfillment.completed}</div>
+                        <div className="text-[10px] opacity-60">Completed {liveOps.totalOrders > 0 ? (liveOps.fulfillment.completed / liveOps.totalOrders * 100).toFixed(1) : "0.0"}%</div>
                       </div>
                       <div className={`p-2.5 rounded-2xl border ${isDark ? "bg-[#151A28] border-white/[0.06]" : "bg-slate-50 border-slate-200/80"}`}>
                         <div className="w-4 h-4 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-bold mx-auto flex items-center justify-center">
                           ⧗
                         </div>
-                        <div className="text-sm font-black mt-1 text-slate-900 dark:text-white">22</div>
-                        <div className="text-[10px] opacity-60">In Progress 5.1%</div>
+                        <div className="text-sm font-black mt-1 text-slate-900 dark:text-white">{liveOps.fulfillment.inProgress}</div>
+                        <div className="text-[10px] opacity-60">In Progress {liveOps.totalOrders > 0 ? (liveOps.fulfillment.inProgress / liveOps.totalOrders * 100).toFixed(1) : "0.0"}%</div>
                       </div>
                       <div className={`p-2.5 rounded-2xl border ${isDark ? "bg-[#151A28] border-white/[0.06]" : "bg-slate-50 border-slate-200/80"}`}>
                         <div className="w-4 h-4 rounded-full bg-rose-500/10 text-rose-500 text-[10px] font-bold mx-auto flex items-center justify-center">
                           ✕
                         </div>
-                        <div className="text-sm font-black mt-1 text-slate-900 dark:text-white">15</div>
-                        <div className="text-[10px] opacity-60">Cancelled 3.5%</div>
+                        <div className="text-sm font-black mt-1 text-slate-900 dark:text-white">{liveOps.fulfillment.cancelled}</div>
+                        <div className="text-[10px] opacity-60">Cancelled {liveOps.totalOrders > 0 ? (liveOps.fulfillment.cancelled / liveOps.totalOrders * 100).toFixed(1) : "0.0"}%</div>
                       </div>
                     </div>
                   </div>
@@ -1348,18 +1343,24 @@ export default function AppleTenantDashboard() {
                         <AlertTriangle className="w-3.5 h-3.5" />
                       </div>
                       <div>
-                        <div className="text-base font-black text-slate-900 dark:text-white">5</div>
+                        <div className="text-base font-black text-slate-900 dark:text-white">{liveOps.lowStockAlerts}</div>
                         <div className="text-[10px] text-slate-400">Low Stock Items</div>
                       </div>
                     </div>
 
                     <div className="space-y-1.5 text-xs">
-                      {criticalInventoryList.map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-2 text-slate-800 dark:text-slate-200 py-0.5">
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${item.dotColor}`} />
-                          <span className="truncate">{item.name} ({item.qty})</span>
+                      {criticalInventoryList.length === 0 ? (
+                        <div className="py-4 text-center text-slate-400 text-xs">
+                          No low stock alerts. Stock levels optimal.
                         </div>
-                      ))}
+                      ) : (
+                        criticalInventoryList.map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-2 text-slate-800 dark:text-slate-200 py-0.5">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${item.dotColor}`} />
+                            <span className="truncate">{item.name} ({item.qty})</span>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1389,7 +1390,7 @@ export default function AppleTenantDashboard() {
                         <Calendar className="w-3.5 h-3.5" />
                       </div>
                       <div>
-                        <div className="text-base font-black text-slate-900 dark:text-white">3</div>
+                        <div className="text-base font-black text-slate-900 dark:text-white">{todayShiftsData.openPositions}</div>
                         <div className="text-[10px] text-slate-400">Open Positions</div>
                       </div>
                     </div>
@@ -1397,15 +1398,15 @@ export default function AppleTenantDashboard() {
                     <div className="space-y-2 text-xs">
                       <div className="flex justify-between items-center py-0.5">
                         <span className="text-slate-600 dark:text-slate-400">Morning (08:00 - 16:00)</span>
-                        <span className="font-bold text-emerald-500">8 / 8</span>
+                        <span className="font-bold text-emerald-500">{todayShiftsData.morning.filled} / {todayShiftsData.morning.total}</span>
                       </div>
                       <div className="flex justify-between items-center py-0.5">
                         <span className="text-slate-600 dark:text-slate-400">Afternoon (12:00 - 20:00)</span>
-                        <span className="font-bold text-amber-500">7 / 8</span>
+                        <span className="font-bold text-amber-500">{todayShiftsData.afternoon.filled} / {todayShiftsData.afternoon.total}</span>
                       </div>
                       <div className="flex justify-between items-center py-0.5">
                         <span className="text-slate-600 dark:text-slate-400">Evening (16:00 - 00:00)</span>
-                        <span className="font-bold text-amber-500">6 / 7</span>
+                        <span className="font-bold text-amber-500">{todayShiftsData.evening.filled} / {todayShiftsData.evening.total}</span>
                       </div>
                     </div>
                   </div>
@@ -1437,12 +1438,14 @@ export default function AppleTenantDashboard() {
                           <Users className="w-3.5 h-3.5" />
                         </div>
                         <div>
-                          <div className="text-base font-black text-slate-900 dark:text-white">18 / 21</div>
+                          <div className="text-base font-black text-slate-900 dark:text-white">
+                            {liveOps.staffOnDuty.present} / {liveOps.staffOnDuty.total}
+                          </div>
                           <div className="text-[10px] text-slate-400">Present</div>
                         </div>
                       </div>
                       <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md">
-                        85.7%
+                        {liveOps.staffOnDuty.total > 0 ? (liveOps.staffOnDuty.present / liveOps.staffOnDuty.total * 100).toFixed(1) : "0.0"}%
                       </span>
                     </div>
 
@@ -1452,21 +1455,21 @@ export default function AppleTenantDashboard() {
                           <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                           Present
                         </span>
-                        <span className="font-bold text-slate-900 dark:text-white">18</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{liveOps.staffOnDuty.present}</span>
                       </div>
                       <div className="flex items-center justify-between py-0.5">
                         <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
                           <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
                           Late
                         </span>
-                        <span className="font-bold text-slate-900 dark:text-white">2</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{liveOps.staffOnDuty.late}</span>
                       </div>
                       <div className="flex items-center justify-between py-0.5">
                         <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
                           <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
                           Absent
                         </span>
-                        <span className="font-bold text-slate-900 dark:text-white">1</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{liveOps.staffOnDuty.absent}</span>
                       </div>
                     </div>
                   </div>
@@ -1495,27 +1498,23 @@ export default function AppleTenantDashboard() {
                     <div className="space-y-1.5 text-xs">
                       <div className="flex justify-between items-center py-0.5">
                         <span className="text-slate-500 dark:text-[#8F95A3]">Revenue</span>
-                        <span className="font-bold text-slate-900 dark:text-white">₹84,520</span>
+                        <span className="font-bold text-slate-900 dark:text-white">₹{liveOps.todaySales.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between items-center py-0.5">
                         <span className="text-slate-500 dark:text-[#8F95A3]">Operating Expenses</span>
-                        <span className="font-bold text-slate-900 dark:text-white">₹56,110</span>
+                        <span className="font-bold text-slate-900 dark:text-white">₹{(Math.max(0, liveOps.todaySales - liveOps.grossProfit)).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between items-center py-0.5">
                         <span className="text-slate-500 dark:text-[#8F95A3]">Gross Profit</span>
-                        <span className="font-bold text-emerald-500">₹28,410</span>
+                        <span className="font-bold text-emerald-500">₹{liveOps.grossProfit.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between items-center py-0.5">
                         <span className="text-slate-500 dark:text-[#8F95A3]">Food Cost %</span>
-                        <span className="font-bold text-slate-900 dark:text-white">31.4%</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{liveOps.foodCostPct}%</span>
                       </div>
                       <div className="flex justify-between items-center py-0.5">
-                        <span className="text-slate-500 dark:text-[#8F95A3]">Other Expenses %</span>
-                        <span className="font-bold text-slate-900 dark:text-white">12.2%</span>
-                      </div>
-                      <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-white/[0.06]">
-                        <span className="text-slate-500 dark:text-[#8F95A3] font-semibold">Net Margin</span>
-                        <span className="font-bold text-emerald-500">33.6%</span>
+                        <span className="text-slate-500 dark:text-[#8F95A3]">Net Margin</span>
+                        <span className="font-bold text-emerald-500">{liveOps.profitMargin}%</span>
                       </div>
                     </div>
                   </div>
@@ -1534,7 +1533,7 @@ export default function AppleTenantDashboard() {
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-slate-900 dark:text-white">Needs Attention</h3>
-                      <p className="text-[11px] text-slate-400">7 action items requiring manager attention</p>
+                      <p className="text-[11px] text-slate-400">{needsAttentionList.length} action items requiring manager attention</p>
                     </div>
                   </div>
                   <button
@@ -1548,141 +1547,46 @@ export default function AppleTenantDashboard() {
                 </div>
 
                 <div className="space-y-2.5">
-                  {/* Alert 1: Low Stock */}
-                  <div
-                    className={`p-3.5 sm:p-4 rounded-2xl border transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
-                      isDark ? "bg-[#0E121D] border-white/[0.08]" : "bg-white border-slate-200/90 shadow-2xs"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center shrink-0 mt-0.5">
-                        <Package className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                          5 inventory items are below minimum reorder point
-                        </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          Chicken Breast (1.2 kg left), Extra Virgin Olive Oil (2.0 L left), and 3 more items.
-                        </p>
-                      </div>
+                  {needsAttentionList.length === 0 ? (
+                    <div className={`p-4 rounded-2xl border text-xs text-slate-400 text-center ${isDark ? "bg-[#0E121D] border-white/[0.08]" : "bg-white border-slate-200/90"}`}>
+                      ✓ All operational checks optimal. No pending attention items.
                     </div>
-                    <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
-                      <span className="text-[11px] text-slate-400">Today, 10:42 AM</span>
-                      {/* Unified button styling matching primary brand color */}
-                      <button
-                        type="button"
-                        onClick={() => router.push(p("/inventory/alerts"))}
-                        className="px-3.5 py-1.5 text-white text-xs font-semibold rounded-xl transition cursor-pointer flex items-center gap-1 shadow-2xs hover:brightness-110 active:scale-[0.98]"
-                        style={{ backgroundColor: brandColor }}
+                  ) : (
+                    needsAttentionList.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`p-3.5 sm:p-4 rounded-2xl border transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                          isDark ? "bg-[#0E121D] border-white/[0.08]" : "bg-white border-slate-200/90 shadow-2xs"
+                        }`}
                       >
-                        <span>Review Stock</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Alert 2: Unassigned Shifts */}
-                  <div
-                    className={`p-3.5 sm:p-4 rounded-2xl border transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
-                      isDark ? "bg-[#0E121D] border-white/[0.08]" : "bg-white border-slate-200/90 shadow-2xs"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
-                        <CalendarDays className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                          3 shifts are still unassigned for tonight&apos;s dinner rush
+                        <div className="flex items-start gap-3">
+                          <div className={`w-8 h-8 rounded-xl ${item.iconBg} ${item.iconColor} flex items-center justify-center shrink-0 mt-0.5`}>
+                            <AlertTriangle className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                              {item.title}
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              {item.desc}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          Line Cook (Station 2) and 2 Floor Stewards need assignment.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
-                      <span className="text-[11px] text-slate-400">Today, 10:31 AM</span>
-                      {/* Unified button styling matching primary brand color */}
-                      <button
-                        type="button"
-                        onClick={() => router.push(p("/shifts/rosters"))}
-                        className="px-3.5 py-1.5 text-white text-xs font-semibold rounded-xl transition cursor-pointer flex items-center gap-1 shadow-2xs hover:brightness-110 active:scale-[0.98]"
-                        style={{ backgroundColor: brandColor }}
-                      >
-                        <span>Assign Staff</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Alert 3: Payroll Cycle */}
-                  <div
-                    className={`p-3.5 sm:p-4 rounded-2xl border transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
-                      isDark ? "bg-[#0E121D] border-white/[0.08]" : "bg-white border-slate-200/90 shadow-2xs"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-slate-500/10 text-slate-600 dark:text-slate-300 flex items-center justify-center shrink-0 mt-0.5">
-                        <Banknote className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                          Monthly payroll cycle has not been initiated
+                        <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
+                          <span className="text-[11px] text-slate-400">{item.timeText}</span>
+                          <button
+                            type="button"
+                            onClick={() => router.push(p(item.actionPath))}
+                            className="px-3.5 py-1.5 text-white text-xs font-semibold rounded-xl transition cursor-pointer flex items-center gap-1 shadow-2xs hover:brightness-110 active:scale-[0.98]"
+                            style={{ backgroundColor: brandColor }}
+                          >
+                            <span>{item.actionText}</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          September payroll is due in 5 days.
-                        </p>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
-                      <span className="text-[11px] text-slate-400">Today, 09:54 AM</span>
-                      {/* Unified button styling matching primary brand color */}
-                      <button
-                        type="button"
-                        onClick={() => router.push(p("/payroll/runs"))}
-                        className="px-3.5 py-1.5 text-white text-xs font-semibold rounded-xl transition cursor-pointer flex items-center gap-1 shadow-2xs hover:brightness-110 active:scale-[0.98]"
-                        style={{ backgroundColor: brandColor }}
-                      >
-                        <span>Run Payroll</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Alert 4: HR Onboarding */}
-                  <div
-                    className={`p-3.5 sm:p-4 rounded-2xl border transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
-                      isDark ? "bg-[#0E121D] border-white/[0.08]" : "bg-white border-slate-200/90 shadow-2xs"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
-                        <UserCheck className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                          2 employees have incomplete onboarding verification
-                        </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          Government ID and food safety documentation pending.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
-                      <span className="text-[11px] text-slate-400">Today, 09:12 AM</span>
-                      {/* Unified button styling matching primary brand color */}
-                      <button
-                        type="button"
-                        onClick={() => router.push(p("/workforce/employees"))}
-                        className="px-3.5 py-1.5 text-white text-xs font-semibold rounded-xl transition cursor-pointer flex items-center gap-1 shadow-2xs hover:brightness-110 active:scale-[0.98]"
-                        style={{ backgroundColor: brandColor }}
-                      >
-                        <span>Review HR</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -1717,25 +1621,31 @@ export default function AppleTenantDashboard() {
                       </div>
                     </div>
 
-                    <div className="divide-y divide-slate-100 dark:divide-white/[0.06] text-xs">
-                      {topSellingDishes.map((dish) => (
-                        <div key={dish.id} className="py-2.5 flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span className="font-mono text-slate-400 font-bold text-xs w-4">{dish.id}</span>
-                            <span className="text-xl shrink-0">{dish.icon}</span>
-                            <span className="font-bold text-slate-900 dark:text-white truncate">
-                              {dish.name}
-                            </span>
+                    {topSellingDishes.length === 0 ? (
+                      <div className="py-8 text-center text-slate-400 text-xs">
+                        No menu item sales recorded yet today. Orders will populate top sellers automatically.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-100 dark:divide-white/[0.06] text-xs">
+                        {topSellingDishes.map((dish) => (
+                          <div key={dish.id} className="py-2.5 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="font-mono text-slate-400 font-bold text-xs w-4">{dish.id}</span>
+                              <span className="text-xl shrink-0">{dish.icon}</span>
+                              <span className="font-bold text-slate-900 dark:text-white truncate">
+                                {dish.name}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 shrink-0 font-mono">
+                              <span className="text-slate-500 dark:text-[#8F95A3]">{dish.qty} sold</span>
+                              <span className="font-bold text-slate-900 dark:text-white">
+                                ₹{dish.revenue.toLocaleString()}
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-4 shrink-0 font-mono">
-                            <span className="text-slate-500 dark:text-[#8F95A3]">{dish.qty}</span>
-                            <span className="font-bold text-slate-900 dark:text-white">
-                              ₹{dish.revenue.toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1760,32 +1670,38 @@ export default function AppleTenantDashboard() {
                       </button>
                     </div>
 
-                    <div className="divide-y divide-slate-100 dark:divide-white/[0.06] text-xs">
-                      {recentActivities.map((act, idx) => (
-                        <div key={idx} className="py-2.5 flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-2.5 min-w-0">
-                            <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${act.dot}`} />
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-slate-900 dark:text-white">
-                                  {act.title}
-                                </span>
-                                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-slate-300">
-                                  {act.badge}
-                                </span>
+                    {recentActivities.length === 0 ? (
+                      <div className="py-8 text-center text-slate-400 text-xs">
+                        No recent activity logged yet. System operations will appear here live.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-100 dark:divide-white/[0.06] text-xs">
+                        {recentActivities.map((act, idx) => (
+                          <div key={idx} className="py-2.5 flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${act.dot}`} />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-slate-900 dark:text-white">
+                                    {act.title}
+                                  </span>
+                                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-slate-300">
+                                    {act.badge}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                                  {act.desc}
+                                </p>
                               </div>
-                              <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                                {act.desc}
-                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="text-[10px] opacity-60 font-mono">{act.time}</div>
+                              <div className="text-[10px] opacity-60">{act.author}</div>
                             </div>
                           </div>
-                          <div className="text-right shrink-0">
-                            <div className="text-[10px] opacity-60 font-mono">{act.time}</div>
-                            <div className="text-[10px] opacity-60">{act.author}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -68,6 +68,10 @@ interface FinancialTx {
   title: string;
   description?: string;
   amount: number;
+  subtotal?: number;
+  gstAmount?: number;
+  otherFeesAmount?: number;
+  otherFeeType?: string;
   taxAmount: number;
   netAmount: number;
   transactionDate: string;
@@ -110,9 +114,13 @@ export default function FinancePerformanceDashboardPage({
   // Add Transaction Modal State
   const [showAddModal, setShowAddModal] = useState(false);
   const [txType, setTxType] = useState<"EXPENSE" | "REVENUE">("EXPENSE");
-  const [txCategory, setTxCategory] = useState("RENT_PROPERTY_LEASE");
+  const [txCategory, setTxCategory] = useState("FOOD_BEVERAGE_SUPPLIERS");
   const [txTitle, setTxTitle] = useState("");
   const [txAmount, setTxAmount] = useState<number | "">("");
+  const [txSubtotal, setTxSubtotal] = useState<number | "">("");
+  const [txGstAmount, setTxGstAmount] = useState<number | "">("");
+  const [txOtherFeesAmount, setTxOtherFeesAmount] = useState<number | "">("");
+  const [txOtherFeeType, setTxOtherFeeType] = useState<string>("Bottle Depot / Deposit");
   const [txTaxAmount, setTxTaxAmount] = useState<number | "">(0);
   const [txDate, setTxDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [txVendor, setTxVendor] = useState("");
@@ -205,10 +213,23 @@ export default function FinancePerformanceDashboardPage({
   // Submit Manual Transaction
   const handleCreateTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!txAmount || Number(txAmount) <= 0) return;
     setSubmittingTx(true);
 
     try {
+      const subVal = typeof txSubtotal === "number" ? txSubtotal : 0;
+      const gstVal = typeof txGstAmount === "number" ? txGstAmount : Number(txTaxAmount || 0);
+      const feeVal = typeof txOtherFeesAmount === "number" ? txOtherFeesAmount : 0;
+      
+      const totalAmount = txType === "EXPENSE" && txSubtotal !== "" 
+        ? (subVal + gstVal + feeVal)
+        : Number(txAmount || 0);
+
+      if (totalAmount <= 0) {
+        setStatusMessage("Please enter a valid amount or breakdown values");
+        setSubmittingTx(false);
+        return;
+      }
+
       const res = await fetch("/api/restaurant/finance/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -216,8 +237,12 @@ export default function FinancePerformanceDashboardPage({
           type: txType,
           category: txCategory,
           title: txTitle,
-          amount: Number(txAmount),
-          taxAmount: Number(txTaxAmount || 0),
+          amount: totalAmount,
+          subtotal: subVal,
+          gstAmount: gstVal,
+          otherFeesAmount: feeVal,
+          otherFeeType: txOtherFeeType || undefined,
+          taxAmount: gstVal,
           transactionDate: txDate,
           vendorOrPayer: txVendor || undefined,
           paymentMethod: txPaymentMethod,
@@ -229,6 +254,9 @@ export default function FinancePerformanceDashboardPage({
         setShowAddModal(false);
         setTxTitle("");
         setTxAmount("");
+        setTxSubtotal("");
+        setTxGstAmount("");
+        setTxOtherFeesAmount("");
         setTxDescription("");
         setTxVendor("");
         setStatusMessage("Financial transaction logged successfully.");
@@ -314,6 +342,16 @@ export default function FinancePerformanceDashboardPage({
 
           {/* Quick Actions */}
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => router.push(`/restaurant/${subdomain}/finance/daily-closing`)}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-slate-950 text-xs font-bold rounded-xl transition-all shadow-md shadow-amber-500/20 cursor-pointer flex items-center gap-1.5"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 12v-2m-9-1h18" />
+              </svg>
+              <span>Daily Cash Register Closing</span>
+            </button>
+
             <button
               onClick={handleAutoSync}
               disabled={syncing}
@@ -842,74 +880,69 @@ export default function FinancePerformanceDashboardPage({
                 </button>
               </div>
 
-              {/* Title & Amount */}
+              {/* Title & Vendor */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block font-medium mb-1">Title / Ref</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Electricity Bill or Catering"
+                    placeholder="e.g. Sysco Food Order or Electricity"
                     value={txTitle}
                     onChange={(e) => setTxTitle(e.target.value)}
                     className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-slate-50 border-slate-200"}`}
                   />
                 </div>
                 <div>
-                  <label className="block font-medium mb-1">Amount ($)</label>
+                  <label className="block font-medium mb-1">Vendor / Payer</label>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    required
-                    placeholder="0.00"
-                    value={txAmount}
-                    onChange={(e) => setTxAmount(parseFloat(e.target.value) || "")}
-                    className={`w-full px-3 py-2 font-mono rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-slate-50 border-slate-200"}`}
+                    type="text"
+                    placeholder="e.g. Sysco / City Power"
+                    value={txVendor}
+                    onChange={(e) => setTxVendor(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-slate-50 border-slate-200"}`}
                   />
                 </div>
               </div>
 
-              {/* Category */}
-              <div>
-                <label className="block font-medium mb-1">Financial Category</label>
-                <select
-                  value={txCategory}
-                  onChange={(e) => setTxCategory(e.target.value)}
-                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-slate-50 border-slate-200"}`}
-                >
-                  {txType === "EXPENSE" ? (
-                    <>
-                      <option value="FOOD_BEVERAGE_SUPPLIERS">Food &amp; Beverage Procurement (COGS)</option>
-                      <option value="PACKAGING_CONSUMABLES">Packaging &amp; Consumables</option>
-                      <option value="RENT_PROPERTY_LEASE">Rent &amp; Property Lease</option>
-                      <option value="UTILITIES">Utilities (Electricity, Water, Gas)</option>
-                      <option value="EQUIPMENT_FINANCING_LEASE">Equipment Financing / Lease</option>
-                      <option value="MAINTENANCE_REPAIRS">Maintenance &amp; Repairs</option>
-                      <option value="CLEANING_HYGIENE">Cleaning &amp; Hygiene Supplies</option>
-                      <option value="TAXES_LICENSES">Taxes &amp; Municipal Licenses</option>
-                      <option value="SAAS_TECHNOLOGY">SaaS &amp; Restaurant Tech</option>
-                      <option value="MARKETING_ADVERTISING">Marketing &amp; Advertising</option>
-                      <option value="INSURANCE">Commercial Insurance</option>
-                      <option value="OTHER_OPERATIONAL_EXPENSES">Other Operational Overhead</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="POS_DINE_IN_SALES">Dine-In Direct Sales</option>
-                      <option value="POS_TAKEAWAY_SALES">Takeaway &amp; Pickup</option>
-                      <option value="POS_DELIVERY_SALES">Direct Delivery</option>
-                      <option value="CATERING_EVENTS">Catering &amp; Private Events</option>
-                      <option value="THIRD_PARTY_DELIVERY">Third-Party Delivery Payout</option>
-                      <option value="MERCHANDISE_REBATES_OTHER">Vendor Rebates &amp; Other</option>
-                    </>
-                  )}
-                </select>
-              </div>
-
-              {/* Date & Vendor */}
+              {/* Category & Date */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-medium mb-1">Date</label>
+                  <label className="block font-medium mb-1">Financial Category</label>
+                  <select
+                    value={txCategory}
+                    onChange={(e) => setTxCategory(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-slate-50 border-slate-200"}`}
+                  >
+                    {txType === "EXPENSE" ? (
+                      <>
+                        <option value="FOOD_BEVERAGE_SUPPLIERS">Food &amp; Beverage Procurement (COGS)</option>
+                        <option value="PACKAGING_CONSUMABLES">Packaging &amp; Consumables</option>
+                        <option value="RENT_PROPERTY_LEASE">Rent &amp; Property Lease</option>
+                        <option value="UTILITIES">Utilities (Electricity, Water, Gas)</option>
+                        <option value="EQUIPMENT_FINANCING_LEASE">Equipment Financing / Lease</option>
+                        <option value="MAINTENANCE_REPAIRS">Maintenance &amp; Repairs</option>
+                        <option value="CLEANING_HYGIENE">Cleaning &amp; Hygiene Supplies</option>
+                        <option value="TAXES_LICENSES">Taxes &amp; Municipal Licenses</option>
+                        <option value="SAAS_TECHNOLOGY">SaaS &amp; Restaurant Tech</option>
+                        <option value="MARKETING_ADVERTISING">Marketing &amp; Advertising</option>
+                        <option value="INSURANCE">Commercial Insurance</option>
+                        <option value="OTHER_OPERATIONAL_EXPENSES">Other Operational Overhead</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="POS_DINE_IN_SALES">Dine-In Direct Sales</option>
+                        <option value="POS_TAKEAWAY_SALES">Takeaway &amp; Pickup</option>
+                        <option value="POS_DELIVERY_SALES">Direct Delivery</option>
+                        <option value="CATERING_EVENTS">Catering &amp; Private Events</option>
+                        <option value="THIRD_PARTY_DELIVERY">Third-Party Delivery Payout</option>
+                        <option value="MERCHANDISE_REBATES_OTHER">Vendor Rebates &amp; Other</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-medium mb-1">Transaction Date</label>
                   <input
                     type="date"
                     required
@@ -918,17 +951,117 @@ export default function FinancePerformanceDashboardPage({
                     className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-slate-50 border-slate-200"}`}
                   />
                 </div>
+              </div>
+
+              {txType === "EXPENSE" ? (
+                /* Itemized Expense Breakdown Fields */
+                <div className="p-3.5 rounded-2xl border space-y-3 bg-black/[0.02] dark:bg-white/[0.02] border-black/[0.06] dark:border-white/[0.06]">
+                  <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    Purchase &amp; Expense Breakdown
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-medium text-slate-400 mb-0.5">
+                        Subtotal ($)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="100.00"
+                        value={txSubtotal}
+                        onChange={(e) =>
+                          setTxSubtotal(e.target.value === "" ? "" : parseFloat(e.target.value))
+                        }
+                        className={`w-full px-2.5 py-1.5 font-mono text-xs rounded-lg border ${
+                          isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-white border-slate-200"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-medium text-slate-400 mb-0.5">
+                        GST Paid ($)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="5.00"
+                        value={txGstAmount}
+                        onChange={(e) =>
+                          setTxGstAmount(e.target.value === "" ? "" : parseFloat(e.target.value))
+                        }
+                        className={`w-full px-2.5 py-1.5 font-mono text-xs rounded-lg border ${
+                          isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-white border-slate-200"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-medium text-slate-400 mb-0.5">
+                        Other Fees ($)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="3.00"
+                        value={txOtherFeesAmount}
+                        onChange={(e) =>
+                          setTxOtherFeesAmount(
+                            e.target.value === "" ? "" : parseFloat(e.target.value)
+                          )
+                        }
+                        className={`w-full px-2.5 py-1.5 font-mono text-xs rounded-lg border ${
+                          isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-white border-slate-200"
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-medium text-slate-400 mb-0.5">
+                      Other Fee Type / Description
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Bottle Depot / Deposit, Recycling Fee, Delivery"
+                      value={txOtherFeeType}
+                      onChange={(e) => setTxOtherFeeType(e.target.value)}
+                      className={`w-full px-2.5 py-1.5 text-xs rounded-lg border ${
+                        isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-white border-slate-200"
+                      }`}
+                    />
+                  </div>
+
+                  {/* Calculated Total Bill Amount Display */}
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#0071E3]/10 border border-[#0071E3]/20 text-xs">
+                    <span className="font-semibold text-[#0071E3] dark:text-[#64B5FF]">Total Bill Amount (Calculated):</span>
+                    <span className="font-mono font-bold text-[#0071E3] dark:text-[#64B5FF] text-sm">
+                      $
+                      {(
+                        (typeof txSubtotal === "number" ? txSubtotal : (parseFloat(String(txSubtotal)) || 0)) +
+                        (typeof txGstAmount === "number" ? txGstAmount : (parseFloat(String(txGstAmount)) || 0)) +
+                        (typeof txOtherFeesAmount === "number" ? txOtherFeesAmount : (parseFloat(String(txOtherFeesAmount)) || 0))
+                      ).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                /* Simple Amount for Revenue */
                 <div>
-                  <label className="block font-medium mb-1">Vendor / Payer</label>
+                  <label className="block font-medium mb-1">Total Revenue Amount ($)</label>
                   <input
-                    type="text"
-                    placeholder="e.g. City Power Corp"
-                    value={txVendor}
-                    onChange={(e) => setTxVendor(e.target.value)}
-                    className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-slate-50 border-slate-200"}`}
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    placeholder="0.00"
+                    value={txAmount}
+                    onChange={(e) => setTxAmount(parseFloat(e.target.value) || "")}
+                    className={`w-full px-3 py-2 font-mono rounded-xl border ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-slate-50 border-slate-200"
+                    }`}
                   />
                 </div>
-              </div>
+              )}
 
               {/* Description */}
               <div>

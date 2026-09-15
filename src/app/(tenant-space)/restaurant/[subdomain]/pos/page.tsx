@@ -224,6 +224,13 @@ export default function PosHubPage({
   const [connectModalProvider, setConnectModalProvider] = useState<
     "TOAST" | "SQUARE" | "CLOVER" | null
   >(null);
+  const [disconnectModalItem, setDisconnectModalItem] = useState<{
+    id: string;
+    provider: string;
+    outletName: string;
+  } | null>(null);
+  const [disconnectConfirmText, setDisconnectConfirmText] = useState<string>("");
+  const [isDisconnecting, setIsDisconnecting] = useState<boolean>(false);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<PosOrder | null>(null);
   const [syncingIntegrationId, setSyncingIntegrationId] = useState<string | null>(null);
   const [syncStatusMsg, setSyncStatusMsg] = useState<{ text: string; isError?: boolean } | null>(
@@ -351,25 +358,48 @@ export default function PosHubPage({
     }
   };
 
-  // Disconnect connection
-  const handleDisconnect = async (integrationId: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to disconnect this POS integration? Previously imported orders will remain intact as read-only historical records, but new order synchronization will stop."
-      )
-    ) {
+  // Disconnect connection modal launcher
+  const handleDisconnect = (integ: PosIntegrationItem) => {
+    setDisconnectModalItem({
+      id: integ.id,
+      provider: integ.provider,
+      outletName: integ.outletName,
+    });
+    setDisconnectConfirmText("");
+  };
+
+  // Confirm and execute actual API deletion/deactivation
+  const confirmAndExecuteDisconnect = async () => {
+    if (!disconnectModalItem) return;
+
+    const normalizedText = disconnectConfirmText.trim().toUpperCase();
+    if (normalizedText !== "DELETE" && normalizedText !== "DISCONNECT") {
       return;
     }
 
+    setIsDisconnecting(true);
     try {
-      const res = await fetch(`/api/restaurant/pos/integrations/${integrationId}?action=DEACTIVATE`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/restaurant/pos/integrations/${disconnectModalItem.id}?action=DEACTIVATE`,
+        {
+          method: "DELETE",
+        }
+      );
       if (res.ok) {
+        setDisconnectModalItem(null);
+        setDisconnectConfirmText("");
         await fetchAllData();
+        setSyncStatusMsg({ text: "POS Integration successfully disconnected." });
+        setTimeout(() => setSyncStatusMsg(null), 5000);
+      } else {
+        const data = await res.json();
+        setSyncStatusMsg({ text: data.error || "Failed to disconnect integration", isError: true });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to disconnect:", err);
+      setSyncStatusMsg({ text: err.message || "Failed to disconnect integration", isError: true });
+    } finally {
+      setIsDisconnecting(false);
     }
   };
 
@@ -708,7 +738,7 @@ export default function PosHubPage({
                 <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
                   <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Gross Volume</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
-                    ${metrics.grossVolume.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    ${Number(metrics.grossVolume || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                   </p>
                   <p className="text-[11px] text-slate-400 mt-1">Total revenue recorded across POS providers</p>
                 </div>
@@ -716,7 +746,7 @@ export default function PosHubPage({
                 <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
                   <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Net Sales</p>
                   <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                    ${metrics.netSales.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    ${Number(metrics.netSales || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                   </p>
                   <p className="text-[11px] text-slate-400 mt-1">Excludes sales tax & refunds</p>
                 </div>
@@ -724,10 +754,10 @@ export default function PosHubPage({
                 <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
                   <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Orders Synced</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
-                    {metrics.orderCount.toLocaleString()}
+                    {(metrics.orderCount || 0).toLocaleString()}
                   </p>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    AOV: ${metrics.aov.toFixed(2)} / order
+                    AOV: ${Number(metrics.aov || 0).toFixed(2)} / order
                   </p>
                 </div>
 
@@ -736,14 +766,14 @@ export default function PosHubPage({
                   <div className="flex items-center gap-3 mt-1">
                     <div>
                       <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
-                        +${metrics.totalTips.toFixed(2)}
+                        +${Number(metrics.totalTips || 0).toFixed(2)}
                       </span>
                       <span className="text-[10px] text-slate-400 block">Tips</span>
                     </div>
                     <div className="h-6 w-px bg-slate-200 dark:bg-slate-800" />
                     <div>
                       <span className="text-lg font-bold text-rose-500">
-                        -${metrics.totalRefunds.toFixed(2)}
+                        -${Number(metrics.totalRefunds || 0).toFixed(2)}
                       </span>
                       <span className="text-[10px] text-slate-400 block">Refunds</span>
                     </div>
@@ -935,7 +965,7 @@ export default function PosHubPage({
                                 </td>
 
                                 <td className="px-5 py-3.5 text-right font-bold text-slate-900 dark:text-white">
-                                  ${order.totalAmount.toFixed(2)}
+                                  ${Number(order.totalAmount || 0).toFixed(2)}
                                 </td>
                               </tr>
                             );
@@ -1022,7 +1052,7 @@ export default function PosHubPage({
                             </button>
 
                             <button
-                              onClick={() => handleDisconnect(integ.id)}
+                              onClick={() => handleDisconnect(integ)}
                               className="px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-500/10 transition-colors border border-rose-500/20"
                             >
                               Disconnect
@@ -1117,7 +1147,7 @@ export default function PosHubPage({
                               {item.name}
                             </div>
                             <div className="font-bold text-slate-900 dark:text-white">
-                              ${(item.quantity * item.unitPrice).toFixed(2)}
+                              ${(Number(item.quantity || 0) * Number(item.unitPrice || 0)).toFixed(2)}
                             </div>
                           </div>
 
@@ -1129,7 +1159,7 @@ export default function PosHubPage({
                                   <span>
                                     + {m.name} {m.option ? `(${m.option})` : ""}
                                   </span>
-                                  {m.price > 0 && <span>+${m.price.toFixed(2)}</span>}
+                                  {Number(m.price || 0) > 0 && <span>+${Number(m.price || 0).toFixed(2)}</span>}
                                 </div>
                               ))}
                             </div>
@@ -1146,43 +1176,43 @@ export default function PosHubPage({
                       <span>
                         $
                         {(
-                          selectedOrderDetails.totalAmount -
-                          selectedOrderDetails.taxAmount -
-                          selectedOrderDetails.tipAmount +
-                          selectedOrderDetails.discountAmount
+                          Number(selectedOrderDetails.totalAmount || 0) -
+                          Number(selectedOrderDetails.taxAmount || 0) -
+                          Number(selectedOrderDetails.tipAmount || 0) +
+                          Number(selectedOrderDetails.discountAmount || 0)
                         ).toFixed(2)}
                       </span>
                     </div>
 
-                    {selectedOrderDetails.discountAmount > 0 && (
+                    {Number(selectedOrderDetails.discountAmount || 0) > 0 && (
                       <div className="flex justify-between text-emerald-600">
                         <span>Discounts Applied</span>
-                        <span>-${selectedOrderDetails.discountAmount.toFixed(2)}</span>
+                        <span>-${Number(selectedOrderDetails.discountAmount || 0).toFixed(2)}</span>
                       </div>
                     )}
 
                     <div className="flex justify-between text-slate-500">
                       <span>Sales Tax</span>
-                      <span>${selectedOrderDetails.taxAmount.toFixed(2)}</span>
+                      <span>${Number(selectedOrderDetails.taxAmount || 0).toFixed(2)}</span>
                     </div>
 
-                    {selectedOrderDetails.tipAmount > 0 && (
+                    {Number(selectedOrderDetails.tipAmount || 0) > 0 && (
                       <div className="flex justify-between text-indigo-500">
                         <span>Staff Gratuity / Tip</span>
-                        <span>+${selectedOrderDetails.tipAmount.toFixed(2)}</span>
+                        <span>+${Number(selectedOrderDetails.tipAmount || 0).toFixed(2)}</span>
                       </div>
                     )}
 
-                    {selectedOrderDetails.refundAmount > 0 && (
+                    {Number(selectedOrderDetails.refundAmount || 0) > 0 && (
                       <div className="flex justify-between text-rose-500 font-semibold">
                         <span>Refund Processed</span>
-                        <span>-${selectedOrderDetails.refundAmount.toFixed(2)}</span>
+                        <span>-${Number(selectedOrderDetails.refundAmount || 0).toFixed(2)}</span>
                       </div>
                     )}
 
                     <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between text-sm font-bold text-slate-900 dark:text-white">
                       <span>Total Charged</span>
-                      <span>${selectedOrderDetails.totalAmount.toFixed(2)}</span>
+                      <span>${Number(selectedOrderDetails.totalAmount || 0).toFixed(2)}</span>
                     </div>
                   </div>
 
@@ -1203,6 +1233,94 @@ export default function PosHubPage({
                     className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200"
                   >
                     Close Order Drawer
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal Popup: Confirm Disconnect POS Integration */}
+          {disconnectModalItem && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+              <div
+                className={`relative w-full max-w-md p-6 rounded-2xl shadow-2xl border transition-all ${
+                  isDark ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
+                }`}
+              >
+                <button
+                  onClick={() => {
+                    setDisconnectModalItem(null);
+                    setDisconnectConfirmText("");
+                  }}
+                  className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 shrink-0">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold tracking-tight">
+                      Disconnect {disconnectModalItem.provider} POS
+                    </h3>
+                    <p className={`text-xs mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                      Location: <span className="font-semibold">{disconnectModalItem.outletName}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <p className={`text-xs leading-relaxed mb-4 ${isDark ? "text-slate-300" : "text-slate-600"}`}>
+                  Are you sure you want to disconnect this POS integration? Previously imported orders will remain intact as read-only historical records, but new order synchronization will stop immediately.
+                </p>
+
+                <div className="space-y-2 mb-6">
+                  <label className={`block text-xs font-semibold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                    To confirm deletion, please type <span className="font-bold text-rose-600 dark:text-rose-400">DELETE</span> below:
+                  </label>
+                  <input
+                    type="text"
+                    value={disconnectConfirmText}
+                    onChange={(e) => setDisconnectConfirmText(e.target.value)}
+                    placeholder="Type DELETE to confirm"
+                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs border font-medium focus:outline-none focus:ring-2 focus:ring-rose-500/50 transition-all ${
+                      isDark
+                        ? "bg-slate-800 border-slate-700 text-white placeholder-slate-500"
+                        : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400"
+                    }`}
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDisconnectModalItem(null);
+                      setDisconnectConfirmText("");
+                    }}
+                    disabled={isDisconnecting}
+                    className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                      isDark
+                        ? "border-slate-700 text-slate-300 hover:bg-slate-800"
+                        : "border-slate-200 text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmAndExecuteDisconnect}
+                    disabled={
+                      isDisconnecting ||
+                      (disconnectConfirmText.trim().toUpperCase() !== "DELETE" &&
+                        disconnectConfirmText.trim().toUpperCase() !== "DISCONNECT")
+                    }
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                  >
+                    {isDisconnecting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                    {isDisconnecting ? "Disconnecting..." : "Disconnect Integration"}
                   </button>
                 </div>
               </div>

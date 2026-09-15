@@ -300,8 +300,9 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
         moduleKey: "finance",
         children: [
           { label: "Financial Overview", desc: "Executive P&L statement, sales revenue & prime costs", href: p("/finance") },
+          { label: "Daily Cash Register Closing", desc: "Daily cash sales, physical till count, cash in/out adjustments & safe deposit", href: p("/finance/daily-closing"), quickAction: true },
           { label: "Bill Reminders", desc: "Vendor invoices, utilities, AMC & payment alerts", href: p("/finance/bill-reminders") },
-          { label: "Payroll Processing", desc: "Staff salaries, tip pooling & pay run calculation", href: p("/payroll/runs"), quickAction: true },
+          { label: "Payroll Processing", desc: "Staff salaries, tip pooling & pay run calculation", href: p("/payroll/runs") },
         ],
       },
       {
@@ -333,6 +334,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
         icon: ClipboardCheck,
         moduleKey: "shift_management",
         children: [
+          { label: "Daily Register Closing", desc: "Digital register closing, physical till audit & safe deposit", href: p("/finance/daily-closing"), quickAction: true },
           { label: "Daily Checklists", desc: "Opening, closing duties & HACCP hygiene audits", href: p("/operations") },
           { label: "Kitchen SOPs & Prep", desc: "Standard recipes, line prep & equipment logs", href: p("/operations") },
         ],
@@ -344,6 +346,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
         icon: Sliders,
         children: [
           { label: "Restaurant Profile", desc: "Branding colors, identity & restaurant details", href: p("/settings/profile") },
+          { label: "WhatsApp Messaging", desc: "Pair WhatsApp Web QR Code & automate PO dispatches", href: p("/settings/whatsapp") },
           { label: "Branch Outlets", desc: "Multi-branch addresses & tax registration numbers", href: p("/settings/branches") },
           { label: "Master Data & Taxes", desc: "GST, service charges & master taxonomies", href: p("/settings/master-data") },
           { label: "Security & 2FA", desc: "Two-factor authentication & recovery codes", href: p("/settings/security") },
@@ -669,7 +672,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
                     </div>
                     <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">No matching pages</p>
                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
-                      Try &quot;items&quot;, &quot;shifts&quot;, &quot;roster&quot;, &quot;payroll&quot;, &quot;alerts&quot;, &quot;catering&quot;
+                      Try &quot;cash&quot;, &quot;closing&quot;, &quot;items&quot;, &quot;shifts&quot;, &quot;roster&quot;, &quot;payroll&quot;, &quot;catering&quot;
                     </p>
                   </div>
                 ) : (

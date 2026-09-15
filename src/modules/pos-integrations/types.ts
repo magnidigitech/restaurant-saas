@@ -51,6 +51,7 @@ export interface NormalizedOrder {
   tipAmount: number;
   discountAmount: number;
   refundAmount: number;
+  finalAmount?: number;
   paymentMethod: string;
   customerName?: string;
   customerPhone?: string;
