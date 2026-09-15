@@ -201,13 +201,19 @@ export class ToastAdapter implements PosProviderAdapter {
         let allItems: any[] = [];
         if (Array.isArray(o.checks)) {
           o.checks.forEach((chk: any) => {
-            if (Array.isArray(chk.items)) {
+            if (Array.isArray(chk.items) && chk.items.length > 0) {
               allItems.push(...chk.items);
+            }
+            if (Array.isArray(chk.selections) && chk.selections.length > 0) {
+              allItems.push(...chk.selections);
             }
           });
         }
         if (allItems.length === 0 && Array.isArray(o.items)) {
-          allItems = o.items;
+          allItems.push(...o.items);
+        }
+        if (allItems.length === 0 && Array.isArray(o.selections)) {
+          allItems.push(...o.selections);
         }
 
         const items = allItems.map((i: any) => ({

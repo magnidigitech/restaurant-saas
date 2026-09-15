@@ -227,6 +227,28 @@ export async function executeSync(integrationId: string, since?: Date) {
             updatedAt: new Date(),
           },
         });
+
+        // Re-sync line items for existing order to populate item details
+        if (order.items && order.items.length > 0) {
+          await prisma.posOrderItem.deleteMany({
+            where: { orderId: existingOrder.id },
+          });
+
+          for (const item of order.items) {
+            await prisma.posOrderItem.create({
+              data: {
+                orderId: existingOrder.id,
+                name: item.name,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                totalPrice: Number(item.quantity) * Number(item.unitPrice),
+                notes: item.notes,
+                modifiers: item.modifiers ? (item.modifiers as any) : undefined,
+              },
+            });
+          }
+        }
+
         updatedOrdersCount++;
       } else {
         const calculatedFinalAmount =
