@@ -280,6 +280,9 @@ export class ToastAdapter implements PosProviderAdapter {
         };
       });
 
+      // Sort fetched Toast orders descending (latest orders first)
+      orders.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
       return { orders };
     } catch (err: any) {
       throw new Error(`Failed to fetch orders from Toast: ${err.message}`);
