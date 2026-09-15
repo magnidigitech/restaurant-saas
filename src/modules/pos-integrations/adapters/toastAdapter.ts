@@ -12,7 +12,7 @@ export class ToastAdapter implements PosProviderAdapter {
 
   /**
    * Helper method to authenticate against Toast API with machine client or partner credentials
-   * Tries ws-api.toasttab.com (shown in developer portal) and fallback toast-api.toasttab.com
+   * Tries ws-api.toasttab.com with userAccessType: TOAST_MACHINE_CLIENT as required by Toast API
    */
   private async authenticateToast(credentials: ProviderCredentials): Promise<string> {
     const { clientId, clientSecret } = credentials;
@@ -20,41 +20,49 @@ export class ToastAdapter implements PosProviderAdapter {
       throw new Error("Client ID and Client Secret are required for Toast authentication.");
     }
 
-    const hostnames = ["https://ws-api.toasttab.com", "https://toast-api.toasttab.com"];
-    const userTypes = ["TOAST_MACHINE_CLIENT", "INTEGRATION"];
+    const hostnames = [
+      "https://ws-api.toasttab.com",
+      "https://toast-api.toasttab.com",
+    ];
+    const userAccessTypes = ["TOAST_MACHINE_CLIENT", "INTEGRATION"];
 
     let lastError = "";
 
     for (const host of hostnames) {
-      for (const userType of userTypes) {
+      for (const userAccessType of userAccessTypes) {
         try {
           const res = await fetch(`${host}/authentication/v1/authentication/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              userType,
+              userAccessType,
               clientId,
               clientSecret,
             }),
           });
 
+          const data = await res.json().catch(() => ({}));
+
           if (res.ok) {
-            const data = await res.json();
             const token =
               data.token?.accessToken ||
               data.token?.token ||
-              data.accessToken ||
-              (typeof data.token === "string" ? data.token : null);
+              (typeof data.token === "string" ? data.token : null) ||
+              data.accessToken;
 
             if (token) {
               return token;
             }
           } else {
-            const errText = await res.text();
-            lastError = `Toast Auth (${res.status}): ${errText || "Invalid credentials"}`;
+            const errDetail =
+              data.message ||
+              data.error_description ||
+              data.error ||
+              `HTTP ${res.status}`;
+            lastError = `Toast API Auth (${res.status}): ${errDetail}`;
           }
         } catch (e: any) {
-          lastError = e.message || "Network error reaching Toast API";
+          lastError = e.message || "Network connection error reaching Toast API.";
         }
       }
     }
@@ -99,7 +107,7 @@ export class ToastAdapter implements PosProviderAdapter {
       };
     }
 
-    // Production Toast API authentication
+    // Production Toast API authentication test
     try {
       const accessToken = await this.authenticateToast(credentials);
 
@@ -120,7 +128,7 @@ export class ToastAdapter implements PosProviderAdapter {
     } catch (err: any) {
       return {
         valid: false,
-        error: err.message || "Could not reach or authenticate with Toast API. Please check your Client ID, Secret, and Restaurant GUID.",
+        error: err.message || "Could not reach or authenticate with Toast API. Please check your Client ID and Client Secret.",
       };
     }
   }
@@ -130,7 +138,7 @@ export class ToastAdapter implements PosProviderAdapter {
     options: { locationId?: string; since?: Date; limit?: number }
   ): Promise<ProviderFetchResult> {
     const { environment, restaurantGuid } = credentials;
-    const limit = options.limit || 25;
+    const limit = Math.min(options.limit || 30, 30); // Restrict to maximum 30 orders for now as requested
 
     if (environment === "SANDBOX") {
       const mockOrders: NormalizedOrder[] = [
@@ -263,7 +271,7 @@ export class ToastAdapter implements PosProviderAdapter {
 
       for (const host of hostnames) {
         try {
-          const endpoint = `${host}/orders/v2/ordersBulk?restaurantGuid=${restaurantGuid}&pageSize=${limit}`;
+          const endpoint = `${host}/orders/v2/ordersBulk?restaurantGuid=${restaurantGuid || ""}&pageSize=${limit}`;
           const response = await fetch(endpoint, {
             headers: {
               "Toast-Restaurant-External-ID": restaurantGuid || "",
@@ -285,12 +293,13 @@ export class ToastAdapter implements PosProviderAdapter {
       }
 
       if (!rawOrders) {
-        throw new Error(`Toast Orders API responded with error: ${lastErrMessage}`);
+        throw new Error(`Toast Orders API error: ${lastErrMessage}`);
       }
 
       const ordersList = Array.isArray(rawOrders) ? rawOrders : rawOrders.orders || rawOrders.data || [];
+      const limitedList = ordersList.slice(0, limit);
 
-      const orders: NormalizedOrder[] = ordersList.map((o: any) => ({
+      const orders: NormalizedOrder[] = limitedList.map((o: any) => ({
         provider: "TOAST",
         providerOrderId: o.guid || String(o.id),
         providerLocationId: options.locationId || restaurantGuid,

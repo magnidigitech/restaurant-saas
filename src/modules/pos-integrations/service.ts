@@ -191,7 +191,7 @@ export async function executeSync(integrationId: string, since?: Date) {
     const fetchResult = await adapter.fetchOrders(credentials, {
       locationId: integration.providerLocationId || undefined,
       since: since || integration.lastSyncAt || undefined,
-      limit: 50,
+      limit: 30,
     });
 
     let newOrdersCount = 0;
