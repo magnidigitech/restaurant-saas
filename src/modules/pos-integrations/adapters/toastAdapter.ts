@@ -67,32 +67,26 @@ export class ToastAdapter implements PosProviderAdapter {
   async validateCredentials(credentials: ProviderCredentials): Promise<ProviderValidationResult> {
     const { clientId, clientSecret, restaurantGuid, environment } = credentials;
 
-    if (!clientId || !clientSecret || !restaurantGuid) {
+    if (!clientId || !clientSecret) {
       return {
         valid: false,
-        error: "Missing required Toast API credentials: Client ID, Client Secret, and Restaurant GUID are required.",
+        error: "Missing required Toast API credentials: Client ID and Client Secret are required.",
       };
     }
 
-    if (environment === "SANDBOX") {
-      // Toast Partner Sandbox validation
-      if (!restaurantGuid.startsWith("toast-") && restaurantGuid.length < 8) {
-        return {
-          valid: false,
-          error: "Invalid Toast Restaurant GUID format for Sandbox. Please verify your developer portal GUID.",
-        };
-      }
+    const effectiveGuid = restaurantGuid?.trim() || "toast-restaurant-main";
 
+    if (environment === "SANDBOX") {
       return {
         valid: true,
         locations: [
           {
-            id: restaurantGuid,
+            id: effectiveGuid,
             name: "Toast Main Dining & Bar (Sandbox)",
             address: "401 Park Dr, Boston, MA",
           },
           {
-            id: `${restaurantGuid}-patio`,
+            id: `${effectiveGuid}-patio`,
             name: "Toast Patio & Takeout (Sandbox)",
             address: "401 Park Dr Suite 800, Boston, MA",
           },
@@ -113,7 +107,7 @@ export class ToastAdapter implements PosProviderAdapter {
         valid: true,
         locations: [
           {
-            id: restaurantGuid,
+            id: effectiveGuid,
             name: "Toast Production Restaurant",
           },
         ],
