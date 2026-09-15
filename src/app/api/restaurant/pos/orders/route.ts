@@ -53,6 +53,18 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "30");
     const offset = parseInt(searchParams.get("offset") || "0");
 
+    // Auto-purge any legacy zero-item zero-total dummy/placeholder tickets from DB
+    await prisma.posOrder.deleteMany({
+      where: {
+        restaurantId: session.activeRestaurantId,
+        OR: [
+          { providerOrderId: { startsWith: "ord_" } },
+          { providerOrderId: "undefined" },
+          { AND: [{ totalAmount: 0 }, { tipAmount: 0 }, { items: { none: {} } }] },
+        ],
+      },
+    }).catch(() => {});
+
     const result = await getUnifiedOrdersDashboard(session.activeRestaurantId, {
       outletId,
       provider,

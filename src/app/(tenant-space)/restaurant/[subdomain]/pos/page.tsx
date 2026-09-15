@@ -915,18 +915,33 @@ export default function PosHubPage({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {orders.length === 0 ? (
-                          <tr>
-                            <td colSpan={9} className="px-6 py-12 text-center text-slate-500">
-                              <ShoppingBag className="w-8 h-8 mx-auto mb-2 text-slate-400 opacity-60" />
-                              <p className="font-semibold text-slate-700 dark:text-slate-300">No orders found</p>
-                              <p className="text-xs mt-1">
-                                Adjust your filters or trigger a sync to pull recent transactions.
-                              </p>
-                            </td>
-                          </tr>
-                        ) : (
-                          orders.map((order) => {
+                        {(() => {
+                          const displayOrders = orders.filter((o) => {
+                            const itemCount = o.items?.length || 0;
+                            const tot = Number(o.totalAmount || 0);
+                            const tip = Number(o.tipAmount || 0);
+                            const pId = String(o.providerOrderId || "");
+                            if ((itemCount === 0 && tot === 0 && tip === 0) || pId.startsWith("ord_") || pId === "undefined" || !pId) {
+                              return false;
+                            }
+                            return true;
+                          });
+
+                          if (displayOrders.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={9} className="px-6 py-12 text-center text-slate-500">
+                                  <ShoppingBag className="w-8 h-8 mx-auto mb-2 text-slate-400 opacity-60" />
+                                  <p className="font-semibold text-slate-700 dark:text-slate-300">No orders found</p>
+                                  <p className="text-xs mt-1">
+                                    Adjust your filters or trigger a sync to pull recent transactions.
+                                  </p>
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return displayOrders.map((order) => {
                             const provDef = POS_PROVIDERS.find((p) => p.id === order.provider);
                             
                             // Format order ref to never show bare 10, 11
@@ -1029,8 +1044,8 @@ export default function PosHubPage({
                                 </td>
                               </tr>
                             );
-                          })
-                        )}
+                          });
+                        })()}
                       </tbody>
                     </table>
                   </div>
