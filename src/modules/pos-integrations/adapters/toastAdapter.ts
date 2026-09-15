@@ -291,6 +291,11 @@ export class ToastAdapter implements PosProviderAdapter {
       let rawOrders: any = null;
       let lastErrMessage = "";
 
+      const endDateStr = new Date().toISOString();
+      const startDateStr = options.since
+        ? options.since.toISOString()
+        : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
       const reqHeaders: Record<string, string> = {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
@@ -299,7 +304,7 @@ export class ToastAdapter implements PosProviderAdapter {
 
       for (const suffix of pathSuffixes) {
         try {
-          const endpoint = `${host}${suffix}?pageSize=${limit}`;
+          const endpoint = `${host}${suffix}?startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}&pageSize=${limit}`;
 
           const response = await fetch(endpoint, {
             headers: reqHeaders,
@@ -331,33 +336,59 @@ export class ToastAdapter implements PosProviderAdapter {
       const ordersList = Array.isArray(rawOrders) ? rawOrders : rawOrders.orders || rawOrders.data || [];
       const limitedList = ordersList.slice(0, limit);
 
-      const orders: NormalizedOrder[] = limitedList.map((o: any) => ({
-        provider: "TOAST",
-        providerOrderId: o.guid || String(o.id),
-        providerLocationId: options.locationId || cleanGuid,
-        orderNumber: o.displayNumber || `TST-${String(o.id || o.guid || "").slice(-4).toUpperCase()}`,
-        orderType: o.diningOption === "Dine In" ? "DINE_IN" : "TAKEAWAY",
-        status: o.voided ? "CANCELLED" : "COMPLETED",
-        totalAmount: Number(o.total || o.amount || 0),
-        taxAmount: Number(o.tax || 0),
-        tipAmount: Number(o.tip || 0),
-        discountAmount: Number(o.discount || 0),
-        refundAmount: Number(o.refundAmount || 0),
-        paymentMethod: o.payments?.[0]?.type || "CREDIT_CARD",
-        customerName: o.customer?.name || (o.customer?.firstName ? `${o.customer.firstName || ""} ${o.customer.lastName || ""}`.trim() : undefined),
-        customerPhone: o.customer?.phone || undefined,
-        createdAt: new Date(o.openedDate || o.createdDate || Date.now()),
-        rawPayload: o,
-        items: (o.checks?.[0]?.items || o.items || []).map((i: any) => ({
-          name: i.name || "Item",
+      const orders: NormalizedOrder[] = limitedList.map((o: any) => {
+        const firstCheck = o.checks?.[0] || {};
+        const totalAmount = Number(firstCheck.amount || o.total || o.amount || 0);
+        const taxAmount = Number(firstCheck.taxAmount || o.tax || 0);
+        const tipAmount = Number(firstCheck.payments?.[0]?.tipAmount || o.tip || 0);
+
+        // Extract items across all checks if available
+        let allItems: any[] = [];
+        if (Array.isArray(o.checks)) {
+          o.checks.forEach((chk: any) => {
+            if (Array.isArray(chk.items)) {
+              allItems.push(...chk.items);
+            }
+          });
+        }
+        if (allItems.length === 0 && Array.isArray(o.items)) {
+          allItems = o.items;
+        }
+
+        const items = allItems.map((i: any) => ({
+          name: i.displayName || i.name || "Menu Item",
           quantity: Number(i.quantity || 1),
           unitPrice: Number(i.price || 0),
           modifiers: (i.selections || i.modifiers || []).map((s: any) => ({
-            name: s.name,
+            name: s.displayName || s.name || "Modifier",
             price: Number(s.price || 0),
           })),
-        })),
-      }));
+        }));
+
+        const custFirstName = o.customer?.firstName || "";
+        const custLastName = o.customer?.lastName || "";
+        const fullName = `${custFirstName} ${custLastName}`.trim();
+
+        return {
+          provider: "TOAST",
+          providerOrderId: o.guid || String(o.id),
+          providerLocationId: options.locationId || cleanGuid,
+          orderNumber: o.displayNumber || `TST-${String(o.guid || o.id || "").slice(-4).toUpperCase()}`,
+          orderType: o.diningOption?.displayName === "Dine In" || o.diningOption === "Dine In" ? "DINE_IN" : "TAKEAWAY",
+          status: o.voided || o.deleted ? "CANCELLED" : "COMPLETED",
+          totalAmount,
+          taxAmount,
+          tipAmount,
+          discountAmount: Number(o.discount || 0),
+          refundAmount: Number(o.refundAmount || 0),
+          paymentMethod: firstCheck.payments?.[0]?.type || o.payments?.[0]?.type || "CREDIT_CARD",
+          customerName: fullName || o.customer?.name || undefined,
+          customerPhone: o.customer?.phone || undefined,
+          createdAt: new Date(o.createdDate || o.openedDate || Date.now()),
+          rawPayload: o,
+          items,
+        };
+      });
 
       return { orders };
     } catch (err: any) {
