@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useParams } from "next/navigation";
 import ModuleAccessGuard from "@/components/ModuleAccessGuard";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
+import * as XLSX from "xlsx";
 import {
   CateringEventDetails,
   SmartMenuTemplate,
@@ -794,22 +795,27 @@ export default function SmartCateringPage() {
     setShowExcelUploadModal(true);
   };
 
-  const handleCsvFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCsvFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setExcelFileName(file.name);
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const text = evt.target?.result as string;
-      if (!text) return;
-      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-      if (lines.length <= 1) return;
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      if (!sheetName) return;
+
+      const sheet = workbook.Sheets[sheetName];
+      const rows2D: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+      if (!rows2D || rows2D.length < 2) return;
 
       const parsed: MenuItemOption[] = [];
-      const startIndex = lines[0].toLowerCase().includes("name") ? 1 : 0;
-      for (let i = startIndex; i < lines.length; i++) {
-        const parts = lines[i].split(",").map((p) => p.trim().replace(/^["']|["']$/g, ""));
+      const firstRowText = String(rows2D[0]?.[0] || "").toLowerCase();
+      const startIndex = firstRowText.includes("name") || firstRowText.includes("item") ? 1 : 0;
+
+      for (let i = startIndex; i < rows2D.length; i++) {
+        const parts = (rows2D[i] || []).map((p: any) => String(p !== null && p !== undefined ? p : "").trim());
         if (!parts[0]) continue;
         const name = parts[0];
         const dietaryRaw = (parts[1] || "VEG").toUpperCase();
@@ -836,8 +842,9 @@ export default function SmartCateringPage() {
       }
 
       setExcelParsedItems(parsed);
-    };
-    reader.readAsText(file);
+    } catch (err) {
+      console.error("Failed to parse catering spreadsheet file:", err);
+    }
   };
 
   const handleConfirmExcelCatalogUpload = async () => {

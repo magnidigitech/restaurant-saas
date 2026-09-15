@@ -4,6 +4,7 @@ import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
+import * as XLSX from "xlsx";
 import {
   ArrowLeft,
   FolderTree,
@@ -412,8 +413,40 @@ export default function InventoryCategoriesPage({
     setCategoryImportReport(null);
 
     try {
-      const text = await file.text();
-      const rows = parseCategoryCSV(text);
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      if (!sheetName) throw new Error("The uploaded file contains no readable sheets.");
+      const sheet = workbook.Sheets[sheetName];
+      const rows2D: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+      if (!rows2D || rows2D.length < 2) {
+        throw new Error("The uploaded file contains no readable category rows.");
+      }
+
+      const headers = (rows2D[0] || []).map((h: any) => String(h || "").toLowerCase().replace(/[^a-z0-9]/g, ""));
+      const rows: any[] = [];
+
+      for (let i = 1; i < rows2D.length; i++) {
+        const rawCells = rows2D[i] || [];
+        if (!rawCells || rawCells.every((c: any) => c === null || c === undefined || String(c).trim() === "")) continue;
+
+        const rowObj: any = { rowNumber: i + 1 };
+        headers.forEach((h: string, colIdx: number) => {
+          const val = rawCells[colIdx] !== null && rawCells[colIdx] !== undefined ? String(rawCells[colIdx]).trim() : "";
+          if (h === "categoryname" || h === "name" || h === "category" || h.includes("categoryname")) {
+            rowObj.name = val;
+          } else if (h === "parentcategory" || h === "parent" || h.includes("parent")) {
+            rowObj.parentCategory = val;
+          } else if (h.includes("desc") || h.includes("note")) {
+            rowObj.description = val;
+          }
+        });
+
+        if (rowObj.name) {
+          rows.push(rowObj);
+        }
+      }
+
       if (rows.length === 0) {
         throw new Error("The uploaded file contains no readable category rows.");
       }

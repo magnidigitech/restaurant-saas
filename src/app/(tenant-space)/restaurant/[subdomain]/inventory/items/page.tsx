@@ -7,6 +7,7 @@ import RestaurantNavbar from "@/components/RestaurantNavbar";
 import ModuleAccessGuard from "@/components/ModuleAccessGuard";
 import { formatUnit } from "@/core/inventory/units";
 import { ArrowLeft, Package, Boxes, Upload } from "lucide-react";
+import * as XLSX from "xlsx";
 
 interface Item {
   id: string;
@@ -402,8 +403,52 @@ export default function InventoryItemsPage({
     setPreviewFilterTab("all");
 
     try {
-      const text = await file.text();
-      const rawRows = parseCSV(text);
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      if (!sheetName) {
+        throw new Error("The uploaded spreadsheet file contains no readable sheets.");
+      }
+      const sheet = workbook.Sheets[sheetName];
+      const rows2D: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+      if (!rows2D || rows2D.length < 2) {
+        throw new Error("The uploaded file contains no valid rows or readable item data.");
+      }
+
+      const headers = (rows2D[0] || []).map((h: any) => String(h || "").toLowerCase().replace(/[^a-z0-9]/g, ""));
+      const rawRows: any[] = [];
+
+      for (let i = 1; i < rows2D.length; i++) {
+        const rawCells = rows2D[i] || [];
+        if (!rawCells || rawCells.every((c: any) => c === null || c === undefined || String(c).trim() === "")) continue;
+
+        const rowObj: any = { rowNumber: i + 1 };
+        headers.forEach((h: string, colIdx: number) => {
+          const val = rawCells[colIdx] !== null && rawCells[colIdx] !== undefined ? String(rawCells[colIdx]).trim() : "";
+          if (h === "itemname" || h === "name" || h === "item" || (h.includes("name") && !h.includes("category"))) {
+            rowObj.name = val;
+          } else if (h === "skucode" || h === "sku" || h === "code" || h.includes("sku")) {
+            rowObj.sku = val;
+          } else if (h === "category" || h === "cat" || h.includes("category") || h.includes("group")) {
+            rowObj.category = val;
+          } else if (h.includes("cost") || h.includes("price") || h === "costperunit" || h === "unitcost") {
+            rowObj.costPerUnit = val;
+          } else if (h.includes("reorder") || h.includes("minstock") || h === "reorderpoint") {
+            rowObj.reorderPoint = val;
+          } else if (h.includes("par") || h.includes("maxstock") || h === "parlevel") {
+            rowObj.parLevel = val;
+          } else if (h.includes("unitofmeasure") || h === "uom" || h === "unit" || h.includes("measure") || h.includes("unitof")) {
+            rowObj.unitOfMeasure = val;
+          } else if (h.includes("desc") || h.includes("note")) {
+            rowObj.description = val;
+          }
+        });
+
+        if (rowObj.name || rowObj.sku) {
+          rawRows.push(rowObj);
+        }
+      }
+
       if (rawRows.length === 0) {
         throw new Error("The uploaded file contains no valid rows or readable item data.");
       }

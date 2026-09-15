@@ -10,6 +10,60 @@ export class ToastAdapter implements PosProviderAdapter {
   provider = "TOAST" as const;
   displayName = "Toast POS";
 
+  /**
+   * Helper method to authenticate against Toast API with machine client or partner credentials
+   * Tries ws-api.toasttab.com (shown in developer portal) and fallback toast-api.toasttab.com
+   */
+  private async authenticateToast(credentials: ProviderCredentials): Promise<string> {
+    const { clientId, clientSecret } = credentials;
+    if (!clientId || !clientSecret) {
+      throw new Error("Client ID and Client Secret are required for Toast authentication.");
+    }
+
+    const hostnames = ["https://ws-api.toasttab.com", "https://toast-api.toasttab.com"];
+    const userTypes = ["TOAST_MACHINE_CLIENT", "INTEGRATION"];
+
+    let lastError = "";
+
+    for (const host of hostnames) {
+      for (const userType of userTypes) {
+        try {
+          const res = await fetch(`${host}/authentication/v1/authentication/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userType,
+              clientId,
+              clientSecret,
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const token =
+              data.token?.accessToken ||
+              data.token?.token ||
+              data.accessToken ||
+              (typeof data.token === "string" ? data.token : null);
+
+            if (token) {
+              return token;
+            }
+          } else {
+            const errText = await res.text();
+            lastError = `Toast Auth (${res.status}): ${errText || "Invalid credentials"}`;
+          }
+        } catch (e: any) {
+          lastError = e.message || "Network error reaching Toast API";
+        }
+      }
+    }
+
+    throw new Error(
+      lastError || "Toast API Authentication failed. Please verify your Client ID and Client Secret."
+    );
+  }
+
   async validateCredentials(credentials: ProviderCredentials): Promise<ProviderValidationResult> {
     const { clientId, clientSecret, restaurantGuid, environment } = credentials;
 
@@ -53,26 +107,8 @@ export class ToastAdapter implements PosProviderAdapter {
 
     // Production Toast API authentication
     try {
-      const authEndpoint = "https://toast-api.toasttab.com/authentication/v1/authentication/login";
-      const response = await fetch(authEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userType: "INTEGRATION",
-          clientId,
-          clientSecret,
-        }),
-      });
+      const accessToken = await this.authenticateToast(credentials);
 
-      if (!response.ok) {
-        const errText = await response.text();
-        return {
-          valid: false,
-          error: `Toast API authentication failed (${response.status}): ${errText || "Invalid credentials or unauthorized integration partner"}`,
-        };
-      }
-
-      const data = await response.json();
       return {
         valid: true,
         locations: [
@@ -82,14 +118,15 @@ export class ToastAdapter implements PosProviderAdapter {
           },
         ],
         providerMetadata: {
-          tokenType: data.tokenType || "Bearer",
+          tokenType: "Bearer",
           environment: "PRODUCTION",
+          authenticatedAt: new Date().toISOString(),
         },
       };
     } catch (err: any) {
       return {
         valid: false,
-        error: `Could not reach Toast API: ${err.message || "Network error. Please check your credentials or test mode."}`,
+        error: err.message || "Could not reach or authenticate with Toast API. Please check your Client ID, Secret, and Restaurant GUID.",
       };
     }
   }
@@ -223,43 +260,64 @@ export class ToastAdapter implements PosProviderAdapter {
       };
     }
 
-    // Toast Production API Fetch: /orders/v2/ordersBulk
+    // Toast Production API Fetch using OAuth 2.0 Access Token
     try {
-      const endpoint = `https://toast-api.toasttab.com/orders/v2/ordersBulk?restaurantGuid=${restaurantGuid}&pageSize=${limit}`;
-      const response = await fetch(endpoint, {
-        headers: {
-          "Toast-Restaurant-External-ID": restaurantGuid || "",
-          Authorization: `Bearer ${credentials.clientId}`,
-        },
-      });
+      const accessToken = await this.authenticateToast(credentials);
+      const hostnames = ["https://ws-api.toasttab.com", "https://toast-api.toasttab.com"];
+      let rawOrders: any = null;
+      let lastErrMessage = "";
 
-      if (!response.ok) {
-        throw new Error(`Toast Orders API responded with HTTP ${response.status}`);
+      for (const host of hostnames) {
+        try {
+          const endpoint = `${host}/orders/v2/ordersBulk?restaurantGuid=${restaurantGuid}&pageSize=${limit}`;
+          const response = await fetch(endpoint, {
+            headers: {
+              "Toast-Restaurant-External-ID": restaurantGuid || "",
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (response.ok) {
+            rawOrders = await response.json();
+            break;
+          } else {
+            const errTxt = await response.text();
+            lastErrMessage = `HTTP ${response.status}: ${errTxt}`;
+          }
+        } catch (e: any) {
+          lastErrMessage = e.message;
+        }
       }
 
-      const rawOrders = await response.json();
-      const orders: NormalizedOrder[] = (rawOrders || []).map((o: any) => ({
+      if (!rawOrders) {
+        throw new Error(`Toast Orders API responded with error: ${lastErrMessage}`);
+      }
+
+      const ordersList = Array.isArray(rawOrders) ? rawOrders : rawOrders.orders || rawOrders.data || [];
+
+      const orders: NormalizedOrder[] = ordersList.map((o: any) => ({
         provider: "TOAST",
         providerOrderId: o.guid || String(o.id),
         providerLocationId: options.locationId || restaurantGuid,
-        orderNumber: o.displayNumber || `TST-${o.id?.slice(0, 4)}`,
+        orderNumber: o.displayNumber || `TST-${String(o.id || o.guid || "").slice(-4).toUpperCase()}`,
         orderType: o.diningOption === "Dine In" ? "DINE_IN" : "TAKEAWAY",
         status: o.voided ? "CANCELLED" : "COMPLETED",
-        totalAmount: Number(o.total || 0),
+        totalAmount: Number(o.total || o.amount || 0),
         taxAmount: Number(o.tax || 0),
         tipAmount: Number(o.tip || 0),
         discountAmount: Number(o.discount || 0),
         refundAmount: Number(o.refundAmount || 0),
         paymentMethod: o.payments?.[0]?.type || "CREDIT_CARD",
-        customerName: o.customer?.name || undefined,
+        customerName: o.customer?.name || (o.customer?.firstName ? `${o.customer.firstName || ""} ${o.customer.lastName || ""}`.trim() : undefined),
         customerPhone: o.customer?.phone || undefined,
         createdAt: new Date(o.openedDate || o.createdDate || Date.now()),
         rawPayload: o,
-        items: (o.checks?.[0]?.items || []).map((i: any) => ({
+        items: (o.checks?.[0]?.items || o.items || []).map((i: any) => ({
           name: i.name || "Item",
-          quantity: i.quantity || 1,
+          quantity: Number(i.quantity || 1),
           unitPrice: Number(i.price || 0),
-          modifiers: (i.selections || []).map((s: any) => ({
+          modifiers: (i.selections || i.modifiers || []).map((s: any) => ({
             name: s.name,
             price: Number(s.price || 0),
           })),

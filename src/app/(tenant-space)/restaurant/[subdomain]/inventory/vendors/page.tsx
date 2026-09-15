@@ -6,6 +6,7 @@ import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import ModuleAccessGuard from "@/components/ModuleAccessGuard";
 import { ArrowLeft, Building2, Upload } from "lucide-react";
+import * as XLSX from "xlsx";
 
 // Simple & Robust CSV / Delimited Spreadsheet Parser for Vendors
 function parseVendorCSV(text: string) {
@@ -288,8 +289,54 @@ export default function VendorDirectoryPage({
     setPreviewFilterTab("all");
 
     try {
-      const text = await file.text();
-      const rawRows = parseVendorCSV(text);
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      if (!sheetName) throw new Error("The uploaded file contains no readable sheets.");
+      const sheet = workbook.Sheets[sheetName];
+      const rows2D: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+      if (!rows2D || rows2D.length < 2) {
+        throw new Error("The uploaded file contains no readable vendor rows.");
+      }
+
+      const headers = (rows2D[0] || []).map((h: any) => String(h || "").toLowerCase().replace(/[^a-z0-9]/g, ""));
+      const rawRows: any[] = [];
+
+      for (let i = 1; i < rows2D.length; i++) {
+        const rawCells = rows2D[i] || [];
+        if (!rawCells || rawCells.every((c: any) => c === null || c === undefined || String(c).trim() === "")) continue;
+
+        const rowObj: any = { rowNumber: i + 1 };
+        headers.forEach((h: string, colIdx: number) => {
+          const val = rawCells[colIdx] !== null && rawCells[colIdx] !== undefined ? String(rawCells[colIdx]).trim() : "";
+          if (h === "suppliername" || h === "vendorname" || h === "name" || h.includes("vendor") || h.includes("supplier")) {
+            rowObj.name = val;
+          } else if (h === "code" || h.includes("code")) {
+            rowObj.code = val;
+          } else if (h.includes("contact") || h.includes("person")) {
+            rowObj.contactPerson = val;
+          } else if (h.includes("email") || h.includes("mail")) {
+            rowObj.email = val;
+          } else if (h.includes("phone") || h.includes("mobile") || h.includes("tel")) {
+            rowObj.phone = val;
+          } else if (h.includes("address") || h.includes("location") || h.includes("street")) {
+            rowObj.address = val;
+          } else if (h.includes("tax") || h.includes("gst") || h.includes("vat")) {
+            rowObj.taxId = val;
+          } else if (h.includes("term") || h.includes("payment")) {
+            rowObj.paymentTerms = val.toUpperCase().replace(/\s+/g, "");
+          } else if (h === "status" || h.includes("state")) {
+            rowObj.status = val.toUpperCase();
+          } else if (h.includes("note") || h.includes("remark") || h.includes("detail") || h.includes("desc")) {
+            rowObj.notes = val;
+          }
+        });
+
+        if (rowObj.name) {
+          rawRows.push(rowObj);
+        }
+      }
+
       if (rawRows.length === 0) {
         throw new Error("The uploaded file contains no readable vendor rows.");
       }
