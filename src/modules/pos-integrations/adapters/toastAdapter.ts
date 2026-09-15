@@ -280,7 +280,7 @@ export class ToastAdapter implements PosProviderAdapter {
       );
     }
 
-    const cleanGuid = restaurantGuid.trim();
+    const cleanGuid = restaurantGuid.trim().replace(/^["']|["']$/g, "");
 
     // Toast Production API Fetch using OAuth 2.0 Access Token
     try {
@@ -295,12 +295,11 @@ export class ToastAdapter implements PosProviderAdapter {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
         "Toast-Restaurant-External-ID": cleanGuid,
-        "toast-restaurant-external-id": cleanGuid,
       };
 
       for (const suffix of pathSuffixes) {
         try {
-          const endpoint = `${host}${suffix}?pageSize=${limit}&restaurantGuid=${encodeURIComponent(cleanGuid)}`;
+          const endpoint = `${host}${suffix}?pageSize=${limit}`;
 
           const response = await fetch(endpoint, {
             headers: reqHeaders,
