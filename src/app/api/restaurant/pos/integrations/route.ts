@@ -25,6 +25,8 @@ const validateSchema = z.object({
   credentials: z.record(z.string(), z.any()),
 });
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   try {
     const session = await getTenantSession();

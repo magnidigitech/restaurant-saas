@@ -4,6 +4,8 @@ import { verifyAccess } from "@/core/permissions/check";
 import { executeSync } from "@/modules/pos-integrations/service";
 import { prisma } from "@/core/database/client";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
