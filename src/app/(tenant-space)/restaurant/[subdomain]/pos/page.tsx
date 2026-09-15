@@ -241,7 +241,7 @@ export default function PosHubPage({
   const [wizardStep, setWizardStep] = useState<number>(1);
   const [wizardEnvironment, setWizardEnvironment] = useState<"SANDBOX" | "PRODUCTION">("PRODUCTION");
   const [wizardOutletId, setWizardOutletId] = useState<string>("");
-  const [wizardImportPeriod, setWizardImportPeriod] = useState<number>(30);
+  const [wizardImportPeriod, setWizardImportPeriod] = useState<number>(365);
   const [wizardCredentials, setWizardCredentials] = useState<Record<string, string>>({});
   const [wizardError, setWizardError] = useState<string | null>(null);
   const [wizardValidating, setWizardValidating] = useState<boolean>(false);
@@ -1677,9 +1677,9 @@ export default function PosHubPage({
 
                       <div className="grid grid-cols-3 gap-3">
                         {[
-                          { days: 7, label: "Last 7 Days", desc: "Fast sync, recent tickets only" },
-                          { days: 30, label: "Last 30 Days", desc: "Recommended for monthly accounting" },
+                          { days: 30, label: "Last 30 Days", desc: "Monthly accounting" },
                           { days: 90, label: "Last 90 Days", desc: "Comprehensive quarter review" },
+                          { days: 365, label: "Year to Date (YTD)", desc: "Full year order history to present" },
                         ].map((p) => (
                           <div
                             key={p.days}
