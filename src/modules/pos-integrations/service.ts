@@ -222,6 +222,7 @@ export async function executeSync(integrationId: string, since?: Date) {
             paymentMethod: order.paymentMethod,
             customerName: order.customerName || existingOrder.customerName,
             customerPhone: order.customerPhone || existingOrder.customerPhone,
+            notes: order.notes || existingOrder.notes,
             rawPayload: order.rawPayload,
             updatedAt: new Date(),
           },

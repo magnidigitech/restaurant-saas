@@ -226,6 +226,30 @@ export class ToastAdapter implements PosProviderAdapter {
           })),
         }));
 
+        // Extract Customer info across Toast order, check, and delivery objects
+        const custObj = o.customer || firstCheck.customer || o.deliveryInfo?.recipient || {};
+        const custFirstName = custObj.firstName || custObj.first_name || "";
+        const custLastName = custObj.lastName || custObj.last_name || "";
+        let derivedCustName = `${custFirstName} ${custLastName}`.trim();
+        if (!derivedCustName && custObj.name) {
+          derivedCustName = custObj.name;
+        }
+        if (!derivedCustName && o.deliveryInfo?.recipient?.name) {
+          derivedCustName = o.deliveryInfo.recipient.name;
+        }
+
+        const derivedCustPhone = custObj.phone || custObj.phoneNumber || o.deliveryInfo?.phone || undefined;
+        const derivedNotes = o.notes || firstCheck.notes || o.deliveryInfo?.deliveryNotes || (o.table?.name ? `Table: ${o.table.name}` : undefined);
+
+        // Determine Order Type (DINE_IN, TAKEAWAY, DELIVERY)
+        const diningOptStr = String(o.diningOption?.displayName || o.diningOption?.name || o.diningOption || "").toUpperCase();
+        let derivedOrderType = "TAKEAWAY";
+        if (diningOptStr.includes("DINE") || diningOptStr.includes("TABLE")) {
+          derivedOrderType = "DINE_IN";
+        } else if (diningOptStr.includes("DELIVER")) {
+          derivedOrderType = "DELIVERY";
+        }
+
         const orderGuid = (o.guid && o.guid !== "undefined") ? o.guid : ((o.id && o.id !== "undefined") ? String(o.id) : (firstCheck.guid || `ord_${Date.now()}_${Math.floor(Math.random() * 1000)}`));
         const sanitizedGuid = String(orderGuid).replace(/[^a-zA-Z0-9]/g, "");
         const shortCode = sanitizedGuid.length >= 4
@@ -239,7 +263,7 @@ export class ToastAdapter implements PosProviderAdapter {
           providerOrderId: orderGuid,
           providerLocationId: options.locationId || cleanGuid,
           orderNumber: orderNumberStr,
-          orderType: o.diningOption?.displayName === "Dine In" || o.diningOption === "Dine In" ? "DINE_IN" : "TAKEAWAY",
+          orderType: derivedOrderType,
           status: o.voided || o.deleted ? "CANCELLED" : "COMPLETED",
           totalAmount,
           taxAmount,
@@ -247,8 +271,9 @@ export class ToastAdapter implements PosProviderAdapter {
           discountAmount: Number(o.discount || 0),
           refundAmount: Number(o.refundAmount || 0),
           paymentMethod: firstCheck.payments?.[0]?.type || o.payments?.[0]?.type || "CREDIT_CARD",
-          customerName: fullName || o.customer?.name || undefined,
-          customerPhone: o.customer?.phone || undefined,
+          customerName: derivedCustName || undefined,
+          customerPhone: derivedCustPhone || undefined,
+          notes: derivedNotes,
           createdAt: new Date(o.createdDate || o.openedDate || Date.now()),
           rawPayload: o,
           items,
