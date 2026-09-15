@@ -301,10 +301,15 @@ export class ToastAdapter implements PosProviderAdapter {
         };
       });
 
-      // Sort fetched Toast orders descending (latest orders first)
-      orders.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      // Filter out empty zero-value staff/void/placeholder checks
+      const validOrders = orders.filter(
+        (o) => o.items.length > 0 || o.totalAmount > 0 || o.tipAmount > 0
+      );
 
-      return { orders };
+      // Sort fetched Toast orders descending (latest orders first)
+      validOrders.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+      return { orders: validOrders };
     } catch (err: any) {
       throw new Error(`Failed to fetch orders from Toast: ${err.message}`);
     }

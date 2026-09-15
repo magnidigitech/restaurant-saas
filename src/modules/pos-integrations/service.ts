@@ -370,7 +370,14 @@ export interface DashboardFilters {
 }
 
 export async function getUnifiedOrdersDashboard(restaurantId: string, filters: DashboardFilters) {
-  const where: any = { restaurantId };
+  const where: any = {
+    restaurantId,
+    NOT: [
+      { providerOrderId: { startsWith: "ord_" } },
+      { providerOrderId: "undefined" },
+      { AND: [{ totalAmount: 0 }, { tipAmount: 0 }, { items: { none: {} } }] },
+    ],
+  };
 
   if (filters.outletId && filters.outletId !== "ALL") {
     where.outletId = filters.outletId;
