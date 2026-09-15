@@ -149,7 +149,7 @@ export class ToastAdapter implements PosProviderAdapter {
       const endDateStr = new Date().toISOString();
       const startDateStr = options.since
         ? options.since.toISOString()
-        : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        : new Date(new Date().getFullYear(), 0, 1).toISOString();
 
       const reqHeaders: Record<string, string> = {
         Authorization: `Bearer ${accessToken}`,
@@ -226,15 +226,19 @@ export class ToastAdapter implements PosProviderAdapter {
           })),
         }));
 
-        const custFirstName = o.customer?.firstName || "";
-        const custLastName = o.customer?.lastName || "";
-        const fullName = `${custFirstName} ${custLastName}`.trim();
+        const orderGuid = (o.guid && o.guid !== "undefined") ? o.guid : ((o.id && o.id !== "undefined") ? String(o.id) : (firstCheck.guid || `ord_${Date.now()}_${Math.floor(Math.random() * 1000)}`));
+        const sanitizedGuid = String(orderGuid).replace(/[^a-zA-Z0-9]/g, "");
+        const shortCode = sanitizedGuid.length >= 4
+          ? sanitizedGuid.slice(-4).toUpperCase()
+          : Math.floor(1000 + Math.random() * 9000).toString();
+
+        const orderNumberStr = o.displayNumber || o.shortOrderNumber || (o.checkNumber ? `#${o.checkNumber}` : `TST-${shortCode}`);
 
         return {
           provider: "TOAST",
-          providerOrderId: o.guid || String(o.id),
+          providerOrderId: orderGuid,
           providerLocationId: options.locationId || cleanGuid,
-          orderNumber: o.displayNumber || `TST-${String(o.guid || o.id || "").slice(-4).toUpperCase()}`,
+          orderNumber: orderNumberStr,
           orderType: o.diningOption?.displayName === "Dine In" || o.diningOption === "Dine In" ? "DINE_IN" : "TAKEAWAY",
           status: o.voided || o.deleted ? "CANCELLED" : "COMPLETED",
           totalAmount,

@@ -215,7 +215,7 @@ export default function PosHubPage({
   const [selectedProvider, setSelectedProvider] = useState<string>("ALL");
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [dateRange, setDateRange] = useState<string>("30d");
+  const [dateRange, setDateRange] = useState<string>("all");
 
   // Navigation tabs: 'orders' | 'integrations'
   const [activeTab, setActiveTab] = useState<"orders" | "integrations">("orders");
@@ -291,7 +291,7 @@ export default function PosHubPage({
       // Date range calculation
       const now = new Date();
       if (dateRange === "today") {
-        const start = new Date(now.setHours(0, 0, 0, 0));
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
         q.set("startDate", start.toISOString());
       } else if (dateRange === "7d") {
         const start = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -299,6 +299,11 @@ export default function PosHubPage({
       } else if (dateRange === "30d") {
         const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
         q.set("startDate", start.toISOString());
+      } else if (dateRange === "ytd") {
+        const start = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
+        q.set("startDate", start.toISOString());
+      } else if (dateRange === "all") {
+        // No startDate filter applied to query all-time history
       }
 
       const res = await fetch(`/api/restaurant/pos/orders?${q.toString()}`);
@@ -380,7 +385,7 @@ export default function PosHubPage({
     setIsDisconnecting(true);
     try {
       const res = await fetch(
-        `/api/restaurant/pos/integrations/${disconnectModalItem.id}?action=DEACTIVATE`,
+        `/api/restaurant/pos/integrations/${disconnectModalItem.id}?action=DELETE`,
         {
           method: "DELETE",
         }
@@ -840,6 +845,8 @@ export default function PosHubPage({
                         <option value="today">Today</option>
                         <option value="7d">Last 7 Days</option>
                         <option value="30d">Last 30 Days</option>
+                        <option value="ytd">Year to Date (YTD)</option>
+                        <option value="all">All Time (Full History)</option>
                       </select>
                     </div>
 

@@ -338,7 +338,7 @@ export async function executeSync(integrationId: string, since?: Date) {
 export async function disconnectIntegration(
   restaurantId: string,
   integrationId: string,
-  action: "DEACTIVATE" | "DELETE" = "DEACTIVATE"
+  action: "DEACTIVATE" | "DELETE" = "DELETE"
 ) {
   const integration = await prisma.posIntegration.findFirst({
     where: { id: integrationId, restaurantId },
@@ -348,27 +348,13 @@ export async function disconnectIntegration(
     throw new Error("Integration not found");
   }
 
-  if (action === "DEACTIVATE") {
-    // Preserve previously imported orders for reporting & historical audit
-    await prisma.posIntegration.update({
-      where: { id: integrationId },
-      data: {
-        status: "DISCONNECTED",
-        errorMessage: "Integration disconnected by user. Synced order history preserved as read-only.",
-      },
-    });
-    return {
-      message: "Integration disconnected. Historical orders remain intact as read-only.",
-    };
-  } else {
-    // Permanent deletion of connection configuration
-    await prisma.posIntegration.delete({
-      where: { id: integrationId },
-    });
-    return {
-      message: "Integration credentials removed. Historical orders retained.",
-    };
-  }
+  await prisma.posIntegration.delete({
+    where: { id: integrationId },
+  });
+
+  return {
+    message: "Integration deleted successfully.",
+  };
 }
 
 export interface DashboardFilters {
