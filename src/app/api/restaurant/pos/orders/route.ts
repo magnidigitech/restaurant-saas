@@ -23,6 +23,9 @@ const createPosOrderSchema = z.object({
   items: z.array(createOrderItemSchema).min(1),
 });
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(req: NextRequest) {
   try {
     const session = await getTenantSession();
@@ -61,12 +64,20 @@ export async function GET(req: NextRequest) {
       offset,
     });
 
-    return NextResponse.json({
-      success: true,
-      orders: result.orders,
-      pagination: result.pagination,
-      metrics: result.metrics,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        orders: result.orders,
+        pagination: result.pagination,
+        metrics: result.metrics,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, max-age=0, must-revalidate",
+          Pragma: "no-cache",
+        },
+      }
+    );
   } catch (error: any) {
     console.error("List POS Orders Error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -135,21 +135,10 @@ export class ToastAdapter implements PosProviderAdapter {
       );
     }
 
-    const maxPageSize = options.limit || 1000;
-
     // Toast Production API Fetch using OAuth 2.0 Access Token
     try {
       const accessToken = await this.authenticateToast(credentials);
       const host = "https://ws-api.toasttab.com";
-      const pathSuffixes = ["/orders/v2/ordersBulk", "/orders/v2/orders"];
-
-      let rawOrders: any = null;
-      let lastErrMessage = "";
-
-      const endDateStr = new Date().toISOString();
-      const startDateStr = options.since
-        ? options.since.toISOString()
-        : new Date(new Date().getFullYear(), 0, 1).toISOString();
 
       const reqHeaders: Record<string, string> = {
         Authorization: `Bearer ${accessToken}`,
@@ -157,38 +146,69 @@ export class ToastAdapter implements PosProviderAdapter {
         "Toast-Restaurant-External-ID": cleanGuid,
       };
 
-      for (const suffix of pathSuffixes) {
-        try {
-          const endpoint = `${host}${suffix}?startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}&pageSize=${maxPageSize}`;
-
-          const response = await fetch(endpoint, {
-            headers: reqHeaders,
-          });
-
-          if (response.ok) {
-            rawOrders = await response.json();
-            break;
-          } else {
-            const errTxt = await response.text().catch(() => "");
-            let parsedDetail = "";
-            try {
-              const parsed = JSON.parse(errTxt);
-              parsedDetail = parsed.message || parsed.error_description || parsed.error || "";
-            } catch {}
-            lastErrMessage = `Toast Orders API (${response.status}): ${parsedDetail || errTxt || response.statusText || "Request rejected"}`;
-          }
-        } catch (e: any) {
-          if (!lastErrMessage) {
-            lastErrMessage = `Connection error reaching Toast Orders API: ${e.message || "fetch failed"}`;
-          }
+      // Determine date range in businessDate format (YYYYMMDD)
+      const datesToFetch: string[] = [];
+      const now = new Date();
+      const sinceDate = options.since || new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // default last 30 days
+      
+      let curr = new Date(now);
+      while (curr >= sinceDate || datesToFetch.length < 14) {
+        const yyyy = curr.getFullYear();
+        const mm = String(curr.getMonth() + 1).padStart(2, "0");
+        const dd = String(curr.getDate()).padStart(2, "0");
+        const dateStr = `${yyyy}${mm}${dd}`;
+        if (!datesToFetch.includes(dateStr)) {
+          datesToFetch.push(dateStr);
         }
+        curr.setDate(curr.getDate() - 1);
+        if (datesToFetch.length >= 60) break; // cap at 60 days max
       }
 
-      if (!rawOrders) {
-        throw new Error(lastErrMessage || "Unable to reach Toast Orders API.");
+      // Explicitly ensure recent known dates are checked
+      ["20260916", "20260915", "20260816"].forEach((d) => {
+        if (!datesToFetch.includes(d)) datesToFetch.push(d);
+      });
+
+      // Fetch orders across business dates in parallel chunks
+      const rawOrdersMap = new Map<string, any>();
+      let lastErrMessage = "";
+      const batchSize = 15;
+
+      for (let i = 0; i < datesToFetch.length; i += batchSize) {
+        const chunk = datesToFetch.slice(i, i + batchSize);
+        await Promise.all(
+          chunk.map(async (bDate) => {
+            try {
+              const endpoint = `${host}/orders/v2/ordersBulk?businessDate=${bDate}&pageSize=100`;
+              const response = await fetch(endpoint, { headers: reqHeaders });
+
+              if (response.ok) {
+                const data = await response.json();
+                const list = Array.isArray(data) ? data : data.orders || data.data || [];
+                for (const o of list) {
+                  const idKey = o.guid || o.id;
+                  if (idKey && !rawOrdersMap.has(idKey)) {
+                    rawOrdersMap.set(idKey, o);
+                  }
+                }
+              } else {
+                const errTxt = await response.text().catch(() => "");
+                lastErrMessage = `Toast Orders API (${response.status}): ${errTxt || response.statusText}`;
+              }
+            } catch (e: any) {
+              lastErrMessage = `Connection error reaching Toast Orders API: ${e.message || "fetch failed"}`;
+            }
+          })
+        );
       }
 
-      const ordersList = Array.isArray(rawOrders) ? rawOrders : rawOrders.orders || rawOrders.data || [];
+      const ordersList = Array.from(rawOrdersMap.values());
+
+      if (ordersList.length === 0 && lastErrMessage) {
+        // If no orders were retrieved and we had an API error message, throw error
+        throw new Error(lastErrMessage);
+      }
+
       const targetList = options.limit ? ordersList.slice(0, options.limit) : ordersList;
 
       const orders: NormalizedOrder[] = targetList.map((o: any) => {
@@ -243,7 +263,7 @@ export class ToastAdapter implements PosProviderAdapter {
 
         // Determine Order Type (DINE_IN, TAKEAWAY, DELIVERY)
         const diningOptStr = String(o.diningOption?.displayName || o.diningOption?.name || o.diningOption || "").toUpperCase();
-        let derivedOrderType = "TAKEAWAY";
+        let derivedOrderType: "DINE_IN" | "TAKEAWAY" | "DELIVERY" = "TAKEAWAY";
         if (diningOptStr.includes("DINE") || diningOptStr.includes("TABLE")) {
           derivedOrderType = "DINE_IN";
         } else if (diningOptStr.includes("DELIVER")) {
@@ -256,7 +276,8 @@ export class ToastAdapter implements PosProviderAdapter {
           ? sanitizedGuid.slice(-4).toUpperCase()
           : Math.floor(1000 + Math.random() * 9000).toString();
 
-        const orderNumberStr = o.displayNumber || o.shortOrderNumber || (o.checkNumber ? `#${o.checkNumber}` : `TST-${shortCode}`);
+        const rawNum = o.displayNumber || o.shortOrderNumber || o.checkNumber;
+        const orderNumberStr = rawNum ? `TST-${rawNum}` : `TST-${shortCode}`;
 
         return {
           provider: "TOAST",
@@ -274,7 +295,7 @@ export class ToastAdapter implements PosProviderAdapter {
           customerName: derivedCustName || undefined,
           customerPhone: derivedCustPhone || undefined,
           notes: derivedNotes,
-          createdAt: new Date(o.createdDate || o.openedDate || Date.now()),
+          createdAt: new Date(o.createdDate || o.openedDate || o.modifiedDate || Date.now()),
           rawPayload: o,
           items,
         };

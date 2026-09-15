@@ -210,12 +210,15 @@ export default function PosHubPage({
     totalRefunds: 0,
   });
 
-  // Filters
+  // Filters & Pagination
   const [selectedOutlet, setSelectedOutlet] = useState<string>("ALL");
   const [selectedProvider, setSelectedProvider] = useState<string>("ALL");
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [dateRange, setDateRange] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(20);
+  const [totalOrders, setTotalOrders] = useState<number>(0);
 
   // Navigation tabs: 'orders' | 'integrations'
   const [activeTab, setActiveTab] = useState<"orders" | "integrations">("orders");
@@ -258,9 +261,21 @@ export default function PosHubPage({
   const fetchAllData = async () => {
     try {
       setLoading(true);
+      const cacheBustHeaders = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+      };
+
       const [resInteg, resOutlets] = await Promise.all([
-        fetch("/api/restaurant/pos/integrations"),
-        fetch("/api/restaurant/outlets"),
+        fetch(`/api/restaurant/pos/integrations?_t=${Date.now()}`, {
+          cache: "no-store",
+          headers: cacheBustHeaders,
+        }),
+        fetch(`/api/restaurant/outlets?_t=${Date.now()}`, {
+          cache: "no-store",
+          headers: cacheBustHeaders,
+        }),
       ]);
 
       const integData = resInteg.ok ? (await resInteg.json()).integrations || [] : [];
@@ -280,13 +295,17 @@ export default function PosHubPage({
     }
   };
 
-  const fetchOrdersList = async () => {
+  const fetchOrdersList = async (pageToFetch = currentPage) => {
     try {
       const q = new URLSearchParams();
       if (selectedOutlet !== "ALL") q.set("outletId", selectedOutlet);
       if (selectedProvider !== "ALL") q.set("provider", selectedProvider);
       if (selectedStatus !== "ALL") q.set("status", selectedStatus);
       if (searchQuery.trim()) q.set("search", searchQuery.trim());
+
+      q.set("limit", String(pageSize));
+      q.set("offset", String((pageToFetch - 1) * pageSize));
+      q.set("_t", String(Date.now())); // Cache buster timestamp
 
       // Date range calculation
       const now = new Date();
@@ -306,10 +325,18 @@ export default function PosHubPage({
         // No startDate filter applied to query all-time history
       }
 
-      const res = await fetch(`/api/restaurant/pos/orders?${q.toString()}`);
+      const res = await fetch(`/api/restaurant/pos/orders?${q.toString()}`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      });
       if (res.ok) {
         const data = await res.json();
         setOrders(data.orders || []);
+        if (data.pagination) setTotalOrders(data.pagination.total || 0);
         if (data.metrics) setMetrics(data.metrics);
       }
     } catch (err) {
@@ -323,9 +350,16 @@ export default function PosHubPage({
 
   useEffect(() => {
     if (!loading) {
-      fetchOrdersList();
+      setCurrentPage(1);
+      fetchOrdersList(1);
     }
-  }, [selectedOutlet, selectedProvider, selectedStatus, dateRange]);
+  }, [selectedOutlet, selectedProvider, selectedStatus, dateRange, pageSize]);
+
+  useEffect(() => {
+    if (!loading) {
+      fetchOrdersList(currentPage);
+    }
+  }, [currentPage]);
 
   // Check URL tab query
   useEffect(() => {
@@ -876,13 +910,14 @@ export default function PosHubPage({
                           <th className="px-4 py-3">Time</th>
                           <th className="px-4 py-3">Items</th>
                           <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3 text-right">Tip</th>
                           <th className="px-5 py-3 text-right">Total</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {orders.length === 0 ? (
                           <tr>
-                            <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
+                            <td colSpan={9} className="px-6 py-12 text-center text-slate-500">
                               <ShoppingBag className="w-8 h-8 mx-auto mb-2 text-slate-400 opacity-60" />
                               <p className="font-semibold text-slate-700 dark:text-slate-300">No orders found</p>
                               <p className="text-xs mt-1">
@@ -893,6 +928,13 @@ export default function PosHubPage({
                         ) : (
                           orders.map((order) => {
                             const provDef = POS_PROVIDERS.find((p) => p.id === order.provider);
+                            
+                            // Format order ref to never show bare 10, 11
+                            let displayRef = order.orderNumber;
+                            if (!displayRef.startsWith("TST-") && !displayRef.startsWith("ORD-") && !displayRef.startsWith("SQ-") && !displayRef.startsWith("CLV-")) {
+                              displayRef = `TST-${displayRef}`;
+                            }
+
                             return (
                               <tr
                                 key={order.id}
@@ -901,7 +943,7 @@ export default function PosHubPage({
                               >
                                 <td className="px-5 py-3.5">
                                   <div className="font-bold text-slate-900 dark:text-white">
-                                    {order.orderNumber}
+                                    {displayRef}
                                   </div>
                                   <div className="text-[11px] text-slate-400 font-mono">
                                     {order.providerOrderId || "Internal"}
@@ -971,6 +1013,17 @@ export default function PosHubPage({
                                   </span>
                                 </td>
 
+                                {/* Dedicated Tip Column */}
+                                <td className="px-4 py-3.5 text-right font-medium whitespace-nowrap">
+                                  {Number(order.tipAmount || 0) > 0 ? (
+                                    <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                                      +${Number(order.tipAmount).toFixed(2)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400">$0.00</span>
+                                  )}
+                                </td>
+
                                 <td className="px-5 py-3.5 text-right font-bold text-slate-900 dark:text-white">
                                   ${Number(order.totalAmount || 0).toFixed(2)}
                                 </td>
@@ -981,6 +1034,87 @@ export default function PosHubPage({
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Pagination Footer */}
+                  {totalOrders > 0 && (
+                    <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-800/30">
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        Showing{" "}
+                        <span className="font-bold text-slate-800 dark:text-slate-200">
+                          {(currentPage - 1) * pageSize + 1}
+                        </span>{" "}
+                        to{" "}
+                        <span className="font-bold text-slate-800 dark:text-slate-200">
+                          {Math.min(currentPage * pageSize, totalOrders)}
+                        </span>{" "}
+                        of{" "}
+                        <span className="font-bold text-slate-800 dark:text-slate-200">
+                          {totalOrders.toLocaleString()}
+                        </span>{" "}
+                        orders
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        {/* Page Size Selector */}
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                          <span>Per page:</span>
+                          <select
+                            value={pageSize}
+                            onChange={(e) => {
+                              setPageSize(Number(e.target.value));
+                              setCurrentPage(1);
+                            }}
+                            className="text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-1 text-slate-700 dark:text-slate-200 font-semibold focus:ring-2 focus:ring-emerald-500"
+                          >
+                            <option value={20}>20</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                            <option value={250}>250</option>
+                          </select>
+                        </div>
+
+                        {/* Pagination Buttons */}
+                        <div className="flex items-center gap-1">
+                          <button
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage(1)}
+                            className="px-2.5 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                          >
+                            First
+                          </button>
+
+                          <button
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            className="px-2.5 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                          >
+                            Prev
+                          </button>
+
+                          {/* Page Indicators */}
+                          <div className="flex items-center px-2 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+                            Page {currentPage} of {Math.ceil(totalOrders / pageSize) || 1}
+                          </div>
+
+                          <button
+                            disabled={currentPage >= Math.ceil(totalOrders / pageSize)}
+                            onClick={() => setCurrentPage((p) => Math.min(Math.ceil(totalOrders / pageSize), p + 1))}
+                            className="px-2.5 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                          >
+                            Next
+                          </button>
+
+                          <button
+                            disabled={currentPage >= Math.ceil(totalOrders / pageSize)}
+                            onClick={() => setCurrentPage(Math.ceil(totalOrders / pageSize))}
+                            className="px-2.5 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                          >
+                            Last
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Manage Connections Tab */
