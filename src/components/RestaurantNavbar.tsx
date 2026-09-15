@@ -244,11 +244,6 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
         href: p("/pos"),
         icon: Store,
         moduleKey: "pos",
-        children: [
-          { label: "POS Integrations Hub", desc: "Toast, Square & Clover unified orders hub", href: p("/pos"), quickAction: true },
-          { label: "Synced Orders Stream", desc: "Real-time unified order stream & line items", href: p("/pos") },
-          { label: "Connection Settings", desc: "Manage POS credentials, sync & mappings", href: p("/pos?tab=settings") },
-        ],
       },
       {
         id: "inventory",
