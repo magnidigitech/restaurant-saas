@@ -15,53 +15,58 @@ export class ToastAdapter implements PosProviderAdapter {
    * Tries ws-api.toasttab.com with userAccessType: TOAST_MACHINE_CLIENT as required by Toast API
    */
   private async authenticateToast(credentials: ProviderCredentials): Promise<string> {
-    const { clientId, clientSecret } = credentials;
+    const { clientId, clientSecret, environment } = credentials;
     if (!clientId || !clientSecret) {
       throw new Error("Client ID and Client Secret are required for Toast authentication.");
     }
 
-    const hostnames = [
-      "https://ws-api.toasttab.com",
-      "https://toast-api.toasttab.com",
-    ];
-    const userAccessTypes = ["TOAST_MACHINE_CLIENT", "INTEGRATION"];
+    const host = environment === "SANDBOX"
+      ? "https://ws-sandbox-api.toasttab.com"
+      : "https://ws-api.toasttab.com";
 
+    const userAccessTypes = ["TOAST_MACHINE_CLIENT", "INTEGRATION"];
     let lastError = "";
 
-    for (const host of hostnames) {
-      for (const userAccessType of userAccessTypes) {
-        try {
-          const res = await fetch(`${host}/authentication/v1/authentication/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              userAccessType,
-              clientId,
-              clientSecret,
-            }),
-          });
+    for (const userAccessType of userAccessTypes) {
+      try {
+        const res = await fetch(`${host}/authentication/v1/authentication/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userAccessType,
+            clientId,
+            clientSecret,
+          }),
+        });
 
-          const data = await res.json().catch(() => ({}));
+        const data = await res.json().catch(() => ({}));
 
-          if (res.ok) {
-            const token =
-              data.token?.accessToken ||
-              data.token?.token ||
-              (typeof data.token === "string" ? data.token : null) ||
-              data.accessToken;
+        if (res.ok) {
+          const token =
+            data.token?.accessToken ||
+            data.token?.token ||
+            (typeof data.token === "string" ? data.token : null) ||
+            data.accessToken;
 
-            if (token) {
-              return token;
-            }
-          } else {
-            const errDetail =
-              data.message ||
-              data.error_description ||
-              data.error ||
-              `HTTP ${res.status}`;
-            lastError = `Toast API Auth (${res.status}): ${errDetail}`;
+          if (token) {
+            return token;
           }
-        } catch (e: any) {
+        } else {
+          const errDetail =
+            data.message ||
+            data.error_description ||
+            data.error ||
+            (res.status === 401 ? "Unauthorized. Please check your Toast Client ID and Client Secret." : `HTTP ${res.status}`);
+          
+          // Store meaningful HTTP status error without overwriting with generic network errors
+          lastError = `Toast API Auth (${res.status}): ${errDetail}`;
+          if (res.status === 401 || res.status === 403) {
+            // Early break on authentication rejection
+            break;
+          }
+        }
+      } catch (e: any) {
+        if (!lastError) {
           lastError = e.message || "Network connection error reaching Toast API.";
         }
       }
@@ -138,7 +143,7 @@ export class ToastAdapter implements PosProviderAdapter {
     options: { locationId?: string; since?: Date; limit?: number }
   ): Promise<ProviderFetchResult> {
     const { environment, restaurantGuid } = credentials;
-    const limit = Math.min(options.limit || 30, 30); // Restrict to maximum 30 orders for now as requested
+    const limit = Math.min(options.limit || 30, 30); // Restrict to maximum 30 orders
 
     if (environment === "SANDBOX") {
       const mockOrders: NormalizedOrder[] = [
@@ -265,35 +270,53 @@ export class ToastAdapter implements PosProviderAdapter {
     // Toast Production API Fetch using OAuth 2.0 Access Token
     try {
       const accessToken = await this.authenticateToast(credentials);
-      const hostnames = ["https://ws-api.toasttab.com", "https://toast-api.toasttab.com"];
+      const host = "https://ws-api.toasttab.com";
+      const pathSuffixes = ["/orders/v2/ordersBulk", "/orders/v2/orders"];
+
       let rawOrders: any = null;
       let lastErrMessage = "";
 
-      for (const host of hostnames) {
+      const reqHeaders: Record<string, string> = {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      };
+
+      if (restaurantGuid && restaurantGuid.trim()) {
+        reqHeaders["Toast-Restaurant-External-ID"] = restaurantGuid.trim();
+      }
+
+      for (const suffix of pathSuffixes) {
         try {
-          const endpoint = `${host}/orders/v2/ordersBulk?restaurantGuid=${restaurantGuid || ""}&pageSize=${limit}`;
+          let endpoint = `${host}${suffix}?pageSize=${limit}`;
+          if (restaurantGuid && restaurantGuid.trim()) {
+            endpoint += `&restaurantGuid=${encodeURIComponent(restaurantGuid.trim())}`;
+          }
+
           const response = await fetch(endpoint, {
-            headers: {
-              "Toast-Restaurant-External-ID": restaurantGuid || "",
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
+            headers: reqHeaders,
           });
 
           if (response.ok) {
             rawOrders = await response.json();
             break;
           } else {
-            const errTxt = await response.text();
-            lastErrMessage = `HTTP ${response.status}: ${errTxt}`;
+            const errTxt = await response.text().catch(() => "");
+            let parsedDetail = "";
+            try {
+              const parsed = JSON.parse(errTxt);
+              parsedDetail = parsed.message || parsed.error_description || parsed.error || "";
+            } catch {}
+            lastErrMessage = `Toast Orders API (${response.status}): ${parsedDetail || errTxt || response.statusText || "Request rejected"}`;
           }
         } catch (e: any) {
-          lastErrMessage = e.message;
+          if (!lastErrMessage) {
+            lastErrMessage = `Connection error reaching Toast Orders API: ${e.message || "fetch failed"}`;
+          }
         }
       }
 
       if (!rawOrders) {
-        throw new Error(`Toast Orders API error: ${lastErrMessage}`);
+        throw new Error(lastErrMessage || "Unable to reach Toast Orders API.");
       }
 
       const ordersList = Array.isArray(rawOrders) ? rawOrders : rawOrders.orders || rawOrders.data || [];
@@ -333,3 +356,4 @@ export class ToastAdapter implements PosProviderAdapter {
     }
   }
 }
+
