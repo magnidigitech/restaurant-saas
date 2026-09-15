@@ -87,6 +87,13 @@ export class ToastAdapter implements PosProviderAdapter {
       };
     }
 
+    if (environment === "PRODUCTION" && (!restaurantGuid || !restaurantGuid.trim())) {
+      return {
+        valid: false,
+        error: "Toast Restaurant External GUID is required for Production integration. Please provide your Toast Restaurant External GUID.",
+      };
+    }
+
     const effectiveGuid = restaurantGuid?.trim() || "toast-restaurant-main";
 
     if (environment === "SANDBOX") {
@@ -267,6 +274,14 @@ export class ToastAdapter implements PosProviderAdapter {
       };
     }
 
+    if (!restaurantGuid || !restaurantGuid.trim()) {
+      throw new Error(
+        "Toast Restaurant External GUID is required to fetch orders. Please edit your Toast connection and enter your Restaurant External GUID."
+      );
+    }
+
+    const cleanGuid = restaurantGuid.trim();
+
     // Toast Production API Fetch using OAuth 2.0 Access Token
     try {
       const accessToken = await this.authenticateToast(credentials);
@@ -279,18 +294,13 @@ export class ToastAdapter implements PosProviderAdapter {
       const reqHeaders: Record<string, string> = {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
+        "Toast-Restaurant-External-ID": cleanGuid,
+        "toast-restaurant-external-id": cleanGuid,
       };
-
-      if (restaurantGuid && restaurantGuid.trim()) {
-        reqHeaders["Toast-Restaurant-External-ID"] = restaurantGuid.trim();
-      }
 
       for (const suffix of pathSuffixes) {
         try {
-          let endpoint = `${host}${suffix}?pageSize=${limit}`;
-          if (restaurantGuid && restaurantGuid.trim()) {
-            endpoint += `&restaurantGuid=${encodeURIComponent(restaurantGuid.trim())}`;
-          }
+          const endpoint = `${host}${suffix}?pageSize=${limit}&restaurantGuid=${encodeURIComponent(cleanGuid)}`;
 
           const response = await fetch(endpoint, {
             headers: reqHeaders,
@@ -325,7 +335,7 @@ export class ToastAdapter implements PosProviderAdapter {
       const orders: NormalizedOrder[] = limitedList.map((o: any) => ({
         provider: "TOAST",
         providerOrderId: o.guid || String(o.id),
-        providerLocationId: options.locationId || restaurantGuid,
+        providerLocationId: options.locationId || cleanGuid,
         orderNumber: o.displayNumber || `TST-${String(o.id || o.guid || "").slice(-4).toUpperCase()}`,
         orderType: o.diningOption === "Dine In" ? "DINE_IN" : "TAKEAWAY",
         status: o.voided ? "CANCELLED" : "COMPLETED",
