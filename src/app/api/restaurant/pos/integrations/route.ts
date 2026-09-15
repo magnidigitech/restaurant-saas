@@ -12,7 +12,7 @@ import { z } from "zod";
 const connectSchema = z.object({
   provider: z.enum(["TOAST", "SQUARE", "CLOVER"]),
   outletId: z.string().min(1),
-  environment: z.enum(["PRODUCTION", "SANDBOX"]).default("SANDBOX"),
+  environment: z.enum(["PRODUCTION", "SANDBOX"]).default("PRODUCTION"),
   credentials: z.record(z.string(), z.any()),
   providerLocationId: z.string().optional(),
   providerLocationName: z.string().optional(),
@@ -21,7 +21,7 @@ const connectSchema = z.object({
 
 const validateSchema = z.object({
   provider: z.enum(["TOAST", "SQUARE", "CLOVER"]),
-  environment: z.enum(["PRODUCTION", "SANDBOX"]).default("SANDBOX"),
+  environment: z.enum(["PRODUCTION", "SANDBOX"]).default("PRODUCTION"),
   credentials: z.record(z.string(), z.any()),
 });
 

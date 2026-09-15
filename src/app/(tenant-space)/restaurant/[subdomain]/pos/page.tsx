@@ -239,7 +239,7 @@ export default function PosHubPage({
 
   // Wizard state for Connect Modal
   const [wizardStep, setWizardStep] = useState<number>(1);
-  const [wizardEnvironment, setWizardEnvironment] = useState<"SANDBOX" | "PRODUCTION">("SANDBOX");
+  const [wizardEnvironment, setWizardEnvironment] = useState<"SANDBOX" | "PRODUCTION">("PRODUCTION");
   const [wizardOutletId, setWizardOutletId] = useState<string>("");
   const [wizardImportPeriod, setWizardImportPeriod] = useState<number>(30);
   const [wizardCredentials, setWizardCredentials] = useState<Record<string, string>>({});
@@ -407,13 +407,13 @@ export default function PosHubPage({
   const openConnectWizard = (providerId: "TOAST" | "SQUARE" | "CLOVER") => {
     setConnectModalProvider(providerId);
     setWizardStep(1);
-    setWizardEnvironment("SANDBOX");
+    setWizardEnvironment("PRODUCTION");
     setWizardCredentials(
       providerId === "TOAST"
-        ? { clientId: "toast_sbx_client_481", clientSecret: "toast_sec_991823", restaurantGuid: "toast-boston-main" }
+        ? { clientId: "", clientSecret: "", restaurantGuid: "" }
         : providerId === "SQUARE"
-        ? { accessToken: "EAAA_sq_sandbox_tok_8921", applicationId: "sq0idp-sandbox-restobird" }
-        : { apiToken: "clv_sec_sandbox_99341", merchantId: "CLV_MERCH_01", region: "NA" }
+        ? { accessToken: "", applicationId: "" }
+        : { apiToken: "", merchantId: "", region: "NA" }
     );
     setWizardError(null);
     setWizardAvailableLocations([]);
@@ -1435,49 +1435,15 @@ export default function PosHubPage({
                     </div>
                   )}
 
-                  {/* Step 2: Credentials & Environment */}
+                  {/* Step 2: Credentials */}
                   {wizardStep === 2 && (
                     <div className="space-y-4">
-                      {/* Environment Toggle */}
-                      <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-bold text-slate-900 dark:text-white">Connection Environment</p>
-                          <p className="text-[11px] text-slate-500">
-                            Use Developer Sandbox for test accounts or Production for live restaurant stores.
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
-                          <button
-                            type="button"
-                            onClick={() => setWizardEnvironment("SANDBOX")}
-                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-                              wizardEnvironment === "SANDBOX"
-                                ? "bg-indigo-600 text-white"
-                                : "text-slate-600 dark:text-slate-400"
-                            }`}
-                          >
-                            Sandbox Test Mode
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setWizardEnvironment("PRODUCTION")}
-                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-                              wizardEnvironment === "PRODUCTION"
-                                ? "bg-emerald-600 text-white"
-                                : "text-slate-600 dark:text-slate-400"
-                            }`}
-                          >
-                            Live Production
-                          </button>
-                        </div>
-                      </div>
-
                       {/* Toast Form */}
                       {connectModalProvider === "TOAST" && (
                         <div className="space-y-3">
                           <div>
                             <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                              Toast Client ID
+                              Toast Client ID <span className="text-rose-500">*</span>
                             </label>
                             <input
                               type="text"
@@ -1486,12 +1452,12 @@ export default function PosHubPage({
                                 setWizardCredentials({ ...wizardCredentials, clientId: e.target.value })
                               }
                               className="w-full text-xs px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500"
-                              placeholder="e.g. toast_partner_481..."
+                              placeholder="Enter your Toast Client ID"
                             />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                              Toast Client Secret
+                              Toast Client Secret <span className="text-rose-500">*</span>
                             </label>
                             <input
                               type="password"
@@ -1500,12 +1466,12 @@ export default function PosHubPage({
                                 setWizardCredentials({ ...wizardCredentials, clientSecret: e.target.value })
                               }
                               className="w-full text-xs px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500"
-                              placeholder="••••••••••••••••"
+                              placeholder="Enter your Toast Client Secret"
                             />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                              Toast Restaurant External GUID
+                              Toast Restaurant External GUID <span className="text-rose-500">*</span>
                             </label>
                             <input
                               type="text"
@@ -1514,7 +1480,7 @@ export default function PosHubPage({
                                 setWizardCredentials({ ...wizardCredentials, restaurantGuid: e.target.value })
                               }
                               className="w-full text-xs px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-emerald-500"
-                              placeholder="e.g. toast-boston-main or GUID"
+                              placeholder="Enter your 36-character Toast Restaurant GUID"
                             />
                           </div>
                         </div>

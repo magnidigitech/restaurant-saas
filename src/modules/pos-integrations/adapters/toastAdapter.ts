@@ -78,7 +78,7 @@ export class ToastAdapter implements PosProviderAdapter {
   }
 
   async validateCredentials(credentials: ProviderCredentials): Promise<ProviderValidationResult> {
-    const { clientId, clientSecret, restaurantGuid, environment } = credentials;
+    const { clientId, clientSecret, restaurantGuid } = credentials;
 
     if (!clientId || !clientSecret) {
       return {
@@ -87,39 +87,16 @@ export class ToastAdapter implements PosProviderAdapter {
       };
     }
 
-    if (environment === "PRODUCTION" && (!restaurantGuid || !restaurantGuid.trim())) {
+    if (!restaurantGuid || !restaurantGuid.trim()) {
       return {
         valid: false,
-        error: "Toast Restaurant External GUID is required for Production integration. Please provide your Toast Restaurant External GUID.",
+        error: "Toast Restaurant External GUID is required. Please provide your Toast Restaurant External GUID.",
       };
     }
 
-    const effectiveGuid = restaurantGuid?.trim() || "toast-restaurant-main";
+    const effectiveGuid = restaurantGuid.trim();
 
-    if (environment === "SANDBOX") {
-      return {
-        valid: true,
-        locations: [
-          {
-            id: effectiveGuid,
-            name: "Toast Main Dining & Bar (Sandbox)",
-            address: "401 Park Dr, Boston, MA",
-          },
-          {
-            id: `${effectiveGuid}-patio`,
-            name: "Toast Patio & Takeout (Sandbox)",
-            address: "401 Park Dr Suite 800, Boston, MA",
-          },
-        ],
-        providerMetadata: {
-          toastVersion: "Orders API v2 (Bulk)",
-          environment: "SANDBOX",
-          authenticatedAt: new Date().toISOString(),
-        },
-      };
-    }
-
-    // Production Toast API authentication test
+    // Toast Production API authentication test
     try {
       const accessToken = await this.authenticateToast(credentials);
 
@@ -149,130 +126,8 @@ export class ToastAdapter implements PosProviderAdapter {
     credentials: ProviderCredentials,
     options: { locationId?: string; since?: Date; limit?: number }
   ): Promise<ProviderFetchResult> {
-    const { environment, restaurantGuid } = credentials;
+    const { restaurantGuid } = credentials;
     const limit = Math.min(options.limit || 30, 30); // Restrict to maximum 30 orders
-
-    if (environment === "SANDBOX") {
-      const mockOrders: NormalizedOrder[] = [
-        {
-          provider: "TOAST",
-          providerOrderId: "tst_ord_98a412",
-          providerLocationId: options.locationId || restaurantGuid || "toast-loc-01",
-          orderNumber: "TST-4102",
-          orderType: "DINE_IN",
-          status: "COMPLETED",
-          totalAmount: 68.5,
-          taxAmount: 5.48,
-          tipAmount: 10.0,
-          discountAmount: 0,
-          refundAmount: 0,
-          paymentMethod: "CREDIT_CARD",
-          customerName: "Alex Rivera",
-          customerPhone: "+1 (617) 555-0142",
-          notes: "Table 14 - Toast Handheld Terminal",
-          createdAt: new Date("2026-09-15T18:09:08.000Z"),
-          rawPayload: {
-            source: "Toast Go 2 Handheld",
-            server: "Marcus L.",
-            diningOption: "Dine In",
-            guid: "8a1e-450f-90c1-392bf",
-          },
-          items: [
-            {
-              name: "Dry-Aged Ribeye 12oz",
-              quantity: 1,
-              unitPrice: 42.0,
-              modifiers: [
-                { name: "Temperature", price: 0, option: "Medium Rare" },
-                { name: "Truffle Butter Glaze", price: 3.5 },
-              ],
-            },
-            {
-              name: "Smoked Gouda Mac & Cheese",
-              quantity: 1,
-              unitPrice: 12.0,
-              modifiers: [{ name: "Crispy Bacon Topping", price: 2.5 }],
-            },
-            {
-              name: "Local Craft IPA",
-              quantity: 1,
-              unitPrice: 8.5,
-            },
-          ],
-        },
-        {
-          provider: "TOAST",
-          providerOrderId: "tst_ord_82c901",
-          providerLocationId: options.locationId || restaurantGuid || "toast-loc-01",
-          orderNumber: "TST-4101",
-          orderType: "TAKEAWAY",
-          status: "COMPLETED",
-          totalAmount: 34.2,
-          taxAmount: 2.74,
-          tipAmount: 4.5,
-          discountAmount: 5.0,
-          refundAmount: 0,
-          paymentMethod: "APPLE_PAY",
-          customerName: "Sarah Jenkins",
-          customerPhone: "+1 (617) 555-0198",
-          notes: "Toast Online Ordering (Takeout)",
-          createdAt: new Date("2026-09-15T17:25:00.000Z"),
-          rawPayload: {
-            source: "Toast Online Ordering",
-            guid: "772f-110a-33c8-112df",
-          },
-          items: [
-            {
-              name: "Artisan Wood-Fired Margherita",
-              quantity: 1,
-              unitPrice: 18.0,
-              modifiers: [{ name: "Extra Fresh Mozzarella", price: 2.0 }],
-            },
-            {
-              name: "Classic Caesar Salad",
-              quantity: 1,
-              unitPrice: 14.0,
-              modifiers: [{ name: "Grilled Chicken", price: 4.5 }],
-            },
-          ],
-        },
-        {
-          provider: "TOAST",
-          providerOrderId: "tst_ord_77f433",
-          providerLocationId: options.locationId || restaurantGuid || "toast-loc-01",
-          orderNumber: "TST-4098",
-          orderType: "DELIVERY",
-          status: "REFUNDED",
-          totalAmount: 45.0,
-          taxAmount: 3.6,
-          tipAmount: 0,
-          discountAmount: 0,
-          refundAmount: 45.0,
-          paymentMethod: "CREDIT_CARD",
-          customerName: "David Kim",
-          customerPhone: "+1 (617) 555-0312",
-          notes: "Customer cancelled - item out of stock",
-          createdAt: new Date("2026-09-15T15:10:00.000Z"),
-          rawPayload: {
-            source: "Toast Third-Party Delivery Integration",
-            refundReason: "Customer Request",
-          },
-          items: [
-            {
-              name: "Double Smash Burger Combo",
-              quantity: 2,
-              unitPrice: 18.5,
-              modifiers: [{ name: "Gluten-Free Bun", price: 1.5 }],
-            },
-          ],
-        },
-      ];
-
-      return {
-        orders: mockOrders.slice(0, limit),
-        recordsRequiringAttention: 1,
-      };
-    }
 
     if (!restaurantGuid || !restaurantGuid.trim()) {
       throw new Error(
