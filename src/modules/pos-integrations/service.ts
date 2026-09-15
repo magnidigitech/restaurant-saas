@@ -191,7 +191,6 @@ export async function executeSync(integrationId: string, since?: Date) {
     const fetchResult = await adapter.fetchOrders(credentials, {
       locationId: integration.providerLocationId || undefined,
       since: since || integration.lastSyncAt || undefined,
-      limit: 30,
     });
 
     let newOrdersCount = 0;
@@ -418,7 +417,7 @@ export async function getUnifiedOrdersDashboard(restaurantId: string, filters: D
     }
   }
 
-  const limit = Math.min(filters.limit || 25, 100);
+  const limit = Math.min(filters.limit || 500, 1000);
   const offset = filters.offset || 0;
 
   const [orders, totalCount, aggregateData] = await Promise.all([

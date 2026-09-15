@@ -127,15 +127,15 @@ export class ToastAdapter implements PosProviderAdapter {
     options: { locationId?: string; since?: Date; limit?: number }
   ): Promise<ProviderFetchResult> {
     const { restaurantGuid } = credentials;
-    const limit = Math.min(options.limit || 30, 30); // Restrict to maximum 30 orders
+    const cleanGuid = restaurantGuid?.trim().replace(/^["']|["']$/g, "");
 
-    if (!restaurantGuid || !restaurantGuid.trim()) {
+    if (!cleanGuid) {
       throw new Error(
         "Toast Restaurant External GUID is required to fetch orders. Please edit your Toast connection and enter your Restaurant External GUID."
       );
     }
 
-    const cleanGuid = restaurantGuid.trim().replace(/^["']|["']$/g, "");
+    const maxPageSize = options.limit || 1000;
 
     // Toast Production API Fetch using OAuth 2.0 Access Token
     try {
@@ -159,7 +159,7 @@ export class ToastAdapter implements PosProviderAdapter {
 
       for (const suffix of pathSuffixes) {
         try {
-          const endpoint = `${host}${suffix}?startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}&pageSize=${limit}`;
+          const endpoint = `${host}${suffix}?startDate=${encodeURIComponent(startDateStr)}&endDate=${encodeURIComponent(endDateStr)}&pageSize=${maxPageSize}`;
 
           const response = await fetch(endpoint, {
             headers: reqHeaders,
@@ -189,9 +189,9 @@ export class ToastAdapter implements PosProviderAdapter {
       }
 
       const ordersList = Array.isArray(rawOrders) ? rawOrders : rawOrders.orders || rawOrders.data || [];
-      const limitedList = ordersList.slice(0, limit);
+      const targetList = options.limit ? ordersList.slice(0, options.limit) : ordersList;
 
-      const orders: NormalizedOrder[] = limitedList.map((o: any) => {
+      const orders: NormalizedOrder[] = targetList.map((o: any) => {
         const firstCheck = o.checks?.[0] || {};
         const totalAmount = Number(firstCheck.amount || o.total || o.amount || 0);
         const taxAmount = Number(firstCheck.taxAmount || o.tax || 0);
