@@ -34,8 +34,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - f4kc5v55gwxkofl1yfiiixqs_postgres-data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
 
 volumes:
-  f4kc5v55gwxkofl1yfiiixqs_postgres-data:
-    name: f4kc5v55gwxkofl1yfiiixqs_postgres-data
+  postgres_data:
