@@ -27,5 +27,7 @@ ENV HOSTNAME="0.0.0.0"
 
 EXPOSE 3000
 
-# Launch Next.js standalone server directly
-CMD ["node", ".next/standalone/server.js"]
+RUN chmod +x /app/entrypoint.sh
+
+# Entrypoint automatically runs database migrations & seeding, then starts Next.js
+ENTRYPOINT ["/bin/sh", "/app/entrypoint.sh"]
