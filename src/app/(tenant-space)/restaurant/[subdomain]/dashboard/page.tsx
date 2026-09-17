@@ -2030,6 +2030,7 @@ export default function AppleTenantDashboard() {
                   <div className="p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl flex items-center gap-1 text-xs font-semibold">
                     {[
                       { id: "day", label: "Today" },
+                      { id: "yesterday", label: "Yesterday" },
                       { id: "week", label: "Week" },
                       { id: "month", label: "Month" },
                       { id: "custom", label: "Custom" },
@@ -2038,28 +2039,38 @@ export default function AppleTenantDashboard() {
                         key={tab.id}
                         type="button"
                         onClick={() => {
-                          setCalendarTab(tab.id as any);
-                          if (tab.id === "day") {
-                            setSalesPeriod("today");
-                            setCustomStartDate(null);
-                            setCustomEndDate(null);
-                            fetchData("today", null, null);
-                            setIsDateModalOpen(false);
-                          } else if (tab.id === "week") {
-                            setSalesPeriod("week");
-                            setCustomStartDate(null);
-                            setCustomEndDate(null);
-                            fetchData("week", null, null);
-                            setIsDateModalOpen(false);
-                          } else if (tab.id === "month") {
-                            setSalesPeriod("month" as any);
-                            setCustomStartDate(null);
-                            setCustomEndDate(null);
-                            fetchData("month", null, null);
-                            setIsDateModalOpen(false);
+                          const t = tab.id as any;
+                          setCalendarTab(t);
+                          const now = new Date();
+                          if (t === "day") {
+                            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                            setCustomStartDate(today);
+                            setCustomEndDate(today);
+                            setCalendarViewMonth(today.getMonth());
+                            setCalendarViewYear(today.getFullYear());
+                          } else if (t === "yesterday") {
+                            const yest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+                            setCustomStartDate(yest);
+                            setCustomEndDate(yest);
+                            setCalendarViewMonth(yest.getMonth());
+                            setCalendarViewYear(yest.getFullYear());
+                          } else if (t === "week") {
+                            const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+                            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                            setCustomStartDate(startOfWeek);
+                            setCustomEndDate(today);
+                            setCalendarViewMonth(today.getMonth());
+                            setCalendarViewYear(today.getFullYear());
+                          } else if (t === "month") {
+                            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                            setCustomStartDate(startOfMonth);
+                            setCustomEndDate(endOfMonth);
+                            setCalendarViewMonth(now.getMonth());
+                            setCalendarViewYear(now.getFullYear());
                           }
                         }}
-                        className={`flex-1 py-2 px-2.5 rounded-xl transition-all text-center ${
+                        className={`flex-1 py-2 px-2.5 rounded-xl transition-all text-center cursor-pointer ${
                           calendarTab === tab.id
                             ? "bg-amber-600 text-white shadow-md font-bold"
                             : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
@@ -2070,139 +2081,142 @@ export default function AppleTenantDashboard() {
                     ))}
                   </div>
 
-                  {/* Custom Start & End Date Input Boxes */}
-                  {calendarTab === "custom" && (
-                    <div className="grid grid-cols-2 gap-3">
+                  {/* Start & End Date Input Boxes (Visible for all tabs) */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCalendarTab("custom");
+                        setPickingTarget("start");
+                      }}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                        pickingTarget === "start"
+                          ? "border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200"
+                          : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300"
+                      }`}
+                    >
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                        Start Date
+                      </span>
+                      <span className="text-xs font-bold block truncate">
+                        {formatDateDisplay(customStartDate, "Select Start Date")}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCalendarTab("custom");
+                        setPickingTarget("end");
+                      }}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                        pickingTarget === "end"
+                          ? "border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200"
+                          : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300"
+                      }`}
+                    >
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                        End Date
+                      </span>
+                      <span className="text-xs font-bold block truncate">
+                        {formatDateDisplay(customEndDate, "Select End Date")}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Interactive Month & Year Calendar View (Always Visible for All Tabs) */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between px-2">
                       <button
                         type="button"
-                        onClick={() => setPickingTarget("start")}
-                        className={`p-3 rounded-2xl border text-left transition-all ${
-                          pickingTarget === "start"
-                            ? "border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200"
-                            : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300"
-                        }`}
+                        onClick={() => {
+                          if (calendarViewMonth === 0) {
+                            setCalendarViewMonth(11);
+                            setCalendarViewYear(calendarViewYear - 1);
+                          } else {
+                            setCalendarViewMonth(calendarViewMonth - 1);
+                          }
+                        }}
+                        className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
                       >
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
-                          Start Date
-                        </span>
-                        <span className="text-xs font-bold block truncate">
-                          {formatDateDisplay(customStartDate, "Select Start Date")}
-                        </span>
+                        <ChevronLeft className="w-5 h-5" />
                       </button>
+
+                      <span className="text-sm font-bold text-slate-900 dark:text-white">
+                        {MONTH_NAMES[calendarViewMonth]} {calendarViewYear}
+                      </span>
 
                       <button
                         type="button"
-                        onClick={() => setPickingTarget("end")}
-                        className={`p-3 rounded-2xl border text-left transition-all ${
-                          pickingTarget === "end"
-                            ? "border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200"
-                            : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300"
-                        }`}
+                        onClick={() => {
+                          if (calendarViewMonth === 11) {
+                            setCalendarViewMonth(0);
+                            setCalendarViewYear(calendarViewYear + 1);
+                          } else {
+                            setCalendarViewMonth(calendarViewMonth + 1);
+                          }
+                        }}
+                        className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
                       >
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
-                          End Date
-                        </span>
-                        <span className="text-xs font-bold block truncate">
-                          {formatDateDisplay(customEndDate, "Select End Date")}
-                        </span>
+                        <ChevronRight className="w-5 h-5" />
                       </button>
                     </div>
-                  )}
 
-                  {/* Month & Year Navigation Header */}
-                  {calendarTab === "custom" && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between px-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (calendarViewMonth === 0) {
-                              setCalendarViewMonth(11);
-                              setCalendarViewYear(calendarViewYear - 1);
-                            } else {
-                              setCalendarViewMonth(calendarViewMonth - 1);
-                            }
-                          }}
-                          className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
-                        >
-                          <ChevronLeft className="w-5 h-5" />
-                        </button>
+                    {/* Days of Week Header */}
+                    <div className="grid grid-cols-7 text-center text-xs font-semibold text-slate-400 dark:text-slate-500">
+                      {["S", "M", "T", "W", "T", "F", "S"].map((dayStr, idx) => (
+                        <div key={idx} className="py-1">
+                          {dayStr}
+                        </div>
+                      ))}
+                    </div>
 
-                        <span className="text-sm font-bold text-slate-900 dark:text-white">
-                          {MONTH_NAMES[calendarViewMonth]} {calendarViewYear}
-                        </span>
+                    {/* Interactive Calendar Days Grid */}
+                    <div className="grid grid-cols-7 gap-1 text-center">
+                      {getCalendarGridDays(calendarViewYear, calendarViewMonth).map((cell, idx) => {
+                        const isStart = isSameDay(cell.dateObj, customStartDate);
+                        const isEnd = isSameDay(cell.dateObj, customEndDate);
+                        const isInRange = isDateInRange(cell.dateObj, customStartDate, customEndDate);
+                        const isSelected = isStart || isEnd;
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (calendarViewMonth === 11) {
-                              setCalendarViewMonth(0);
-                              setCalendarViewYear(calendarViewYear + 1);
-                            } else {
-                              setCalendarViewMonth(calendarViewMonth + 1);
-                            }
-                          }}
-                          className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
-                        >
-                          <ChevronRight className="w-5 h-5" />
-                        </button>
-                      </div>
-
-                      {/* Days of Week Header */}
-                      <div className="grid grid-cols-7 text-center text-xs font-semibold text-slate-400 dark:text-slate-500">
-                        {["S", "M", "T", "W", "T", "F", "S"].map((dayStr, idx) => (
-                          <div key={idx} className="py-1">
-                            {dayStr}
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Interactive Calendar Days Grid */}
-                      <div className="grid grid-cols-7 gap-1 text-center">
-                        {getCalendarGridDays(calendarViewYear, calendarViewMonth).map((cell, idx) => {
-                          const isStart = isSameDay(cell.dateObj, customStartDate);
-                          const isEnd = isSameDay(cell.dateObj, customEndDate);
-                          const isInRange = isDateInRange(cell.dateObj, customStartDate, customEndDate);
-                          const isSelected = isStart || isEnd;
-
-                          return (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => {
-                                if (pickingTarget === "start") {
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              setCalendarTab("custom");
+                              if (pickingTarget === "start") {
+                                setCustomStartDate(cell.dateObj);
+                                if (customEndDate && cell.dateObj > customEndDate) {
+                                  setCustomEndDate(null);
+                                }
+                                setPickingTarget("end");
+                              } else {
+                                if (customStartDate && cell.dateObj < customStartDate) {
                                   setCustomStartDate(cell.dateObj);
-                                  if (customEndDate && cell.dateObj > customEndDate) {
-                                    setCustomEndDate(null);
-                                  }
+                                  setCustomEndDate(null);
                                   setPickingTarget("end");
                                 } else {
-                                  if (customStartDate && cell.dateObj < customStartDate) {
-                                    setCustomStartDate(cell.dateObj);
-                                    setCustomEndDate(null);
-                                    setPickingTarget("end");
-                                  } else {
-                                    setCustomEndDate(cell.dateObj);
-                                  }
+                                  setCustomEndDate(cell.dateObj);
                                 }
-                              }}
-                              className={`py-2 text-xs font-semibold rounded-xl transition-all ${
-                                !cell.isCurrentMonth
-                                  ? "text-slate-300 dark:text-slate-700 opacity-40"
-                                  : isSelected
-                                  ? "bg-amber-600 text-white font-bold shadow-md shadow-amber-600/20"
-                                  : isInRange
-                                  ? "bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200"
-                                  : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
-                              }`}
-                            >
-                              {cell.day}
-                            </button>
-                          );
-                        })}
-                      </div>
+                              }
+                            }}
+                            className={`py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                              !cell.isCurrentMonth
+                                ? "text-slate-300 dark:text-slate-700 opacity-40"
+                                : isSelected
+                                ? "bg-amber-600 text-white font-bold shadow-md shadow-amber-600/20"
+                                : isInRange
+                                ? "bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200"
+                                : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                            }`}
+                          >
+                            {cell.day}
+                          </button>
+                        );
+                      })}
                     </div>
-                  )}
+                  </div>
 
                   {/* Apply & Reset Controls */}
                   <div className="flex items-center gap-3 pt-2">
@@ -2212,6 +2226,7 @@ export default function AppleTenantDashboard() {
                         setCustomStartDate(null);
                         setCustomEndDate(null);
                         setSalesPeriod("today");
+                        setCalendarTab("day");
                         fetchData("today", null, null);
                         setIsDateModalOpen(false);
                       }}
@@ -2222,7 +2237,21 @@ export default function AppleTenantDashboard() {
                     <button
                       type="button"
                       onClick={() => {
-                        fetchData("custom", customStartDate, customEndDate);
+                        if (calendarTab === "day") {
+                          setSalesPeriod("today");
+                          fetchData("today", null, null);
+                        } else if (calendarTab === "yesterday") {
+                          setSalesPeriod("yesterday" as any);
+                          fetchData("yesterday", null, null);
+                        } else if (calendarTab === "week") {
+                          setSalesPeriod("week");
+                          fetchData("week", null, null);
+                        } else if (calendarTab === "month") {
+                          setSalesPeriod("month" as any);
+                          fetchData("month", null, null);
+                        } else {
+                          fetchData("custom", customStartDate, customEndDate);
+                        }
                         setIsDateModalOpen(false);
                       }}
                       className="flex-1 py-2.5 px-4 text-xs font-bold text-white rounded-xl shadow-md transition-colors cursor-pointer"

@@ -2282,17 +2282,48 @@ export default function PosHubPage({
                   {/* Presets Tab Bar (Image 2 Style) */}
                   <div className="p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl flex items-center gap-1 text-xs font-semibold">
                     {[
-                      { id: "day", label: "Day" },
+                      { id: "day", label: "Today" },
+                      { id: "yesterday", label: "Yesterday" },
                       { id: "week", label: "Week" },
                       { id: "month", label: "Month" },
-                      { id: "year", label: "Year" },
                       { id: "custom", label: "Custom" },
                     ].map((tab) => (
                       <button
                         key={tab.id}
                         type="button"
-                        onClick={() => setCalendarTab(tab.id as "day" | "week" | "month" | "year" | "custom")}
-                        className={`flex-1 py-2 px-2.5 rounded-xl transition-all text-center ${calendarTab === tab.id
+                        onClick={() => {
+                          const t = tab.id as any;
+                          setCalendarTab(t);
+                          const now = new Date();
+                          if (t === "day") {
+                            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                            setCustomStartDate(today);
+                            setCustomEndDate(today);
+                            setCalendarViewMonth(today.getMonth());
+                            setCalendarViewYear(today.getFullYear());
+                          } else if (t === "yesterday") {
+                            const yest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+                            setCustomStartDate(yest);
+                            setCustomEndDate(yest);
+                            setCalendarViewMonth(yest.getMonth());
+                            setCalendarViewYear(yest.getFullYear());
+                          } else if (t === "week") {
+                            const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+                            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                            setCustomStartDate(startOfWeek);
+                            setCustomEndDate(today);
+                            setCalendarViewMonth(today.getMonth());
+                            setCalendarViewYear(today.getFullYear());
+                          } else if (t === "month") {
+                            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                            setCustomStartDate(startOfMonth);
+                            setCustomEndDate(endOfMonth);
+                            setCalendarViewMonth(now.getMonth());
+                            setCalendarViewYear(now.getFullYear());
+                          }
+                        }}
+                        className={`flex-1 py-2 px-2.5 rounded-xl transition-all text-center cursor-pointer ${calendarTab === tab.id
                             ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20 font-bold"
                             : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
                           }`}
@@ -2302,46 +2333,43 @@ export default function PosHubPage({
                     ))}
                   </div>
 
-                  {/* Custom Start & End Date Input Boxes (Image 2 Style) */}
-                  {(calendarTab === "custom" || calendarTab === "day" || calendarTab === "week") && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setPickingTarget("start")}
-                        className={`p-3 rounded-2xl border text-left transition-all ${pickingTarget === "start"
-                            ? "border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200"
-                            : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300"
-                          }`}
-                      >
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
-                          Start Date
-                        </span>
-                        <span className="text-xs font-bold block truncate">
-                          {formatDateDisplay(customStartDate, "Select Start Date")}
-                        </span>
-                      </button>
+                  {/* Start & End Date Input Boxes (Visible for all tabs) */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPickingTarget("start")}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${pickingTarget === "start"
+                          ? "border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200"
+                          : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300"
+                        }`}
+                    >
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                        Start Date
+                      </span>
+                      <span className="text-xs font-bold block truncate">
+                        {formatDateDisplay(customStartDate, "Select Start Date")}
+                      </span>
+                    </button>
 
-                      <button
-                        type="button"
-                        onClick={() => setPickingTarget("end")}
-                        className={`p-3 rounded-2xl border text-left transition-all ${pickingTarget === "end"
-                            ? "border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200"
-                            : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300"
-                          }`}
-                      >
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
-                          End Date
-                        </span>
-                        <span className="text-xs font-bold block truncate">
-                          {formatDateDisplay(customEndDate, "Select End Date")}
-                        </span>
-                      </button>
-                    </div>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => setPickingTarget("end")}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${pickingTarget === "end"
+                          ? "border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200"
+                          : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300"
+                        }`}
+                    >
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                        End Date
+                      </span>
+                      <span className="text-xs font-bold block truncate">
+                        {formatDateDisplay(customEndDate, "Select End Date")}
+                      </span>
+                    </button>
+                  </div>
 
-                  {/* Month & Year Navigation Header */}
-                  {(calendarTab === "custom" || calendarTab === "day" || calendarTab === "week") && (
-                    <div className="space-y-4">
+                  {/* Month & Year Navigation Header (Visible for all tabs) */}
+                  <div className="space-y-4">
                       <div className="flex items-center justify-between px-2">
                         <button
                           type="button"
@@ -2417,7 +2445,6 @@ export default function PosHubPage({
                         })}
                       </div>
                     </div>
-                  )}
 
                   {/* Month Selection Grid (When 'Month' tab active) */}
                   {calendarTab === "month" && (
