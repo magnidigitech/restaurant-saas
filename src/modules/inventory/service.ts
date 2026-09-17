@@ -545,15 +545,15 @@ export const InventoryService = {
         }
 
         // 8. Description
-        const currentDesc = matchedItem.description || "";
-        if (description && description !== currentDesc) {
+        const currentDesc = (matchedItem.description || "").trim();
+        if (r.description !== undefined && r.description !== null && description !== currentDesc) {
           overrides.push({
             field: "description",
             label: "Description",
             oldValue: currentDesc || "—",
-            newValue: description,
+            newValue: description || "—",
           });
-          updateData.description = description;
+          updateData.description = description || null;
         }
 
         if (overrides.length > 0) {

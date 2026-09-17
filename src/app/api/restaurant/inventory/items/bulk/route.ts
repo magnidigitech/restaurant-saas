@@ -8,6 +8,7 @@ const bulkRowSchema = z.object({
   rowNumber: z.number().optional(),
   name: z.string().optional(),
   sku: z.string().optional(),
+  description: z.string().optional().nullable(),
   category: z.string().optional(),
   unitOfMeasure: z.string().optional(),
   costPerUnit: z.union([z.number(), z.string()]).optional(),

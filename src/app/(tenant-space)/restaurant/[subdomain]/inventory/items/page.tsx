@@ -114,7 +114,7 @@ function parseCSV(text: string) {
         rowObj.parLevel = val;
       } else if (h.includes("unitofmeasure") || h === "uom" || h === "unit" || h.includes("measure") || h.includes("unitof")) {
         rowObj.unitOfMeasure = val;
-      } else if (h.includes("desc") || h.includes("note")) {
+      } else if (h.includes("desc") || h.includes("note") || h.includes("detail") || h.includes("remark") || h.includes("comment") || h.includes("spec")) {
         rowObj.description = val;
       }
     });
@@ -439,7 +439,7 @@ export default function InventoryItemsPage({
             rowObj.parLevel = val;
           } else if (h.includes("unitofmeasure") || h === "uom" || h === "unit" || h.includes("measure") || h.includes("unitof")) {
             rowObj.unitOfMeasure = val;
-          } else if (h.includes("desc") || h.includes("note")) {
+          } else if (h.includes("desc") || h.includes("note") || h.includes("detail") || h.includes("remark") || h.includes("comment") || h.includes("spec")) {
             rowObj.description = val;
           }
         });
@@ -963,7 +963,15 @@ export default function InventoryItemsPage({
                           <tr key={item.id} className={`transition ${isDark ? "hover:bg-white/[0.02]" : "hover:bg-slate-50/80"}`}>
                             <td className="py-3.5 px-4">
                               <div className="font-semibold">{item.name}</div>
-                              {item.sku && <div className="text-[10px] font-mono opacity-50">SKU: {item.sku}</div>}
+                              <div className="flex items-center gap-2 mt-0.5">
+                                {item.sku && <span className="text-[10px] font-mono opacity-50">SKU: {item.sku}</span>}
+                                {item.sku && item.description && <span className="text-[10px] opacity-30">•</span>}
+                                {item.description && (
+                                  <span className="text-[10px] opacity-60 line-clamp-1 max-w-[260px]" title={item.description}>
+                                    {item.description}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="py-3.5 px-4">
                               {item.category ? (
