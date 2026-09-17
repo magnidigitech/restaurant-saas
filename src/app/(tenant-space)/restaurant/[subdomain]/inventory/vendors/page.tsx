@@ -42,17 +42,19 @@ function parseVendorCSV(text: string) {
     const rowObj: any = { rowNumber: i + 1 };
     headers.forEach((h, colIdx) => {
       const val = rawCells[colIdx] || "";
-      if (h === "vendorname" || h === "name" || h === "supplier" || h === "company" || h.includes("vendorname")) {
-        rowObj.name = val;
-      } else if (h === "code" || h === "vendorcode" || h === "suppliercode") {
+      if (h === "code" || h === "vendorcode" || h === "suppliercode" || (h.includes("code") && !h.includes("zip") && !h.includes("postal"))) {
         rowObj.code = val;
+      } else if (h === "vendorname" || h === "suppliername" || h === "companyname" || h === "name" || h === "supplier" || h === "company" || h === "vendor" || h.includes("vendorname") || h.includes("suppliername")) {
+        rowObj.name = val;
       } else if (h.includes("contact") || h.includes("person") || h.includes("representative")) {
         rowObj.contactPerson = val;
       } else if (h.includes("email") || h.includes("mail")) {
         rowObj.email = val;
       } else if (h.includes("phone") || h.includes("mobile") || h.includes("tel")) {
         rowObj.phone = val;
-      } else if (h.includes("address") || h.includes("location") || h.includes("street")) {
+      } else if (h.includes("location") || h.includes("outlet") || h.includes("branch")) {
+        rowObj.locations = val;
+      } else if (h.includes("address") || h.includes("street")) {
         rowObj.address = val;
       } else if (h.includes("tax") || h.includes("gst") || h.includes("vat")) {
         rowObj.taxId = val;
@@ -261,11 +263,17 @@ export default function VendorDirectoryPage({
 
   // Handle Vendor Template Download
   const handleDownloadVendorTemplate = () => {
+    const outletSample =
+      outlets.length > 1
+        ? `"${outlets[0].name}, ${outlets[1].name}"`
+        : outlets.length === 1
+        ? `"${outlets[0].name}"`
+        : '"All Locations"';
     const csvContent =
-      "Vendor Name,Vendor Code,Contact Person,Email,Phone,Address,Tax ID / GST,Payment Terms,Status,Notes\r\n" +
-      "Fresh Produce Direct,VEND-001,John Doe,orders@freshproduce.com,+1 555-0192,123 Market St,GSTIN12345ABC,NET30,ACTIVE,Daily morning produce delivery\r\n" +
-      "Apex Packaging Co,VEND-002,Jane Smith,sales@apexpack.com,+1 555-0144,456 Industrial Pkwy,GSTIN98765XYZ,NET15,ACTIVE,Supplies takeout boxes and napkins\r\n" +
-      "Valley Dairy Farms,VEND-003,Bob Miller,support@valleydairy.com,+1 555-0188,789 Farm Rd,GSTIN54321DEF,COD,ACTIVE,Weekly dairy and cheese deliveries\r\n";
+      "Vendor Name,Vendor Code,Contact Person,Email,Phone,Locations,Address,Tax ID / GST,Payment Terms,Status,Notes\r\n" +
+      `Fresh Produce Direct,VEND-001,John Doe,orders@freshproduce.com,+1 555-0192,${outletSample},123 Market St,GSTIN12345ABC,NET30,ACTIVE,Daily morning produce delivery\r\n` +
+      "Apex Packaging Co,VEND-002,Jane Smith,sales@apexpack.com,+1 555-0144,All Locations,456 Industrial Pkwy,GSTIN98765XYZ,NET15,ACTIVE,Supplies takeout boxes and napkins\r\n" +
+      "Valley Dairy Farms,VEND-003,Bob Miller,support@valleydairy.com,+1 555-0188,All Locations,789 Farm Rd,GSTIN54321DEF,COD,ACTIVE,Weekly dairy and cheese deliveries\r\n";
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -309,17 +317,19 @@ export default function VendorDirectoryPage({
         const rowObj: any = { rowNumber: i + 1 };
         headers.forEach((h: string, colIdx: number) => {
           const val = rawCells[colIdx] !== null && rawCells[colIdx] !== undefined ? String(rawCells[colIdx]).trim() : "";
-          if (h === "suppliername" || h === "vendorname" || h === "name" || h.includes("vendor") || h.includes("supplier")) {
-            rowObj.name = val;
-          } else if (h === "code" || h.includes("code")) {
+          if (h === "code" || h === "vendorcode" || h === "suppliercode" || (h.includes("code") && !h.includes("zip") && !h.includes("postal"))) {
             rowObj.code = val;
-          } else if (h.includes("contact") || h.includes("person")) {
+          } else if (h === "suppliername" || h === "vendorname" || h === "companyname" || h === "name" || h === "vendor" || h === "supplier" || h.includes("vendorname") || h.includes("suppliername")) {
+            rowObj.name = val;
+          } else if (h.includes("contact") || h.includes("person") || h.includes("rep")) {
             rowObj.contactPerson = val;
           } else if (h.includes("email") || h.includes("mail")) {
             rowObj.email = val;
           } else if (h.includes("phone") || h.includes("mobile") || h.includes("tel")) {
             rowObj.phone = val;
-          } else if (h.includes("address") || h.includes("location") || h.includes("street")) {
+          } else if (h.includes("location") || h.includes("outlet") || h.includes("branch")) {
+            rowObj.locations = val;
+          } else if (h.includes("address") || h.includes("street")) {
             rowObj.address = val;
           } else if (h.includes("tax") || h.includes("gst") || h.includes("vat")) {
             rowObj.taxId = val;
@@ -353,12 +363,32 @@ export default function VendorDirectoryPage({
         // Fallback to current vendors state
       }
 
-      // Compute diff across all 10 fields for every row
+      const resolveOutletIds = (locStr?: string): string[] => {
+        if (!locStr) return [];
+        const raw = locStr.trim();
+        if (!raw || raw.toLowerCase() === "all" || raw.toLowerCase() === "all locations" || raw.toLowerCase() === "all outlets") {
+          return [];
+        }
+        const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
+        const matchedIds: string[] = [];
+        for (const p of parts) {
+          const pLower = p.toLowerCase();
+          const found = outlets.find((o) => o.name.toLowerCase() === pLower || o.id === p);
+          if (found && !matchedIds.includes(found.id)) {
+            matchedIds.push(found.id);
+          }
+        }
+        return matchedIds;
+      };
+
+      // Compute diff across all 11 fields for every row
       const processedRows = rawRows.map((row: any, idx: number) => {
         const rowCode = (row.code || "").trim();
         const rowName = (row.name || "").trim();
         const codeLower = rowCode.toLowerCase();
         const nameLower = rowName.toLowerCase();
+        const rowOutletIds = resolveOutletIds(row.locations);
+        row.outletIds = rowOutletIds;
 
         // Match existing vendor: by code first, then by name
         let matched: Vendor | undefined = undefined;
@@ -396,6 +426,21 @@ export default function VendorDirectoryPage({
           checkField("status", "Status", matched.status, row.status);
           checkField("notes", "Notes", matched.notes, row.notes);
 
+          // Check locations
+          if (row.locations !== undefined) {
+            const currIds = matched.outletIds || [];
+            const sortedCurr = currIds.slice().sort().join(",");
+            const sortedNew = rowOutletIds.slice().sort().join(",");
+            if (sortedCurr !== sortedNew) {
+              overrides.push({
+                field: "locations",
+                label: "Locations",
+                oldValue: getOutletNames(currIds),
+                newValue: getOutletNames(rowOutletIds),
+              });
+            }
+          }
+
           const isUpdate = overrides.length > 0;
           return {
             ...row,
@@ -403,6 +448,7 @@ export default function VendorDirectoryPage({
             matchType: isUpdate ? "UPDATE" : "IDENTICAL",
             matchedVendorId: matched.id,
             matchedVendorName: matched.name,
+            outletIds: rowOutletIds,
             overrides,
             selected: isUpdate, // Default checked if there are overrides to apply!
           };
@@ -413,6 +459,7 @@ export default function VendorDirectoryPage({
             matchType: "NEW",
             matchedVendorId: undefined,
             matchedVendorName: undefined,
+            outletIds: rowOutletIds,
             overrides: [],
             selected: true, // Default checked for new suppliers
           };
@@ -469,7 +516,9 @@ export default function VendorDirectoryPage({
           paymentTerms: r.paymentTerms,
           status: r.status,
           notes: r.notes,
-          action: r.matchType === "UPDATE" ? "UPDATE" : "CREATE",
+          outletIds: r.outletIds,
+          locations: r.locations,
+          action: (r.matchedVendorId || r.matchType === "UPDATE") ? "UPDATE" : "CREATE",
           existingVendorId: r.matchedVendorId,
         })),
         updateExisting: true,
@@ -1457,9 +1506,10 @@ export default function VendorDirectoryPage({
                             </th>
                             <th className="py-3 px-3 w-12 text-center">#</th>
                             <th className="py-3 px-4 min-w-[160px]">Action / Status</th>
-                            <th className="py-3 px-4 min-w-[200px]">Supplier Name</th>
+                            <th className="py-3 px-4 min-w-[180px]">Supplier Name</th>
                             <th className="py-3 px-4 min-w-[130px]">Vendor Code</th>
-                            <th className="py-3 px-4 min-w-[160px]">Contact Person</th>
+                            <th className="py-3 px-4 min-w-[170px]">Locations</th>
+                            <th className="py-3 px-4 min-w-[150px]">Contact Person</th>
                             <th className="py-3 px-4 min-w-[180px]">Email &amp; Phone</th>
                             <th className="py-3 px-4 min-w-[130px]">Payment Terms</th>
                             <th className="py-3 px-4 min-w-[120px]">Tax ID / GST</th>
@@ -1538,6 +1588,24 @@ export default function VendorDirectoryPage({
                                       </div>
                                     ) : (
                                       <span className="font-mono text-[11px] opacity-75">{row.code || "—"}</span>
+                                    )}
+                                  </td>
+
+                                  {/* Locations */}
+                                  <td className="py-2.5 px-4 text-xs">
+                                    {overridesMap.has("locations") ? (
+                                      <div className="space-y-0.5">
+                                        <div className="line-through text-rose-500 opacity-60 text-[10px] truncate max-w-[180px]">
+                                          {overridesMap.get("locations")?.oldValue}
+                                        </div>
+                                        <div className="text-emerald-500 font-medium truncate max-w-[180px]">
+                                          {overridesMap.get("locations")?.newValue}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <span className="truncate max-w-[180px] block opacity-75">
+                                        {getOutletNames(row.outletIds)}
+                                      </span>
                                     )}
                                   </td>
 
@@ -1644,7 +1712,7 @@ export default function VendorDirectoryPage({
                                 {/* Collapsible Overrides Drawer */}
                                 {isExpanded && row.overrides && row.overrides.length > 0 && (
                                   <tr className={isDark ? "bg-[#141A29]/80" : "bg-amber-50/40"}>
-                                    <td colSpan={11} className="p-3 sm:p-4">
+                                    <td colSpan={12} className="p-3 sm:p-4">
                                       <div className={`p-3 sm:p-4 rounded-xl border space-y-2.5 text-xs ${
                                         isDark ? "bg-[#0B0E17] border-white/[0.08]" : "bg-white border-amber-200 shadow-xs"
                                       }`}>

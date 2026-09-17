@@ -630,7 +630,7 @@ export default function InventoryItemsPage({
           reorderPoint: r.reorderPoint,
           parLevel: r.parLevel,
           description: r.description,
-          action: r.matchType === "UPDATE" ? "UPDATE" : "CREATE",
+          action: (r.matchedItemId || r.matchType === "UPDATE") ? "UPDATE" : "CREATE",
           existingItemId: r.matchedItemId,
         })),
         updateExisting: true,

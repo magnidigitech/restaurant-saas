@@ -275,6 +275,8 @@ export const VendorService = {
       paymentTerms?: string;
       status?: string;
       notes?: string;
+      outletIds?: string[];
+      locations?: string;
       action?: "CREATE" | "UPDATE" | "SKIP";
       existingVendorId?: string;
     }>,
@@ -295,8 +297,17 @@ export const VendorService = {
         paymentTerms: true,
         status: true,
         notes: true,
+        outletIds: true,
       },
     });
+
+    const outlets = await db.restaurantOutlet.findMany({
+      where: { restaurantId },
+      select: { id: true, name: true },
+    });
+
+    const outletNameMap = new Map<string, string>();
+    outlets.forEach((o) => outletNameMap.set(o.name.trim().toLowerCase(), o.id));
 
     const existingIdMap = new Map<string, any>();
     const existingNameMap = new Map<string, any>();
@@ -347,6 +358,31 @@ export const VendorService = {
       const status = normalizeStatus(r.status || "");
       const notes = (r.notes || "").trim();
 
+      // Resolve comma-separated locations or outletIds
+      let resolvedOutletIds: string[] | undefined = undefined;
+      if (Array.isArray(r.outletIds)) {
+        resolvedOutletIds = r.outletIds;
+      } else if (r.locations !== undefined) {
+        const rawLoc = (r.locations || "").trim();
+        if (!rawLoc || rawLoc.toLowerCase() === "all" || rawLoc.toLowerCase() === "all locations" || rawLoc.toLowerCase() === "all outlets") {
+          resolvedOutletIds = [];
+        } else {
+          const parts = rawLoc.split(",").map((p) => p.trim()).filter(Boolean);
+          const matchedIds: string[] = [];
+          for (const p of parts) {
+            const pLower = p.toLowerCase();
+            if (outletNameMap.has(pLower)) {
+              const oId = outletNameMap.get(pLower)!;
+              if (!matchedIds.includes(oId)) matchedIds.push(oId);
+            } else {
+              const byId = outlets.find((o) => o.id === p);
+              if (byId && !matchedIds.includes(byId.id)) matchedIds.push(byId.id);
+            }
+          }
+          resolvedOutletIds = matchedIds;
+        }
+      }
+
       if (r.action === "SKIP") {
         skipped.push({
           row: rowNum,
@@ -380,7 +416,7 @@ export const VendorService = {
       }
 
       if (matchedVendor) {
-        const canUpdate = r.action === "UPDATE" || (shouldUpdateExisting && r.action !== "CREATE");
+        const canUpdate = r.action === "UPDATE" || shouldUpdateExisting;
 
         if (!canUpdate) {
           skipped.push({
@@ -430,8 +466,43 @@ export const VendorService = {
           }
         }
 
-        if (overrides.length > 0) {
+        // Location diff
+        if (resolvedOutletIds !== undefined) {
+          const currIds: string[] = Array.isArray(matchedVendor.outletIds) ? matchedVendor.outletIds : [];
+          const sortedCurr = currIds.slice().sort().join(",");
+          const sortedNew = resolvedOutletIds.slice().sort().join(",");
+          if (sortedCurr !== sortedNew) {
+            const currNames = currIds.length > 0
+              ? currIds.map((id) => outlets.find((o) => o.id === id)?.name || id).join(", ")
+              : "All Locations";
+            const newNames = resolvedOutletIds.length > 0
+              ? resolvedOutletIds.map((id) => outlets.find((o) => o.id === id)?.name || id).join(", ")
+              : "All Locations";
+            overrides.push({
+              field: "locations",
+              label: "Locations",
+              oldValue: currNames,
+              newValue: newNames,
+            });
+            updatePayload.outletIds = resolvedOutletIds;
+          }
+        }
+
+        if (overrides.length > 0 || r.action === "UPDATE") {
           try {
+            // Guarantee complete database overwrite for all non-empty fields
+            if (name) updatePayload.name = name;
+            if (code !== undefined && code !== "") updatePayload.code = code;
+            if (contactPerson !== undefined) updatePayload.contactPerson = contactPerson || null;
+            if (email !== undefined) updatePayload.email = email || null;
+            if (phone !== undefined) updatePayload.phone = phone || null;
+            if (address !== undefined) updatePayload.address = address || null;
+            if (taxId !== undefined) updatePayload.taxId = taxId || null;
+            if (paymentTerms) updatePayload.paymentTerms = paymentTerms;
+            if (status) updatePayload.status = status;
+            if (notes !== undefined) updatePayload.notes = notes || null;
+            if (resolvedOutletIds !== undefined) updatePayload.outletIds = resolvedOutletIds;
+
             const updatedVendor = await this.updateVendor(restaurantId, matchedVendor.id, updatePayload);
 
             // Update in-memory lookup maps
@@ -447,7 +518,9 @@ export const VendorService = {
               row: rowNum,
               name: updatedVendor.name,
               code: updatedVendor.code || undefined,
-              overrides,
+              overrides: overrides.length > 0 ? overrides : [
+                { field: "record", label: "Supplier Record", oldValue: "Existing", newValue: "Overwritten" }
+              ],
             });
           } catch (err: any) {
             failed.push({
@@ -486,6 +559,7 @@ export const VendorService = {
             taxId: taxId || undefined,
             paymentTerms,
             status,
+            outletIds: resolvedOutletIds || [],
             notes: notes || undefined,
           });
 

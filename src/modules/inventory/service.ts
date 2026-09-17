@@ -447,7 +447,7 @@ export const InventoryService = {
       }
 
       if (matchedItem) {
-        const canUpdate = r.action === "UPDATE" || (shouldUpdateExisting && r.action !== "CREATE");
+        const canUpdate = r.action === "UPDATE" || shouldUpdateExisting;
 
         if (!canUpdate) {
           skipped.push({
@@ -556,8 +556,18 @@ export const InventoryService = {
           updateData.description = description || null;
         }
 
-        if (overrides.length > 0) {
+        if (overrides.length > 0 || r.action === "UPDATE") {
           try {
+            // Force populate all non-empty fields to ensure complete database overwrite
+            if (name) updateData.name = name;
+            if (sku !== undefined && sku !== "") updateData.sku = sku;
+            if (categoryId !== undefined) updateData.categoryId = categoryId || null;
+            if (unitOfMeasure) updateData.unitOfMeasure = unitOfMeasure as any;
+            if (costRaw !== undefined && costRaw !== "" && costRaw !== null) updateData.costPerUnit = costPerUnit;
+            if (r.reorderPoint !== undefined && r.reorderPoint !== "") updateData.reorderPoint = reorderPoint;
+            if (r.parLevel !== undefined && r.parLevel !== "") updateData.parLevel = parLevel;
+            if (r.description !== undefined && r.description !== null) updateData.description = description || null;
+
             const updatedItem = await prisma.inventoryItem.update({
               where: { id: matchedItem.id },
               data: updateData,
@@ -579,7 +589,9 @@ export const InventoryService = {
               row: rowNum,
               name: updatedItem.name,
               sku: updatedItem.sku || undefined,
-              overrides,
+              overrides: overrides.length > 0 ? overrides : [
+                { field: "record", label: "Catalog Record", oldValue: "Existing", newValue: "Overwritten" }
+              ],
             });
           } catch (err: any) {
             failed.push({

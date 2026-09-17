@@ -16,6 +16,8 @@ const bulkVendorRowSchema = z.object({
   paymentTerms: z.string().optional(),
   status: z.string().optional(),
   notes: z.string().optional(),
+  outletIds: z.array(z.string()).optional(),
+  locations: z.string().optional(),
   action: z.enum(["CREATE", "UPDATE", "SKIP"]).optional(),
   existingVendorId: z.string().optional(),
 });
