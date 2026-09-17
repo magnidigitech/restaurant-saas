@@ -1659,11 +1659,11 @@ export default function AppleTenantDashboard() {
                         </select>
                         <button
                           type="button"
-                          onClick={() => router.push(p("/pos"))}
+                          onClick={() => router.push(p("/pos/items"))}
                           className="text-xs font-semibold hover:underline flex items-center gap-0.5 cursor-pointer"
                           style={{ color: brandColor }}
                         >
-                          <span>View Menu</span>
+                          <span>View List</span>
                           <ArrowRight className="w-3 h-3" />
                         </button>
                       </div>
