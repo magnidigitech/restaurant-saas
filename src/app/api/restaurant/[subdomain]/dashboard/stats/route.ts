@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/core/database/client";
 import { getTenantSession } from "@/core/auth/session";
 import { verifyAccess } from "@/core/permissions/check";
+import {
+  getComparisonDateRanges,
+  calculatePercentageChange,
+  getSingleDayBounds,
+} from "@/core/analytics/comparisonHelpers";
 
 export async function GET(
   req: NextRequest,
@@ -37,138 +42,40 @@ export async function GET(
     const outletTimezone = primaryOutlet?.timezone?.trim() || "UTC";
     const outletCurrency = primaryOutlet?.currency?.trim() || "USD";
 
-    // Helper to calculate zoned dates in the outlet's timezone
-    const createCustomZonedDate = (year: number, month: number, day: number, h: number, m: number, s: number, ms: number) => {
-      const candidate = new Date(Date.UTC(year, month - 1, day, h, m, s, ms));
-      const parts = new Intl.DateTimeFormat("en-US", {
-        timeZone: outletTimezone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      }).formatToParts(candidate);
-
-      const partMap: Record<string, string> = {};
-      parts.forEach((p) => { partMap[p.type] = p.value; });
-
-      let localH = Number(partMap.hour);
-      if (localH === 24) localH = 0;
-
-      const localZoned = new Date(
-        Date.UTC(
-          Number(partMap.year),
-          Number(partMap.month) - 1,
-          Number(partMap.day),
-          localH,
-          Number(partMap.minute),
-          Number(partMap.second)
-        )
-      );
-
-      const diffMs = candidate.getTime() - localZoned.getTime();
-      return new Date(candidate.getTime() + diffMs);
-    };
-
-    // Helper to calculate start/end bounds for any given day in the outlet's timezone
-    const getZonedBounds = (tz: string, dayOffset = 0) => {
-      const targetTz = tz || "UTC";
-      const refDate = new Date(Date.now() + dayOffset * 86400000);
-
-      const formatter = new Intl.DateTimeFormat("en-CA", {
-        timeZone: targetTz,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      });
-
-      const ymd = formatter.format(refDate); // "YYYY-MM-DD"
-      const [year, month, day] = ymd.split("-").map(Number);
-
-      const dObj = new Date(year, month - 1, day);
-      const formattedDate = dObj.toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-      });
-
-      return {
-        start: createCustomZonedDate(year, month, day, 0, 0, 0, 0),
-        end: createCustomZonedDate(year, month, day, 23, 59, 59, 999),
-        formattedDate,
-        year,
-        month,
-        day,
-      };
-    };
-
     const { searchParams } = new URL(req.url);
     const period = searchParams.get("period") || "today";
     const outletId = searchParams.get("outletId");
     const startDateParam = searchParams.get("startDate");
     const endDateParam = searchParams.get("endDate");
 
-    const todayBounds = getZonedBounds(outletTimezone, 0);
-    const yesterdayBounds = getZonedBounds(outletTimezone, -1);
+    // Seamless comparison ranges with timezone-aware start-inclusive/end-exclusive boundaries
+    const comparisonRanges = getComparisonDateRanges(
+      period,
+      outletTimezone,
+      startDateParam,
+      endDateParam
+    );
 
+    const filterStart = comparisonRanges.current.start;
+    const filterEndExclusive = comparisonRanges.current.endExclusive;
+    const prevStart = comparisonRanges.previous.start;
+    const prevEndExclusive = comparisonRanges.previous.endExclusive;
+
+    const formattedTodayDate = comparisonRanges.current.label;
+
+    const todayBounds = getSingleDayBounds(outletTimezone, 0);
     const todayStart = todayBounds.start;
-    const todayEnd = todayBounds.end;
+    const todayEnd = todayBounds.endExclusive;
 
-    const yesterdayStart = yesterdayBounds.start;
-    const yesterdayEnd = yesterdayBounds.end;
-
-    // Start of current month in outlet's timezone
-    const monthStart = createCustomZonedDate(todayBounds.year, todayBounds.month, 1, 0, 0, 0, 0);
-
-    let filterStart: Date = todayStart;
-    let filterEnd: Date = todayEnd;
-    let formattedTodayDate = `Today, ${todayBounds.formattedDate}`;
-
-    if (startDateParam) {
-      const [sy, sm, sd] = startDateParam.split("-").map(Number);
-      const [ey, em, ed] = (endDateParam || startDateParam).split("-").map(Number);
-
-      filterStart = createCustomZonedDate(sy, sm, sd, 0, 0, 0, 0);
-      filterEnd = createCustomZonedDate(ey, em, ed, 23, 59, 59, 999);
-
-      const sStr = new Intl.DateTimeFormat("en-GB", {
-        timeZone: outletTimezone,
-        day: "numeric",
-        month: "short",
-      }).format(filterStart);
-
-      const eStr = new Intl.DateTimeFormat("en-GB", {
-        timeZone: outletTimezone,
-        day: "numeric",
-        month: "short",
-      }).format(filterEnd);
-
-      formattedTodayDate = sStr === eStr ? sStr : `${sStr} - ${eStr}`;
-    } else if (period === "yesterday") {
-      filterStart = yesterdayStart;
-      filterEnd = yesterdayEnd;
-      formattedTodayDate = `Yesterday, ${yesterdayBounds.formattedDate}`;
-    } else if (period === "week") {
-      filterStart = getZonedBounds(outletTimezone, -6).start;
-      filterEnd = todayEnd;
-      formattedTodayDate = `This Week (${getZonedBounds(outletTimezone, -6).formattedDate} - ${todayBounds.formattedDate})`;
-    } else if (period === "month") {
-      filterStart = monthStart;
-      filterEnd = todayEnd;
-      formattedTodayDate = `This Month (${todayBounds.formattedDate})`;
-    } else {
-      filterStart = todayStart;
-      filterEnd = todayEnd;
-      formattedTodayDate = `Today, ${todayBounds.formattedDate}`;
-    }
-
-    // Parallel Database Queries for maximum speed
+    // Parallel Database Queries for maximum performance
     const [
-      todayOrders,
-      yesterdayOrders,
-      todayRevenueTxs,
-      monthTxs,
+      currentOrders,
+      previousOrders,
+      currentRevenueTxs,
+      currentPeriodTxs,
+      previousPeriodTxs,
+      earliestOrder,
+      restaurantInfo,
       activeEmployeesCount,
       todayAttendance,
       lowStockItems,
@@ -181,11 +88,12 @@ export async function GET(
       pendingSwaps,
       pendingOnboardings,
     ] = await Promise.all([
-      // 1. Filtered POS Orders
+      // 1. Current Period Filtered POS Orders
       prisma.posOrder.findMany({
         where: {
           restaurantId,
-          createdAt: { gte: filterStart, lte: filterEnd },
+          ...(outletId && outletId !== "all" ? { outletId } : {}),
+          createdAt: { gte: filterStart, lt: filterEndExclusive },
         },
         select: {
           id: true,
@@ -196,32 +104,67 @@ export async function GET(
         },
       }),
 
-      // 2. Yesterday POS Orders (for comparison)
+      // 2. Previous Period POS Orders (for exact comparison)
       prisma.posOrder.findMany({
         where: {
           restaurantId,
-          createdAt: { gte: yesterdayStart, lte: yesterdayEnd },
+          ...(outletId && outletId !== "all" ? { outletId } : {}),
+          createdAt: { gte: prevStart, lt: prevEndExclusive },
         },
-        select: { totalAmount: true },
+        select: {
+          id: true,
+          totalAmount: true,
+          orderType: true,
+          status: true,
+          createdAt: true,
+        },
       }),
 
-      // 3. Filtered Revenue Transactions
+      // 3. Current Filtered Revenue Transactions
       prisma.financialTransaction.findMany({
         where: {
           restaurantId,
+          ...(outletId && outletId !== "all" ? { outletId } : {}),
           type: "REVENUE",
-          transactionDate: { gte: filterStart, lte: filterEnd },
+          transactionDate: { gte: filterStart, lt: filterEndExclusive },
         },
         select: { amount: true },
       }),
 
-      // 4. Month Financial Transactions
+      // 4. Current Period Financial Transactions (Revenue & COGS)
       prisma.financialTransaction.findMany({
         where: {
           restaurantId,
-          transactionDate: { gte: monthStart },
+          ...(outletId && outletId !== "all" ? { outletId } : {}),
+          transactionDate: { gte: filterStart, lt: filterEndExclusive },
         },
         select: { type: true, category: true, amount: true },
+      }),
+
+      // 4b. Previous Period Financial Transactions (Revenue & COGS)
+      prisma.financialTransaction.findMany({
+        where: {
+          restaurantId,
+          ...(outletId && outletId !== "all" ? { outletId } : {}),
+          transactionDate: { gte: prevStart, lt: prevEndExclusive },
+        },
+        select: { type: true, category: true, amount: true },
+      }),
+
+      // 4c. Earliest Order check to identify genuinely missing historical data
+      prisma.posOrder.findFirst({
+        where: {
+          restaurantId,
+          ...(outletId && outletId !== "all" ? { outletId } : {}),
+        },
+        orderBy: { createdAt: "asc" },
+        select: { createdAt: true },
+      }),
+
+      // 4d. Restaurant creation date
+      prisma.restaurant.findUnique({
+        where: { id: restaurantId },
+        select: { createdAt: true },
       }),
 
       // 5. Total Employees
@@ -233,7 +176,7 @@ export async function GET(
       prisma.attendanceRecord.findMany({
         where: {
           restaurantId,
-          workDate: { gte: todayStart, lte: todayEnd },
+          workDate: { gte: todayStart, lt: todayEnd },
         },
         select: { status: true },
       }),
@@ -258,7 +201,7 @@ export async function GET(
           order: {
             restaurantId,
             ...(outletId && outletId !== "all" ? { outletId } : {}),
-            createdAt: { gte: filterStart, lte: filterEnd },
+            createdAt: { gte: filterStart, lt: filterEndExclusive },
             status: "COMPLETED",
           },
           isVoided: false,
@@ -337,31 +280,71 @@ export async function GET(
       }),
     ]);
 
-    // 1. Sales & Order Calculations
-    const posSalesToday = todayOrders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
-    const ledgerSalesToday = todayRevenueTxs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    const todaySales = posSalesToday > 0 ? posSalesToday : ledgerSalesToday;
+    // 1. Sales & Order Calculations for Current & Previous Periods
+    const posSalesCurrent = currentOrders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
+    const ledgerSalesCurrent = currentRevenueTxs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const currentSales = posSalesCurrent > 0 ? posSalesCurrent : ledgerSalesCurrent;
 
-    const posSalesYesterday = yesterdayOrders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
-    const yesterdaySales = posSalesYesterday > 0 ? posSalesYesterday : 0;
+    // Determine whether comparison historical data genuinely exists for previous period
+    const earliestDataDate = earliestOrder?.createdAt || restaurantInfo?.createdAt || new Date();
+    const isPreviousDataMissing =
+      prevEndExclusive.getTime() < earliestDataDate.getTime() &&
+      previousOrders.length === 0 &&
+      previousPeriodTxs.length === 0;
 
-    const salesGrowth = yesterdaySales > 0
-      ? Math.round(((todaySales - yesterdaySales) / yesterdaySales) * 1000) / 10
-      : (todaySales > 0 ? 100 : 0);
+    let previousSales: number | null = null;
+    let previousOrdersCount: number | null = null;
+    let previousAov: number | null = null;
+    let previousGrossProfit: number | null = null;
+    let previousFoodCostPct: number | null = null;
+    let previousCancelled: number | null = null;
 
-    const totalOrders = todayOrders.length;
-    const avgOrderValue = totalOrders > 0 ? Math.round(todaySales / totalOrders) : 0;
+    if (!isPreviousDataMissing) {
+      const posSalesPrevious = previousOrders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
+      const ledgerSalesPrevious = previousPeriodTxs
+        .filter((t) => t.type === "REVENUE")
+        .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+      previousSales = posSalesPrevious > 0 ? posSalesPrevious : ledgerSalesPrevious;
+      previousOrdersCount = previousOrders.length;
+      previousAov = previousOrdersCount > 0 ? Math.round(previousSales / previousOrdersCount) : 0;
+      previousCancelled = previousOrders.filter((o) => o.status === "CANCELLED").length;
+    }
 
-    // Channels
-    const dineInOrds = todayOrders.filter((o) => o.orderType === "DINE_IN");
-    const deliveryOrds = todayOrders.filter((o) => o.orderType === "DELIVERY");
-    const takeawayOrds = todayOrders.filter((o) => o.orderType === "TAKEAWAY");
+    const currentTotalOrders = currentOrders.length;
+    const currentAov = currentTotalOrders > 0 ? Math.round(currentSales / currentTotalOrders) : 0;
+
+    // Dynamic Percentage Changes based on selected filter & comparison period
+    const salesComparison = calculatePercentageChange(
+      currentSales,
+      previousSales,
+      comparisonRanges.comparisonLabel,
+      true
+    );
+
+    const ordersComparison = calculatePercentageChange(
+      currentTotalOrders,
+      previousOrdersCount,
+      comparisonRanges.comparisonLabel,
+      true
+    );
+
+    const aovComparison = calculatePercentageChange(
+      currentAov,
+      previousAov,
+      comparisonRanges.comparisonLabel,
+      true
+    );
+
+    // Channels (Current Period)
+    const dineInOrds = currentOrders.filter((o) => o.orderType === "DINE_IN");
+    const deliveryOrds = currentOrders.filter((o) => o.orderType === "DELIVERY");
+    const takeawayOrds = currentOrders.filter((o) => o.orderType === "TAKEAWAY");
 
     const dineInAmt = dineInOrds.reduce((s, o) => s + Number(o.totalAmount || 0), 0);
     const deliveryAmt = deliveryOrds.reduce((s, o) => s + Number(o.totalAmount || 0), 0);
     const takeawayAmt = takeawayOrds.reduce((s, o) => s + Number(o.totalAmount || 0), 0);
 
-    const totalPosAmt = todaySales || 1;
+    const totalPosAmt = currentSales || 1;
 
     const channelBreakdown = {
       dineIn: {
@@ -381,13 +364,20 @@ export async function GET(
       },
     };
 
-    // Fulfillment
-    const completed = todayOrders.filter((o) => o.status === "COMPLETED" || (o.status as string) === "SETTLED").length;
-    const inProgress = todayOrders.filter((o) => o.status === "PENDING" || o.status === "PREPARING").length;
-    const cancelled = todayOrders.filter((o) => o.status === "CANCELLED").length;
+    // Fulfillment (Current Period)
+    const completed = currentOrders.filter((o) => o.status === "COMPLETED" || (o.status as string) === "SETTLED").length;
+    const inProgress = currentOrders.filter((o) => o.status === "PENDING" || o.status === "PREPARING").length;
+    const currentCancelled = currentOrders.filter((o) => o.status === "CANCELLED").length;
+
+    const cancellationComparison = calculatePercentageChange(
+      currentCancelled,
+      previousCancelled,
+      comparisonRanges.comparisonLabel,
+      false // Lower cancellations is better
+    );
 
     // 2. Sales Chart Bars Aggregation (Date-wise for Week/Month/Multi-day vs Hourly for Single Day)
-    const isMultiDay = period === "week" || period === "month" || (filterEnd.getTime() - filterStart.getTime() > 36 * 3600 * 1000);
+    const isMultiDay = comparisonRanges.isMultiDay;
 
     let hourlyBars: Array<{ time: string; sales: number; orders: number; heightPct: number }> = [];
 
@@ -396,7 +386,7 @@ export async function GET(
       const dailyMap: Record<string, { label: string; sales: number; orders: number }> = {};
       const currentCursor = new Date(filterStart);
 
-      while (currentCursor <= filterEnd) {
+      while (currentCursor < filterEndExclusive) {
         const ymd = new Intl.DateTimeFormat("en-CA", {
           timeZone: outletTimezone,
           year: "numeric",
@@ -416,7 +406,7 @@ export async function GET(
         currentCursor.setUTCDate(currentCursor.getUTCDate() + 1);
       }
 
-      todayOrders.forEach((o) => {
+      currentOrders.forEach((o) => {
         const ymd = new Intl.DateTimeFormat("en-CA", {
           timeZone: outletTimezone,
           year: "numeric",
@@ -448,7 +438,7 @@ export async function GET(
         hourlyMap[h] = { sales: 0, orders: 0 };
       }
 
-      todayOrders.forEach((o) => {
+      currentOrders.forEach((o) => {
         const hStr = new Intl.DateTimeFormat("en-US", {
           timeZone: outletTimezone,
           hour: "numeric",
@@ -485,25 +475,47 @@ export async function GET(
     }
 
     // 3. Finance & Profit
-    let totalMonthRev = 0;
-    let totalMonthExp = 0;
-    let totalCogs = 0;
-
-    monthTxs.forEach((t) => {
+    let currentCogs = 0;
+    currentPeriodTxs.forEach((t) => {
       const amt = Number(t.amount || 0);
-      if (t.type === "REVENUE") {
-        totalMonthRev += amt;
-      } else if (t.type === "EXPENSE") {
-        totalMonthExp += amt;
+      if (t.type === "EXPENSE") {
         if (t.category === "FOOD_BEVERAGE_SUPPLIERS" || t.category === "COGS_INVENTORY") {
-          totalCogs += amt;
+          currentCogs += amt;
         }
       }
     });
 
-    const grossProfit = totalMonthRev - totalCogs;
-    const profitMargin = totalMonthRev > 0 ? Math.round((grossProfit / totalMonthRev) * 1000) / 10 : 0;
-    const foodCostPct = totalMonthRev > 0 ? Math.round((totalCogs / totalMonthRev) * 1000) / 10 : 0;
+    const grossProfit = currentSales - currentCogs;
+    const profitMargin = currentSales > 0 ? Math.round((grossProfit / currentSales) * 1000) / 10 : 0;
+    const foodCostPct = currentSales > 0 ? Math.round((currentCogs / currentSales) * 1000) / 10 : 0;
+
+    if (!isPreviousDataMissing && previousSales !== null) {
+      let prevCogs = 0;
+      previousPeriodTxs.forEach((t) => {
+        const amt = Number(t.amount || 0);
+        if (t.type === "EXPENSE") {
+          if (t.category === "FOOD_BEVERAGE_SUPPLIERS" || t.category === "COGS_INVENTORY") {
+            prevCogs += amt;
+          }
+        }
+      });
+      previousGrossProfit = previousSales - prevCogs;
+      previousFoodCostPct = previousSales > 0 ? Math.round((prevCogs / previousSales) * 1000) / 10 : 0;
+    }
+
+    const grossProfitComparison = calculatePercentageChange(
+      grossProfit,
+      previousGrossProfit,
+      comparisonRanges.comparisonLabel,
+      true
+    );
+
+    const foodCostComparison = calculatePercentageChange(
+      foodCostPct,
+      previousFoodCostPct,
+      comparisonRanges.comparisonLabel,
+      false // Lower food cost % is better
+    );
 
     // 4. Attendance
     const presentCount = todayAttendance.filter((a) => a.status === "PRESENT" || a.status === "ON_BREAK").length;
@@ -708,17 +720,23 @@ export async function GET(
       outletCurrency,
       formattedTodayDate,
       liveOps: {
-        todaySales,
-        yesterdaySales,
-        salesGrowth,
-        totalOrders,
-        ordersGrowth: 0,
-        avgOrderValue,
-        aovGrowth: 0,
+        todaySales: currentSales,
+        yesterdaySales: previousSales ?? 0,
+        salesGrowth: salesComparison.percentageChange ?? 0,
+        salesComparison,
+        totalOrders: currentTotalOrders,
+        ordersGrowth: ordersComparison.percentageChange ?? 0,
+        ordersComparison,
+        avgOrderValue: currentAov,
+        aovGrowth: aovComparison.percentageChange ?? 0,
+        aovComparison,
         grossProfit,
         profitMargin,
-        profitGrowth: 0,
+        profitGrowth: grossProfitComparison.percentageChange ?? 0,
+        grossProfitComparison,
         foodCostPct,
+        foodCostComparison,
+        cancellationComparison,
         staffOnDuty,
         lowStockAlerts: lowStockItems.length,
         pendingActions: needsAttentionList.length,
@@ -726,7 +744,7 @@ export async function GET(
         fulfillment: {
           completed,
           inProgress,
-          cancelled,
+          cancelled: currentCancelled,
         },
       },
       hourlyBars,

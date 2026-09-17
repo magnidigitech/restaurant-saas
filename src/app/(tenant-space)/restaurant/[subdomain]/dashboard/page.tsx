@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
+import type { MetricComparison } from "@/core/analytics/comparisonHelpers";
 import {
   Package,
   Clock,
@@ -447,7 +448,38 @@ export default function AppleTenantDashboard() {
 
   // Live Operations Business Metrics
   // Live Operations Business Metrics (Starts at zero, updated purely via live database API)
-  const [liveOps, setLiveOps] = useState({
+  const [liveOps, setLiveOps] = useState<{
+    todaySales: number;
+    yesterdaySales: number;
+    salesGrowth: number;
+    salesComparison?: MetricComparison;
+    totalOrders: number;
+    ordersGrowth: number;
+    ordersComparison?: MetricComparison;
+    avgOrderValue: number;
+    aovGrowth: number;
+    aovComparison?: MetricComparison;
+    grossProfit: number;
+    profitMargin: number;
+    profitGrowth: number;
+    grossProfitComparison?: MetricComparison;
+    foodCostPct: number;
+    foodCostComparison?: MetricComparison;
+    cancellationComparison?: MetricComparison;
+    staffOnDuty: { present: number; total: number; late: number; absent: number };
+    lowStockAlerts: number;
+    pendingActions: number;
+    channelBreakdown: {
+      dineIn: { count: number; percentage: number; amount: number };
+      delivery: { count: number; percentage: number; amount: number };
+      takeaway: { count: number; percentage: number; amount: number };
+    };
+    fulfillment: {
+      completed: number;
+      inProgress: number;
+      cancelled: number;
+    };
+  }>({
     todaySales: 0,
     yesterdaySales: 0,
     salesGrowth: 0,
@@ -473,6 +505,15 @@ export default function AppleTenantDashboard() {
       cancelled: 0,
     },
   });
+
+  const latestFetchIdRef = useRef(0);
+
+  const getMetricColorClass = (comp?: MetricComparison) => {
+    if (!comp || comp.status === "none") return "text-slate-400 dark:text-slate-500";
+    if (comp.status === "positive") return "text-emerald-500 dark:text-emerald-400";
+    if (comp.status === "negative") return "text-rose-500 dark:text-rose-400";
+    return "text-slate-500 dark:text-slate-400";
+  };
 
   // Hourly sales progression for bar chart (Bound to real POS order hours)
   const [hourlyBars, setHourlyBars] = useState([
@@ -537,6 +578,7 @@ export default function AppleTenantDashboard() {
     startDateOverride?: Date | null,
     endDateOverride?: Date | null
   ) => {
+    const fetchId = ++latestFetchIdRef.current;
     try {
       const periodParam = periodOverride !== undefined ? periodOverride : salesPeriod;
       const sDate = startDateOverride !== undefined ? startDateOverride : customStartDate;
@@ -578,6 +620,11 @@ export default function AppleTenantDashboard() {
         fetch("/api/restaurant/finance/pnl").catch(() => null),
         fetch(`/api/restaurant/${subdomain}/dashboard/stats?${statsQuery.toString()}`).catch(() => null),
       ]);
+
+      if (fetchId !== latestFetchIdRef.current) {
+        // Stale response: a newer filter was selected, ignore earlier response
+        return;
+      }
 
       const dataBranding = await resBranding.json();
       const dataModules = await resModules.json();
@@ -978,8 +1025,17 @@ export default function AppleTenantDashboard() {
                     <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-0.5">
                       {currencySymbol}{liveOps.todaySales.toLocaleString()}
                     </div>
-                    <div className="text-[11px] font-bold text-emerald-500 flex items-center gap-0.5 mt-1">
-                      <span>↑ +12.8%</span>
+                    <div className={`text-[11px] font-bold flex items-center gap-1 mt-1 ${getMetricColorClass(liveOps.salesComparison)}`}>
+                      {liveOps.salesComparison ? (
+                        <>
+                          <span>{liveOps.salesComparison.changeLabel}</span>
+                          {liveOps.salesComparison.comparisonLabel && (
+                            <span className="font-normal opacity-75">{liveOps.salesComparison.comparisonLabel}</span>
+                          )}
+                        </>
+                      ) : (
+                        <span>No comparison data</span>
+                      )}
                     </div>
                   </div>
                   {/* Mini Red Sparkline SVG */}
@@ -1011,8 +1067,17 @@ export default function AppleTenantDashboard() {
                     <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-0.5">
                       {liveOps.totalOrders}
                     </div>
-                    <div className="text-[11px] font-bold text-emerald-500 flex items-center gap-0.5 mt-1">
-                      <span>↑ +8.2%</span>
+                    <div className={`text-[11px] font-bold flex items-center gap-1 mt-1 ${getMetricColorClass(liveOps.ordersComparison)}`}>
+                      {liveOps.ordersComparison ? (
+                        <>
+                          <span>{liveOps.ordersComparison.changeLabel}</span>
+                          {liveOps.ordersComparison.comparisonLabel && (
+                            <span className="font-normal opacity-75">{liveOps.ordersComparison.comparisonLabel}</span>
+                          )}
+                        </>
+                      ) : (
+                        <span>No comparison data</span>
+                      )}
                     </div>
                   </div>
                   {/* Mini Orange Sparkline SVG */}
@@ -1044,8 +1109,17 @@ export default function AppleTenantDashboard() {
                     <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-0.5">
                       {currencySymbol}{liveOps.avgOrderValue}
                     </div>
-                    <div className="text-[11px] font-bold text-emerald-500 flex items-center gap-0.5 mt-1">
-                      <span>↑ +3.1%</span>
+                    <div className={`text-[11px] font-bold flex items-center gap-1 mt-1 ${getMetricColorClass(liveOps.aovComparison)}`}>
+                      {liveOps.aovComparison ? (
+                        <>
+                          <span>{liveOps.aovComparison.changeLabel}</span>
+                          {liveOps.aovComparison.comparisonLabel && (
+                            <span className="font-normal opacity-75">{liveOps.aovComparison.comparisonLabel}</span>
+                          )}
+                        </>
+                      ) : (
+                        <span>No comparison data</span>
+                      )}
                     </div>
                   </div>
                   {/* Mini Red Sparkline SVG */}
@@ -1077,8 +1151,17 @@ export default function AppleTenantDashboard() {
                     <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-0.5">
                       {currencySymbol}{liveOps.grossProfit.toLocaleString()}
                     </div>
-                    <div className="text-[11px] font-bold text-emerald-500 flex items-center gap-0.5 mt-1">
-                      <span>↑ +14.4%</span>
+                    <div className={`text-[11px] font-bold flex items-center gap-1 mt-1 ${getMetricColorClass(liveOps.grossProfitComparison)}`}>
+                      {liveOps.grossProfitComparison ? (
+                        <>
+                          <span>{liveOps.grossProfitComparison.changeLabel}</span>
+                          {liveOps.grossProfitComparison.comparisonLabel && (
+                            <span className="font-normal opacity-75">{liveOps.grossProfitComparison.comparisonLabel}</span>
+                          )}
+                        </>
+                      ) : (
+                        <span>No comparison data</span>
+                      )}
                     </div>
                   </div>
                   {/* Mini Amber Sparkline SVG */}
@@ -1111,12 +1194,25 @@ export default function AppleTenantDashboard() {
                       <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
                         {liveOps.foodCostPct}%
                       </span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                        Optimal
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                        liveOps.foodCostPct <= 33
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                          : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                      }`}>
+                        {liveOps.foodCostPct <= 33 ? "Optimal" : "High"}
                       </span>
                     </div>
-                    <div className="text-[11px] text-slate-400 mt-1">
-                      Target &lt; 33%
+                    <div className={`text-[11px] font-bold flex items-center gap-1 mt-1 ${getMetricColorClass(liveOps.foodCostComparison)}`}>
+                      {liveOps.foodCostComparison ? (
+                        <>
+                          <span>{liveOps.foodCostComparison.changeLabel}</span>
+                          {liveOps.foodCostComparison.comparisonLabel && (
+                            <span className="font-normal opacity-75">{liveOps.foodCostComparison.comparisonLabel}</span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="font-normal text-slate-400">Target &lt; 33%</span>
+                      )}
                     </div>
                   </div>
                   <div className="w-full h-1.5 bg-slate-100 dark:bg-white/[0.08] rounded-full overflow-hidden mt-3">
@@ -1344,6 +1440,11 @@ export default function AppleTenantDashboard() {
                         </div>
                         <div className="text-sm font-black mt-1 text-slate-900 dark:text-white">{liveOps.fulfillment.cancelled}</div>
                         <div className="text-[10px] opacity-60">Cancelled {liveOps.totalOrders > 0 ? (liveOps.fulfillment.cancelled / liveOps.totalOrders * 100).toFixed(1) : "0.0"}%</div>
+                        {liveOps.cancellationComparison && (
+                          <div className={`text-[10px] font-bold mt-0.5 ${getMetricColorClass(liveOps.cancellationComparison)}`}>
+                            <span>{liveOps.cancellationComparison.changeLabel}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
