@@ -249,7 +249,7 @@ export async function GET(
             restaurantId,
             ...(outletId && outletId !== "all" ? { outletId } : {}),
             createdAt: { gte: filterStart, lte: filterEnd },
-            status: { in: ["COMPLETED", "SETTLED"] as any },
+            status: "COMPLETED",
           },
           isVoided: false,
         },
