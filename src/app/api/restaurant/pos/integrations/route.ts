@@ -11,7 +11,7 @@ import { z } from "zod";
 
 const connectSchema = z.object({
   provider: z.enum(["TOAST", "SQUARE", "CLOVER"]),
-  outletId: z.string().min(1),
+  outletId: z.string().optional(),
   environment: z.enum(["PRODUCTION", "SANDBOX"]).default("PRODUCTION"),
   credentials: z.record(z.string(), z.any()),
   providerLocationId: z.string().optional(),
@@ -88,15 +88,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: valResult.valid, result: valResult });
     }
 
-    // Auto-resolve outletId if missing or blank
+    // Auto-resolve or create default outletId if missing or blank
     if (!body.outletId || typeof body.outletId !== "string" || !body.outletId.trim()) {
-      const defaultOutlet = await prisma.restaurantOutlet.findFirst({
+      let defaultOutlet = await prisma.restaurantOutlet.findFirst({
         where: { restaurantId: session.activeRestaurantId },
         select: { id: true },
       });
-      if (defaultOutlet) {
-        body.outletId = defaultOutlet.id;
+
+      if (!defaultOutlet) {
+        const restaurant = await prisma.restaurant.findUnique({
+          where: { id: session.activeRestaurantId },
+          select: { name: true },
+        });
+        const createdOutlet = await prisma.restaurantOutlet.create({
+          data: {
+            restaurantId: session.activeRestaurantId,
+            name: restaurant?.name ? `${restaurant.name} Main Outlet` : "Main Outlet",
+            code: "MAIN",
+            currency: "USD",
+            status: "ACTIVE",
+          },
+        });
+        defaultOutlet = { id: createdOutlet.id };
       }
+
+      body.outletId = defaultOutlet.id;
     }
 
     const parsed = connectSchema.safeParse(body);
@@ -113,9 +129,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const resolvedOutletId = body.outletId || parsed.data.outletId;
+
     const result = await connectPosIntegration(session.activeRestaurantId, {
       provider: parsed.data.provider as PosProviderType,
-      outletId: parsed.data.outletId,
+      outletId: resolvedOutletId,
       environment: parsed.data.environment as PosEnvironmentType,
       credentials: {
         ...parsed.data.credentials,
