@@ -949,50 +949,21 @@ export default function AppleTenantDashboard() {
               <ChevronDown className="hidden sm:inline w-3 h-3 opacity-60" />
             </div>
 
-            {/* Primary Action Button: + New Order on desktop, + Order on mobile */}
-            {hasPosAccess && (
-              <button
-                type="button"
-                onClick={() => router.push(p("/pos"))}
-                className="px-2.5 sm:px-3.5 py-1.5 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1 shadow-sm shrink-0 hover:brightness-110 active:scale-[0.98]"
+            {/* User Profile Avatar */}
+            <div
+              onClick={() => router.push(p("/settings/profile"))}
+              className={`px-2 sm:px-2.5 py-1 rounded-xl border flex items-center gap-1.5 cursor-pointer ${
+                isDark ? "bg-white/[0.04] border-white/[0.08]" : "bg-slate-50 border-slate-200"
+              }`}
+            >
+              <div
+                className="w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center"
                 style={{ backgroundColor: brandColor }}
               >
-                <span className="hidden sm:inline">+ New Order</span>
-                <span className="sm:hidden">+ Order</span>
-              </button>
-            )}
-
-            {/* Schedule Shift Button (Desktop lg+) */}
-            {hasShiftAccess && (
-              <button
-                type="button"
-                onClick={() => router.push(p("/shifts/rosters"))}
-                className={`hidden lg:flex px-3 py-1.5 rounded-xl text-xs font-semibold border transition items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                  isDark
-                    ? "bg-white/[0.04] border-white/[0.08] hover:bg-white/[0.08] text-slate-200"
-                    : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
-                }`}
-              >
-                <Calendar className="w-3.5 h-3.5 opacity-60" />
-                <span>Schedule Shift</span>
-              </button>
-            )}
-
-            {/* Run Payroll Button (Desktop xl+) */}
-            {hasPayrollAccess && (
-              <button
-                type="button"
-                onClick={() => router.push(p("/payroll/runs"))}
-                className={`hidden xl:flex px-3 py-1.5 rounded-xl text-xs font-semibold border transition items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                  isDark
-                    ? "bg-white/[0.04] border-white/[0.08] hover:bg-white/[0.08] text-slate-200"
-                    : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
-                }`}
-              >
-                <Banknote className="w-3.5 h-3.5 opacity-60" />
-                <span>Run Payroll</span>
-              </button>
-            )}
+                MD
+              </div>
+              <ChevronDown className="hidden sm:inline w-3 h-3 opacity-60" />
+            </div>
 
             {/* Modules Hub Switcher / Mode Switcher */}
             <button
