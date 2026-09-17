@@ -1696,7 +1696,6 @@ export default function AppleTenantDashboard() {
                                 <td className="py-2.5 pl-1">
                                   <div className="flex items-center gap-2.5 min-w-0">
                                     <span className="font-mono text-slate-400 font-bold text-xs w-3 shrink-0">{idx + 1}</span>
-                                    <span className="text-base shrink-0">{dish.icon || "🍗"}</span>
                                     <span className="font-bold text-slate-900 dark:text-white truncate max-w-[160px] sm:max-w-[200px]" title={dish.name}>
                                       {dish.name}
                                     </span>

@@ -613,7 +613,6 @@ export async function GET(
     }
 
     // 8. Top Selling Dishes (grouped by menu item ID / dish name)
-    const dishIcons = ["🍗", "🧀", "🍚", "🫓", "🥘", "🍲", "🥙", "🌯", "🥗", "🍨"];
     const groupedDishesMap = new Map<string, {
       posMenuItemId: string | null;
       name: string;
@@ -626,7 +625,10 @@ export async function GET(
       const key = item.posMenuItemId || item.name.toLowerCase().trim();
       const existing = groupedDishesMap.get(key);
       const q = Number(item.quantity || 1);
-      const net = Number(item.netSales || item.totalPrice || 0);
+      const netSalesNum = Number(item.netSales || 0);
+      const totalNum = Number(item.totalPrice || 0);
+      const unitNum = Number(item.unitPrice || 0);
+      const net = netSalesNum > 0 ? netSalesNum : (totalNum > 0 ? totalNum : (unitNum * q));
 
       if (existing) {
         existing.quantity += q;
@@ -650,7 +652,6 @@ export async function GET(
       netSales: Math.round(g.netSales * 100) / 100,
       revenue: Math.round(g.netSales),
       ordersCount: g.orderIds.size,
-      icon: dishIcons[idx % dishIcons.length],
     }));
 
     const topSellingDishes = [...aggregatedList].sort((a, b) => b.qty - a.qty).slice(0, 10);
