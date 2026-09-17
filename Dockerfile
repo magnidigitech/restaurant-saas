@@ -6,7 +6,7 @@ RUN apk add --no-cache libc6-compat
 
 # Install node dependencies
 COPY package.json package-lock.json* ./
-RUN npm install
+RUN npm install --include=dev
 
 # Copy source code
 COPY . .
