@@ -904,7 +904,7 @@ export default function AppleTenantDashboard() {
               }`}
             >
               <Calendar className="w-3.5 h-3.5 opacity-60" />
-              <span>{formattedTodayDate ? (formattedTodayDate.startsWith("Today") || formattedTodayDate.startsWith("Yesterday") || formattedTodayDate.startsWith("This") ? formattedTodayDate : `Today, ${formattedTodayDate}`) : `Today, ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}</span>
+              <span>{formattedTodayDate || "Today"}</span>
               <ChevronDown className="w-3 h-3 opacity-60" />
             </div>
 
@@ -1237,54 +1237,21 @@ export default function AppleTenantDashboard() {
                   }`}
                 >
                   <div>
-                    {/* Header with period toggle & filter */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                    {/* Header: Unified Top Bar Filter handles Date Selection */}
+                    <div className="flex items-center justify-between gap-3 mb-6">
                       <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
                         Sales Performance
                       </h3>
-
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-white/[0.04] text-xs font-semibold">
-                          {(["today", "yesterday", "week"] as const).map((period) => (
-                            <button
-                              key={period}
-                              type="button"
-                              onClick={() => {
-                                setSalesPeriod(period);
-                                setCustomStartDate(null);
-                                setCustomEndDate(null);
-                                fetchData(period, null, null);
-                              }}
-                              className={`px-3 py-1 rounded-lg capitalize transition cursor-pointer text-xs ${
-                                salesPeriod === period
-                                  ? "text-white shadow-xs font-bold"
-                                  : "text-slate-600 dark:text-[#8F95A3] hover:text-slate-900 dark:hover:text-white"
-                              }`}
-                              style={salesPeriod === period ? { backgroundColor: brandColor } : {}}
-                            >
-                              {period === "week" ? "This Week" : period}
-                            </button>
-                          ))}
-                        </div>
-
-                        <div
-                          onClick={() => setIsDateModalOpen(true)}
-                          className="px-2.5 py-1 rounded-xl border text-xs font-semibold flex items-center gap-1 cursor-pointer border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition"
-                        >
-                          <span>Sales Date</span>
-                          <ChevronDown className="w-3 h-3 opacity-60" />
-                        </div>
-                      </div>
                     </div>
 
                     {/* Bar Chart with Y-axis markers and interactive bars */}
                     <div className="relative pt-6 pb-2">
-                      {/* Interactive Tooltip Card for 6 PM Peak (or Hovered Bar) */}
-                      {hoveredBarIdx !== null && (
+                      {/* Interactive Tooltip Card for hovered Bar */}
+                      {hoveredBarIdx !== null && hourlyBars[hoveredBarIdx] && (
                         <div
                           className="absolute -top-1 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-[10px] text-center shadow-lg pointer-events-none transform -translate-x-1/2 z-20"
                           style={{
-                            left: `${((hoveredBarIdx + 0.5) / hourlyBars.length) * 90 + 5}%`,
+                            left: `${((hoveredBarIdx + 0.5) / Math.max(1, hourlyBars.length)) * 90 + 5}%`,
                           }}
                         >
                           <div className="font-semibold opacity-75">
@@ -1323,15 +1290,13 @@ export default function AppleTenantDashboard() {
                         })}
                       </div>
 
-                      {/* X-axis Time Labels */}
-                      <div className="flex justify-between px-2 pt-2 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
-                        <span>10 AM</span>
-                        <span>12 PM</span>
-                        <span>2 PM</span>
-                        <span>4 PM</span>
-                        <span>6 PM</span>
-                        <span>8 PM</span>
-                        <span>10 PM</span>
+                      {/* Dynamic X-axis Time & Date Labels */}
+                      <div className="flex justify-between px-1 pt-2 text-[10px] font-semibold text-slate-400 dark:text-slate-500 overflow-hidden">
+                        {hourlyBars.map((bar, idx) => (
+                          <span key={idx} className="flex-1 text-center truncate">
+                            {bar.time}
+                          </span>
+                        ))}
                       </div>
                     </div>
                   </div>
