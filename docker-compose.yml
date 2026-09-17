@@ -21,6 +21,8 @@ services:
       - PORT=3000
     ports:
       - "3000:3000"
+    volumes:
+      - /var/lib/restobird_uploads:/app/public/uploads
     depends_on:
       - db
 
