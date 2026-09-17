@@ -104,9 +104,7 @@ export async function POST(req: NextRequest) {
           data: {
             restaurantId: session.activeRestaurantId,
             name: restaurant?.name ? `${restaurant.name} Main Outlet` : "Main Outlet",
-            code: "MAIN",
             currency: "USD",
-            status: "ACTIVE",
           },
         });
         defaultOutlet = { id: createdOutlet.id };

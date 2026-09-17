@@ -126,9 +126,7 @@ export async function connectPosIntegration(restaurantId: string, payload: Conne
         data: {
           restaurantId,
           name: restaurant?.name ? `${restaurant.name} Main Outlet` : "Main Outlet",
-          code: "MAIN",
           currency: "USD",
-          status: "ACTIVE",
         },
       });
     }
