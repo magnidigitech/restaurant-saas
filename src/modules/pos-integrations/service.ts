@@ -108,12 +108,32 @@ export async function connectPosIntegration(restaurantId: string, payload: Conne
     throw new Error(validation.error || "Failed to validate POS credentials");
   }
 
-  // 2. Verify outlet belongs to restaurant
-  const outlet = await prisma.restaurantOutlet.findFirst({
+  // 2. Verify outlet belongs to restaurant (or auto-create default outlet if none exists)
+  let outlet = await prisma.restaurantOutlet.findFirst({
     where: { id: payload.outletId, restaurantId },
   });
+
   if (!outlet) {
-    throw new Error("Specified outlet does not belong to this restaurant");
+    let anyOutlet = await prisma.restaurantOutlet.findFirst({
+      where: { restaurantId },
+    });
+    if (!anyOutlet) {
+      const restaurant = await prisma.restaurant.findUnique({
+        where: { id: restaurantId },
+        select: { name: true },
+      });
+      anyOutlet = await prisma.restaurantOutlet.create({
+        data: {
+          restaurantId,
+          name: restaurant?.name ? `${restaurant.name} Main Outlet` : "Main Outlet",
+          code: "MAIN",
+          currency: "USD",
+          status: "ACTIVE",
+        },
+      });
+    }
+    outlet = anyOutlet;
+    payload.outletId = anyOutlet.id;
   }
 
   // 3. Upsert PosIntegration

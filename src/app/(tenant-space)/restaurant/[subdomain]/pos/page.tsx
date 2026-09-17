@@ -655,6 +655,9 @@ export default function PosHubPage({
     setConnectModalProvider(providerId);
     setWizardStep(1);
     setWizardEnvironment("PRODUCTION");
+    if (outlets.length > 0 && !wizardOutletId) {
+      setWizardOutletId(outlets[0].id);
+    }
     setWizardCredentials(
       providerId === "TOAST"
         ? { clientId: "", clientSecret: "", restaurantGuid: "" }
@@ -715,12 +718,14 @@ export default function PosHubPage({
         (l) => l.id === wizardSelectedLocationId
       );
 
+      const targetOutletId = wizardOutletId || (outlets.length > 0 ? outlets[0].id : "");
+
       const res = await fetch("/api/restaurant/pos/integrations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           provider: connectModalProvider,
-          outletId: wizardOutletId,
+          outletId: targetOutletId,
           environment: wizardEnvironment,
           credentials: wizardCredentials,
           providerLocationId: wizardSelectedLocationId,

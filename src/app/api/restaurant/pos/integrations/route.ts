@@ -88,10 +88,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: valResult.valid, result: valResult });
     }
 
+    // Auto-resolve outletId if missing or blank
+    if (!body.outletId || typeof body.outletId !== "string" || !body.outletId.trim()) {
+      const defaultOutlet = await prisma.restaurantOutlet.findFirst({
+        where: { restaurantId: session.activeRestaurantId },
+        select: { id: true },
+      });
+      if (defaultOutlet) {
+        body.outletId = defaultOutlet.id;
+      }
+    }
+
     const parsed = connectSchema.safeParse(body);
     if (!parsed.success) {
+      const fieldErrors = parsed.error.flatten().fieldErrors;
+      const firstErrorField = Object.keys(fieldErrors)[0];
+      const errorMsg = firstErrorField 
+        ? `Invalid payload: '${firstErrorField}' ${fieldErrors[firstErrorField]?.[0] || 'is invalid'}`
+        : "Invalid connection payload";
+
       return NextResponse.json(
-        { error: "Invalid connection payload", details: parsed.error.flatten() },
+        { error: errorMsg, details: fieldErrors },
         { status: 400 }
       );
     }
