@@ -25,7 +25,11 @@ export async function GET(
       return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
     }
 
-    const restaurantId = session.activeRestaurantId;
+    const targetRestaurant = await prisma.restaurant.findUnique({
+      where: { subdomain },
+      select: { id: true },
+    });
+    const restaurantId = targetRestaurant?.id || session.activeRestaurantId;
 
     // Fetch primary outlet to obtain timezone and currency
     const outlets = await prisma.restaurantOutlet.findMany({

@@ -105,9 +105,10 @@ export function getSingleDayBounds(timezone: string, dayOffset = 0): {
 
   const start = createCustomZonedDate(year, month, day, 0, 0, 0, 0, targetTz);
   // Next day midnight in target timezone (start-inclusive, end-exclusive)
-  const nextRef = new Date(Date.UTC(year, month - 1, day) + 86400000);
-  const nextYmd = formatter.format(nextRef);
-  const [ny, nm, nd] = nextYmd.split("-").map(Number);
+  const nextDate = new Date(Date.UTC(year, month - 1, day + 1));
+  const ny = nextDate.getUTCFullYear();
+  const nm = nextDate.getUTCMonth() + 1;
+  const nd = nextDate.getUTCDate();
   const endExclusive = createCustomZonedDate(ny, nm, nd, 0, 0, 0, 0, targetTz);
 
   const dObj = new Date(year, month - 1, day);
