@@ -11,6 +11,7 @@
     "db:migrate:dev": "npx prisma migrate dev",
     "db:migrate:deploy": "npx prisma migrate deploy",
     "db:seed": "npx prisma db seed",
+    "seed": "npx tsx prisma/seed.ts",
     "test:security": "npx tsx src/core/tests/security.test.ts"
   },
   "dependencies": {

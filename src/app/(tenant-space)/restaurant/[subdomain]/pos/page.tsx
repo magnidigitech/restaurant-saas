@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, use } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import React, { useState, useEffect, useCallback, use } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import ModuleAccessGuard from "@/components/ModuleAccessGuard";
@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   AlertCircle,
-  XCircle,
   Clock,
   Search,
   ChevronRight,
@@ -21,16 +20,11 @@ import {
   ArrowLeft,
   Plus,
   Settings,
-  Receipt,
   ShoppingBag,
-  Layers,
   X,
   Lock,
   Calendar,
-  ExternalLink,
   ChevronDown,
-  Sparkles,
-  Database,
   Check,
 } from "lucide-react";
 
@@ -82,7 +76,7 @@ interface PosOrder {
   customerPhone?: string;
   notes?: string;
   createdAt: string;
-  rawPayload?: any;
+  rawPayload?: Record<string, unknown> | null;
   items: PosOrderItem[];
 }
 
@@ -192,9 +186,8 @@ export default function PosHubPage({
 }: {
   params: Promise<{ subdomain: string }>;
 }) {
-  const { subdomain } = use(params);
+  use(params);
   const searchParams = useSearchParams();
-  const router = useRouter();
   const { isDark } = useTheme();
 
   // State
@@ -359,6 +352,7 @@ export default function PosHubPage({
 
   const handlePresetSelect = (presetKey: string) => {
     const now = new Date();
+    const nowMs = now.getTime();
     if (presetKey === "today") {
       const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
       const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
@@ -366,20 +360,20 @@ export default function PosHubPage({
       setCustomEndDate(end);
       setDateRange("today");
     } else if (presetKey === "7d") {
-      const start = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      const end = new Date();
+      const start = new Date(nowMs - 7 * 24 * 60 * 60 * 1000);
+      const end = new Date(nowMs);
       setCustomStartDate(start);
       setCustomEndDate(end);
       setDateRange("7d");
     } else if (presetKey === "30d") {
-      const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const end = new Date();
+      const start = new Date(nowMs - 30 * 24 * 60 * 60 * 1000);
+      const end = new Date(nowMs);
       setCustomStartDate(start);
       setCustomEndDate(end);
       setDateRange("30d");
     } else if (presetKey === "ytd") {
       const start = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
-      const end = new Date();
+      const end = new Date(nowMs);
       setCustomStartDate(start);
       setCustomEndDate(end);
       setDateRange("ytd");
@@ -396,7 +390,6 @@ export default function PosHubPage({
     }
     setIsDateModalOpen(false);
     setCurrentPage(1);
-    fetchOrdersList(1);
   };
 
   const getDateFilterLabel = () => {
@@ -419,7 +412,9 @@ export default function PosHubPage({
   };
 
   // Navigation tabs: 'orders' | 'integrations'
-  const [activeTab, setActiveTab] = useState<"orders" | "integrations">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "integrations">(
+    searchParams?.get("tab") === "settings" ? "integrations" : "orders"
+  );
 
   // Modals & Drawers
   const [connectModalProvider, setConnectModalProvider] = useState<
@@ -455,10 +450,80 @@ export default function PosHubPage({
     outletName: string;
   } | null>(null);
 
+  const fetchOrdersList = useCallback(
+    async (pageToFetch = currentPage) => {
+      try {
+        const q = new URLSearchParams();
+        if (selectedOutlet !== "ALL") q.set("outletId", selectedOutlet);
+        if (selectedProvider !== "ALL") q.set("provider", selectedProvider);
+        if (selectedStatus !== "ALL") q.set("status", selectedStatus);
+        if (searchQuery.trim()) q.set("search", searchQuery.trim());
+
+        q.set("limit", String(pageSize));
+        q.set("offset", String((pageToFetch - 1) * pageSize));
+
+        // Date range calculation
+        const now = new Date();
+        const nowMs = now.getTime();
+        if (dateRange === "today") {
+          const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+          q.set("startDate", start.toISOString());
+        } else if (dateRange === "7d") {
+          const start = new Date(nowMs - 7 * 24 * 60 * 60 * 1000);
+          q.set("startDate", start.toISOString());
+        } else if (dateRange === "30d") {
+          const start = new Date(nowMs - 30 * 24 * 60 * 60 * 1000);
+          q.set("startDate", start.toISOString());
+        } else if (dateRange === "ytd") {
+          const start = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
+          q.set("startDate", start.toISOString());
+        } else if (dateRange === "custom") {
+          if (customStartDate) {
+            const s = new Date(customStartDate);
+            s.setHours(0, 0, 0, 0);
+            q.set("startDate", s.toISOString());
+          }
+          if (customEndDate) {
+            const e = new Date(customEndDate);
+            e.setHours(23, 59, 59, 999);
+            q.set("endDate", e.toISOString());
+          }
+        }
+
+        const res = await fetch(`/api/restaurant/pos/orders?${q.toString()}`, {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setOrders(data.orders || []);
+          if (data.pagination) setTotalOrders(data.pagination.total || 0);
+          if (data.metrics) setMetrics(data.metrics);
+        }
+      } catch (err) {
+        console.error("Error fetching POS orders:", err);
+      }
+    },
+    [
+      currentPage,
+      selectedOutlet,
+      selectedProvider,
+      selectedStatus,
+      searchQuery,
+      pageSize,
+      dateRange,
+      customStartDate,
+      customEndDate,
+    ]
+  );
+
   // Load Integrations, Orders, and Outlets
-  const fetchAllData = async () => {
+  const fetchAllData = useCallback(async () => {
     try {
-      setLoading(true);
       const cacheBustHeaders = {
         "Cache-Control": "no-cache, no-store, must-revalidate",
         Pragma: "no-cache",
@@ -466,11 +531,11 @@ export default function PosHubPage({
       };
 
       const [resInteg, resOutlets] = await Promise.all([
-        fetch(`/api/restaurant/pos/integrations?_t=${Date.now()}`, {
+        fetch("/api/restaurant/pos/integrations", {
           cache: "no-store",
           headers: cacheBustHeaders,
         }),
-        fetch(`/api/restaurant/outlets?_t=${Date.now()}`, {
+        fetch("/api/restaurant/outlets", {
           cache: "no-store",
           headers: cacheBustHeaders,
         }),
@@ -491,91 +556,23 @@ export default function PosHubPage({
     } finally {
       setLoading(false);
     }
-  };
-
-  const fetchOrdersList = async (pageToFetch = currentPage) => {
-    try {
-      const q = new URLSearchParams();
-      if (selectedOutlet !== "ALL") q.set("outletId", selectedOutlet);
-      if (selectedProvider !== "ALL") q.set("provider", selectedProvider);
-      if (selectedStatus !== "ALL") q.set("status", selectedStatus);
-      if (searchQuery.trim()) q.set("search", searchQuery.trim());
-
-      q.set("limit", String(pageSize));
-      q.set("offset", String((pageToFetch - 1) * pageSize));
-      q.set("_t", String(Date.now())); // Cache buster timestamp
-
-      // Date range calculation
-      const now = new Date();
-      if (dateRange === "today") {
-        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-        q.set("startDate", start.toISOString());
-      } else if (dateRange === "7d") {
-        const start = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        q.set("startDate", start.toISOString());
-      } else if (dateRange === "30d") {
-        const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-        q.set("startDate", start.toISOString());
-      } else if (dateRange === "ytd") {
-        const start = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
-        q.set("startDate", start.toISOString());
-      } else if (dateRange === "custom") {
-        if (customStartDate) {
-          const s = new Date(customStartDate);
-          s.setHours(0, 0, 0, 0);
-          q.set("startDate", s.toISOString());
-        }
-        if (customEndDate) {
-          const e = new Date(customEndDate);
-          e.setHours(23, 59, 59, 999);
-          q.set("endDate", e.toISOString());
-        }
-      } else if (dateRange === "all") {
-        // No startDate filter applied to query all-time history
-      }
-
-      const res = await fetch(`/api/restaurant/pos/orders?${q.toString()}`, {
-        cache: "no-store",
-        headers: {
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          Pragma: "no-cache",
-          Expires: "0",
-        },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setOrders(data.orders || []);
-        if (data.pagination) setTotalOrders(data.pagination.total || 0);
-        if (data.metrics) setMetrics(data.metrics);
-      }
-    } catch (err) {
-      console.error("Error fetching POS orders:", err);
-    }
-  };
+  }, [wizardOutletId, fetchOrdersList]);
 
   useEffect(() => {
-    fetchAllData();
-  }, []);
+    const init = async () => {
+      await fetchAllData();
+    };
+    void init();
+  }, [fetchAllData]);
 
   useEffect(() => {
     if (!loading) {
-      setCurrentPage(1);
-      fetchOrdersList(1);
+      const loadOrders = async () => {
+        await fetchOrdersList(currentPage);
+      };
+      void loadOrders();
     }
-  }, [selectedOutlet, selectedProvider, selectedStatus, dateRange, customStartDate, customEndDate, pageSize]);
-
-  useEffect(() => {
-    if (!loading) {
-      fetchOrdersList(currentPage);
-    }
-  }, [currentPage]);
-
-  // Check URL tab query
-  useEffect(() => {
-    if (searchParams.get("tab") === "settings") {
-      setActiveTab("integrations");
-    }
-  }, [searchParams]);
+  }, [currentPage, fetchOrdersList, loading]);
 
   // Trigger manual synchronization
   const handleSyncIntegration = async (integrationId: string) => {
@@ -599,8 +596,9 @@ export default function PosHubPage({
       // Refresh data
       await fetchAllData();
       setTimeout(() => setSyncStatusMsg(null), 5000);
-    } catch (err: any) {
-      setSyncStatusMsg({ text: err.message || "Failed to synchronize orders", isError: true });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to synchronize orders";
+      setSyncStatusMsg({ text: errorMessage, isError: true });
     } finally {
       setSyncingIntegrationId(null);
     }
@@ -643,9 +641,10 @@ export default function PosHubPage({
         const data = await res.json();
         setSyncStatusMsg({ text: data.error || "Failed to disconnect integration", isError: true });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to disconnect integration";
       console.error("Failed to disconnect:", err);
-      setSyncStatusMsg({ text: err.message || "Failed to disconnect integration", isError: true });
+      setSyncStatusMsg({ text: errorMessage, isError: true });
     } finally {
       setIsDisconnecting(false);
     }
@@ -660,8 +659,8 @@ export default function PosHubPage({
       providerId === "TOAST"
         ? { clientId: "", clientSecret: "", restaurantGuid: "" }
         : providerId === "SQUARE"
-        ? { accessToken: "", applicationId: "" }
-        : { apiToken: "", merchantId: "", region: "NA" }
+          ? { accessToken: "", applicationId: "" }
+          : { apiToken: "", merchantId: "", region: "NA" }
     );
     setWizardError(null);
     setWizardAvailableLocations([]);
@@ -697,8 +696,9 @@ export default function PosHubPage({
         setWizardSelectedLocationId(locations[0].id);
       }
       setWizardStep(3); // Proceed to location mapping
-    } catch (err: any) {
-      setWizardError(err.message || "Failed to validate credentials");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to validate credentials";
+      setWizardError(errorMessage);
     } finally {
       setWizardValidating(false);
     }
@@ -741,8 +741,9 @@ export default function PosHubPage({
       });
       setWizardStep(5); // Success step
       await fetchAllData();
-    } catch (err: any) {
-      setWizardError(err.message || "Failed to connect integration");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to connect integration";
+      setWizardError(errorMessage);
     } finally {
       setWizardValidating(false);
     }
@@ -780,11 +781,10 @@ export default function PosHubPage({
             <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 w-full sm:w-auto shrink-0">
               <button
                 onClick={() => setActiveTab(activeTab === "orders" ? "integrations" : "orders")}
-                className={`inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium border transition-colors ${
-                  activeTab === "integrations"
+                className={`inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium border transition-colors ${activeTab === "integrations"
                     ? "bg-slate-800 text-white border-slate-700 dark:bg-slate-700"
                     : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
-                }`}
+                  }`}
               >
                 <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span>{activeTab === "integrations" ? "View Orders Stream" : "Manage Connections"}</span>
@@ -808,11 +808,10 @@ export default function PosHubPage({
           {/* Sync Status Toast Bar */}
           {syncStatusMsg && (
             <div
-              className={`mt-4 p-3 rounded-xl flex items-center justify-between text-sm ${
-                syncStatusMsg.isError
+              className={`mt-4 p-3 rounded-xl flex items-center justify-between text-sm ${syncStatusMsg.isError
                   ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
                   : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-2">
                 {syncStatusMsg.isError ? (
@@ -1041,11 +1040,10 @@ export default function PosHubPage({
                           <button
                             key={prov}
                             onClick={() => setSelectedProvider(prov)}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
-                              selectedProvider === prov
+                            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${selectedProvider === prov
                                 ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm font-semibold"
                                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                            }`}
+                              }`}
                           >
                             {prov === "ALL" ? "All POS" : prov}
                           </button>
@@ -1193,15 +1191,14 @@ export default function PosHubPage({
                                 <div className="flex items-center justify-between text-xs pt-1">
                                   <div className="flex items-center gap-2">
                                     <span
-                                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                        order.status === "COMPLETED"
+                                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${order.status === "COMPLETED"
                                           ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                                           : order.status === "REFUNDED"
-                                          ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
-                                          : order.status === "CANCELLED"
-                                          ? "bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20"
-                                          : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                                      }`}
+                                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                                            : order.status === "CANCELLED"
+                                              ? "bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20"
+                                              : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                                        }`}
                                     >
                                       {order.status}
                                     </span>
@@ -1312,15 +1309,14 @@ export default function PosHubPage({
 
                                     <td className="px-4 py-3.5">
                                       <span
-                                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                          order.status === "COMPLETED"
+                                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${order.status === "COMPLETED"
                                             ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                                             : order.status === "REFUNDED"
-                                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
-                                            : order.status === "CANCELLED"
-                                            ? "bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20"
-                                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                                        }`}
+                                              ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                                              : order.status === "CANCELLED"
+                                                ? "bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20"
+                                                : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                                          }`}
                                       >
                                         {order.status}
                                       </span>
@@ -1469,11 +1465,10 @@ export default function PosHubPage({
                                   {provDef?.name}
                                 </h3>
                                 <span
-                                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                                    integ.status === "ACTIVE"
+                                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${integ.status === "ACTIVE"
                                       ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
                                       : "bg-slate-500/10 text-slate-400 border border-slate-500/20"
-                                  }`}
+                                    }`}
                                 >
                                   {integ.status}
                                 </span>
@@ -1698,9 +1693,8 @@ export default function PosHubPage({
           {disconnectModalItem && (
             <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
               <div
-                className={`relative w-full max-w-md p-6 rounded-2xl shadow-2xl border transition-all ${
-                  isDark ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
-                }`}
+                className={`relative w-full max-w-md p-6 rounded-2xl shadow-2xl border transition-all ${isDark ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
+                  }`}
               >
                 <button
                   onClick={() => {
@@ -1739,11 +1733,10 @@ export default function PosHubPage({
                     value={disconnectConfirmText}
                     onChange={(e) => setDisconnectConfirmText(e.target.value)}
                     placeholder="Type DELETE to confirm"
-                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs border font-medium focus:outline-none focus:ring-2 focus:ring-rose-500/50 transition-all ${
-                      isDark
+                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs border font-medium focus:outline-none focus:ring-2 focus:ring-rose-500/50 transition-all ${isDark
                         ? "bg-slate-800 border-slate-700 text-white placeholder-slate-500"
                         : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400"
-                    }`}
+                      }`}
                     autoFocus
                   />
                 </div>
@@ -1756,11 +1749,10 @@ export default function PosHubPage({
                       setDisconnectConfirmText("");
                     }}
                     disabled={isDisconnecting}
-                    className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-colors ${
-                      isDark
+                    className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-colors ${isDark
                         ? "border-slate-700 text-slate-300 hover:bg-slate-800"
                         : "border-slate-200 text-slate-700 hover:bg-slate-100"
-                    }`}
+                      }`}
                   >
                     Cancel
                   </button>
@@ -1821,13 +1813,12 @@ export default function PosHubPage({
                     ].map((s) => (
                       <div key={s.step} className="flex items-center gap-1.5">
                         <div
-                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                            wizardStep === s.step
+                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${wizardStep === s.step
                               ? "bg-emerald-600 text-white"
                               : wizardStep > s.step
-                              ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                              : "bg-slate-200 dark:bg-slate-800 text-slate-400"
-                          }`}
+                                ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                                : "bg-slate-200 dark:bg-slate-800 text-slate-400"
+                            }`}
                         >
                           {wizardStep > s.step ? <Check className="w-3.5 h-3.5" /> : s.step}
                         </div>
@@ -2132,11 +2123,10 @@ export default function PosHubPage({
                           <div
                             key={p.days}
                             onClick={() => setWizardImportPeriod(p.days)}
-                            className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
-                              wizardImportPeriod === p.days
+                            className={`p-3.5 rounded-xl border cursor-pointer transition-all ${wizardImportPeriod === p.days
                                 ? "bg-emerald-500/10 border-emerald-500 text-emerald-700 dark:text-emerald-300"
                                 : "bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 hover:border-slate-300"
-                            }`}
+                              }`}
                           >
                             <p className="font-bold text-xs">{p.label}</p>
                             <p className="text-[10px] text-slate-500 mt-1">{p.desc}</p>
@@ -2253,12 +2243,11 @@ export default function PosHubPage({
                       <button
                         key={tab.id}
                         type="button"
-                        onClick={() => setCalendarTab(tab.id as any)}
-                        className={`flex-1 py-2 px-2.5 rounded-xl transition-all text-center ${
-                          calendarTab === tab.id
+                        onClick={() => setCalendarTab(tab.id as "day" | "week" | "month" | "year" | "custom")}
+                        className={`flex-1 py-2 px-2.5 rounded-xl transition-all text-center ${calendarTab === tab.id
                             ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20 font-bold"
                             : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
-                        }`}
+                          }`}
                       >
                         {tab.label}
                       </button>
@@ -2271,11 +2260,10 @@ export default function PosHubPage({
                       <button
                         type="button"
                         onClick={() => setPickingTarget("start")}
-                        className={`p-3 rounded-2xl border text-left transition-all ${
-                          pickingTarget === "start"
+                        className={`p-3 rounded-2xl border text-left transition-all ${pickingTarget === "start"
                             ? "border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200"
                             : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300"
-                        }`}
+                          }`}
                       >
                         <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
                           Start Date
@@ -2288,11 +2276,10 @@ export default function PosHubPage({
                       <button
                         type="button"
                         onClick={() => setPickingTarget("end")}
-                        className={`p-3 rounded-2xl border text-left transition-all ${
-                          pickingTarget === "end"
+                        className={`p-3 rounded-2xl border text-left transition-all ${pickingTarget === "end"
                             ? "border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200"
                             : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300"
-                        }`}
+                          }`}
                       >
                         <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
                           End Date
@@ -2365,17 +2352,16 @@ export default function PosHubPage({
                               key={idx}
                               type="button"
                               onClick={() => handleCalendarDateClick(cell.dateObj)}
-                              className={`h-9 w-full rounded-xl text-xs font-semibold flex items-center justify-center transition-all ${
-                                isStart || isEnd
+                              className={`h-9 w-full rounded-xl text-xs font-semibold flex items-center justify-center transition-all ${isStart || isEnd
                                   ? "bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/30 rounded-full"
                                   : inRange
-                                  ? "bg-emerald-500/15 dark:bg-emerald-500/25 text-emerald-800 dark:text-emerald-200 font-bold"
-                                  : isToday
-                                  ? "border border-emerald-500 text-emerald-600 font-bold"
-                                  : cell.isCurrentMonth
-                                  ? "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
-                                  : "text-slate-300 dark:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                              }`}
+                                    ? "bg-emerald-500/15 dark:bg-emerald-500/25 text-emerald-800 dark:text-emerald-200 font-bold"
+                                    : isToday
+                                      ? "border border-emerald-500 text-emerald-600 font-bold"
+                                      : cell.isCurrentMonth
+                                        ? "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                        : "text-slate-300 dark:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                                }`}
                             >
                               {cell.day}
                             </button>
@@ -2425,11 +2411,10 @@ export default function PosHubPage({
                                 setCustomStartDate(start);
                                 setCustomEndDate(end);
                               }}
-                              className={`py-3 px-2 rounded-xl text-xs font-semibold transition-all ${
-                                isSelMonth
+                              className={`py-3 px-2 rounded-xl text-xs font-semibold transition-all ${isSelMonth
                                   ? "bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/30"
                                   : "bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-600"
-                              }`}
+                                }`}
                             >
                               {mName}
                             </button>
@@ -2456,11 +2441,10 @@ export default function PosHubPage({
                               setCustomStartDate(start);
                               setCustomEndDate(end);
                             }}
-                            className={`py-3 px-2 rounded-xl text-xs font-semibold transition-all ${
-                              isSelYear
+                            className={`py-3 px-2 rounded-xl text-xs font-semibold transition-all ${isSelYear
                                 ? "bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/30"
                                 : "bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-600"
-                            }`}
+                              }`}
                           >
                             {yr}
                           </button>
@@ -2486,11 +2470,10 @@ export default function PosHubPage({
                           key={p.id}
                           type="button"
                           onClick={() => handlePresetSelect(p.id)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                            dateRange === p.id && !customStartDate
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${dateRange === p.id && !customStartDate
                               ? "bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30"
                               : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-                          }`}
+                            }`}
                         >
                           {p.label}
                         </button>
