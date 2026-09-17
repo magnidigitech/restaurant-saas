@@ -37,6 +37,41 @@ export async function GET(
     const outletTimezone = primaryOutlet?.timezone?.trim() || "UTC";
     const outletCurrency = primaryOutlet?.currency?.trim() || "USD";
 
+    // Helper to calculate zoned dates in the outlet's timezone
+    const createCustomZonedDate = (year: number, month: number, day: number, h: number, m: number, s: number, ms: number) => {
+      const candidate = new Date(Date.UTC(year, month - 1, day, h, m, s, ms));
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: outletTimezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      }).formatToParts(candidate);
+
+      const partMap: Record<string, string> = {};
+      parts.forEach((p) => { partMap[p.type] = p.value; });
+
+      let localH = Number(partMap.hour);
+      if (localH === 24) localH = 0;
+
+      const localZoned = new Date(
+        Date.UTC(
+          Number(partMap.year),
+          Number(partMap.month) - 1,
+          Number(partMap.day),
+          localH,
+          Number(partMap.minute),
+          Number(partMap.second)
+        )
+      );
+
+      const diffMs = candidate.getTime() - localZoned.getTime();
+      return new Date(candidate.getTime() + diffMs);
+    };
+
     // Helper to calculate start/end bounds for any given day in the outlet's timezone
     const getZonedBounds = (tz: string, dayOffset = 0) => {
       const targetTz = tz || "UTC";
@@ -52,40 +87,6 @@ export async function GET(
       const ymd = formatter.format(refDate); // "YYYY-MM-DD"
       const [year, month, day] = ymd.split("-").map(Number);
 
-      const createZonedDate = (h: number, m: number, s: number, ms: number) => {
-        const candidate = new Date(Date.UTC(year, month - 1, day, h, m, s, ms));
-        const parts = new Intl.DateTimeFormat("en-US", {
-          timeZone: targetTz,
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: false,
-        }).formatToParts(candidate);
-
-        const partMap: Record<string, string> = {};
-        parts.forEach((p) => { partMap[p.type] = p.value; });
-
-        let localH = Number(partMap.hour);
-        if (localH === 24) localH = 0;
-
-        const localZoned = new Date(
-          Date.UTC(
-            Number(partMap.year),
-            Number(partMap.month) - 1,
-            Number(partMap.day),
-            localH,
-            Number(partMap.minute),
-            Number(partMap.second)
-          )
-        );
-
-        const diffMs = candidate.getTime() - localZoned.getTime();
-        return new Date(candidate.getTime() + diffMs);
-      };
-
       const dObj = new Date(year, month - 1, day);
       const formattedDate = dObj.toLocaleDateString("en-GB", {
         day: "numeric",
@@ -93,8 +94,8 @@ export async function GET(
       });
 
       return {
-        start: createZonedDate(0, 0, 0, 0),
-        end: createZonedDate(23, 59, 59, 999),
+        start: createCustomZonedDate(year, month, day, 0, 0, 0, 0),
+        end: createCustomZonedDate(year, month, day, 23, 59, 59, 999),
         formattedDate,
         year,
         month,
@@ -104,6 +105,7 @@ export async function GET(
 
     const { searchParams } = new URL(req.url);
     const period = searchParams.get("period") || "today";
+    const outletId = searchParams.get("outletId");
     const startDateParam = searchParams.get("startDate");
     const endDateParam = searchParams.get("endDate");
 
@@ -117,24 +119,32 @@ export async function GET(
     const yesterdayEnd = yesterdayBounds.end;
 
     // Start of current month in outlet's timezone
-    const monthStart = getZonedBounds(outletTimezone, 0).start;
-    monthStart.setUTCDate(1);
+    const monthStart = createCustomZonedDate(todayBounds.year, todayBounds.month, 1, 0, 0, 0, 0);
 
     let filterStart: Date = todayStart;
     let filterEnd: Date = todayEnd;
     let formattedTodayDate = `Today, ${todayBounds.formattedDate}`;
 
-    if (startDateParam && endDateParam) {
-      filterStart = new Date(startDateParam);
-      filterEnd = new Date(endDateParam);
-      if (isNaN(filterEnd.getTime())) {
-        filterEnd = todayEnd;
-      } else {
-        filterEnd.setHours(23, 59, 59, 999);
-      }
-      const sStr = filterStart.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-      const eStr = filterEnd.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-      formattedTodayDate = `${sStr} - ${eStr}`;
+    if (startDateParam) {
+      const [sy, sm, sd] = startDateParam.split("-").map(Number);
+      const [ey, em, ed] = (endDateParam || startDateParam).split("-").map(Number);
+
+      filterStart = createCustomZonedDate(sy, sm, sd, 0, 0, 0, 0);
+      filterEnd = createCustomZonedDate(ey, em, ed, 23, 59, 59, 999);
+
+      const sStr = new Intl.DateTimeFormat("en-GB", {
+        timeZone: outletTimezone,
+        day: "numeric",
+        month: "short",
+      }).format(filterStart);
+
+      const eStr = new Intl.DateTimeFormat("en-GB", {
+        timeZone: outletTimezone,
+        day: "numeric",
+        month: "short",
+      }).format(filterEnd);
+
+      formattedTodayDate = sStr === eStr ? sStr : `${sStr} - ${eStr}`;
     } else if (period === "yesterday") {
       filterStart = yesterdayStart;
       filterEnd = yesterdayEnd;
@@ -695,7 +705,7 @@ export async function GET(
       success: true,
       outletTimezone,
       outletCurrency,
-      formattedTodayDate: todayBounds.formattedDate,
+      formattedTodayDate,
       liveOps: {
         todaySales,
         yesterdaySales,

@@ -307,9 +307,9 @@ export default function AppleTenantDashboard() {
 
   // Tab switch: "operations" (Data-First Dashboard - Default) vs "modules" (Original Complete Modules Directory)
   const [activeTab, setActiveTab] = useState<"operations" | "modules">("operations");
-  const [salesPeriod, setSalesPeriod] = useState<"today" | "yesterday" | "week">("today");
+  const [salesPeriod, setSalesPeriod] = useState<"today" | "yesterday" | "week" | "month" | "custom">("today");
   const [topSellingRankBy, setTopSellingRankBy] = useState<"quantity" | "revenue">("quantity");
-  const [hoveredBarIdx, setHoveredBarIdx] = useState<number | null>(4); // Default to 6 PM peak bar
+  const [hoveredBarIdx, setHoveredBarIdx] = useState<number | null>(null); // Only show marker on hover
 
   const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
   const [customEndDate, setCustomEndDate] = useState<Date | null>(null);
@@ -544,8 +544,18 @@ export default function AppleTenantDashboard() {
 
       const statsQuery = new URLSearchParams();
       if (periodParam) statsQuery.set("period", periodParam);
-      if (sDate) statsQuery.set("startDate", sDate.toISOString().split("T")[0]);
-      if (eDate) statsQuery.set("endDate", eDate.toISOString().split("T")[0]);
+      if (sDate) {
+        const y = sDate.getFullYear();
+        const m = String(sDate.getMonth() + 1).padStart(2, "0");
+        const d = String(sDate.getDate()).padStart(2, "0");
+        statsQuery.set("startDate", `${y}-${m}-${d}`);
+      }
+      if (eDate) {
+        const y = eDate.getFullYear();
+        const m = String(eDate.getMonth() + 1).padStart(2, "0");
+        const d = String(eDate.getDate()).padStart(2, "0");
+        statsQuery.set("endDate", `${y}-${m}-${d}`);
+      }
 
       const [
         resBranding,
@@ -554,7 +564,6 @@ export default function AppleTenantDashboard() {
         resOutlets,
         resAlerts,
         resPayroll,
-        resPos,
         resAttendance,
         resFinance,
         resStats,
@@ -565,7 +574,6 @@ export default function AppleTenantDashboard() {
         fetch("/api/restaurant/outlets"),
         fetch("/api/restaurant/inventory/alerts").catch(() => null),
         fetch("/api/restaurant/payroll/runs").catch(() => null),
-        fetch("/api/restaurant/pos/orders?limit=100").catch(() => null),
         fetch("/api/restaurant/attendance/live-board").catch(() => null),
         fetch("/api/restaurant/finance/pnl").catch(() => null),
         fetch(`/api/restaurant/${subdomain}/dashboard/stats?${statsQuery.toString()}`).catch(() => null),
@@ -577,7 +585,6 @@ export default function AppleTenantDashboard() {
       const dataOutlets = resOutlets.ok ? await resOutlets.json() : null;
       const dataAlerts = resAlerts && resAlerts.ok ? await resAlerts.json() : null;
       const dataPayroll = resPayroll && resPayroll.ok ? await resPayroll.json() : null;
-      const dataPos = resPos && resPos.ok ? await resPos.json() : null;
       const dataAttendance = resAttendance && resAttendance.ok ? await resAttendance.json() : null;
       const dataFinance = resFinance && resFinance.ok ? await resFinance.json() : null;
       const dataStats = resStats && resStats.ok ? await resStats.json() : null;
@@ -649,34 +656,25 @@ export default function AppleTenantDashboard() {
           setRecentActivities(dataStats.recentActivities);
         }
       } else {
-        // Fallback live sync without any dummy numbers
-        if (dataPos?.orders) {
-          const ords = dataPos.orders;
-          const totalSales = ords.reduce((sum: number, o: any) => sum + Number(o.totalAmount || 0), 0);
-          const dineIn = ords.filter((o: any) => o.orderType === "DINE_IN").length;
-          const delivery = ords.filter((o: any) => o.orderType === "DELIVERY").length;
-          const takeaway = ords.filter((o: any) => o.orderType === "TAKEAWAY").length;
-          const completed = ords.filter((o: any) => o.status === "COMPLETED" || o.status === "SETTLED").length;
-          const inProg = ords.filter((o: any) => o.status === "PENDING" || o.status === "PREPARING").length;
-          const cancelled = ords.filter((o: any) => o.status === "CANCELLED").length;
-
-          setLiveOps((prev) => ({
-            ...prev,
-            todaySales: Math.round(totalSales),
-            totalOrders: ords.length,
-            avgOrderValue: ords.length > 0 ? Math.round(totalSales / ords.length) : 0,
-            channelBreakdown: {
-              dineIn: { count: dineIn, percentage: ords.length ? Math.round((dineIn / ords.length) * 1000) / 10 : 0, amount: Math.round(totalSales * (ords.length ? dineIn / ords.length : 0)) },
-              delivery: { count: delivery, percentage: ords.length ? Math.round((delivery / ords.length) * 1000) / 10 : 0, amount: Math.round(totalSales * (ords.length ? delivery / ords.length : 0)) },
-              takeaway: { count: takeaway, percentage: ords.length ? Math.round((takeaway / ords.length) * 1000) / 10 : 0, amount: Math.round(totalSales * (ords.length ? takeaway / ords.length : 0)) },
-            },
-            fulfillment: {
-              completed,
-              inProgress: inProg,
-              cancelled,
-            },
-          }));
-        }
+        // Zero out liveOps when stats has no data or fails
+        setLiveOps((prev) => ({
+          ...prev,
+          todaySales: 0,
+          totalOrders: 0,
+          avgOrderValue: 0,
+          channelBreakdown: {
+            dineIn: { count: 0, percentage: 0, amount: 0 },
+            delivery: { count: 0, percentage: 0, amount: 0 },
+            takeaway: { count: 0, percentage: 0, amount: 0 },
+          },
+          fulfillment: {
+            completed: 0,
+            inProgress: 0,
+            cancelled: 0,
+          },
+        }));
+        setHourlyBars([]);
+      }
 
         if (dataAttendance?.counts) {
           const attCounts = dataAttendance.counts;
@@ -701,7 +699,6 @@ export default function AppleTenantDashboard() {
             profitMargin: rev > 0 ? Math.round((gross / rev) * 1000) / 10 : 0,
           }));
         }
-      }
     } catch {
       setError("Network error loading dashboard");
     } finally {
@@ -889,24 +886,10 @@ export default function AppleTenantDashboard() {
 
           {/* Right Global Selectors & Action Buttons (Clean flex, zero overflow scroll!) */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Branch Selector: Visible on sm+ */}
-            <div
-              onClick={() => router.push(p("/settings/branches"))}
-              className={`hidden sm:flex px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-semibold items-center gap-1.5 cursor-pointer whitespace-nowrap hover:bg-slate-100 dark:hover:bg-white/[0.08] transition ${
-                isDark
-                  ? "bg-white/[0.04] border-white/[0.08] text-slate-200"
-                  : "bg-slate-50 border-slate-200 text-slate-700"
-              }`}
-            >
-              <Store className="w-3.5 h-3.5 opacity-60" />
-              <span>All Branches ({metrics.totalOutlets})</span>
-              <ChevronDown className="w-3 h-3 opacity-60" />
-            </div>
-
-            {/* Date Selector: Visible on md+ */}
+            {/* Date Selector */}
             <div
               onClick={() => setIsDateModalOpen(true)}
-              className={`hidden md:flex px-3 py-1.5 rounded-xl border text-xs font-semibold items-center gap-1.5 cursor-pointer whitespace-nowrap hover:bg-slate-100 dark:hover:bg-white/[0.08] transition ${
+              className={`flex px-3 py-1.5 rounded-xl border text-xs font-semibold items-center gap-1.5 cursor-pointer whitespace-nowrap hover:bg-slate-100 dark:hover:bg-white/[0.08] transition ${
                 isDark
                   ? "bg-white/[0.04] border-white/[0.08] text-slate-200"
                   : "bg-slate-50 border-slate-200 text-slate-700"
@@ -915,54 +898,6 @@ export default function AppleTenantDashboard() {
               <Calendar className="w-3.5 h-3.5 opacity-60" />
               <span>{formattedTodayDate || "Today"}</span>
               <ChevronDown className="w-3 h-3 opacity-60" />
-            </div>
-
-            {/* Notifications Bell */}
-            <div
-              onClick={() => router.push(p("/operations"))}
-              className={`w-8 h-8 rounded-xl border flex items-center justify-center relative cursor-pointer hover:bg-slate-100 dark:hover:bg-white/[0.08] transition ${
-                isDark ? "bg-white/[0.04] border-white/[0.08]" : "bg-slate-50 border-slate-200"
-              }`}
-            >
-              <Bell className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-              <span
-                className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-bold text-white flex items-center justify-center"
-                style={{ backgroundColor: brandColor }}
-              >
-                1
-              </span>
-            </div>
-
-            {/* User Profile Avatar */}
-            <div
-              onClick={() => router.push(p("/settings/profile"))}
-              className={`px-2 sm:px-2.5 py-1 rounded-xl border flex items-center gap-1.5 cursor-pointer ${
-                isDark ? "bg-white/[0.04] border-white/[0.08]" : "bg-slate-50 border-slate-200"
-              }`}
-            >
-              <div
-                className="w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center"
-                style={{ backgroundColor: brandColor }}
-              >
-                MD
-              </div>
-              <ChevronDown className="hidden sm:inline w-3 h-3 opacity-60" />
-            </div>
-
-            {/* User Profile Avatar */}
-            <div
-              onClick={() => router.push(p("/settings/profile"))}
-              className={`px-2 sm:px-2.5 py-1 rounded-xl border flex items-center gap-1.5 cursor-pointer ${
-                isDark ? "bg-white/[0.04] border-white/[0.08]" : "bg-slate-50 border-slate-200"
-              }`}
-            >
-              <div
-                className="w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center"
-                style={{ backgroundColor: brandColor }}
-              >
-                MD
-              </div>
-              <ChevronDown className="hidden sm:inline w-3 h-3 opacity-60" />
             </div>
 
             {/* Modules Hub Switcher / Mode Switcher */}
@@ -1030,7 +965,15 @@ export default function AppleTenantDashboard() {
                   </div>
                   <div className="mt-3">
                     <span className="text-[11px] font-semibold text-slate-500 dark:text-[#8F95A3] block">
-                      Today&apos;s Sales
+                      {salesPeriod === "yesterday"
+                        ? "Yesterday's Sales"
+                        : salesPeriod === "week"
+                        ? "This Week's Sales"
+                        : salesPeriod === "month"
+                        ? "This Month's Sales"
+                        : salesPeriod === "custom"
+                        ? "Period Sales"
+                        : "Today's Sales"}
                     </span>
                     <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-0.5">
                       {currencySymbol}{liveOps.todaySales.toLocaleString()}
@@ -1225,7 +1168,10 @@ export default function AppleTenantDashboard() {
                     </div>
 
                     {/* Bar Chart with Y-axis markers and interactive bars */}
-                    <div className="relative pt-6 pb-2">
+                    <div
+                      className="relative pt-6 pb-2"
+                      onMouseLeave={() => setHoveredBarIdx(null)}
+                    >
                       {/* Interactive Tooltip Card for hovered Bar */}
                       {hoveredBarIdx !== null && hourlyBars[hoveredBarIdx] && (
                         <div
@@ -1256,6 +1202,7 @@ export default function AppleTenantDashboard() {
                               key={idx}
                               className="flex-1 flex flex-col items-center h-full justify-end cursor-pointer group"
                               onMouseEnter={() => setHoveredBarIdx(idx)}
+                              onMouseLeave={() => setHoveredBarIdx(null)}
                             >
                               <div
                                 className="w-full max-w-[18px] rounded-t-md transition-all duration-200"
@@ -2221,18 +2168,31 @@ export default function AppleTenantDashboard() {
                       onClick={() => {
                         if (calendarTab === "day") {
                           setSalesPeriod("today");
+                          setCustomStartDate(null);
+                          setCustomEndDate(null);
                           fetchData("today", null, null);
                         } else if (calendarTab === "yesterday") {
-                          setSalesPeriod("yesterday" as any);
+                          setSalesPeriod("yesterday");
+                          setCustomStartDate(null);
+                          setCustomEndDate(null);
                           fetchData("yesterday", null, null);
                         } else if (calendarTab === "week") {
                           setSalesPeriod("week");
+                          setCustomStartDate(null);
+                          setCustomEndDate(null);
                           fetchData("week", null, null);
                         } else if (calendarTab === "month") {
-                          setSalesPeriod("month" as any);
+                          setSalesPeriod("month");
+                          setCustomStartDate(null);
+                          setCustomEndDate(null);
                           fetchData("month", null, null);
                         } else {
-                          fetchData("custom", customStartDate, customEndDate);
+                          const s = customStartDate || new Date();
+                          const e = customEndDate || customStartDate || new Date();
+                          setSalesPeriod("custom");
+                          setCustomStartDate(s);
+                          setCustomEndDate(e);
+                          fetchData("custom", s, e);
                         }
                         setIsDateModalOpen(false);
                       }}
