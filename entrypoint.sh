@@ -2,9 +2,9 @@
 set -e
 
 echo "----------------------------------------"
-echo "🗄️ Running Prisma Database Migrations..."
+echo "🗄️ Synchronizing Prisma Database Schema..."
 echo "----------------------------------------"
-npx prisma migrate deploy
+npx prisma db push --accept-data-loss
 
 echo "----------------------------------------"
 echo "🌱 Seeding Initial System Data..."
