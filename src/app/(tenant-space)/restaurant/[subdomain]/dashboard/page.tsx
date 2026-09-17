@@ -493,7 +493,9 @@ export default function AppleTenantDashboard() {
 
   const [criticalInventoryList, setCriticalInventoryList] = useState<Array<{ name: string; qty: string; status: string; dotColor: string }>>([]);
 
-  const [topSellingDishes, setTopSellingDishes] = useState<Array<{ id: number; name: string; qty: number; revenue: number; icon: string }>>([]);
+  const [topSellingDishes, setTopSellingDishes] = useState<Array<any>>([]);
+  const [topByRevenueDishes, setTopByRevenueDishes] = useState<Array<any>>([]);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
 
   const [todayShiftsData, setTodayShiftsData] = useState({
     openPositions: 0,
@@ -636,6 +638,12 @@ export default function AppleTenantDashboard() {
         }
         if (dataStats.topSellingDishes) {
           setTopSellingDishes(dataStats.topSellingDishes);
+        }
+        if (dataStats.topByRevenueDishes) {
+          setTopByRevenueDishes(dataStats.topByRevenueDishes);
+        }
+        if (dataStats.lastSyncAt) {
+          setLastSyncAt(dataStats.lastSyncAt);
         }
         if (dataStats.recentActivities && dataStats.recentActivities.length > 0) {
           setRecentActivities(dataStats.recentActivities);
@@ -1711,9 +1719,9 @@ export default function AppleTenantDashboard() {
                       <div>
                         <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
                           <span>Top Selling Items</span>
-                          {dataStats?.lastSyncAt && (
+                          {lastSyncAt && (
                             <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                              Synced {new Date(dataStats.lastSyncAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              Synced {new Date(lastSyncAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                             </span>
                           )}
                         </h3>
@@ -1743,7 +1751,10 @@ export default function AppleTenantDashboard() {
                       </div>
                     </div>
 
-                    {((topSellingRankBy === "quantity" ? dataStats?.topSellingDishes : dataStats?.topByRevenueDishes) || topSellingDishes).length === 0 ? (
+                    {(topSellingRankBy === "quantity"
+                      ? topSellingDishes
+                      : (topByRevenueDishes.length > 0 ? topByRevenueDishes : topSellingDishes)
+                    ).length === 0 ? (
                       <div className="py-8 text-center text-slate-400 text-xs">
                         No menu item sales recorded for the selected period. Orders will populate top sellers automatically.
                       </div>
@@ -1759,9 +1770,9 @@ export default function AppleTenantDashboard() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-white/[0.06]">
-                            {((topSellingRankBy === "quantity"
-                              ? (dataStats?.topSellingDishes || [])
-                              : (dataStats?.topByRevenueDishes || dataStats?.topSellingDishes || []))
+                            {(topSellingRankBy === "quantity"
+                              ? topSellingDishes
+                              : (topByRevenueDishes.length > 0 ? topByRevenueDishes : topSellingDishes)
                             ).slice(0, 10).map((dish: any, idx: number) => (
                               <tr key={dish.id || idx} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors">
                                 <td className="py-2.5 pl-1">
