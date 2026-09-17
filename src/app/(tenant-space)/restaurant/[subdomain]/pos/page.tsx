@@ -63,7 +63,7 @@ interface PosOrder {
   providerOrderId: string | null;
   providerLocationId: string | null;
   outletId: string;
-  outlet: { id: string; name: string; currency: string };
+  outlet: { id: string; name: string; currency: string; timezone?: string };
   orderType: string;
   status: string;
   totalAmount: number;
@@ -84,6 +84,7 @@ interface Outlet {
   id: string;
   name: string;
   currency: string;
+  timezone?: string;
 }
 
 interface DashboardMetrics {
@@ -234,6 +235,54 @@ export default function PosHubPage({
       month: "short",
       year: "numeric",
     });
+  };
+
+  const formatOrderDate = (dateStr: string, timezone?: string) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    const tz = timezone || outlets.find((o) => o.id === selectedOutlet)?.timezone || outlets[0]?.timezone || "UTC";
+    try {
+      return d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        timeZone: tz,
+      });
+    } catch {
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    }
+  };
+
+  const formatOrderTime = (dateStr: string, timezone?: string) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    const tz = timezone || outlets.find((o) => o.id === selectedOutlet)?.timezone || outlets[0]?.timezone || "UTC";
+    try {
+      return d.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: tz,
+      });
+    } catch {
+      return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    }
+  };
+
+  const formatOrderDateTime = (dateStr: string, timezone?: string) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    const tz = timezone || outlets.find((o) => o.id === selectedOutlet)?.timezone || outlets[0]?.timezone || "UTC";
+    try {
+      return d.toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: tz,
+      });
+    } catch {
+      return d.toLocaleString();
+    }
   };
 
   const isSameDay = (d1: Date | null, d2: Date | null) => {
@@ -1187,8 +1236,8 @@ export default function PosHubPage({
                                     <span className="font-medium text-slate-600 dark:text-slate-300">{order.outlet?.name}</span>
                                   </div>
                                   <div className="text-[11px] text-slate-400 whitespace-nowrap">
-                                    {new Date(order.createdAt).toLocaleDateString([], { month: "short", day: "numeric" })},{" "}
-                                    {new Date(order.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                    {formatOrderDate(order.createdAt, order.outlet?.timezone)},{" "}
+                                    {formatOrderTime(order.createdAt, order.outlet?.timezone)}
                                   </div>
                                 </div>
 
@@ -1297,15 +1346,9 @@ export default function PosHubPage({
                                     </td>
 
                                     <td className="px-4 py-3.5 text-slate-500 whitespace-nowrap">
-                                      {new Date(order.createdAt).toLocaleDateString([], {
-                                        month: "short",
-                                        day: "numeric",
-                                      })}{" "}
+                                      {formatOrderDate(order.createdAt, order.outlet?.timezone)}{" "}
                                       •{" "}
-                                      {new Date(order.createdAt).toLocaleTimeString([], {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                      })}
+                                      {formatOrderTime(order.createdAt, order.outlet?.timezone)}
                                     </td>
 
                                     <td className="px-4 py-3.5 text-slate-600 dark:text-slate-300">
@@ -1583,7 +1626,7 @@ export default function PosHubPage({
                         {selectedOrderDetails.outlet?.name}
                       </p>
                       <p className="text-slate-500 text-[11px]">
-                        {new Date(selectedOrderDetails.createdAt).toLocaleString()}
+                        {formatOrderDateTime(selectedOrderDetails.createdAt, selectedOrderDetails.outlet?.timezone)}
                       </p>
                     </div>
                   </div>

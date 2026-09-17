@@ -436,7 +436,7 @@ export async function getUnifiedOrdersDashboard(restaurantId: string, filters: D
     prisma.posOrder.findMany({
       where,
       include: {
-        outlet: { select: { id: true, name: true, currency: true } },
+        outlet: { select: { id: true, name: true, currency: true, timezone: true } },
         items: true,
       },
       orderBy: { createdAt: "desc" },

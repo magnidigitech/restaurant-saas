@@ -102,6 +102,11 @@ export async function GET(
       };
     };
 
+    const { searchParams } = new URL(req.url);
+    const period = searchParams.get("period") || "today";
+    const startDateParam = searchParams.get("startDate");
+    const endDateParam = searchParams.get("endDate");
+
     const todayBounds = getZonedBounds(outletTimezone, 0);
     const yesterdayBounds = getZonedBounds(outletTimezone, -1);
 
@@ -114,6 +119,39 @@ export async function GET(
     // Start of current month in outlet's timezone
     const monthStart = getZonedBounds(outletTimezone, 0).start;
     monthStart.setUTCDate(1);
+
+    let filterStart: Date = todayStart;
+    let filterEnd: Date = todayEnd;
+    let formattedTodayDate = todayBounds.formattedDate;
+
+    if (startDateParam && endDateParam) {
+      filterStart = new Date(startDateParam);
+      filterEnd = new Date(endDateParam);
+      if (isNaN(filterEnd.getTime())) {
+        filterEnd = todayEnd;
+      } else {
+        filterEnd.setHours(23, 59, 59, 999);
+      }
+      const sStr = filterStart.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+      const eStr = filterEnd.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+      formattedTodayDate = `${sStr} - ${eStr}`;
+    } else if (period === "yesterday") {
+      filterStart = yesterdayStart;
+      filterEnd = yesterdayEnd;
+      formattedTodayDate = `Yesterday, ${yesterdayBounds.formattedDate}`;
+    } else if (period === "week") {
+      filterStart = getZonedBounds(outletTimezone, -6).start;
+      filterEnd = todayEnd;
+      formattedTodayDate = `This Week (${getZonedBounds(outletTimezone, -6).formattedDate} - ${todayBounds.formattedDate})`;
+    } else if (period === "month") {
+      filterStart = monthStart;
+      filterEnd = todayEnd;
+      formattedTodayDate = `This Month (${todayBounds.formattedDate})`;
+    } else {
+      filterStart = todayStart;
+      filterEnd = todayEnd;
+      formattedTodayDate = todayBounds.formattedDate;
+    }
 
     // Parallel Database Queries for maximum speed
     const [
@@ -132,11 +170,11 @@ export async function GET(
       pendingSwaps,
       pendingOnboardings,
     ] = await Promise.all([
-      // 1. Today POS Orders
+      // 1. Filtered POS Orders
       prisma.posOrder.findMany({
         where: {
           restaurantId,
-          createdAt: { gte: todayStart, lte: todayEnd },
+          createdAt: { gte: filterStart, lte: filterEnd },
         },
         select: {
           id: true,
@@ -147,7 +185,7 @@ export async function GET(
         },
       }),
 
-      // 2. Yesterday POS Orders
+      // 2. Yesterday POS Orders (for comparison)
       prisma.posOrder.findMany({
         where: {
           restaurantId,
@@ -156,12 +194,12 @@ export async function GET(
         select: { totalAmount: true },
       }),
 
-      // 3. Today Revenue Transactions (Financial Ledger)
+      // 3. Filtered Revenue Transactions
       prisma.financialTransaction.findMany({
         where: {
           restaurantId,
           type: "REVENUE",
-          transactionDate: { gte: todayStart, lte: todayEnd },
+          transactionDate: { gte: filterStart, lte: filterEnd },
         },
         select: { amount: true },
       }),

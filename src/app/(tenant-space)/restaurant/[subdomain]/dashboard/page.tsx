@@ -42,6 +42,7 @@ import {
   Check,
   ChevronRight,
   ChevronDown,
+  ChevronLeft,
   RefreshCw,
   Bell,
   Flame,
@@ -309,6 +310,98 @@ export default function AppleTenantDashboard() {
   const [salesPeriod, setSalesPeriod] = useState<"today" | "yesterday" | "week">("today");
   const [hoveredBarIdx, setHoveredBarIdx] = useState<number | null>(4); // Default to 6 PM peak bar
 
+  const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
+  const [customEndDate, setCustomEndDate] = useState<Date | null>(null);
+  const [isDateModalOpen, setIsDateModalOpen] = useState<boolean>(false);
+  const [calendarTab, setCalendarTab] = useState<"day" | "week" | "month" | "year" | "custom">("day");
+  const [pickingTarget, setPickingTarget] = useState<"start" | "end">("start");
+  const [calendarViewMonth, setCalendarViewMonth] = useState<number>(new Date().getMonth());
+  const [calendarViewYear, setCalendarViewYear] = useState<number>(new Date().getFullYear());
+
+  const MONTH_NAMES = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const formatDateDisplay = (date: Date | null, fallback: string) => {
+    if (!date) return fallback;
+    return date.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const isSameDay = (d1: Date | null, d2: Date | null) => {
+    if (!d1 || !d2) return false;
+    return (
+      d1.getFullYear() === d2.getFullYear() &&
+      d1.getMonth() === d2.getMonth() &&
+      d1.getDate() === d2.getDate()
+    );
+  };
+
+  const isDateInRange = (date: Date, start: Date | null, end: Date | null) => {
+    if (!start || !end) return false;
+    const t = date.getTime();
+    const s = new Date(start).setHours(0, 0, 0, 0);
+    const e = new Date(end).setHours(23, 59, 59, 999);
+    return t >= s && t <= e;
+  };
+
+  const getCalendarGridDays = (year: number, month: number) => {
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const daysInCurrentMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    const daysList: Array<{
+      day: number;
+      month: number;
+      year: number;
+      isCurrentMonth: boolean;
+      dateObj: Date;
+    }> = [];
+
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const prevM = month === 0 ? 11 : month - 1;
+      const prevY = month === 0 ? year - 1 : year;
+      const dNum = daysInPrevMonth - i;
+      daysList.push({
+        day: dNum,
+        month: prevM,
+        year: prevY,
+        isCurrentMonth: false,
+        dateObj: new Date(prevY, prevM, dNum),
+      });
+    }
+
+    for (let d = 1; d <= daysInCurrentMonth; d++) {
+      daysList.push({
+        day: d,
+        month,
+        year,
+        isCurrentMonth: true,
+        dateObj: new Date(year, month, d),
+      });
+    }
+
+    const targetLength = daysList.length > 35 ? 42 : 35;
+    const remainingCells = targetLength - daysList.length;
+    for (let d = 1; d <= remainingCells; d++) {
+      const nextM = month === 11 ? 0 : month + 1;
+      const nextY = month === 11 ? year + 1 : year;
+      daysList.push({
+        day: d,
+        month: nextM,
+        year: nextY,
+        isCurrentMonth: false,
+        dateObj: new Date(nextY, nextM, d),
+      });
+    }
+
+    return daysList;
+  };
+
   const [outletCurrency, setOutletCurrency] = useState<string>("USD");
   const [formattedTodayDate, setFormattedTodayDate] = useState<string>("");
 
@@ -436,8 +529,21 @@ export default function AppleTenantDashboard() {
 
   const p = (path: string) => (isSubdomain ? path : `/restaurant/${subdomain}${path}`);
 
-  const fetchData = async () => {
+  const fetchData = async (
+    periodOverride?: string,
+    startDateOverride?: Date | null,
+    endDateOverride?: Date | null
+  ) => {
     try {
+      const periodParam = periodOverride !== undefined ? periodOverride : salesPeriod;
+      const sDate = startDateOverride !== undefined ? startDateOverride : customStartDate;
+      const eDate = endDateOverride !== undefined ? endDateOverride : customEndDate;
+
+      const statsQuery = new URLSearchParams();
+      if (periodParam) statsQuery.set("period", periodParam);
+      if (sDate) statsQuery.set("startDate", sDate.toISOString().split("T")[0]);
+      if (eDate) statsQuery.set("endDate", eDate.toISOString().split("T")[0]);
+
       const [
         resBranding,
         resModules,
@@ -459,7 +565,7 @@ export default function AppleTenantDashboard() {
         fetch("/api/restaurant/pos/orders?limit=100").catch(() => null),
         fetch("/api/restaurant/attendance/live-board").catch(() => null),
         fetch("/api/restaurant/finance/pnl").catch(() => null),
-        fetch(`/api/restaurant/${subdomain}/dashboard/stats`).catch(() => null),
+        fetch(`/api/restaurant/${subdomain}/dashboard/stats?${statsQuery.toString()}`).catch(() => null),
       ]);
 
       const dataBranding = await resBranding.json();
@@ -776,7 +882,8 @@ export default function AppleTenantDashboard() {
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Branch Selector: Visible on sm+ */}
             <div
-              className={`hidden sm:flex px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-semibold items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              onClick={() => router.push(p("/settings/branches"))}
+              className={`hidden sm:flex px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-semibold items-center gap-1.5 cursor-pointer whitespace-nowrap hover:bg-slate-100 dark:hover:bg-white/[0.08] transition ${
                 isDark
                   ? "bg-white/[0.04] border-white/[0.08] text-slate-200"
                   : "bg-slate-50 border-slate-200 text-slate-700"
@@ -789,20 +896,22 @@ export default function AppleTenantDashboard() {
 
             {/* Date Selector: Visible on md+ */}
             <div
-              className={`hidden md:flex px-3 py-1.5 rounded-xl border text-xs font-semibold items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+              onClick={() => setIsDateModalOpen(true)}
+              className={`hidden md:flex px-3 py-1.5 rounded-xl border text-xs font-semibold items-center gap-1.5 cursor-pointer whitespace-nowrap hover:bg-slate-100 dark:hover:bg-white/[0.08] transition ${
                 isDark
                   ? "bg-white/[0.04] border-white/[0.08] text-slate-200"
                   : "bg-slate-50 border-slate-200 text-slate-700"
               }`}
             >
               <Calendar className="w-3.5 h-3.5 opacity-60" />
-              <span>Today, {formattedTodayDate || new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>
+              <span>{formattedTodayDate ? (formattedTodayDate.startsWith("Today") || formattedTodayDate.startsWith("Yesterday") || formattedTodayDate.startsWith("This") ? formattedTodayDate : `Today, ${formattedTodayDate}`) : `Today, ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}</span>
               <ChevronDown className="w-3 h-3 opacity-60" />
             </div>
 
             {/* Notifications Bell */}
             <div
-              className={`w-8 h-8 rounded-xl border flex items-center justify-center relative cursor-pointer ${
+              onClick={() => router.push(p("/operations"))}
+              className={`w-8 h-8 rounded-xl border flex items-center justify-center relative cursor-pointer hover:bg-slate-100 dark:hover:bg-white/[0.08] transition ${
                 isDark ? "bg-white/[0.04] border-white/[0.08]" : "bg-slate-50 border-slate-200"
               }`}
             >
@@ -1140,7 +1249,12 @@ export default function AppleTenantDashboard() {
                             <button
                               key={period}
                               type="button"
-                              onClick={() => setSalesPeriod(period)}
+                              onClick={() => {
+                                setSalesPeriod(period);
+                                setCustomStartDate(null);
+                                setCustomEndDate(null);
+                                fetchData(period, null, null);
+                              }}
                               className={`px-3 py-1 rounded-lg capitalize transition cursor-pointer text-xs ${
                                 salesPeriod === period
                                   ? "text-white shadow-xs font-bold"
@@ -1153,8 +1267,11 @@ export default function AppleTenantDashboard() {
                           ))}
                         </div>
 
-                        <div className="px-2.5 py-1 rounded-xl border text-xs font-semibold flex items-center gap-1 cursor-pointer border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300">
-                          <span>Sales</span>
+                        <div
+                          onClick={() => setIsDateModalOpen(true)}
+                          className="px-2.5 py-1 rounded-xl border text-xs font-semibold flex items-center gap-1 cursor-pointer border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition"
+                        >
+                          <span>Sales Date</span>
                           <ChevronDown className="w-3 h-3 opacity-60" />
                         </div>
                       </div>
@@ -1886,6 +2003,236 @@ export default function AppleTenantDashboard() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+          {/* Calendar Style Date Range Filter Modal (Matching POS) */}
+          {isDateModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[92vh]">
+                {/* Modal Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                      Filter Dashboard Date
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setIsDateModalOpen(false)}
+                    className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto space-y-5">
+                  {/* Presets Tab Bar */}
+                  <div className="p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl flex items-center gap-1 text-xs font-semibold">
+                    {[
+                      { id: "day", label: "Today" },
+                      { id: "week", label: "Week" },
+                      { id: "month", label: "Month" },
+                      { id: "custom", label: "Custom" },
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => {
+                          setCalendarTab(tab.id as any);
+                          if (tab.id === "day") {
+                            setSalesPeriod("today");
+                            setCustomStartDate(null);
+                            setCustomEndDate(null);
+                            fetchData("today", null, null);
+                            setIsDateModalOpen(false);
+                          } else if (tab.id === "week") {
+                            setSalesPeriod("week");
+                            setCustomStartDate(null);
+                            setCustomEndDate(null);
+                            fetchData("week", null, null);
+                            setIsDateModalOpen(false);
+                          } else if (tab.id === "month") {
+                            setSalesPeriod("month" as any);
+                            setCustomStartDate(null);
+                            setCustomEndDate(null);
+                            fetchData("month", null, null);
+                            setIsDateModalOpen(false);
+                          }
+                        }}
+                        className={`flex-1 py-2 px-2.5 rounded-xl transition-all text-center ${
+                          calendarTab === tab.id
+                            ? "bg-amber-600 text-white shadow-md font-bold"
+                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Custom Start & End Date Input Boxes */}
+                  {calendarTab === "custom" && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setPickingTarget("start")}
+                        className={`p-3 rounded-2xl border text-left transition-all ${
+                          pickingTarget === "start"
+                            ? "border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200"
+                            : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300"
+                        }`}
+                      >
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                          Start Date
+                        </span>
+                        <span className="text-xs font-bold block truncate">
+                          {formatDateDisplay(customStartDate, "Select Start Date")}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setPickingTarget("end")}
+                        className={`p-3 rounded-2xl border text-left transition-all ${
+                          pickingTarget === "end"
+                            ? "border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200"
+                            : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300"
+                        }`}
+                      >
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                          End Date
+                        </span>
+                        <span className="text-xs font-bold block truncate">
+                          {formatDateDisplay(customEndDate, "Select End Date")}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Month & Year Navigation Header */}
+                  {calendarTab === "custom" && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between px-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (calendarViewMonth === 0) {
+                              setCalendarViewMonth(11);
+                              setCalendarViewYear(calendarViewYear - 1);
+                            } else {
+                              setCalendarViewMonth(calendarViewMonth - 1);
+                            }
+                          }}
+                          className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">
+                          {MONTH_NAMES[calendarViewMonth]} {calendarViewYear}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (calendarViewMonth === 11) {
+                              setCalendarViewMonth(0);
+                              setCalendarViewYear(calendarViewYear + 1);
+                            } else {
+                              setCalendarViewMonth(calendarViewMonth + 1);
+                            }
+                          }}
+                          className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* Days of Week Header */}
+                      <div className="grid grid-cols-7 text-center text-xs font-semibold text-slate-400 dark:text-slate-500">
+                        {["S", "M", "T", "W", "T", "F", "S"].map((dayStr, idx) => (
+                          <div key={idx} className="py-1">
+                            {dayStr}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Interactive Calendar Days Grid */}
+                      <div className="grid grid-cols-7 gap-1 text-center">
+                        {getCalendarGridDays(calendarViewYear, calendarViewMonth).map((cell, idx) => {
+                          const isStart = isSameDay(cell.dateObj, customStartDate);
+                          const isEnd = isSameDay(cell.dateObj, customEndDate);
+                          const isInRange = isDateInRange(cell.dateObj, customStartDate, customEndDate);
+                          const isSelected = isStart || isEnd;
+
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                if (pickingTarget === "start") {
+                                  setCustomStartDate(cell.dateObj);
+                                  if (customEndDate && cell.dateObj > customEndDate) {
+                                    setCustomEndDate(null);
+                                  }
+                                  setPickingTarget("end");
+                                } else {
+                                  if (customStartDate && cell.dateObj < customStartDate) {
+                                    setCustomStartDate(cell.dateObj);
+                                    setCustomEndDate(null);
+                                    setPickingTarget("end");
+                                  } else {
+                                    setCustomEndDate(cell.dateObj);
+                                  }
+                                }
+                              }}
+                              className={`py-2 text-xs font-semibold rounded-xl transition-all ${
+                                !cell.isCurrentMonth
+                                  ? "text-slate-300 dark:text-slate-700 opacity-40"
+                                  : isSelected
+                                  ? "bg-amber-600 text-white font-bold shadow-md shadow-amber-600/20"
+                                  : isInRange
+                                  ? "bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200"
+                                  : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                              }`}
+                            >
+                              {cell.day}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Apply & Reset Controls */}
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomStartDate(null);
+                        setCustomEndDate(null);
+                        setSalesPeriod("today");
+                        fetchData("today", null, null);
+                        setIsDateModalOpen(false);
+                      }}
+                      className="flex-1 py-2.5 px-4 text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      Reset Filter
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        fetchData("custom", customStartDate, customEndDate);
+                        setIsDateModalOpen(false);
+                      }}
+                      className="flex-1 py-2.5 px-4 text-xs font-bold text-white rounded-xl shadow-md transition-colors cursor-pointer"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      Apply Filter
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </main>
