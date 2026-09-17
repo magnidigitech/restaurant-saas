@@ -309,6 +309,21 @@ export default function AppleTenantDashboard() {
   const [salesPeriod, setSalesPeriod] = useState<"today" | "yesterday" | "week">("today");
   const [hoveredBarIdx, setHoveredBarIdx] = useState<number | null>(4); // Default to 6 PM peak bar
 
+  const [outletCurrency, setOutletCurrency] = useState<string>("USD");
+  const [formattedTodayDate, setFormattedTodayDate] = useState<string>("");
+
+  const currencySymbol = useMemo(() => {
+    if (!outletCurrency) return "$";
+    const code = outletCurrency.toUpperCase();
+    if (code === "INR") return "₹";
+    if (code === "CAD" || code === "USD" || code === "AUD" || code === "NZD") return "$";
+    if (code === "EUR") return "€";
+    if (code === "GBP") return "£";
+    if (code === "AED") return "د.إ";
+    if (code === "SAR" || code === "QAR" || code === "OMR") return "﷼";
+    return "$";
+  }, [outletCurrency]);
+
   const [modules, setModules] = useState<Module[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [branding, setBranding] = useState<Branding | null>(null);
@@ -483,6 +498,16 @@ export default function AppleTenantDashboard() {
         latestPayrollNet: latestRun ? Number(latestRun.totalNet) : null,
         pendingSwaps: 0,
       });
+
+      if (dataStats?.outletCurrency) {
+        setOutletCurrency(dataStats.outletCurrency);
+      } else if (dataOutlets?.outlets?.[0]?.currency) {
+        setOutletCurrency(dataOutlets.outlets[0].currency);
+      }
+
+      if (dataStats?.formattedTodayDate) {
+        setFormattedTodayDate(dataStats.formattedTodayDate);
+      }
 
       // Synchronize aggregated live stats if API route returned success
       if (dataStats?.success && dataStats?.liveOps) {
@@ -771,7 +796,7 @@ export default function AppleTenantDashboard() {
               }`}
             >
               <Calendar className="w-3.5 h-3.5 opacity-60" />
-              <span>Today, 11 Sep</span>
+              <span>Today, {formattedTodayDate || new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>
               <ChevronDown className="w-3 h-3 opacity-60" />
             </div>
 
@@ -919,7 +944,7 @@ export default function AppleTenantDashboard() {
                       Today&apos;s Sales
                     </span>
                     <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-0.5">
-                      ₹{liveOps.todaySales.toLocaleString()}
+                      {currencySymbol}{liveOps.todaySales.toLocaleString()}
                     </div>
                     <div className="text-[11px] font-bold text-emerald-500 flex items-center gap-0.5 mt-1">
                       <span>↑ +12.8%</span>
@@ -985,7 +1010,7 @@ export default function AppleTenantDashboard() {
                       Avg. Order Value
                     </span>
                     <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-0.5">
-                      ₹{liveOps.avgOrderValue}
+                      {currencySymbol}{liveOps.avgOrderValue}
                     </div>
                     <div className="text-[11px] font-bold text-emerald-500 flex items-center gap-0.5 mt-1">
                       <span>↑ +3.1%</span>
@@ -1018,7 +1043,7 @@ export default function AppleTenantDashboard() {
                       Gross Profit
                     </span>
                     <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-0.5">
-                      ₹{liveOps.grossProfit.toLocaleString()}
+                      {currencySymbol}{liveOps.grossProfit.toLocaleString()}
                     </div>
                     <div className="text-[11px] font-bold text-emerald-500 flex items-center gap-0.5 mt-1">
                       <span>↑ +14.4%</span>
@@ -1149,7 +1174,7 @@ export default function AppleTenantDashboard() {
                             {hourlyBars[hoveredBarIdx].time || "Peak"}
                           </div>
                           <div className="font-extrabold text-xs">
-                            ₹{hourlyBars[hoveredBarIdx].sales.toLocaleString()}
+                            {currencySymbol}{hourlyBars[hoveredBarIdx].sales.toLocaleString()}
                           </div>
                           <div className="opacity-70 text-[9px]">
                             {hourlyBars[hoveredBarIdx].orders} orders
@@ -1498,15 +1523,15 @@ export default function AppleTenantDashboard() {
                     <div className="space-y-1.5 text-xs">
                       <div className="flex justify-between items-center py-0.5">
                         <span className="text-slate-500 dark:text-[#8F95A3]">Revenue</span>
-                        <span className="font-bold text-slate-900 dark:text-white">₹{liveOps.todaySales.toLocaleString()}</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{currencySymbol}{liveOps.todaySales.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between items-center py-0.5">
                         <span className="text-slate-500 dark:text-[#8F95A3]">Operating Expenses</span>
-                        <span className="font-bold text-slate-900 dark:text-white">₹{(Math.max(0, liveOps.todaySales - liveOps.grossProfit)).toLocaleString()}</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{currencySymbol}{(Math.max(0, liveOps.todaySales - liveOps.grossProfit)).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between items-center py-0.5">
                         <span className="text-slate-500 dark:text-[#8F95A3]">Gross Profit</span>
-                        <span className="font-bold text-emerald-500">₹{liveOps.grossProfit.toLocaleString()}</span>
+                        <span className="font-bold text-emerald-500">{currencySymbol}{liveOps.grossProfit.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between items-center py-0.5">
                         <span className="text-slate-500 dark:text-[#8F95A3]">Food Cost %</span>
@@ -1639,7 +1664,7 @@ export default function AppleTenantDashboard() {
                             <div className="flex items-center gap-4 shrink-0 font-mono">
                               <span className="text-slate-500 dark:text-[#8F95A3]">{dish.qty} sold</span>
                               <span className="font-bold text-slate-900 dark:text-white">
-                                ₹{dish.revenue.toLocaleString()}
+                                {currencySymbol}{dish.revenue.toLocaleString()}
                               </span>
                             </div>
                           </div>

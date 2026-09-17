@@ -27,15 +27,93 @@ export async function GET(
 
     const restaurantId = session.activeRestaurantId;
 
-    // Time boundaries
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    // Fetch primary outlet to obtain timezone and currency configuration
+    const outlets = await prisma.restaurantOutlet.findMany({
+      where: { restaurantId },
+      orderBy: { createdAt: "asc" },
+    });
 
-    const yesterdayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
-    const yesterdayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
+    const primaryOutlet = outlets[0];
+    const outletTimezone = primaryOutlet?.timezone?.trim() || "UTC";
+    const outletCurrency = primaryOutlet?.currency?.trim() || "USD";
 
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+    // Helper to calculate start/end bounds for any given day in the outlet's timezone
+    const getZonedBounds = (tz: string, dayOffset = 0) => {
+      const targetTz = tz || "UTC";
+      const refDate = new Date(Date.now() + dayOffset * 86400000);
+
+      const formatter = new Intl.DateTimeFormat("en-CA", {
+        timeZone: targetTz,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+
+      const ymd = formatter.format(refDate); // "YYYY-MM-DD"
+      const [year, month, day] = ymd.split("-").map(Number);
+
+      const createZonedDate = (h: number, m: number, s: number, ms: number) => {
+        const candidate = new Date(Date.UTC(year, month - 1, day, h, m, s, ms));
+        const parts = new Intl.DateTimeFormat("en-US", {
+          timeZone: targetTz,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        }).formatToParts(candidate);
+
+        const partMap: Record<string, string> = {};
+        parts.forEach((p) => { partMap[p.type] = p.value; });
+
+        let localH = Number(partMap.hour);
+        if (localH === 24) localH = 0;
+
+        const localZoned = new Date(
+          Date.UTC(
+            Number(partMap.year),
+            Number(partMap.month) - 1,
+            Number(partMap.day),
+            localH,
+            Number(partMap.minute),
+            Number(partMap.second)
+          )
+        );
+
+        const diffMs = candidate.getTime() - localZoned.getTime();
+        return new Date(candidate.getTime() + diffMs);
+      };
+
+      const dObj = new Date(year, month - 1, day);
+      const formattedDate = dObj.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+      });
+
+      return {
+        start: createZonedDate(0, 0, 0, 0),
+        end: createZonedDate(23, 59, 59, 999),
+        formattedDate,
+        year,
+        month,
+        day,
+      };
+    };
+
+    const todayBounds = getZonedBounds(outletTimezone, 0);
+    const yesterdayBounds = getZonedBounds(outletTimezone, -1);
+
+    const todayStart = todayBounds.start;
+    const todayEnd = todayBounds.end;
+
+    const yesterdayStart = yesterdayBounds.start;
+    const yesterdayEnd = yesterdayBounds.end;
+
+    // Start of current month in outlet's timezone
+    const monthStart = getZonedBounds(outletTimezone, 0).start;
+    monthStart.setUTCDate(1);
 
     // Parallel Database Queries for maximum speed
     const [
@@ -458,6 +536,9 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
+      outletTimezone,
+      outletCurrency,
+      formattedTodayDate: todayBounds.formattedDate,
       liveOps: {
         todaySales,
         yesterdaySales,
