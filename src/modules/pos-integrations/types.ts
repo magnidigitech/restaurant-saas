@@ -28,9 +28,14 @@ export interface ProviderCredentials {
 }
 
 export interface NormalizedOrderItem {
+  posMenuItemId?: string;
+  providerItemId?: string;
   name: string;
   quantity: number;
   unitPrice: number;
+  totalPrice?: number;
+  netSales?: number;
+  isVoided?: boolean;
   notes?: string;
   modifiers?: Array<{
     name: string;

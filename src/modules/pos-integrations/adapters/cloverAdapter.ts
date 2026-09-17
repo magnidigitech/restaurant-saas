@@ -215,11 +215,20 @@ export class CloverAdapter implements PosProviderAdapter {
           paymentMethod: o.payments?.elements?.[0]?.tender?.label || "CLOVER_PAYMENT",
           createdAt: new Date(o.clientCreatedTime || o.createdTime || Date.now()),
           rawPayload: o,
-          items: (o.lineItems?.elements || []).map((li: any) => ({
-            name: li.name || "Item",
-            quantity: 1,
-            unitPrice: Number(li.price || 0) / 100,
-          })),
+          items: (o.lineItems?.elements || []).map((li: any, idx: number) => {
+            const uPrice = Number(li.price || 0) / 100;
+            const qty = Number(li.quantity || 1);
+            return {
+              posMenuItemId: li.item?.id || `clv_menu_${idx + 1}`,
+              providerItemId: li.id || `clv_li_${idx + 1}`,
+              name: li.name || "Item",
+              quantity: qty,
+              unitPrice: uPrice,
+              totalPrice: qty * uPrice,
+              netSales: qty * uPrice,
+              isVoided: Boolean(li.refunded || li.isRefund || false),
+            };
+          }),
         };
       });
 

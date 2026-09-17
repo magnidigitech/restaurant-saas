@@ -213,73 +213,61 @@ export async function executeSync(integrationId: string, since?: Date) {
 
     let newOrdersCount = 0;
     let updatedOrdersCount = 0;
+    let skippedOrdersCount = 0;
 
     for (const order of fetchResult.orders) {
-      // Check if order already exists (Idempotent import to prevent duplicate orders)
-      const existingOrder = await prisma.posOrder.findFirst({
+      if (!order.providerOrderId) continue;
+
+      const dbStatus = order.status === "REFUNDED" ? "CANCELLED" : order.status;
+      const calculatedFinalAmount =
+        order.finalAmount ??
+        (Number(order.totalAmount || 0) +
+          Number(order.taxAmount || 0) +
+          Number(order.tipAmount || 0) -
+          Number(order.discountAmount || 0) -
+          Number(order.refundAmount || 0));
+
+      const existingOrder = await prisma.posOrder.findUnique({
         where: {
-          restaurantId: integration.restaurantId,
-          provider: order.provider,
-          providerOrderId: order.providerOrderId,
+          restaurantId_provider_providerOrderId: {
+            restaurantId: integration.restaurantId,
+            provider: order.provider,
+            providerOrderId: order.providerOrderId,
+          },
+        },
+        include: {
+          items: true,
         },
       });
 
-      const dbStatus = order.status === "REFUNDED" ? "CANCELLED" : order.status;
+      let dbOrder;
+      let isNew = false;
 
-      if (existingOrder) {
-        // Reflect updates, cancellations, and refunds
-        await prisma.posOrder.update({
-          where: { id: existingOrder.id },
-          data: {
+      if (!existingOrder) {
+        dbOrder = await prisma.posOrder.upsert({
+          where: {
+            restaurantId_provider_providerOrderId: {
+              restaurantId: integration.restaurantId,
+              provider: order.provider,
+              providerOrderId: order.providerOrderId,
+            },
+          },
+          update: {
             status: dbStatus,
             totalAmount: order.totalAmount,
             taxAmount: order.taxAmount,
             tipAmount: order.tipAmount,
-            refundAmount: order.refundAmount,
             discountAmount: order.discountAmount,
+            refundAmount: order.refundAmount,
+            finalAmount: calculatedFinalAmount,
             paymentMethod: order.paymentMethod,
-            customerName: order.customerName || existingOrder.customerName,
-            customerPhone: order.customerPhone || existingOrder.customerPhone,
-            notes: order.notes || existingOrder.notes,
+            customerName: order.customerName,
+            customerPhone: order.customerPhone,
             rawPayload: order.rawPayload,
+            notes: order.notes,
             updatedAt: new Date(),
           },
-        });
-
-        // Re-sync line items for existing order to populate item details
-        if (order.items && order.items.length > 0) {
-          await prisma.posOrderItem.deleteMany({
-            where: { orderId: existingOrder.id },
-          });
-
-          for (const item of order.items) {
-            await prisma.posOrderItem.create({
-              data: {
-                orderId: existingOrder.id,
-                name: item.name,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice,
-                totalPrice: Number(item.quantity) * Number(item.unitPrice),
-                notes: item.notes,
-                modifiers: item.modifiers ? (item.modifiers as any) : undefined,
-              },
-            });
-          }
-        }
-
-        updatedOrdersCount++;
-      } else {
-        const calculatedFinalAmount =
-          order.finalAmount ??
-          (Number(order.totalAmount || 0) +
-            Number(order.taxAmount || 0) +
-            Number(order.tipAmount || 0) -
-            Number(order.discountAmount || 0) -
-            Number(order.refundAmount || 0));
-
-        // Create new synced order
-        const createdOrder = await prisma.posOrder.create({
-          data: {
+          create: {
             restaurantId: integration.restaurantId,
             outletId: integration.outletId,
             provider: order.provider,
@@ -299,28 +287,89 @@ export async function executeSync(integrationId: string, since?: Date) {
             customerPhone: order.customerPhone,
             rawPayload: order.rawPayload,
             notes: order.notes,
-            createdAt: order.createdAt,
+            createdAt: order.createdAt || new Date(),
           },
         });
+        isNew = true;
+        newOrdersCount++;
+      } else {
+        // Check if order has changed
+        const isSameStatus = existingOrder.status === dbStatus;
+        const isSameTotal = Number(existingOrder.totalAmount) === Number(order.totalAmount);
+        const isSameDiscount = Number(existingOrder.discountAmount) === Number(order.discountAmount);
+        const isSameRefund = Number(existingOrder.refundAmount) === Number(order.refundAmount);
+        const isSameItemCount = existingOrder.items.length === (order.items?.length || 0);
 
-        // Add line items
-        if (order.items && order.items.length > 0) {
-          for (const item of order.items) {
-            await prisma.posOrderItem.create({
-              data: {
-                orderId: createdOrder.id,
-                name: item.name,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice,
-                totalPrice: Number(item.quantity) * Number(item.unitPrice),
-                notes: item.notes,
-                modifiers: item.modifiers ? (item.modifiers as any) : undefined,
-              },
-            });
-          }
+        if (isSameStatus && isSameTotal && isSameDiscount && isSameRefund && isSameItemCount) {
+          skippedOrdersCount++;
+          continue;
         }
 
-        newOrdersCount++;
+        dbOrder = await prisma.posOrder.update({
+          where: { id: existingOrder.id },
+          data: {
+            status: dbStatus,
+            totalAmount: order.totalAmount,
+            taxAmount: order.taxAmount,
+            tipAmount: order.tipAmount,
+            discountAmount: order.discountAmount,
+            refundAmount: order.refundAmount,
+            finalAmount: calculatedFinalAmount,
+            paymentMethod: order.paymentMethod,
+            customerName: order.customerName || existingOrder.customerName,
+            customerPhone: order.customerPhone || existingOrder.customerPhone,
+            rawPayload: order.rawPayload,
+            notes: order.notes || existingOrder.notes,
+            updatedAt: new Date(),
+          },
+        });
+        updatedOrdersCount++;
+      }
+
+      // Upsert / Refresh line items
+      if (order.items && order.items.length > 0) {
+        for (let idx = 0; idx < order.items.length; idx++) {
+          const item = order.items[idx];
+          const providerItemId = item.providerItemId || `item_${idx + 1}`;
+          const qty = Number(item.quantity || 1);
+          const uPrice = Number(item.unitPrice || 0);
+          const totPrice = item.totalPrice ?? (qty * uPrice);
+          const netSalesVal = item.netSales ?? (totPrice - Number(order.discountAmount || 0) / order.items.length);
+          const isVoidVal = item.isVoided ?? (dbStatus === "CANCELLED");
+
+          await prisma.posOrderItem.upsert({
+            where: {
+              orderId_providerItemId: {
+                orderId: dbOrder.id,
+                providerItemId,
+              },
+            },
+            update: {
+              posMenuItemId: item.posMenuItemId || null,
+              name: item.name,
+              quantity: qty,
+              unitPrice: uPrice,
+              totalPrice: totPrice,
+              netSales: netSalesVal > 0 ? netSalesVal : totPrice,
+              isVoided: isVoidVal,
+              notes: item.notes || null,
+              modifiers: item.modifiers ? (item.modifiers as any) : undefined,
+            },
+            create: {
+              orderId: dbOrder.id,
+              posMenuItemId: item.posMenuItemId || null,
+              providerItemId,
+              name: item.name,
+              quantity: qty,
+              unitPrice: uPrice,
+              totalPrice: totPrice,
+              netSales: netSalesVal > 0 ? netSalesVal : totPrice,
+              isVoided: isVoidVal,
+              notes: item.notes || null,
+              modifiers: item.modifiers ? (item.modifiers as any) : undefined,
+            },
+          });
+        }
       }
     }
 
@@ -338,6 +387,7 @@ export async function executeSync(integrationId: string, since?: Date) {
       success: true,
       newOrdersCount,
       updatedOrdersCount,
+      skippedOrdersCount,
       totalProcessed: fetchResult.orders.length,
       recordsRequiringAttention: fetchResult.recordsRequiringAttention || 0,
     };

@@ -163,6 +163,7 @@ export async function GET(
       todayAttendance,
       lowStockItems,
       topPosItems,
+      latestIntegration,
       recentStockLogs,
       recentClosings,
       recentPayrolls,
@@ -241,17 +242,37 @@ export async function GET(
         },
       }),
 
-      // 8. Top Selling POS Order Items
-      prisma.posOrderItem.groupBy({
-        by: ["name"],
+      // 8. Top Selling POS Order Items with date and outlet filters
+      prisma.posOrderItem.findMany({
         where: {
           order: {
             restaurantId,
+            ...(outletId && outletId !== "all" ? { outletId } : {}),
+            createdAt: { gte: filterStart, lte: filterEnd },
+            status: { in: ["COMPLETED", "SETTLED"] as any },
           },
+          isVoided: false,
         },
-        _sum: { quantity: true, totalPrice: true },
-        orderBy: { _sum: { quantity: "desc" } },
-        take: 5,
+        select: {
+          id: true,
+          orderId: true,
+          posMenuItemId: true,
+          name: true,
+          quantity: true,
+          unitPrice: true,
+          totalPrice: true,
+          netSales: true,
+        },
+      }),
+
+      // 8b. Latest POS Integration sync timestamp
+      prisma.posIntegration.findFirst({
+        where: {
+          restaurantId,
+          ...(outletId && outletId !== "all" ? { outletId } : {}),
+        },
+        orderBy: { lastSyncAt: "desc" },
+        select: { lastSyncAt: true },
       }),
 
       // 9. Recent Stock Ledger logs
@@ -581,15 +602,50 @@ export async function GET(
       });
     }
 
-    // 8. Top Selling Dishes
-    const dishIcons = ["🍗", "🧀", "🍚", "🫓", "🥘"];
-    const topSellingDishes = topPosItems.map((item, idx) => ({
+    // 8. Top Selling Dishes (grouped by menu item ID / dish name)
+    const dishIcons = ["🍗", "🧀", "🍚", "🫓", "🥘", "🍲", "🥙", "🌯", "🥗", "🍨"];
+    const groupedDishesMap = new Map<string, {
+      posMenuItemId: string | null;
+      name: string;
+      quantity: number;
+      netSales: number;
+      orderIds: Set<string>;
+    }>();
+
+    (topPosItems || []).forEach((item: any) => {
+      const key = item.posMenuItemId || item.name.toLowerCase().trim();
+      const existing = groupedDishesMap.get(key);
+      const q = Number(item.quantity || 1);
+      const net = Number(item.netSales || item.totalPrice || 0);
+
+      if (existing) {
+        existing.quantity += q;
+        existing.netSales += net;
+        existing.orderIds.add(item.orderId);
+      } else {
+        groupedDishesMap.set(key, {
+          posMenuItemId: item.posMenuItemId || null,
+          name: item.name,
+          quantity: q,
+          netSales: net,
+          orderIds: new Set([item.orderId]),
+        });
+      }
+    });
+
+    const aggregatedList = Array.from(groupedDishesMap.values()).map((g, idx) => ({
       id: idx + 1,
-      name: item.name,
-      qty: item._sum?.quantity || 0,
-      revenue: Math.round(Number(item._sum?.totalPrice || 0)),
+      name: g.name,
+      qty: g.quantity,
+      netSales: Math.round(g.netSales * 100) / 100,
+      revenue: Math.round(g.netSales),
+      ordersCount: g.orderIds.size,
       icon: dishIcons[idx % dishIcons.length],
     }));
+
+    const topSellingDishes = [...aggregatedList].sort((a, b) => b.qty - a.qty).slice(0, 10);
+    const topByRevenueDishes = [...aggregatedList].sort((a, b) => b.netSales - a.netSales).slice(0, 10);
+    const lastSyncAt = latestIntegration?.lastSyncAt || null;
 
     // 9. Recent Activities Log
     const recentActivities: Array<{
@@ -667,6 +723,8 @@ export async function GET(
       todayShiftsData,
       needsAttentionList,
       topSellingDishes,
+      topByRevenueDishes,
+      lastSyncAt,
       recentActivities: recentActivities.slice(0, 6),
     });
   } catch (error: any) {

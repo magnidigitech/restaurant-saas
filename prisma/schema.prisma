@@ -1958,6 +1958,7 @@ model PosOrder {
   outlet             RestaurantOutlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
   items              PosOrderItem[]
 
+  @@unique([restaurantId, provider, providerOrderId])
   @@index([restaurantId, provider, providerOrderId])
   @@index([restaurantId])
   @@index([outletId])
@@ -1967,23 +1968,29 @@ model PosOrder {
 }
 
 model PosOrderItem {
-  id         String   @id @default(uuid())
-  orderId    String   @map("order_id")
-  recipeId   String?  @map("recipe_id")
-  name       String
-  quantity   Int      @default(1)
-  unitPrice  Decimal  @map("unit_price")
-  totalPrice Decimal  @map("total_price")
-  modifiers  Json?
-  notes      String?
-  createdAt  DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid())
+  orderId        String   @map("order_id")
+  recipeId       String?  @map("recipe_id")
+  posMenuItemId  String?  @map("pos_menu_item_id")
+  providerItemId String?  @map("provider_item_id")
+  name           String
+  quantity       Int      @default(1)
+  unitPrice      Decimal  @map("unit_price")
+  totalPrice     Decimal  @map("total_price")
+  netSales       Decimal  @default(0) @map("net_sales")
+  isVoided       Boolean  @default(false) @map("is_voided")
+  modifiers      Json?
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
 
   // Relations
-  order      PosOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  recipe     Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  order          PosOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  recipe         Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
 
+  @@unique([orderId, providerItemId])
   @@index([orderId])
   @@index([recipeId])
+  @@index([posMenuItemId])
   @@map("pos_order_items")
 }
 

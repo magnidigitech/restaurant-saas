@@ -236,15 +236,26 @@ export class ToastAdapter implements PosProviderAdapter {
           allItems.push(...o.selections);
         }
 
-        const items = allItems.map((i: any) => ({
-          name: i.displayName || i.name || "Menu Item",
-          quantity: Number(i.quantity || 1),
-          unitPrice: Number(i.price || 0),
-          modifiers: (i.selections || i.modifiers || []).map((s: any) => ({
-            name: s.displayName || s.name || "Modifier",
-            price: Number(s.price || 0),
-          })),
-        }));
+        const items = allItems.map((i: any, index: number) => {
+          const qty = Number(i.quantity || 1);
+          const uPrice = Number(i.price || 0);
+          const disc = Number(i.discountAmount || 0);
+          const net = i.netAmount !== undefined ? Number(i.netAmount) : (qty * uPrice - disc);
+          return {
+            posMenuItemId: i.item?.guid || i.entityId || i.menuItem?.guid || i.itemGroup?.guid || (i.guid ? String(i.guid) : undefined),
+            providerItemId: i.guid ? String(i.guid) : `item_${index + 1}`,
+            name: i.displayName || i.name || "Menu Item",
+            quantity: qty,
+            unitPrice: uPrice,
+            totalPrice: qty * uPrice,
+            netSales: net > 0 ? net : (qty * uPrice),
+            isVoided: Boolean(i.voided || i.isVoided || false),
+            modifiers: (i.selections || i.modifiers || []).map((s: any) => ({
+              name: s.displayName || s.name || "Modifier",
+              price: Number(s.price || 0),
+            })),
+          };
+        });
 
         // Extract Customer info across Toast order, check, and delivery objects
         const custObj = o.customer || firstCheck.customer || o.deliveryInfo?.recipient || {};

@@ -308,6 +308,7 @@ export default function AppleTenantDashboard() {
   // Tab switch: "operations" (Data-First Dashboard - Default) vs "modules" (Original Complete Modules Directory)
   const [activeTab, setActiveTab] = useState<"operations" | "modules">("operations");
   const [salesPeriod, setSalesPeriod] = useState<"today" | "yesterday" | "week">("today");
+  const [topSellingRankBy, setTopSellingRankBy] = useState<"quantity" | "revenue">("quantity");
   const [hoveredBarIdx, setHoveredBarIdx] = useState<number | null>(4); // Default to 6 PM peak bar
 
   const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
@@ -1706,16 +1707,30 @@ export default function AppleTenantDashboard() {
                   }`}
                 >
                   <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                        Top Selling Items
-                      </h3>
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                          <span>Top Selling Items</span>
+                          {dataStats?.lastSyncAt && (
+                            <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                              Synced {new Date(dataStats.lastSyncAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          )}
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          Ranked by {topSellingRankBy === "quantity" ? "units sold" : "net revenue"} in outlet timezone
+                        </p>
+                      </div>
 
                       <div className="flex items-center gap-2">
-                        <div className="px-2.5 py-1 rounded-xl border text-xs font-semibold flex items-center gap-1 cursor-pointer border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300">
-                          <span>By Quantity</span>
-                          <ChevronDown className="w-3 h-3 opacity-60" />
-                        </div>
+                        <select
+                          value={topSellingRankBy}
+                          onChange={(e) => setTopSellingRankBy(e.target.value as "quantity" | "revenue")}
+                          className="px-2.5 py-1 rounded-xl border text-xs font-semibold bg-transparent border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer"
+                        >
+                          <option value="quantity" className="dark:bg-slate-900">By Quantity</option>
+                          <option value="revenue" className="dark:bg-slate-900">By Revenue</option>
+                        </select>
                         <button
                           type="button"
                           onClick={() => router.push(p("/pos"))}
@@ -1728,29 +1743,49 @@ export default function AppleTenantDashboard() {
                       </div>
                     </div>
 
-                    {topSellingDishes.length === 0 ? (
+                    {((topSellingRankBy === "quantity" ? dataStats?.topSellingDishes : dataStats?.topByRevenueDishes) || topSellingDishes).length === 0 ? (
                       <div className="py-8 text-center text-slate-400 text-xs">
-                        No menu item sales recorded yet today. Orders will populate top sellers automatically.
+                        No menu item sales recorded for the selected period. Orders will populate top sellers automatically.
                       </div>
                     ) : (
-                      <div className="divide-y divide-slate-100 dark:divide-white/[0.06] text-xs">
-                        {topSellingDishes.map((dish) => (
-                          <div key={dish.id} className="py-2.5 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <span className="font-mono text-slate-400 font-bold text-xs w-4">{dish.id}</span>
-                              <span className="text-xl shrink-0">{dish.icon}</span>
-                              <span className="font-bold text-slate-900 dark:text-white truncate">
-                                {dish.name}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-4 shrink-0 font-mono">
-                              <span className="text-slate-500 dark:text-[#8F95A3]">{dish.qty} sold</span>
-                              <span className="font-bold text-slate-900 dark:text-white">
-                                {currencySymbol}{dish.revenue.toLocaleString()}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-100 dark:border-white/[0.06] text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
+                              <th className="pb-2 pl-1">Item</th>
+                              <th className="pb-2 text-right">Quantity sold</th>
+                              <th className="pb-2 text-right">Net item sales</th>
+                              <th className="pb-2 text-right pr-1">Orders containing item</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-white/[0.06]">
+                            {((topSellingRankBy === "quantity"
+                              ? (dataStats?.topSellingDishes || [])
+                              : (dataStats?.topByRevenueDishes || dataStats?.topSellingDishes || []))
+                            ).slice(0, 10).map((dish: any, idx: number) => (
+                              <tr key={dish.id || idx} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors">
+                                <td className="py-2.5 pl-1">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <span className="font-mono text-slate-400 font-bold text-xs w-3 shrink-0">{idx + 1}</span>
+                                    <span className="text-base shrink-0">{dish.icon || "🍗"}</span>
+                                    <span className="font-bold text-slate-900 dark:text-white truncate max-w-[160px] sm:max-w-[200px]" title={dish.name}>
+                                      {dish.name}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="py-2.5 text-right font-mono font-semibold text-slate-700 dark:text-slate-300">
+                                  {dish.qty || 0} sold
+                                </td>
+                                <td className="py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">
+                                  {currencySymbol}{(dish.netSales ?? dish.revenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                                <td className="py-2.5 text-right pr-1 font-mono text-slate-500 dark:text-slate-400">
+                                  {dish.ordersCount ? `${dish.ordersCount} ${dish.ordersCount === 1 ? "order" : "orders"}` : "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     )}
                   </div>

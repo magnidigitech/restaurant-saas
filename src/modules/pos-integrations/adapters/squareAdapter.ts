@@ -241,15 +241,27 @@ export class SquareAdapter implements PosProviderAdapter {
           paymentMethod: o.tenders?.[0]?.type || "SQUARE_PAYMENT",
           createdAt: new Date(o.created_at || Date.now()),
           rawPayload: o,
-          items: (o.line_items || []).map((li: any) => ({
-            name: li.name || "Item",
-            quantity: Number(li.quantity || 1),
-            unitPrice: Number(li.base_price_money?.amount || 0) / 100,
-            modifiers: (li.modifiers || []).map((m: any) => ({
-              name: m.name,
-              price: Number(m.base_price_money?.amount || 0) / 100,
-            })),
-          })),
+          items: (o.line_items || []).map((li: any, idx: number) => {
+            const qty = Number(li.quantity || 1);
+            const uPrice = Number(li.base_price_money?.amount || 0) / 100;
+            const grossSales = Number(li.gross_sales_money?.amount || 0) / 100;
+            const totalDisc = Number(li.total_discount_money?.amount || 0) / 100;
+            const net = grossSales > 0 ? (grossSales - totalDisc) : (qty * uPrice - totalDisc);
+            return {
+              posMenuItemId: li.catalog_object_id || li.item_id || `sq_menu_${idx + 1}`,
+              providerItemId: li.uid || `sq_li_${idx + 1}`,
+              name: li.name || "Item",
+              quantity: qty,
+              unitPrice: uPrice,
+              totalPrice: qty * uPrice,
+              netSales: net > 0 ? net : (qty * uPrice),
+              isVoided: false,
+              modifiers: (li.modifiers || []).map((m: any) => ({
+                name: m.name,
+                price: Number(m.base_price_money?.amount || 0) / 100,
+              })),
+            };
+          }),
         };
       });
 

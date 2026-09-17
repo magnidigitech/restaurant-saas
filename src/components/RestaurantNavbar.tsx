@@ -341,7 +341,6 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
         icon: Sliders,
         children: [
           { label: "Restaurant Profile", desc: "Branding colors, identity & restaurant details", href: p("/settings/profile") },
-          { label: "WhatsApp Messaging", desc: "Pair WhatsApp Web QR Code & automate PO dispatches", href: p("/settings/whatsapp") },
           { label: "Branch Outlets", desc: "Multi-branch addresses & tax registration numbers", href: p("/settings/branches") },
           { label: "Master Data & Taxes", desc: "GST, service charges & master taxonomies", href: p("/settings/master-data") },
           { label: "Security & 2FA", desc: "Two-factor authentication & recovery codes", href: p("/settings/security") },
