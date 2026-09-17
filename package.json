@@ -12,6 +12,7 @@
     "db:migrate:deploy": "npx prisma migrate deploy",
     "db:seed": "npx prisma db seed",
     "seed": "npx tsx prisma/seed.ts",
+    "reset:admin": "npx tsx scripts/reset-admin-password.ts",
     "test:security": "npx tsx src/core/tests/security.test.ts"
   },
   "dependencies": {

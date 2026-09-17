@@ -9,7 +9,30 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  console.log("Seeding all 12 operational and security modules...");
+  console.log("Seeding Platform Super Admin users...");
+  const adminPasswordHash = await bcrypt.hash("Superadmin@123", 10);
+
+  await prisma.platformUser.upsert({
+    where: { email: "admin@restobird.com" },
+    update: { passwordHash: adminPasswordHash },
+    create: {
+      email: "admin@restobird.com",
+      name: "Resto Bird Platform Admin",
+      passwordHash: adminPasswordHash,
+    },
+  });
+
+  await prisma.platformUser.upsert({
+    where: { email: "admin@platform.com" },
+    update: { passwordHash: adminPasswordHash },
+    create: {
+      email: "admin@platform.com",
+      name: "Platform Super Admin",
+      passwordHash: adminPasswordHash,
+    },
+  });
+
+  console.log("Seeding all operational and security modules...");
 
   const modules = [
     {
