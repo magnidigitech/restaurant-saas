@@ -626,20 +626,28 @@ export default function AppleTenantDashboard() {
         return;
       }
 
-      const dataBranding = await resBranding.json();
-      const dataModules = await resModules.json();
-      const dataEmployees = resEmployees.ok ? await resEmployees.json() : null;
-      const dataOutlets = resOutlets.ok ? await resOutlets.json() : null;
-      const dataAlerts = resAlerts && resAlerts.ok ? await resAlerts.json() : null;
-      const dataPayroll = resPayroll && resPayroll.ok ? await resPayroll.json() : null;
-      const dataAttendance = resAttendance && resAttendance.ok ? await resAttendance.json() : null;
-      const dataFinance = resFinance && resFinance.ok ? await resFinance.json() : null;
-      const dataStats = resStats && resStats.ok ? await resStats.json() : null;
-
       if (resModules.status === 401) {
         router.push(p("/login"));
         return;
       }
+
+      let dataBranding: any = null;
+      let dataModules: any = null;
+      try {
+        if (resBranding.ok) dataBranding = await resBranding.json();
+      } catch (e) {}
+
+      try {
+        if (resModules.ok) dataModules = await resModules.json();
+      } catch (e) {}
+
+      const dataEmployees = resEmployees.ok ? await resEmployees.json().catch(() => null) : null;
+      const dataOutlets = resOutlets.ok ? await resOutlets.json().catch(() => null) : null;
+      const dataAlerts = resAlerts && resAlerts.ok ? await resAlerts.json().catch(() => null) : null;
+      const dataPayroll = resPayroll && resPayroll.ok ? await resPayroll.json().catch(() => null) : null;
+      const dataAttendance = resAttendance && resAttendance.ok ? await resAttendance.json().catch(() => null) : null;
+      const dataFinance = resFinance && resFinance.ok ? await resFinance.json().catch(() => null) : null;
+      const dataStats = resStats && resStats.ok ? await resStats.json().catch(() => null) : null;
 
       if (resBranding.ok) setBranding(dataBranding);
       if (resModules.ok) {
