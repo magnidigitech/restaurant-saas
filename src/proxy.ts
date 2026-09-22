@@ -165,10 +165,8 @@ export async function proxy(req: NextRequest) {
   if (subdomain === "admin" || path.startsWith("/platform-admin") || path.startsWith("/api/platform-admin")) {
     const isPublicPlatformApi =
       path === "/api/platform-admin/auth/login" ||
-      path === "/api/platform-admin/auth/2fa/challenge" ||
-      path === "/api/platform-admin/auth/2fa/send-email-code" ||
-      path === "/api/platform-admin/auth/passkeys/auth-options" ||
-      path === "/api/platform-admin/auth/passkeys/auth-verify";
+      path.startsWith("/api/platform-admin/auth/2fa") ||
+      path.startsWith("/api/platform-admin/auth/passkeys");
 
     if (path.startsWith("/api/platform-admin") && !isPublicPlatformApi) {
       const token = req.cookies.get(PLATFORM_SESSION_COOKIE)?.value;
@@ -219,8 +217,7 @@ export async function proxy(req: NextRequest) {
         const isPublicTenantApi =
           path === "/api/restaurant/auth/login" ||
           path.startsWith("/api/restaurant/auth/passkeys") ||
-          path.startsWith("/api/restaurant/auth/2fa/challenge") ||
-          path === "/api/restaurant/auth/2fa/send-email-code" ||
+          path.startsWith("/api/restaurant/auth/2fa") ||
           path === "/api/restaurant/activate" ||
           path.endsWith("/branding") ||
           path.startsWith("/api/restaurant/onboarding/portal");
