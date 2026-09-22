@@ -516,20 +516,22 @@ export default function AppleTenantDashboard() {
   };
 
   // Hourly sales progression for bar chart (Bound to real POS order hours)
-  const [hourlyBars, setHourlyBars] = useState([
-    { time: "10 AM", sales: 0, orders: 0, heightPct: 15 },
-    { time: "", sales: 0, orders: 0, heightPct: 15 },
-    { time: "12 PM", sales: 0, orders: 0, heightPct: 15 },
-    { time: "", sales: 0, orders: 0, heightPct: 15 },
-    { time: "2 PM", sales: 0, orders: 0, heightPct: 15 },
-    { time: "", sales: 0, orders: 0, heightPct: 15 },
-    { time: "4 PM", sales: 0, orders: 0, heightPct: 15 },
-    { time: "", sales: 0, orders: 0, heightPct: 15 },
-    { time: "6 PM", sales: 0, orders: 0, heightPct: 15 },
-    { time: "", sales: 0, orders: 0, heightPct: 15 },
-    { time: "8 PM", sales: 0, orders: 0, heightPct: 15 },
-    { time: "", sales: 0, orders: 0, heightPct: 15 },
-    { time: "10 PM", sales: 0, orders: 0, heightPct: 15 },
+  const [hourlyBars, setHourlyBars] = useState<
+    Array<{ time: string; sales: number; orders: number; heightPct: number; isPeak?: boolean }>
+  >([
+    { time: "10 AM", sales: 0, orders: 0, heightPct: 0, isPeak: false },
+    { time: "11 AM", sales: 0, orders: 0, heightPct: 0, isPeak: false },
+    { time: "12 PM", sales: 0, orders: 0, heightPct: 0, isPeak: false },
+    { time: "1 PM", sales: 0, orders: 0, heightPct: 0, isPeak: false },
+    { time: "2 PM", sales: 0, orders: 0, heightPct: 0, isPeak: false },
+    { time: "3 PM", sales: 0, orders: 0, heightPct: 0, isPeak: false },
+    { time: "4 PM", sales: 0, orders: 0, heightPct: 0, isPeak: false },
+    { time: "5 PM", sales: 0, orders: 0, heightPct: 0, isPeak: false },
+    { time: "6 PM", sales: 0, orders: 0, heightPct: 0, isPeak: false },
+    { time: "7 PM", sales: 0, orders: 0, heightPct: 0, isPeak: false },
+    { time: "8 PM", sales: 0, orders: 0, heightPct: 0, isPeak: false },
+    { time: "9 PM", sales: 0, orders: 0, heightPct: 0, isPeak: false },
+    { time: "10 PM", sales: 0, orders: 0, heightPct: 0, isPeak: false },
   ]);
 
   const [criticalInventoryList, setCriticalInventoryList] = useState<Array<{ name: string; qty: string; status: string; dotColor: string }>>([]);
@@ -1284,10 +1286,15 @@ export default function AppleTenantDashboard() {
                             left: `${((hoveredBarIdx + 0.5) / Math.max(1, hourlyBars.length)) * 90 + 5}%`,
                           }}
                         >
-                          <div className="font-semibold opacity-75">
-                            {hourlyBars[hoveredBarIdx].time || "Peak"}
+                          <div className="font-semibold opacity-90 flex items-center justify-center gap-1.5">
+                            <span>{hourlyBars[hoveredBarIdx].time}</span>
+                            {hourlyBars[hoveredBarIdx].isPeak && hourlyBars[hoveredBarIdx].sales > 0 && (
+                              <span className="text-[9px] font-bold text-amber-300 bg-amber-400/20 px-1.5 py-0.5 rounded tracking-wide uppercase">
+                                Peak
+                              </span>
+                            )}
                           </div>
-                          <div className="font-extrabold text-xs">
+                          <div className="font-extrabold text-xs mt-0.5">
                             {currencySymbol}{hourlyBars[hoveredBarIdx].sales.toLocaleString()}
                           </div>
                           <div className="opacity-70 text-[9px]">
@@ -1300,6 +1307,7 @@ export default function AppleTenantDashboard() {
                       <div className="flex items-end justify-between h-44 sm:h-48 border-b border-slate-100 dark:border-white/[0.06] px-2 gap-2">
                         {hourlyBars.map((bar, idx) => {
                           const isHovered = hoveredBarIdx === idx;
+                          const hasSales = bar.sales > 0 && bar.heightPct > 0;
 
                           return (
                             <div
@@ -1308,14 +1316,18 @@ export default function AppleTenantDashboard() {
                               onMouseEnter={() => setHoveredBarIdx(idx)}
                               onMouseLeave={() => setHoveredBarIdx(null)}
                             >
-                              <div
-                                className="w-full max-w-[18px] rounded-t-md transition-all duration-200"
-                                style={{
-                                  height: `${bar.heightPct}%`,
-                                  backgroundColor: isHovered ? brandColor : `${brandColor}CC`,
-                                  transform: isHovered ? "scaleY(1.05)" : undefined,
-                                }}
-                              />
+                              {hasSales ? (
+                                <div
+                                  className="w-full max-w-[18px] rounded-t-md transition-all duration-200"
+                                  style={{
+                                    height: `${bar.heightPct}%`,
+                                    backgroundColor: isHovered ? brandColor : `${brandColor}CC`,
+                                    transform: isHovered ? "scaleY(1.05)" : undefined,
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-full h-0" />
+                              )}
                             </div>
                           );
                         })}
@@ -1323,11 +1335,15 @@ export default function AppleTenantDashboard() {
 
                       {/* Dynamic X-axis Time & Date Labels */}
                       <div className="flex justify-between px-1 pt-2 text-[10px] font-semibold text-slate-400 dark:text-slate-500 overflow-hidden">
-                        {hourlyBars.map((bar, idx) => (
-                          <span key={idx} className="flex-1 text-center truncate">
-                            {bar.time}
-                          </span>
-                        ))}
+                        {hourlyBars.map((bar, idx) => {
+                          const showLabel =
+                            hourlyBars.length <= 8 || idx % 2 === 0 || idx === hourlyBars.length - 1;
+                          return (
+                            <span key={idx} className="flex-1 text-center truncate">
+                              {showLabel ? bar.time : ""}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>

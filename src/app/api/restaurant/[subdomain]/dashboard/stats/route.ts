@@ -383,7 +383,13 @@ export async function GET(
     // 2. Sales Chart Bars Aggregation (Date-wise for Week/Month/Multi-day vs Hourly for Single Day)
     const isMultiDay = comparisonRanges.isMultiDay;
 
-    let hourlyBars: Array<{ time: string; sales: number; orders: number; heightPct: number }> = [];
+    let hourlyBars: Array<{
+      time: string;
+      sales: number;
+      orders: number;
+      heightPct: number;
+      isPeak?: boolean;
+    }> = [];
 
     if (isMultiDay) {
       // Date-wise sales aggregation
@@ -424,21 +430,58 @@ export async function GET(
         }
       });
 
-      let maxDailySales = 1;
-      Object.values(dailyMap).forEach((val) => {
-        if (val.sales > maxDailySales) maxDailySales = val.sales;
-      });
-
-      hourlyBars = Object.values(dailyMap).map((item) => ({
+      let rawBars = Object.values(dailyMap).map((item) => ({
         time: item.label,
         sales: Math.round(item.sales),
         orders: item.orders,
-        heightPct: Math.max(15, Math.round((item.sales / maxDailySales) * 100)),
+      }));
+
+      // Strip leading and trailing 0 sales days dynamically if sales exist
+      let firstNonZero = rawBars.findIndex((b) => b.sales > 0);
+      let lastNonZero = rawBars.length - 1;
+      while (lastNonZero >= 0 && rawBars[lastNonZero].sales === 0) {
+        lastNonZero--;
+      }
+
+      if (firstNonZero !== -1 && lastNonZero >= firstNonZero) {
+        const startIdx = Math.max(0, firstNonZero - 1);
+        const endIdx = Math.min(rawBars.length - 1, lastNonZero + 1);
+        rawBars = rawBars.slice(startIdx, endIdx + 1);
+      }
+
+      let maxDailySales = 0;
+      rawBars.forEach((b) => {
+        if (b.sales > maxDailySales) maxDailySales = b.sales;
+      });
+
+      hourlyBars = rawBars.map((item) => ({
+        time: item.time,
+        sales: item.sales,
+        orders: item.orders,
+        heightPct: maxDailySales > 0 && item.sales > 0 ? Math.max(12, Math.round((item.sales / maxDailySales) * 100)) : 0,
+        isPeak: maxDailySales > 0 && item.sales === maxDailySales,
       }));
     } else {
-      // Single-day hourly sales aggregation (10 AM to 10 PM) in outlet timezone
+      // Single-day hourly sales aggregation (10 AM to 10 PM default window) in outlet timezone
+      let minHour = 10;
+      let maxHour = 22;
+
+      // Scan current orders to ensure all active order hours are captured
+      currentOrders.forEach((o) => {
+        const hStr = new Intl.DateTimeFormat("en-US", {
+          timeZone: outletTimezone,
+          hour: "numeric",
+          hour12: false,
+        }).format(new Date(o.createdAt));
+        const h = Number(hStr);
+        if (!isNaN(h)) {
+          if (h < minHour) minHour = Math.max(0, h);
+          if (h > maxHour) maxHour = Math.min(23, h);
+        }
+      });
+
       const hourlyMap: Record<number, { sales: number; orders: number }> = {};
-      for (let h = 10; h <= 22; h++) {
+      for (let h = minHour; h <= maxHour; h++) {
         hourlyMap[h] = { sales: 0, orders: 0 };
       }
 
@@ -450,32 +493,54 @@ export async function GET(
         }).format(new Date(o.createdAt));
         const h = Number(hStr);
 
-        if (hourlyMap[h]) {
+        if (hourlyMap[h] !== undefined) {
           hourlyMap[h].sales += Number(o.totalAmount || 0);
           hourlyMap[h].orders += 1;
         }
       });
 
-      let maxHourlySales = 1;
-      Object.values(hourlyMap).forEach((val) => {
-        if (val.sales > maxHourlySales) maxHourlySales = val.sales;
+      const helperFormatTime = (h: number) => {
+        if (h === 0) return "12 AM";
+        if (h < 12) return `${h} AM`;
+        if (h === 12) return "12 PM";
+        return `${h - 12} PM`;
+      };
+
+      let rawBars = Object.keys(hourlyMap)
+        .map((hKey) => Number(hKey))
+        .sort((a, b) => a - b)
+        .map((h) => ({
+          hour: h,
+          time: helperFormatTime(h),
+          sales: Math.round(hourlyMap[h].sales),
+          orders: hourlyMap[h].orders,
+        }));
+
+      // Dynamically strip leading and trailing zero sales hours if sales exist
+      let firstNonZero = rawBars.findIndex((b) => b.sales > 0);
+      let lastNonZero = rawBars.length - 1;
+      while (lastNonZero >= 0 && rawBars[lastNonZero].sales === 0) {
+        lastNonZero--;
+      }
+
+      if (firstNonZero !== -1 && lastNonZero >= firstNonZero) {
+        const startIdx = Math.max(0, firstNonZero - 1);
+        const endIdx = Math.min(rawBars.length - 1, lastNonZero + 1);
+        rawBars = rawBars.slice(startIdx, endIdx + 1);
+      }
+
+      let maxHourlySales = 0;
+      rawBars.forEach((b) => {
+        if (b.sales > maxHourlySales) maxHourlySales = b.sales;
       });
 
-      hourlyBars = [
-        { time: "10 AM", sales: Math.round(hourlyMap[10].sales), orders: hourlyMap[10].orders, heightPct: Math.max(15, Math.round((hourlyMap[10].sales / maxHourlySales) * 100)) },
-        { time: "", sales: Math.round(hourlyMap[11].sales), orders: hourlyMap[11].orders, heightPct: Math.max(15, Math.round((hourlyMap[11].sales / maxHourlySales) * 100)) },
-        { time: "12 PM", sales: Math.round(hourlyMap[12].sales), orders: hourlyMap[12].orders, heightPct: Math.max(15, Math.round((hourlyMap[12].sales / maxHourlySales) * 100)) },
-        { time: "", sales: Math.round(hourlyMap[13].sales), orders: hourlyMap[13].orders, heightPct: Math.max(15, Math.round((hourlyMap[13].sales / maxHourlySales) * 100)) },
-        { time: "2 PM", sales: Math.round(hourlyMap[14].sales), orders: hourlyMap[14].orders, heightPct: Math.max(15, Math.round((hourlyMap[14].sales / maxHourlySales) * 100)) },
-        { time: "", sales: Math.round(hourlyMap[15].sales), orders: hourlyMap[15].orders, heightPct: Math.max(15, Math.round((hourlyMap[15].sales / maxHourlySales) * 100)) },
-        { time: "4 PM", sales: Math.round(hourlyMap[16].sales), orders: hourlyMap[16].orders, heightPct: Math.max(15, Math.round((hourlyMap[16].sales / maxHourlySales) * 100)) },
-        { time: "", sales: Math.round(hourlyMap[17].sales), orders: hourlyMap[17].orders, heightPct: Math.max(15, Math.round((hourlyMap[17].sales / maxHourlySales) * 100)) },
-        { time: "6 PM", sales: Math.round(hourlyMap[18].sales), orders: hourlyMap[18].orders, heightPct: Math.max(15, Math.round((hourlyMap[18].sales / maxHourlySales) * 100)) },
-        { time: "", sales: Math.round(hourlyMap[19].sales), orders: hourlyMap[19].orders, heightPct: Math.max(15, Math.round((hourlyMap[19].sales / maxHourlySales) * 100)) },
-        { time: "8 PM", sales: Math.round(hourlyMap[20].sales), orders: hourlyMap[20].orders, heightPct: Math.max(15, Math.round((hourlyMap[20].sales / maxHourlySales) * 100)) },
-        { time: "", sales: Math.round(hourlyMap[21].sales), orders: hourlyMap[21].orders, heightPct: Math.max(15, Math.round((hourlyMap[21].sales / maxHourlySales) * 100)) },
-        { time: "10 PM", sales: Math.round(hourlyMap[22].sales), orders: hourlyMap[22].orders, heightPct: Math.max(15, Math.round((hourlyMap[22].sales / maxHourlySales) * 100)) },
-      ];
+      hourlyBars = rawBars.map((item) => ({
+        time: item.time,
+        sales: item.sales,
+        orders: item.orders,
+        heightPct: maxHourlySales > 0 && item.sales > 0 ? Math.max(12, Math.round((item.sales / maxHourlySales) * 100)) : 0,
+        isPeak: maxHourlySales > 0 && item.sales === maxHourlySales,
+      }));
     }
 
     // 3. Finance & Profit
