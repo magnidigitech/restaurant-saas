@@ -94,7 +94,7 @@ export default function AppleTenantLoginPage() {
       // 2. Prompt biometric / hardware key with browser WebAuthn API
       let assertion;
       try {
-        assertion = await startAuthentication(options);
+        assertion = await startAuthentication({ optionsJSON: options });
       } catch (authErr: any) {
         if (authErr.name === "NotAllowedError") {
           throw new Error("Passkey sign-in was canceled or timed out.");
@@ -108,7 +108,9 @@ export default function AppleTenantLoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           subdomain,
-          assertion,
+          response: assertion,
+          expectedChallenge: options.challenge,
+          trustDevice,
         }),
       });
 
