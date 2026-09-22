@@ -1350,7 +1350,7 @@ export default function AppleTenantDashboard() {
                   {/* Cleaned: Redundant metrics strip beneath chart removed per user request */}
                 </div>
 
-                {/* Right Card: Orders by Channel (Donut Chart) (4 Cols) */}
+                {/* Right Card: Completed vs Cancelled (Donut Chart) (4 Cols) */}
                 <div
                   className={`lg:col-span-4 p-5 sm:p-6 rounded-3xl border transition flex flex-col justify-between ${
                     isDark ? "bg-[#0E121D] border-white/[0.08]" : "bg-white border-slate-200/90 shadow-2xs"
@@ -1359,7 +1359,7 @@ export default function AppleTenantDashboard() {
                   <div>
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                        Orders by Channel
+                        Completed vs Cancelled
                       </h3>
                       <button
                         type="button"
@@ -1372,75 +1372,121 @@ export default function AppleTenantDashboard() {
                       </button>
                     </div>
 
-                    {/* Donut Chart & Legend */}
-                    <div className="flex items-center justify-center gap-6 py-2">
-                      {/* SVG Donut */}
-                      <div className="relative w-36 h-36 shrink-0">
-                        <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
-                          {/* Slices: Dine-in 43.5%, Delivery 34.5%, Takeaway 22% */}
-                          <circle
-                            cx="50"
-                            cy="50"
-                            r="36"
-                            fill="none"
-                            stroke="#1E293B"
-                            strokeWidth="14"
-                            strokeDasharray="226"
-                            strokeDashoffset="0"
-                            className="dark:stroke-white/10"
-                          />
-                          <circle
-                            cx="50"
-                            cy="50"
-                            r="36"
-                            fill="none"
-                            stroke="#F59E0B"
-                            strokeWidth="14"
-                            strokeDasharray="226"
-                            strokeDashoffset="50"
-                          />
-                          <circle
-                            cx="50"
-                            cy="50"
-                            r="36"
-                            fill="none"
-                            stroke={brandColor}
-                            strokeWidth="14"
-                            strokeDasharray="226"
-                            strokeDashoffset="128"
-                          />
-                        </svg>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                          <span className="text-xl font-black text-slate-900 dark:text-white">{liveOps.totalOrders}</span>
-                          <span className="text-[10px] font-semibold text-slate-400">Orders</span>
-                        </div>
-                      </div>
+                    {/* Dynamic Donut Chart & Legend for Completed, In Progress, Cancelled */}
+                    {(() => {
+                      const totalOrds = liveOps.totalOrders || 0;
+                      const compCount = liveOps.fulfillment.completed || 0;
+                      const progCount = liveOps.fulfillment.inProgress || 0;
+                      const cancCount = liveOps.fulfillment.cancelled || 0;
 
-                      {/* Legend */}
-                      <div className="space-y-2 text-xs">
-                        <div className="flex items-center justify-between gap-4 font-semibold">
-                          <span className="flex items-center gap-1.5 text-slate-900 dark:text-white">
-                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: brandColor }} />
-                            Dine-in
-                          </span>
-                          <span className="font-bold text-slate-900 dark:text-white">{liveOps.channelBreakdown.dineIn.count} <span className="text-[10px] opacity-60">{liveOps.channelBreakdown.dineIn.percentage}%</span></span>
+                      const compPct = totalOrds > 0 ? compCount / totalOrds : 0;
+                      const progPct = totalOrds > 0 ? progCount / totalOrds : 0;
+                      const cancPct = totalOrds > 0 ? cancCount / totalOrds : 0;
+
+                      const circumference = 226.195;
+                      const compDash = compPct * circumference;
+                      const progDash = progPct * circumference;
+                      const cancDash = cancPct * circumference;
+
+                      const compOffset = 0;
+                      const progOffset = -compDash;
+                      const cancOffset = -(compDash + progDash);
+
+                      return (
+                        <div className="flex items-center justify-center gap-6 py-2">
+                          {/* SVG Donut */}
+                          <div className="relative w-36 h-36 shrink-0">
+                            <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
+                              <circle
+                                cx="50"
+                                cy="50"
+                                r="36"
+                                fill="none"
+                                stroke="#1E293B"
+                                strokeWidth="14"
+                                strokeDasharray="226.195"
+                                strokeDashoffset="0"
+                                className="dark:stroke-white/10"
+                              />
+                              {compCount > 0 && (
+                                <circle
+                                  cx="50"
+                                  cy="50"
+                                  r="36"
+                                  fill="none"
+                                  stroke="#10B981"
+                                  strokeWidth="14"
+                                  strokeDasharray={`${compDash} ${circumference}`}
+                                  strokeDashoffset={compOffset}
+                                  className="transition-all duration-500"
+                                />
+                              )}
+                              {progCount > 0 && (
+                                <circle
+                                  cx="50"
+                                  cy="50"
+                                  r="36"
+                                  fill="none"
+                                  stroke="#F59E0B"
+                                  strokeWidth="14"
+                                  strokeDasharray={`${progDash} ${circumference}`}
+                                  strokeDashoffset={progOffset}
+                                  className="transition-all duration-500"
+                                />
+                              )}
+                              {cancCount > 0 && (
+                                <circle
+                                  cx="50"
+                                  cy="50"
+                                  r="36"
+                                  fill="none"
+                                  stroke="#EF4444"
+                                  strokeWidth="14"
+                                  strokeDasharray={`${cancDash} ${circumference}`}
+                                  strokeDashoffset={cancOffset}
+                                  className="transition-all duration-500"
+                                />
+                              )}
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                              <span className="text-xl font-black text-slate-900 dark:text-white">{totalOrds}</span>
+                              <span className="text-[10px] font-semibold text-slate-400">Orders</span>
+                            </div>
+                          </div>
+
+                          {/* Legend */}
+                          <div className="space-y-2 text-xs">
+                            <div className="flex items-center justify-between gap-4 font-semibold">
+                              <span className="flex items-center gap-1.5 text-slate-900 dark:text-white">
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                                Completed
+                              </span>
+                              <span className="font-bold text-slate-900 dark:text-white">
+                                {compCount} <span className="text-[10px] opacity-60">{(compPct * 100).toFixed(0)}%</span>
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4 font-semibold">
+                              <span className="flex items-center gap-1.5 text-slate-900 dark:text-white">
+                                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+                                In Progress
+                              </span>
+                              <span className="font-bold text-slate-900 dark:text-white">
+                                {progCount} <span className="text-[10px] opacity-60">{(progPct * 100).toFixed(0)}%</span>
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4 font-semibold">
+                              <span className="flex items-center gap-1.5 text-slate-900 dark:text-white">
+                                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+                                Cancelled
+                              </span>
+                              <span className="font-bold text-slate-900 dark:text-white">
+                                {cancCount} <span className="text-[10px] opacity-60">{(cancPct * 100).toFixed(0)}%</span>
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between gap-4 font-semibold">
-                          <span className="flex items-center gap-1.5 text-slate-900 dark:text-white">
-                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-                            Delivery
-                          </span>
-                          <span className="font-bold text-slate-900 dark:text-white">{liveOps.channelBreakdown.delivery.count} <span className="text-[10px] opacity-60">{liveOps.channelBreakdown.delivery.percentage}%</span></span>
-                        </div>
-                        <div className="flex items-center justify-between gap-4 font-semibold">
-                          <span className="flex items-center gap-1.5 text-slate-900 dark:text-white">
-                            <span className="w-2.5 h-2.5 rounded-full bg-slate-900 dark:bg-white/40 shrink-0" />
-                            Takeaway
-                          </span>
-                          <span className="font-bold text-slate-900 dark:text-white">{liveOps.channelBreakdown.takeaway.count} <span className="text-[10px] opacity-60">{liveOps.channelBreakdown.takeaway.percentage}%</span></span>
-                        </div>
-                      </div>
-                    </div>
+                      );
+                    })()}
 
                     {/* 3 Status summary cards */}
                     <div className="grid grid-cols-3 gap-2 mt-5 text-center">
@@ -2080,7 +2126,7 @@ export default function AppleTenantDashboard() {
 
                 <div className="p-6 overflow-y-auto space-y-5">
                   {/* Presets Tab Bar */}
-                  <div className="p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl flex items-center gap-1 text-xs font-semibold">
+                  <div className="p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl flex items-center gap-1 text-[11px] sm:text-xs font-semibold overflow-x-auto scrollbar-none w-full">
                     {[
                       { id: "day", label: "Today" },
                       { id: "yesterday", label: "Yesterday" },
@@ -2123,7 +2169,7 @@ export default function AppleTenantDashboard() {
                             setCalendarViewYear(now.getFullYear());
                           }
                         }}
-                        className={`flex-1 py-2 px-2.5 rounded-xl transition-all text-center cursor-pointer ${
+                        className={`flex-1 min-w-[54px] sm:min-w-0 py-1.5 sm:py-2 px-1 sm:px-2 rounded-xl transition-all text-center cursor-pointer whitespace-nowrap ${
                           calendarTab === tab.id
                             ? "bg-amber-600 text-white shadow-md font-bold"
                             : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-700/50"

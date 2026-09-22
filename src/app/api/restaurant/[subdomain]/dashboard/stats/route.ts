@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/core/database/client";
 import { getTenantSession } from "@/core/auth/session";
 import { verifyAccess } from "@/core/permissions/check";
+import { executeSync } from "@/modules/pos-integrations/service";
 import {
   getComparisonDateRanges,
   calculatePercentageChange,
@@ -35,6 +36,25 @@ export async function GET(
       select: { id: true },
     });
     const restaurantId = targetRestaurant?.id || session.activeRestaurantId;
+
+    // POS Auto-sync check: Automatically sync active POS integrations if lastSyncAt is older than 1 hour (60 mins)
+    try {
+      const activeIntegrations = await prisma.posIntegration.findMany({
+        where: { restaurantId, status: "ACTIVE" },
+      });
+      const ONE_HOUR_MS = 60 * 60 * 1000;
+      const nowMs = Date.now();
+      for (const integ of activeIntegrations) {
+        const lastSync = integ.lastSyncAt ? new Date(integ.lastSyncAt).getTime() : 0;
+        if (nowMs - lastSync >= ONE_HOUR_MS) {
+          executeSync(integ.id).catch((err) =>
+            console.error(`POS 1-hour auto-sync error for integration ${integ.id}:`, err)
+          );
+        }
+      }
+    } catch (autoSyncErr) {
+      console.error("POS Auto-sync trigger check error:", autoSyncErr);
+    }
 
     // Fetch primary outlet to obtain timezone and currency configuration
     const outlets = await prisma.restaurantOutlet.findMany({
@@ -462,26 +482,9 @@ export async function GET(
         isPeak: maxDailySales > 0 && item.sales === maxDailySales,
       }));
     } else {
-      // Single-day hourly sales aggregation (10 AM to 10 PM default window) in outlet timezone
-      let minHour = 10;
-      let maxHour = 22;
-
-      // Scan current orders to ensure all active order hours are captured
-      currentOrders.forEach((o) => {
-        const hStr = new Intl.DateTimeFormat("en-US", {
-          timeZone: outletTimezone,
-          hour: "numeric",
-          hour12: false,
-        }).format(new Date(o.createdAt));
-        const h = Number(hStr);
-        if (!isNaN(h)) {
-          if (h < minHour) minHour = Math.max(0, h);
-          if (h > maxHour) maxHour = Math.min(23, h);
-        }
-      });
-
+      // Single-day hourly sales aggregation scanning full 24-hour window (0 to 23) in outlet timezone
       const hourlyMap: Record<number, { sales: number; orders: number }> = {};
-      for (let h = minHour; h <= maxHour; h++) {
+      for (let h = 0; h <= 23; h++) {
         hourlyMap[h] = { sales: 0, orders: 0 };
       }
 
@@ -516,7 +519,7 @@ export async function GET(
           orders: hourlyMap[h].orders,
         }));
 
-      // Dynamically strip leading and trailing zero sales hours if sales exist
+      // Dynamically strip leading and trailing zero sales hours across full 24h window
       let firstNonZero = rawBars.findIndex((b) => b.sales > 0);
       let lastNonZero = rawBars.length - 1;
       while (lastNonZero >= 0 && rawBars[lastNonZero].sales === 0) {
@@ -527,6 +530,9 @@ export async function GET(
         const startIdx = Math.max(0, firstNonZero - 1);
         const endIdx = Math.min(rawBars.length - 1, lastNonZero + 1);
         rawBars = rawBars.slice(startIdx, endIdx + 1);
+      } else {
+        // If no sales exist yet today, default to standard 10 AM to 10 PM operating window with flat empty bars
+        rawBars = rawBars.filter((b) => b.hour >= 10 && b.hour <= 22);
       }
 
       let maxHourlySales = 0;
