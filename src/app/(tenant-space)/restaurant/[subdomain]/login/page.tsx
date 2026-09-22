@@ -158,7 +158,7 @@ export default function AppleTenantLoginPage() {
           setChallengeToken(data.challengeToken);
           setHasPasskeys(Boolean(data.hasPasskeys));
           setHasTotp(Boolean(data.hasTotp));
-          setMfaMethod(data.hasPasskeys ? "PASSKEY" : "TOTP");
+          setMfaMethod(data.hasPasskeys ? "PASSKEY" : data.hasTotp ? "TOTP" : "EMAIL");
           setStep("2FA");
           setLoading(false);
           return;
@@ -468,15 +468,17 @@ export default function AppleTenantLoginPage() {
           {step === "2FA" && (
             <div className="space-y-4">
               {/* Method Selector Tabs */}
-              <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-white/[0.06] text-[11px]">
+              <div className="flex w-full gap-1 p-1 rounded-xl bg-white/[0.06] text-[11px]">
                 {hasPasskeys && (
                   <button
                     type="button"
                     onClick={() => {
                       setMfaMethod("PASSKEY");
                       setError("");
+                      setOtpCode("");
+                      setRecoveryCode("");
                     }}
-                    className={`py-1.5 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
+                    className={`flex-1 py-1.5 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
                       mfaMethod === "PASSKEY"
                         ? "bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30"
                         : "text-slate-400 hover:text-white"
@@ -490,8 +492,10 @@ export default function AppleTenantLoginPage() {
                   onClick={() => {
                     setMfaMethod("TOTP");
                     setError("");
+                    setOtpCode("");
+                    setRecoveryCode("");
                   }}
-                  className={`py-1.5 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
+                  className={`flex-1 py-1.5 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
                     mfaMethod === "TOTP"
                       ? "bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30"
                       : "text-slate-400 hover:text-white"
@@ -504,8 +508,10 @@ export default function AppleTenantLoginPage() {
                   onClick={() => {
                     setMfaMethod("EMAIL");
                     setError("");
+                    setOtpCode("");
+                    setRecoveryCode("");
                   }}
-                  className={`py-1.5 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
+                  className={`flex-1 py-1.5 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
                     mfaMethod === "EMAIL"
                       ? "bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30"
                       : "text-slate-400 hover:text-white"
@@ -518,8 +524,10 @@ export default function AppleTenantLoginPage() {
                   onClick={() => {
                     setMfaMethod("RECOVERY");
                     setError("");
+                    setOtpCode("");
+                    setRecoveryCode("");
                   }}
-                  className={`py-1.5 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
+                  className={`flex-1 py-1.5 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
                     mfaMethod === "RECOVERY"
                       ? "bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30"
                       : "text-slate-400 hover:text-white"

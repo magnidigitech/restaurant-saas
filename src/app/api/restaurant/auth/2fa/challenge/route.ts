@@ -96,16 +96,16 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         email: user.email,
         name: user.name,
-        role: membership.role,
+        role: "RESTAURANT_USER",
         activeRestaurantId: membership.restaurantId,
-        subdomain: membership.restaurant.subdomain,
+        activeRestaurantSubdomain: membership.restaurant.subdomain,
         tokenVersion: user.tokenVersion,
       });
 
-      await trackUserSession(user.id, req.headers, membership.restaurantId);
+      await trackUserSession(user.id, membership.restaurantId, req.headers);
 
       if (trustDevice) {
-        await createTrustedDevice(user.id, req.headers, 30);
+        await createTrustedDevice(user.id, membership.restaurantId, req.headers, 30);
       }
 
       return NextResponse.json({

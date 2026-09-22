@@ -154,7 +154,7 @@ export default function PlatformAdminLoginPage() {
         setOtpCode("");
         setRecoveryCode("");
         setEmailSentInfo(null);
-        setMfaMethod(data.hasPasskeys ? "PASSKEY" : "TOTP");
+        setMfaMethod(data.hasPasskeys ? "PASSKEY" : data.hasTotp ? "TOTP" : "EMAIL");
         return;
       }
 
@@ -299,12 +299,12 @@ export default function PlatformAdminLoginPage() {
           {/* STEP 2: 2FA CHALLENGE */}
           {step === "2FA" && (
             <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-[#090d15] border border-white/[0.08] text-[11px]">
+              <div className="flex w-full gap-1 p-1 rounded-xl bg-[#090d15] border border-white/[0.08] text-[11px]">
                 {hasPasskeys && (
                   <button
                     type="button"
-                    onClick={() => { setMfaMethod("PASSKEY"); setError(""); }}
-                    className={`py-2 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
+                    onClick={() => { setMfaMethod("PASSKEY"); setError(""); setOtpCode(""); setRecoveryCode(""); }}
+                    className={`flex-1 py-2 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
                       mfaMethod === "PASSKEY"
                         ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-xs font-bold"
                         : "text-slate-400 hover:text-white"
@@ -315,8 +315,8 @@ export default function PlatformAdminLoginPage() {
                 )}
                 <button
                   type="button"
-                  onClick={() => { setMfaMethod("TOTP"); setError(""); }}
-                  className={`py-2 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
+                  onClick={() => { setMfaMethod("TOTP"); setError(""); setOtpCode(""); setRecoveryCode(""); }}
+                  className={`flex-1 py-2 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
                     mfaMethod === "TOTP"
                       ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-xs font-bold"
                       : "text-slate-400 hover:text-white"
@@ -326,8 +326,8 @@ export default function PlatformAdminLoginPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setMfaMethod("EMAIL"); setError(""); }}
-                  className={`py-2 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
+                  onClick={() => { setMfaMethod("EMAIL"); setError(""); setOtpCode(""); setRecoveryCode(""); }}
+                  className={`flex-1 py-2 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
                     mfaMethod === "EMAIL"
                       ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-xs font-bold"
                       : "text-slate-400 hover:text-white"
@@ -337,8 +337,8 @@ export default function PlatformAdminLoginPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setMfaMethod("RECOVERY"); setError(""); }}
-                  className={`py-2 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
+                  onClick={() => { setMfaMethod("RECOVERY"); setError(""); setOtpCode(""); setRecoveryCode(""); }}
+                  className={`flex-1 py-2 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
                     mfaMethod === "RECOVERY"
                       ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-xs font-bold"
                       : "text-slate-400 hover:text-white"
