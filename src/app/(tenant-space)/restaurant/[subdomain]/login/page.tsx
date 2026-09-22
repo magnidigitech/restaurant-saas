@@ -103,7 +103,7 @@ export default function AppleTenantLoginPage() {
       }
 
       // 3. Verify assertion with backend
-      const verRes = await fetch("/api/restaurant/auth/passkeys/verify-auth", {
+      const verRes = await fetch("/api/restaurant/auth/passkeys/auth-verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
