@@ -42,7 +42,7 @@ export default function AppleTenantLoginPage() {
 
   // 2FA Challenge State
   const [step, setStep] = useState<"CREDENTIALS" | "2FA">("CREDENTIALS");
-  const [mfaMethod, setMfaMethod] = useState<"TOTP" | "PASSKEY" | "RECOVERY">("TOTP");
+  const [mfaMethod, setMfaMethod] = useState<"TOTP" | "PASSKEY" | "EMAIL" | "RECOVERY">("TOTP");
   const [challengeToken, setChallengeToken] = useState("");
   const [hasPasskeys, setHasPasskeys] = useState(false);
   const [hasTotp, setHasTotp] = useState(true);
@@ -50,6 +50,8 @@ export default function AppleTenantLoginPage() {
   const [recoveryCode, setRecoveryCode] = useState("");
   const [trustDevice, setTrustDevice] = useState(true);
   const [verifying2fa, setVerifying2fa] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSentInfo, setEmailSentInfo] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchBranding = async () => {
@@ -256,6 +258,8 @@ export default function AppleTenantLoginPage() {
     setError("");
     setOtpCode("");
     setRecoveryCode("");
+    setEmailSentInfo(null);
+    setEmailSending(false);
   };
 
   if (pageLoading) {
