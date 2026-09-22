@@ -161,8 +161,8 @@ export async function POST(req: NextRequest) {
         email: user.email,
         name: user.name,
         role: "RESTAURANT_USER",
-        activeRestaurantId: payload.restaurantId,
-        activeRestaurantSubdomain: payload.subdomain,
+        activeRestaurantId: membership.restaurantId,
+        activeRestaurantSubdomain: membership.restaurant.subdomain.toLowerCase(),
         tokenVersion: user.tokenVersion,
       });
 
@@ -225,8 +225,8 @@ export async function POST(req: NextRequest) {
       email: user.email,
       name: user.name,
       role: "RESTAURANT_USER",
-      activeRestaurantId: payload.restaurantId,
-      activeRestaurantSubdomain: payload.subdomain,
+      activeRestaurantId: membership.restaurantId,
+      activeRestaurantSubdomain: membership.restaurant.subdomain.toLowerCase(),
       tokenVersion: user.tokenVersion,
     });
 

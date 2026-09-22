@@ -151,7 +151,7 @@ export async function proxy(req: NextRequest) {
       const token = req.cookies.get(TENANT_SESSION_COOKIE)?.value;
       const session = token ? await verifyToken(token) : null;
 
-      if (!session || session.activeRestaurantSubdomain !== pathSubdomain) {
+      if (!session || (session.activeRestaurantSubdomain || "").toLowerCase() !== pathSubdomain.toLowerCase()) {
         return NextResponse.redirect(
           createCleanRedirectUrl(`/restaurant/${pathSubdomain}/login`, req)
         );
@@ -247,7 +247,7 @@ export async function proxy(req: NextRequest) {
       const token = req.cookies.get(TENANT_SESSION_COOKIE)?.value;
       const session = token ? await verifyToken(token) : null;
 
-      if (!session || session.activeRestaurantSubdomain !== subdomain) {
+      if (!session || (session.activeRestaurantSubdomain || "").toLowerCase() !== subdomain.toLowerCase()) {
         return NextResponse.redirect(createCleanRedirectUrl("/login", req));
       }
 
