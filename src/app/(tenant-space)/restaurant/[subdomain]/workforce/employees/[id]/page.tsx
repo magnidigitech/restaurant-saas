@@ -420,11 +420,11 @@ export default function AppleEmployeeDetailPage({
                           isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                         }`}
                       >
-                        <option value="FULL_TIME">Full-Time (48h/wk default)</option>
-                        <option value="PART_TIME">Part-Time (20h/wk default)</option>
-                        <option value="INTERN">Intern (20h/wk default)</option>
-                        <option value="TEMPORARY">Temporary (25h/wk default)</option>
-                        <option value="CONTRACT">Contractor (40h/wk default)</option>
+                        <option value="FULL_TIME">Full-Time</option>
+                        <option value="PART_TIME">Part-Time</option>
+                        <option value="INTERN">Intern</option>
+                        <option value="TEMPORARY">Temporary</option>
+                        <option value="CONTRACT">Contractor</option>
                         <option value="CUSTOM">Custom Hours Limit...</option>
                       </select>
                     </div>

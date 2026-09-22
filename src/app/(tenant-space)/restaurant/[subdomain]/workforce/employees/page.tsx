@@ -6,7 +6,8 @@ import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import ModuleAccessGuard from "@/components/ModuleAccessGuard";
 import OnboardingTab from "./OnboardingTab";
-import { Users, UserCheck, ArrowLeft, Search, Filter, Plus, RotateCcw } from "lucide-react";
+import { Users, UserCheck, ArrowLeft, Search, Filter, Plus, RotateCcw, Upload, FileSpreadsheet, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 
 interface Department {
   id: string;
@@ -301,6 +302,110 @@ export default function AppleEmployeeDirectoryPage() {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Excel Bulk Import Modal State
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [parsedRows, setParsedRows] = useState<any[]>([]);
+  const [importSuccessMsg, setImportSuccessMsg] = useState("");
+  const [importErrorMsg, setImportErrorMsg] = useState("");
+
+  const handleDownloadSampleExcel = () => {
+    const sampleData = [
+      {
+        "First Name": "John",
+        "Last Name": "Doe",
+        "Personal Email": "john.doe@example.com",
+        "Phone": "+1555019283",
+        "Department": "Kitchen Operations",
+        "Designation": "Head Chef",
+        "Outlet": outlets[0]?.name || "Main Outlet",
+        "Worker Type": "FULL_TIME",
+        "Joining Date": "2026-01-15",
+        "Gender": "MALE",
+        "Kiosk Pin": "1234",
+      },
+      {
+        "First Name": "Sarah",
+        "Last Name": "Smith",
+        "Personal Email": "sarah.smith@example.com",
+        "Phone": "+1555019284",
+        "Department": "Front of House",
+        "Designation": "Captain",
+        "Outlet": outlets[0]?.name || "Main Outlet",
+        "Worker Type": "PART_TIME",
+        "Joining Date": "2026-02-01",
+        "Gender": "FEMALE",
+        "Kiosk Pin": "5678",
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Employees Template");
+    XLSX.writeFile(workbook, "employee_import_template.xlsx");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportErrorMsg("");
+    setImportSuccessMsg("");
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsName = wb.SheetNames[0];
+        const ws = wb.Sheets[wsName];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        if (!data || data.length === 0) {
+          setImportErrorMsg("The uploaded Excel file contains no data rows.");
+          return;
+        }
+
+        setParsedRows(data);
+      } catch {
+        setImportErrorMsg("Failed to parse Excel file. Please ensure it is a valid .xlsx, .xls, or .csv file.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleExecuteImport = async () => {
+    if (parsedRows.length === 0) return;
+    setImporting(true);
+    setImportErrorMsg("");
+    setImportSuccessMsg("");
+
+    try {
+      const res = await fetch("/api/restaurant/employees/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employees: parsedRows }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to import employees");
+
+      const { importedCount, skippedCount } = data.results || {};
+      let msg = `Successfully imported ${importedCount} employee${importedCount === 1 ? "" : "s"}!`;
+      if (skippedCount > 0) {
+        msg += ` (${skippedCount} row${skippedCount === 1 ? "" : "s"} skipped due to missing required fields).`;
+      }
+      setImportSuccessMsg(msg);
+      setParsedRows([]);
+      fetchEmployees();
+      fetchFilters();
+    } catch (err: any) {
+      setImportErrorMsg(err.message || "Error during import");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -316,12 +421,12 @@ export default function AppleEmployeeDirectoryPage() {
   });
 
   const workerTypeOptions = [
-    { id: "FULL_TIME", name: "Full-Time (48h)" },
-    { id: "PART_TIME", name: "Part-Time (20h)" },
-    { id: "INTERN", name: "Intern (20h)" },
-    { id: "TEMPORARY", name: "Temporary (25h)" },
-    { id: "CONTRACT", name: "Contractor (40h)" },
-    { id: "CUSTOM", name: "Custom Hours..." },
+    { id: "FULL_TIME", name: "Full-Time" },
+    { id: "PART_TIME", name: "Part-Time" },
+    { id: "INTERN", name: "Intern" },
+    { id: "TEMPORARY", name: "Temporary" },
+    { id: "CONTRACT", name: "Contractor" },
+    { id: "CUSTOM", name: "Custom" },
   ];
 
   const handleAddNewDepartment = async (name: string) => {
@@ -479,21 +584,21 @@ export default function AppleEmployeeDirectoryPage() {
     switch (wt) {
       case "PART_TIME":
         return {
-          label: `Part-Time (${hoursLimit || 20}h)`,
+          label: "Part-Time",
           cls: isDark
             ? "bg-amber-500/15 text-amber-300 border-amber-500/25"
             : "bg-amber-50 text-amber-800 border-amber-200",
         };
       case "INTERN":
         return {
-          label: `Intern (${hoursLimit || 20}h)`,
+          label: "Intern",
           cls: isDark
             ? "bg-purple-500/15 text-purple-300 border-purple-500/25"
             : "bg-purple-50 text-purple-800 border-purple-200",
         };
       case "TEMPORARY":
         return {
-          label: `Temporary (${hoursLimit || 25}h)`,
+          label: "Temporary",
           cls: isDark
             ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/25"
             : "bg-cyan-50 text-cyan-800 border-cyan-200",
@@ -501,22 +606,14 @@ export default function AppleEmployeeDirectoryPage() {
       case "CONTRACT":
       case "CONSULTANT":
         return {
-          label: `Contract (${hoursLimit || 40}h)`,
+          label: "Contract",
           cls: isDark
             ? "bg-blue-500/15 text-blue-300 border-blue-500/25"
             : "bg-blue-50 text-blue-800 border-blue-200",
         };
       default:
-        if (hoursLimit && hoursLimit < 40) {
-          return {
-            label: `Custom (${hoursLimit}h)`,
-            cls: isDark
-              ? "bg-indigo-500/15 text-indigo-300 border-indigo-500/25"
-              : "bg-indigo-50 text-indigo-800 border-indigo-200",
-          };
-        }
         return {
-          label: `Full-Time (${hoursLimit || 48}h)`,
+          label: "Full-Time",
           cls: isDark
             ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25"
             : "bg-emerald-50 text-emerald-800 border-emerald-200",
@@ -674,7 +771,7 @@ export default function AppleEmployeeDirectoryPage() {
               {stats.fullTime}
             </p>
             <p className={`text-[10px] sm:text-[11px] truncate ${isDark ? "text-[#6C7280]" : "text-slate-400"}`}>
-              48h / wk staff
+              Full-Time staff
             </p>
           </div>
 
@@ -791,8 +888,28 @@ export default function AppleEmployeeDirectoryPage() {
               )}
             </div>
 
-            {/* Same Row on Mobile: Add Employee (full width flex-1) & Filter button */}
-            <div className="flex items-center gap-2.5 w-full sm:w-auto order-1 sm:order-2">
+            {/* Same Row on Mobile: Import Excel & Add Employee & Filter button */}
+            <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto order-1 sm:order-2 flex-wrap sm:flex-nowrap">
+              <button
+                type="button"
+                onClick={() => {
+                  setImportErrorMsg("");
+                  setImportSuccessMsg("");
+                  setParsedRows([]);
+                  setShowImportModal(true);
+                }}
+                className={`px-3.5 sm:px-4 py-2.5 rounded-xl border transition flex items-center justify-center gap-2 text-xs font-semibold cursor-pointer shrink-0 h-10 ${
+                  isDark
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 shadow-2xs"
+                }`}
+                title="Import employees from Excel"
+              >
+                <Upload className="w-4 h-4" />
+                <span className="hidden sm:inline">Import Excel</span>
+                <span className="sm:hidden">Excel</span>
+              </button>
+
               <button
                 onClick={() => {
                   setError("");
@@ -1419,6 +1536,166 @@ export default function AppleEmployeeDirectoryPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      {/* Excel Bulk Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className={`border rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh] ${
+            isDark ? "bg-[#0E121D] border-white/[0.08]" : "bg-white border-slate-200"
+          }`}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-black/[0.06] dark:border-white/[0.06]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className={`text-base font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                    Import Employees via Excel / CSV
+                  </h3>
+                  <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    Upload staff roster including Department, Designation, Outlet & Details
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-5">
+              {/* Template Banner */}
+              <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                isDark ? "bg-blue-500/10 border-blue-500/20" : "bg-blue-50/80 border-blue-200"
+              }`}>
+                <div className="space-y-0.5">
+                  <h4 className={`text-xs font-bold ${isDark ? "text-blue-300" : "text-blue-900"}`}>
+                    Download Sample Excel Template
+                  </h4>
+                  <p className={`text-[11px] ${isDark ? "text-blue-200/70" : "text-blue-700"}`}>
+                    Pre-formatted headers for First Name, Last Name, Email, Department, Designation, Outlet & Work Type.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadSampleExcel}
+                  className="px-3.5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-bold rounded-xl transition shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Template</span>
+                </button>
+              </div>
+
+              {importSuccessMsg && (
+                <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-xl flex items-center gap-2">
+                  <span>✓</span>
+                  <span>{importSuccessMsg}</span>
+                </div>
+              )}
+
+              {importErrorMsg && (
+                <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl flex items-center gap-2">
+                  <span>⚠️</span>
+                  <span>{importErrorMsg}</span>
+                </div>
+              )}
+
+              {/* Dropzone File Upload */}
+              <div className="space-y-2">
+                <label className={`block text-xs font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                  Select Excel (.xlsx, .xls) or CSV File
+                </label>
+                <div className={`border-2 border-dashed rounded-2xl p-6 text-center transition cursor-pointer relative ${
+                  isDark
+                    ? "border-white/10 hover:border-emerald-500/40 bg-white/[0.02]"
+                    : "border-slate-200 hover:border-emerald-500/40 bg-slate-50/50"
+                }`}>
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls, .csv"
+                    onChange={handleFileUpload}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  />
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-500 mx-auto flex items-center justify-center mb-2">
+                    <Upload className="w-5 h-5" />
+                  </div>
+                  <p className={`text-xs font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                    Click to browse or drag & drop file here
+                  </p>
+                  <p className={`text-[11px] mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                    Supports Microsoft Excel (.xlsx, .xls) and Comma Separated (.csv)
+                  </p>
+                </div>
+              </div>
+
+              {/* Parsed Preview Table */}
+              {parsedRows.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className={`text-xs font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                      Ready to Import ({parsedRows.length} rows found)
+                    </h4>
+                    <span className="text-[10px] text-emerald-500 font-semibold">
+                      Departments & Designations auto-created if new
+                    </span>
+                  </div>
+
+                  <div className="max-h-52 overflow-x-auto overflow-y-auto border border-black/[0.08] dark:border-white/[0.08] rounded-xl text-xs">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className={isDark ? "bg-white/5 text-slate-300" : "bg-slate-100 text-slate-700"}>
+                          <th className="p-2">First Name</th>
+                          <th className="p-2">Last Name</th>
+                          <th className="p-2">Department</th>
+                          <th className="p-2">Designation</th>
+                          <th className="p-2">Outlet</th>
+                          <th className="p-2">Worker Type</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-black/[0.05] dark:divide-white/[0.05]">
+                        {parsedRows.slice(0, 50).map((r: any, idx: number) => (
+                          <tr key={idx} className={isDark ? "hover:bg-white/[0.02]" : "hover:bg-slate-50"}>
+                            <td className="p-2 font-medium">{r["First Name"] || r.firstName || r.firstname || "-"}</td>
+                            <td className="p-2">{r["Last Name"] || r.lastName || r.lastname || "-"}</td>
+                            <td className="p-2 text-blue-400 font-semibold">{r["Department"] || r.department || "-"}</td>
+                            <td className="p-2 text-indigo-400 font-semibold">{r["Designation"] || r.designation || "-"}</td>
+                            <td className="p-2">{r["Outlet"] || r.outlet || "-"}</td>
+                            <td className="p-2">{r["Worker Type"] || r.workerType || "FULL_TIME"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-black/[0.06] dark:border-white/[0.06] flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowImportModal(false)}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                  isDark ? "bg-white/5 hover:bg-white/10 text-slate-300" : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                }`}
+              >
+                Close
+              </button>
+              {parsedRows.length > 0 && (
+                <button
+                  type="button"
+                  disabled={importing}
+                  onClick={handleExecuteImport}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition shadow-sm cursor-pointer flex items-center gap-1.5"
+                >
+                  {importing ? "Importing..." : `Confirm & Import ${parsedRows.length} Employees`}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

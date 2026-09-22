@@ -6,6 +6,8 @@ import { z } from "zod";
 import { sendEmployeeOnboardingEmail } from "@/core/mail";
 import { HROnboardingService } from "@/modules/hr-onboarding/service";
 
+import { MasterDataService } from "@/modules/master-data/service";
+
 const createEmployeeSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
@@ -19,7 +21,9 @@ const createEmployeeSchema = z.object({
   weeklyHoursLimit: z.number().positive().nullable().optional(),
   // Optional initial employment record details
   departmentId: z.string().optional(),
+  departmentName: z.string().optional(),
   designationId: z.string().optional(),
+  designationName: z.string().optional(),
   primaryOutletId: z.string().optional(),
 });
 
@@ -180,14 +184,28 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // 4. Create initial active EmploymentRecord if details provided
-      if (data.departmentId || data.designationId || data.primaryOutletId) {
+      // 4. Resolve / Auto-create Department and Designation in Master Data if needed
+      let departmentId = data.departmentId || null;
+      if (data.departmentName) {
+        departmentId = await MasterDataService.findOrCreateDepartmentByName(restaurantId, data.departmentName);
+      } else if (departmentId && !departmentId.includes("-")) {
+        departmentId = await MasterDataService.findOrCreateDepartmentByName(restaurantId, departmentId);
+      }
+
+      let designationId = data.designationId || null;
+      if (data.designationName) {
+        designationId = await MasterDataService.findOrCreateDesignationByName(restaurantId, data.designationName);
+      } else if (designationId && !designationId.includes("-")) {
+        designationId = await MasterDataService.findOrCreateDesignationByName(restaurantId, designationId);
+      }
+
+      if (departmentId || designationId || data.primaryOutletId) {
         await tx.employmentRecord.create({
           data: {
             restaurantId,
             employeeId: employee.id,
-            departmentId: data.departmentId || null,
-            designationId: data.designationId || null,
+            departmentId,
+            designationId,
             primaryOutletId: data.primaryOutletId || null,
             employmentType: data.workerType,
             effectiveFrom: employee.joiningDate,

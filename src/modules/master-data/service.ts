@@ -37,6 +37,37 @@ export class MasterDataService {
     });
   }
 
+  static async findOrCreateDepartmentByName(restaurantId: string, nameStr: string) {
+    const trimmed = nameStr.trim();
+    if (!trimmed) return null;
+
+    const existing = await prisma.department.findFirst({
+      where: {
+        restaurantId,
+        name: { equals: trimmed, mode: "insensitive" },
+        archivedAt: null,
+      },
+    });
+    if (existing) return existing.id;
+
+    const baseCode = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "DEPT";
+    let code = baseCode;
+    let attempt = 1;
+    while (await prisma.department.findFirst({ where: { restaurantId, code } })) {
+      code = `${baseCode.slice(0, 6)}${attempt++}`;
+    }
+
+    const created = await prisma.department.create({
+      data: {
+        restaurantId,
+        name: trimmed,
+        code,
+        status: "ACTIVE",
+      },
+    });
+    return created.id;
+  }
+
   static async archiveDepartment(restaurantId: string, id: string) {
     return prisma.department.updateMany({
       where: { id, restaurantId },
@@ -78,6 +109,37 @@ export class MasterDataService {
         ...(data.status && { status: data.status }),
       },
     });
+  }
+
+  static async findOrCreateDesignationByName(restaurantId: string, nameStr: string) {
+    const trimmed = nameStr.trim();
+    if (!trimmed) return null;
+
+    const existing = await prisma.designation.findFirst({
+      where: {
+        restaurantId,
+        name: { equals: trimmed, mode: "insensitive" },
+        archivedAt: null,
+      },
+    });
+    if (existing) return existing.id;
+
+    const baseCode = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "DESIG";
+    let code = baseCode;
+    let attempt = 1;
+    while (await prisma.designation.findFirst({ where: { restaurantId, code } })) {
+      code = `${baseCode.slice(0, 6)}${attempt++}`;
+    }
+
+    const created = await prisma.designation.create({
+      data: {
+        restaurantId,
+        name: trimmed,
+        code,
+        status: "ACTIVE",
+      },
+    });
+    return created.id;
   }
 
   static async archiveDesignation(restaurantId: string, id: string) {
