@@ -104,6 +104,7 @@ export async function verifyTotpCode(secret: string, token: string): Promise<boo
     const result = await verify({
       secret,
       token: cleanToken,
+      window: 2,
     });
 
     return result.valid === true;
@@ -177,13 +178,13 @@ export interface TwoFactorChallengePayload {
 }
 
 /**
- * Creates a short-lived (5 minutes), single-purpose 2FA challenge JWT.
+ * Creates a short-lived (15 minutes), single-purpose 2FA challenge JWT.
  */
 export async function sign2FAChallenge(payload: Omit<TwoFactorChallengePayload, "type">): Promise<string> {
   return await new jose.SignJWT({ ...payload, type: "2FA_CHALLENGE" })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("5m")
+    .setExpirationTime("15m")
     .sign(CHALLENGE_SECRET);
 }
 

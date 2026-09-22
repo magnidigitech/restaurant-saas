@@ -134,10 +134,13 @@ export default function AppleTenantLoginPage() {
       (window.location.host.includes(".localhost") && !window.location.host.startsWith("admin."))
     );
     const target = isSubdomain ? "/dashboard" : `/restaurant/${subdomain}/dashboard`;
-    if (typeof window !== "undefined") {
-      window.location.href = target;
-    } else {
+    try {
       router.push(target);
+      router.refresh();
+    } catch {
+      if (typeof window !== "undefined") {
+        window.location.href = target;
+      }
     }
   };
 
