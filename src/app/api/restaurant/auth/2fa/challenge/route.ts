@@ -12,6 +12,7 @@ import {
   verifyTotpCode,
   verifyRecoveryCodeMatch,
 } from "@/core/auth/two-factor";
+import { verifyAndConsumeEmailCode } from "@/core/auth/two-factor-email";
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,7 +29,8 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const challengeToken = body.challengeToken;
-    const isRecoveryCode = Boolean(body.isRecoveryCode || body.method === "RECOVERY");
+    const isEmailCode = Boolean(body.isEmailCode || body.method === "EMAIL");
+    const isRecoveryCode = !isEmailCode && Boolean(body.isRecoveryCode || body.method === "RECOVERY");
     const rawCode = body.code || (isRecoveryCode ? body.recoveryCode : body.otpCode) || "";
     const code = typeof rawCode === "string" ? rawCode.trim() : "";
     const trustDevice = Boolean(body.trustDevice);
@@ -77,6 +79,40 @@ export async function POST(req: NextRequest) {
 
     if (!membership || membership.status !== "ACTIVE" || membership.restaurant.status !== "ACTIVE") {
       return NextResponse.json({ error: "Access to this restaurant workspace is unavailable" }, { status: 403 });
+    }
+
+    // Case Email OTP Verification (Single-Use Code)
+    if (isEmailCode) {
+      const emailKey = `restaurant_2fa_email:${user.id}`;
+      const emailRes = verifyAndConsumeEmailCode(emailKey, code);
+      if (!emailRes.valid) {
+        return NextResponse.json(
+          { error: emailRes.error || "Invalid verification code" },
+          { status: 400 }
+        );
+      }
+
+      await setTenantSession({
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        role: membership.role,
+        activeRestaurantId: membership.restaurantId,
+        subdomain: membership.restaurant.subdomain,
+        tokenVersion: user.tokenVersion,
+      });
+
+      await trackUserSession(user.id, req.headers, membership.restaurantId);
+
+      if (trustDevice) {
+        await createTrustedDevice(user.id, req.headers, 30);
+      }
+
+      return NextResponse.json({
+        success: true,
+        user: { name: user.name, email: user.email },
+        usedEmailCode: true,
+      });
     }
 
     // 4. Case A: Recovery Code Verification

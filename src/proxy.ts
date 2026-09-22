@@ -166,6 +166,7 @@ export async function proxy(req: NextRequest) {
     const isPublicPlatformApi =
       path === "/api/platform-admin/auth/login" ||
       path === "/api/platform-admin/auth/2fa/challenge" ||
+      path === "/api/platform-admin/auth/2fa/send-email-code" ||
       path === "/api/platform-admin/auth/passkeys/auth-options" ||
       path === "/api/platform-admin/auth/passkeys/auth-verify";
 
@@ -201,11 +202,9 @@ export async function proxy(req: NextRequest) {
 
       const token = req.cookies.get(PLATFORM_SESSION_COOKIE)?.value;
       const session = token ? await verifyToken(token) : null;
-
       if (!session || session.role !== "PLATFORM_ADMIN") {
         return NextResponse.redirect(createCleanRedirectUrl("/platform-admin/login", req));
       }
-
       return NextResponse.next();
     }
 
@@ -221,6 +220,7 @@ export async function proxy(req: NextRequest) {
           path === "/api/restaurant/auth/login" ||
           path.startsWith("/api/restaurant/auth/passkeys") ||
           path.startsWith("/api/restaurant/auth/2fa/challenge") ||
+          path === "/api/restaurant/auth/2fa/send-email-code" ||
           path === "/api/restaurant/activate" ||
           path.endsWith("/branding") ||
           path.startsWith("/api/restaurant/onboarding/portal");

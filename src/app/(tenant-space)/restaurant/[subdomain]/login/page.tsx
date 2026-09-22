@@ -175,6 +175,26 @@ export default function AppleTenantLoginPage() {
     }
   };
 
+  const handleSendEmailCode = async () => {
+    setError("");
+    setEmailSending(true);
+    try {
+      const res = await fetch("/api/restaurant/auth/2fa/send-email-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeToken }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send email verification code");
+      setEmailSentInfo(data.message || "Verification code sent to your email!");
+      setMfaMethod("EMAIL");
+    } catch (err: any) {
+      setError(err.message || "Failed to send email code");
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
   const handle2FASubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -182,9 +202,10 @@ export default function AppleTenantLoginPage() {
 
     try {
       const isRecovery = mfaMethod === "RECOVERY";
+      const isEmail = mfaMethod === "EMAIL";
       const codeToVerify = isRecovery ? recoveryCode.trim() : otpCode.trim();
 
-      if (mfaMethod === "TOTP") {
+      if (mfaMethod === "TOTP" || mfaMethod === "EMAIL") {
         if (otpCode.length !== 6) {
           throw new Error("Please enter a 6-digit authentication code.");
         }
@@ -201,6 +222,7 @@ export default function AppleTenantLoginPage() {
         otpCode: codeToVerify,
         recoveryCode: codeToVerify,
         isRecoveryCode: isRecovery,
+        isEmailCode: isEmail,
         method: mfaMethod,
         trustDevice,
       };
@@ -446,7 +468,7 @@ export default function AppleTenantLoginPage() {
           {step === "2FA" && (
             <div className="space-y-4">
               {/* Method Selector Tabs */}
-              <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-white/[0.06] text-xs">
+              <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-white/[0.06] text-[11px]">
                 {hasPasskeys && (
                   <button
                     type="button"
@@ -454,7 +476,7 @@ export default function AppleTenantLoginPage() {
                       setMfaMethod("PASSKEY");
                       setError("");
                     }}
-                    className={`py-1.5 px-2 rounded-lg font-medium transition cursor-pointer text-center ${
+                    className={`py-1.5 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
                       mfaMethod === "PASSKEY"
                         ? "bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30"
                         : "text-slate-400 hover:text-white"
@@ -469,13 +491,27 @@ export default function AppleTenantLoginPage() {
                     setMfaMethod("TOTP");
                     setError("");
                   }}
-                  className={`py-1.5 px-2 rounded-lg font-medium transition cursor-pointer text-center ${
+                  className={`py-1.5 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
                     mfaMethod === "TOTP"
                       ? "bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30"
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
-                  Authenticator
+                  App OTP
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMfaMethod("EMAIL");
+                    setError("");
+                  }}
+                  className={`py-1.5 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
+                    mfaMethod === "EMAIL"
+                      ? "bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Email
                 </button>
                 <button
                   type="button"
@@ -483,13 +519,13 @@ export default function AppleTenantLoginPage() {
                     setMfaMethod("RECOVERY");
                     setError("");
                   }}
-                  className={`py-1.5 px-2 rounded-lg font-medium transition cursor-pointer text-center ${
+                  className={`py-1.5 px-1 rounded-lg font-medium transition cursor-pointer text-center ${
                     mfaMethod === "RECOVERY"
                       ? "bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30"
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
-                  Recovery
+                  Backup
                 </button>
               </div>
 
@@ -567,7 +603,97 @@ export default function AppleTenantLoginPage() {
                       "Verify & Sign In"
                     )}
                   </button>
+
+                  <div className="text-center pt-1">
+                    <button
+                      type="button"
+                      onClick={handleSendEmailCode}
+                      disabled={emailSending}
+                      className="text-xs text-amber-400 hover:text-amber-300 font-semibold underline cursor-pointer"
+                    >
+                      {emailSending ? "Sending Code to Email..." : "Try another way: Send code to Email"}
+                    </button>
+                  </div>
                 </form>
+              )}
+
+              {/* Email Code Form */}
+              {mfaMethod === "EMAIL" && (
+                <div className="space-y-4">
+                  {emailSentInfo ? (
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-semibold text-emerald-300 text-center">
+                      {emailSentInfo}
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 text-center">
+                      Click below to send a 6-digit single-use verification code to your registered email address.
+                    </div>
+                  )}
+
+                  {!emailSentInfo ? (
+                    <button
+                      type="button"
+                      onClick={handleSendEmailCode}
+                      disabled={emailSending}
+                      className="w-full py-3 px-4 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow-sm disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {emailSending ? "Sending Email Code..." : "Send Verification Code to Email"}
+                    </button>
+                  ) : (
+                    <form className="space-y-4" onSubmit={handle2FASubmit}>
+                      <div>
+                        <label
+                          htmlFor="email-otp"
+                          className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 text-center"
+                        >
+                          6-Digit Email Code
+                        </label>
+                        <input
+                          id="email-otp"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={6}
+                          autoFocus
+                          required
+                          placeholder="000000"
+                          value={otpCode}
+                          onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                          className="w-full rounded-xl px-4 py-3 text-center font-mono text-xl tracking-[0.4em] font-bold border border-white/[0.09] bg-[#080B12] text-white transition focus:outline-hidden focus:border-amber-500/60"
+                        />
+                      </div>
+
+                      <label className="flex items-center gap-2 text-xs cursor-pointer select-none text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={trustDevice}
+                          onChange={(e) => setTrustDevice(e.target.checked)}
+                          className="w-4 h-4 rounded border-slate-700 bg-[#080B12] text-amber-500 focus:ring-amber-400 cursor-pointer"
+                        />
+                        <span>Trust this device for 30 days</span>
+                      </label>
+
+                      <button
+                        type="submit"
+                        disabled={verifying2fa || otpCode.length !== 6}
+                        className="w-full py-3 px-4 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow-sm disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        {verifying2fa ? "Verifying..." : "Verify & Sign In"}
+                      </button>
+
+                      <div className="text-center pt-1">
+                        <button
+                          type="button"
+                          onClick={handleSendEmailCode}
+                          disabled={emailSending}
+                          className="text-xs text-amber-400 hover:text-amber-300 font-semibold underline cursor-pointer"
+                        >
+                          {emailSending ? "Resending..." : "Resend Code to Email"}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
               )}
 
               {/* Recovery Code Form */}

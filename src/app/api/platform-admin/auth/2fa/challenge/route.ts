@@ -11,6 +11,7 @@ import {
   verifyTotpCode,
   verifyRecoveryCodeMatch,
 } from "@/core/auth/two-factor";
+import { verifyAndConsumeEmailCode } from "@/core/auth/two-factor-email";
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,7 +26,8 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { challengeToken, code, isRecoveryCode, trustDevice } = body;
+    const { challengeToken, code, isRecoveryCode, isEmailCode, method, trustDevice } = body;
+    const isEmail = Boolean(isEmailCode || method === "EMAIL");
 
     if (!challengeToken || typeof challengeToken !== "string") {
       return NextResponse.json({ error: "Missing or invalid challenge token" }, { status: 400 });
@@ -52,6 +54,38 @@ export async function POST(req: NextRequest) {
 
     if (!platformUser || platformUser.tokenVersion !== payload.tokenVersion) {
       return NextResponse.json({ error: "Invalid session. Please sign in again." }, { status: 401 });
+    }
+
+    // Case A: Email OTP Verification (Single-Use Code)
+    if (isEmail) {
+      const emailKey = `platform_2fa_email:${platformUser.id}`;
+      const emailRes = verifyAndConsumeEmailCode(emailKey, code);
+      if (!emailRes.valid) {
+        return NextResponse.json(
+          { error: emailRes.error || "Invalid verification code" },
+          { status: 400 }
+        );
+      }
+
+      await setPlatformSession({
+        userId: platformUser.id,
+        email: platformUser.email,
+        name: platformUser.name,
+        role: "PLATFORM_ADMIN",
+        tokenVersion: platformUser.tokenVersion,
+      });
+
+      await trackPlatformSession(platformUser.id, req.headers);
+
+      if (trustDevice) {
+        await createPlatformTrustedDevice(platformUser.id, req.headers, 30);
+      }
+
+      return NextResponse.json({
+        success: true,
+        user: { name: platformUser.name, email: platformUser.email },
+        usedEmailCode: true,
+      });
     }
 
     // Case A: Recovery Code

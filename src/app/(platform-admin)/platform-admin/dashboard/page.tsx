@@ -317,15 +317,7 @@ export default function ApplePlatformAdminDashboard() {
     primaryAdminName: "",
     primaryAdminEmail: "",
   });
-  const [selectedModules, setSelectedModules] = useState<string[]>([
-    "inventory",
-    "attendance",
-    "workforce",
-    "shifts",
-    "payroll",
-    "pos",
-    "finance",
-  ]);
+  const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [createdInvite, setCreatedInvite] = useState<{
@@ -827,30 +819,25 @@ export default function ApplePlatformAdminDashboard() {
       >
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center space-x-3.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-b from-[#0071E3] to-[#0051A8] flex items-center justify-center font-bold text-white shadow-sm shadow-blue-500/30">
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-              </svg>
-            </div>
+            <img src="/resto-bird-logo.png" alt="Resto Bird" className="h-8 w-auto object-contain" />
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className={`text-sm font-semibold tracking-tight ${isDark ? "text-white" : "text-[#1D1D1F]"}`}>
-                  Resto Bird Platform
-                </h1>
-                <span
-                  className={`text-[10px] font-medium tracking-wide uppercase px-2 py-0.5 rounded-full border ${
-                    isDark
-                      ? "bg-white/[0.06] text-[#9BA1B0] border-white/[0.08]"
-                      : "bg-slate-100 text-slate-600 border-slate-200"
-                  }`}
-                >
-                  Platform Super Admin
-                </span>
-              </div>
+              <h1 className={`text-sm font-semibold tracking-tight ${isDark ? "text-white" : "text-[#1D1D1F]"}`}>
+                Resto Bird Platform
+              </h1>
             </div>
           </div>
 
           <div className="flex items-center space-x-3">
+            <span
+              className={`text-[10px] font-medium tracking-wide uppercase px-2.5 py-0.5 rounded-full border ${
+                isDark
+                  ? "bg-white/[0.06] text-[#9BA1B0] border-white/[0.08]"
+                  : "bg-slate-100 text-slate-600 border-slate-200"
+              }`}
+            >
+              Platform Super Admin
+            </span>
+
             {/* Apple Sliding Sun / Moon Theme Toggle */}
             <button
               type="button"
@@ -896,17 +883,6 @@ export default function ApplePlatformAdminDashboard() {
                 </svg>
               </span>
             </button>
-
-            <div
-              className={`hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-medium ${
-                isDark
-                  ? "bg-emerald-500/[0.08] border-emerald-500/20 text-emerald-400"
-                  : "bg-emerald-50 border-emerald-200 text-emerald-700"
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span>Production Live</span>
-            </div>
 
             <button
               onClick={handleLogout}
