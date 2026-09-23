@@ -36,6 +36,16 @@ export default function OnboardingTab({ subdomain, onCountChange }: OnboardingTa
   const [sessions, setSessions] = useState<Session[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [showStartModal, setShowStartModal] = useState(false);
+  const [confirmDeleteSession, setConfirmDeleteSession] = useState<Session | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [startForm, setStartForm] = useState({ employeeId: "", templateId: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
   // Modals & search states
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [templateSearchQuery, setTemplateSearchQuery] = useState("");
