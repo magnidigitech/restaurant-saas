@@ -6,7 +6,7 @@ import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import ModuleAccessGuard from "@/components/ModuleAccessGuard";
 import OnboardingTab from "./OnboardingTab";
-import { Users, UserCheck, ArrowLeft, Search, Filter, Plus, RotateCcw, Upload, FileSpreadsheet, Download, CheckCircle2 } from "lucide-react";
+import { Users, UserCheck, ArrowLeft, Search, Filter, Plus, RotateCcw, Upload, FileSpreadsheet, Download, CheckCircle2, Archive, RefreshCw, AlertTriangle } from "lucide-react";
 import * as XLSX from "xlsx";
 
 interface Department {
@@ -521,24 +521,43 @@ export default function AppleEmployeeDirectoryPage() {
     }
   };
 
-  const handleToggleArchive = async (id: string, name: string, isArchived: boolean) => {
-    const actionName = isArchived ? "restore" : "archive";
-    if (!confirm(`Are you sure you want to ${actionName} ${name}?`)) return;
+  const [confirmArchiveModal, setConfirmArchiveModal] = useState<{
+    id: string;
+    name: string;
+    isArchived: boolean;
+  } | null>(null);
+  const [archiving, setArchiving] = useState(false);
 
+  const handleToggleArchive = (id: string, name: string, isArchived: boolean) => {
+    setConfirmArchiveModal({ id, name, isArchived });
+  };
+
+  const handleExecuteToggleArchive = async () => {
+    if (!confirmArchiveModal) return;
+    setArchiving(true);
     try {
-      const res = await fetch(`/api/restaurant/employees/${id}`, {
+      const res = await fetch(`/api/restaurant/employees/${confirmArchiveModal.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ archived: !isArchived }),
+        body: JSON.stringify({ archived: !confirmArchiveModal.isArchived }),
       });
       if (res.ok) {
+        flashSuccess(
+          confirmArchiveModal.isArchived
+            ? `Successfully restored ${confirmArchiveModal.name} back to active staff.`
+            : `Successfully archived ${confirmArchiveModal.name}.`
+        );
+        setConfirmArchiveModal(null);
         fetchEmployees();
       } else {
         const d = await res.json();
-        alert(d.error || `Failed to ${actionName} employee`);
+        setError(d.error || `Failed to update status`);
       }
     } catch (e) {
       console.error(e);
+      setError("Network error updating status");
+    } finally {
+      setArchiving(false);
     }
   };
 
@@ -1928,7 +1947,74 @@ export default function AppleEmployeeDirectoryPage() {
                 >
                   {importing ? "Importing..." : `Confirm & Import ${parsedRows.length} Employees`}
                 </button>
-              )}
+      {/* Archive / Restore Custom Confirmation Modal */}
+      {confirmArchiveModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div
+            className={`w-full max-w-md rounded-3xl p-6 border shadow-2xl space-y-5 animate-in zoom-in-95 duration-200 ${
+              isDark ? "bg-[#0E121D] border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex items-center gap-3.5">
+              <div
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                  confirmArchiveModal.isArchived
+                    ? "bg-amber-500/15 text-amber-500 border border-amber-500/30"
+                    : "bg-rose-500/15 text-rose-500 border border-rose-500/30"
+                }`}
+              >
+                {confirmArchiveModal.isArchived ? (
+                  <RefreshCw className="w-6 h-6" />
+                ) : (
+                  <Archive className="w-6 h-6" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-base font-bold tracking-tight">
+                  {confirmArchiveModal.isArchived ? "Restore Employee Profile?" : "Archive Employee Profile?"}
+                </h3>
+                <p className={`text-xs mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  {confirmArchiveModal.name}
+                </p>
+              </div>
+            </div>
+
+            <p className={`text-xs leading-relaxed ${isDark ? "text-slate-300" : "text-slate-600"}`}>
+              {confirmArchiveModal.isArchived
+                ? `Are you sure you want to restore ${confirmArchiveModal.name} back to active staff? They will immediately regain access to shift rosters and schedules.`
+                : `Are you sure you want to archive ${confirmArchiveModal.name}? Their profile will be moved to Archived Staff and deactivated from active rosters.`}
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-black/[0.06] dark:border-white/[0.06]">
+              <button
+                type="button"
+                onClick={() => setConfirmArchiveModal(null)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                  isDark
+                    ? "border-white/10 text-slate-300 hover:bg-white/5"
+                    : "border-slate-200 text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={archiving}
+                onClick={handleExecuteToggleArchive}
+                className={`px-5 py-2.5 rounded-xl text-xs font-bold text-white transition shadow-sm cursor-pointer flex items-center gap-2 ${
+                  confirmArchiveModal.isArchived
+                    ? "bg-amber-600 hover:bg-amber-500 active:scale-95"
+                    : "bg-rose-600 hover:bg-rose-500 active:scale-95"
+                }`}
+              >
+                {archiving ? (
+                  "Processing..."
+                ) : confirmArchiveModal.isArchived ? (
+                  "Yes, Restore Staff"
+                ) : (
+                  "Yes, Archive Staff"
+                )}
+              </button>
             </div>
           </div>
         </div>

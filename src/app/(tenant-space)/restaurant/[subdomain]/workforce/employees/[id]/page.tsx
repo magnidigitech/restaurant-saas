@@ -4,6 +4,7 @@ import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
+import { Archive, RefreshCw } from "lucide-react";
 
 export default function AppleEmployeeDetailPage({
   params,
@@ -100,10 +101,17 @@ export default function AppleEmployeeDetailPage({
     }
   };
 
-  const handleArchiveToggle = async () => {
+  const [confirmArchiveModal, setConfirmArchiveModal] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+
+  const handleArchiveToggle = () => {
+    setConfirmArchiveModal(true);
+  };
+
+  const handleExecuteArchiveToggle = async () => {
     if (!employee) return;
     const isArchived = !!employee.archivedAt;
-    if (!confirm(`Are you sure you want to ${isArchived ? "reactivate" : "archive"} ${employee.firstName}?`)) return;
+    setArchiving(true);
 
     try {
       const res = await fetch(`/api/restaurant/employees/${id}`, {
@@ -111,9 +119,14 @@ export default function AppleEmployeeDetailPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ archived: !isArchived }),
       });
-      if (res.ok) fetchEmployee();
+      if (res.ok) {
+        setConfirmArchiveModal(false);
+        fetchEmployee();
+      }
     } catch (e) {
       console.error(e);
+    } finally {
+      setArchiving(false);
     }
   };
 
@@ -1314,6 +1327,77 @@ export default function AppleEmployeeDetailPage({
                 className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl cursor-pointer"
               >
                 Close Statement
+              </button>
+            </div>
+          </div>
+        </div>
+      {/* Archive / Reactivate Custom Confirmation Modal */}
+      {confirmArchiveModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div
+            className={`w-full max-w-md rounded-3xl p-6 border shadow-2xl space-y-5 animate-in zoom-in-95 duration-200 ${
+              isDark ? "bg-[#0E121D] border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex items-center gap-3.5">
+              <div
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                  isArchived
+                    ? "bg-amber-500/15 text-amber-500 border border-amber-500/30"
+                    : "bg-rose-500/15 text-rose-500 border border-rose-500/30"
+                }`}
+              >
+                {isArchived ? (
+                  <RefreshCw className="w-6 h-6" />
+                ) : (
+                  <Archive className="w-6 h-6" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-base font-bold tracking-tight">
+                  {isArchived ? "Reactivate Employee Profile?" : "Archive Employee Profile?"}
+                </h3>
+                <p className={`text-xs mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  {employee.firstName} {employee.lastName} ({employee.employeeCode})
+                </p>
+              </div>
+            </div>
+
+            <p className={`text-xs leading-relaxed ${isDark ? "text-slate-300" : "text-slate-600"}`}>
+              {isArchived
+                ? `Are you sure you want to reactivate ${employee.firstName} ${employee.lastName}? They will immediately regain access to shift schedules and active rosters.`
+                : `Are you sure you want to archive ${employee.firstName} ${employee.lastName}? Their profile will be moved to Archived Staff and deactivated from active rosters.`}
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-black/[0.06] dark:border-white/[0.06]">
+              <button
+                type="button"
+                onClick={() => setConfirmArchiveModal(false)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                  isDark
+                    ? "border-white/10 text-slate-300 hover:bg-white/5"
+                    : "border-slate-200 text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={archiving}
+                onClick={handleExecuteArchiveToggle}
+                className={`px-5 py-2.5 rounded-xl text-xs font-bold text-white transition shadow-sm cursor-pointer flex items-center gap-2 ${
+                  isArchived
+                    ? "bg-amber-600 hover:bg-amber-500 active:scale-95"
+                    : "bg-rose-600 hover:bg-rose-500 active:scale-95"
+                }`}
+              >
+                {archiving ? (
+                  "Processing..."
+                ) : isArchived ? (
+                  "Yes, Reactivate Staff"
+                ) : (
+                  "Yes, Archive Staff"
+                )}
               </button>
             </div>
           </div>
