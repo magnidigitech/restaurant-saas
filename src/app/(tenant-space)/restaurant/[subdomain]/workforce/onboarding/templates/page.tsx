@@ -2,6 +2,29 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  PlusCircle,
+  Copy,
+  Trash2,
+  Eye,
+  Settings as SettingsIcon,
+  HelpCircle,
+  UploadCloud,
+  FileText,
+  CheckSquare,
+  Circle,
+  ChevronDown,
+  PenTool,
+  Calendar,
+  Clock,
+  AlignLeft,
+  AlignJustify,
+  CheckCircle2,
+  FolderPlus,
+  Palette,
+  GripHorizontal,
+  ArrowLeft,
+} from "lucide-react";
 
 type TaskType = "FORM_INPUT" | "SIGNATURE" | "DOCUMENT" | "DATE" | "CHECKBOX";
 
@@ -31,21 +54,21 @@ interface GoogleFieldType {
   taskType: TaskType;
   label: string;
   desc: string;
-  badge: string;
+  icon: React.ReactNode;
   hasOptions?: boolean;
 }
 
 const GOOGLE_FIELD_TYPES: GoogleFieldType[] = [
-  { key: "short_answer", taskType: "FORM_INPUT", label: "Short Answer", desc: "Single line text response", badge: "Short Text" },
-  { key: "paragraph", taskType: "FORM_INPUT", label: "Paragraph", desc: "Long text paragraph response", badge: "Paragraph" },
-  { key: "multiple_choice", taskType: "FORM_INPUT", label: "Multiple Choice (Radio)", desc: "Single option radio selection", badge: "Radio", hasOptions: true },
-  { key: "checkboxes", taskType: "CHECKBOX", label: "Checkboxes (Multi-Select)", desc: "Multiple options checklist", badge: "Checkboxes", hasOptions: true },
-  { key: "dropdown", taskType: "FORM_INPUT", label: "Dropdown", desc: "Select option from dropdown menu", badge: "Dropdown", hasOptions: true },
-  { key: "file_upload", taskType: "DOCUMENT", label: "File Upload", desc: "Upload ID, PDF, License or Photo", badge: "File Upload" },
-  { key: "signature", taskType: "SIGNATURE", label: "Digital Signature", desc: "Touch or mouse signature sign-off", badge: "Signature" },
-  { key: "date", taskType: "DATE", label: "Date", desc: "Calendar date picker", badge: "Date" },
-  { key: "time", taskType: "FORM_INPUT", label: "Time", desc: "Time picker input", badge: "Time" },
-  { key: "agreement", taskType: "CHECKBOX", label: "Checklist Agreement", desc: "Confirmation agreement checkbox", badge: "Agreement" },
+  { key: "short_answer", taskType: "FORM_INPUT", label: "Short answer", desc: "Single line text response", icon: <AlignLeft className="w-4 h-4 text-gray-600" /> },
+  { key: "paragraph", taskType: "FORM_INPUT", label: "Paragraph", desc: "Long text paragraph response", icon: <AlignJustify className="w-4 h-4 text-gray-600" /> },
+  { key: "multiple_choice", taskType: "FORM_INPUT", label: "Multiple choice", desc: "Single option selection", icon: <Circle className="w-4 h-4 text-gray-600" />, hasOptions: true },
+  { key: "checkboxes", taskType: "CHECKBOX", label: "Checkboxes", desc: "Multiple options selection", icon: <CheckSquare className="w-4 h-4 text-gray-600" />, hasOptions: true },
+  { key: "dropdown", taskType: "FORM_INPUT", label: "Dropdown", desc: "Choose from list menu", icon: <ChevronDown className="w-4 h-4 text-gray-600" />, hasOptions: true },
+  { key: "file_upload", taskType: "DOCUMENT", label: "File upload", desc: "Upload ID, PDF, License or Photo", icon: <UploadCloud className="w-4 h-4 text-gray-600" /> },
+  { key: "signature", taskType: "SIGNATURE", label: "Digital Signature", desc: "Mouse or touch signature sign-off", icon: <PenTool className="w-4 h-4 text-gray-600" /> },
+  { key: "date", taskType: "DATE", label: "Date", desc: "Calendar date picker", icon: <Calendar className="w-4 h-4 text-gray-600" /> },
+  { key: "time", taskType: "FORM_INPUT", label: "Time", desc: "Time picker input", icon: <Clock className="w-4 h-4 text-gray-600" /> },
+  { key: "agreement", taskType: "CHECKBOX", label: "Agreement Checkbox", desc: "Confirmation checkbox", icon: <CheckCircle2 className="w-4 h-4 text-gray-600" /> },
 ];
 
 export default function OnboardingTemplatesPage() {
@@ -57,22 +80,28 @@ export default function OnboardingTemplatesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<Template | null>(null);
+
+  // Tabs: "questions" | "responses" | "settings"
+  const [activeTab, setActiveTab] = useState<"questions" | "responses" | "settings">("questions");
   const [viewMode, setViewMode] = useState<"edit" | "preview">("edit");
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
-  // Drag and drop state
+  // Drag & Drop
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
-  // File upload demo state
-  const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
-  const [previewFiles, setPreviewFiles] = useState<{ [key: string]: string }>({});
+  // Field type dropdown menu open state per task
+  const [openDropdownTaskId, setOpenDropdownTaskId] = useState<string | null>(null);
 
   // Template creation modal
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({ name: "", description: "", isDefault: false });
   const [submitting, setSubmitting] = useState(false);
   const [addingTask, setAddingTask] = useState(false);
+
+  // Preview Upload file mock
+  const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+  const [previewFiles, setPreviewFiles] = useState<{ [key: string]: string }>({});
 
   const fetchTemplates = async () => {
     try {
@@ -117,11 +146,17 @@ export default function OnboardingTemplatesPage() {
     }
   };
 
-  useEffect(() => { fetchTemplates(); }, []);
+  useEffect(() => {
+    fetchTemplates();
+  }, []);
 
   const handleCreateTemplate = async () => {
-    if (!createForm.name) { setError("Template name is required"); return; }
-    setSubmitting(true); setError("");
+    if (!createForm.name) {
+      setError("Template name is required");
+      return;
+    }
+    setSubmitting(true);
+    setError("");
     try {
       const res = await fetch("/api/restaurant/onboarding/templates", {
         method: "POST",
@@ -129,8 +164,8 @@ export default function OnboardingTemplatesPage() {
         body: JSON.stringify({
           ...createForm,
           tasks: [
-            { title: "Full Legal Name", description: "As shown on official ID", taskType: "FORM_INPUT", isRequired: true },
-            { title: "Digital Signature", description: "Sign to confirm onboarding details", taskType: "SIGNATURE", isRequired: true },
+            { title: "Full Legal Name", description: "As shown on official ID", taskType: "FORM_INPUT", isRequired: true, fieldConfig: JSON.stringify({ subtype: "short_answer" }) },
+            { title: "Digital Signature", description: "Sign to confirm onboarding details", taskType: "SIGNATURE", isRequired: true, fieldConfig: JSON.stringify({ subtype: "signature" }) },
           ],
         }),
       });
@@ -138,14 +173,22 @@ export default function OnboardingTemplatesPage() {
       if (!res.ok) throw new Error(data.error);
       setShowCreateModal(false);
       setCreateForm({ name: "", description: "", isDefault: false });
+      if (data.template) {
+        setSelected(data.template);
+        if (data.template.tasks?.length > 0) setActiveTaskId(data.template.tasks[0].id);
+      }
       fetchTemplates();
-    } catch (e: any) { setError(e.message || "Failed to create template"); }
-    finally { setSubmitting(false); }
+    } catch (e: any) {
+      setError(e.message || "Failed to create template");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleAddField = async (fieldDef: GoogleFieldType) => {
     if (!selected) return;
-    setAddingTask(true); setError("");
+    setAddingTask(true);
+    setError("");
     const initialConfig = fieldDef.hasOptions
       ? JSON.stringify({ subtype: fieldDef.key, options: ["Option 1", "Option 2"] })
       : JSON.stringify({ subtype: fieldDef.key });
@@ -156,10 +199,10 @@ export default function OnboardingTemplatesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "add_task",
-          title: `Untitled ${fieldDef.label}`,
+          title: `Untitled question`,
           description: "",
           taskType: fieldDef.taskType,
-          isRequired: true,
+          isRequired: false,
           requiresDoc: fieldDef.taskType === "DOCUMENT",
           fieldConfig: initialConfig,
         }),
@@ -172,8 +215,44 @@ export default function OnboardingTemplatesPage() {
         if (lastTask) setActiveTaskId(lastTask.id);
       }
       fetchTemplates();
-    } catch (e: any) { setError(e.message || "Failed to add question field"); }
-    finally { setAddingTask(false); }
+    } catch (e: any) {
+      setError(e.message || "Failed to add question field");
+    } finally {
+      setAddingTask(false);
+    }
+  };
+
+  const handleDuplicateTask = async (taskToDup: Task) => {
+    if (!selected) return;
+    setAddingTask(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/restaurant/onboarding/templates/${selected.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add_task",
+          title: `${taskToDup.title} (Copy)`,
+          description: taskToDup.description || "",
+          taskType: taskToDup.taskType,
+          isRequired: taskToDup.isRequired,
+          requiresDoc: taskToDup.requiresDoc,
+          fieldConfig: taskToDup.fieldConfig,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      if (data.template) {
+        setSelected(data.template);
+        const lastTask = data.template.tasks[data.template.tasks.length - 1];
+        if (lastTask) setActiveTaskId(lastTask.id);
+      }
+      fetchTemplates();
+    } catch (e: any) {
+      setError(e.message || "Failed to duplicate question");
+    } finally {
+      setAddingTask(false);
+    }
   };
 
   const handleMoveTask = async (fromIdx: number, toIdx: number) => {
@@ -195,9 +274,7 @@ export default function OnboardingTemplatesPage() {
         }),
       });
       const data = await res.json();
-      if (data.template) {
-        setSelected(data.template);
-      }
+      if (data.template) setSelected(data.template);
     } catch {
       setError("Failed to reorder questions");
       fetchTemplates();
@@ -257,6 +334,7 @@ export default function OnboardingTemplatesPage() {
 
   const handleTaskFieldDefChange = (taskId: string, fieldDef: GoogleFieldType) => {
     if (!selected) return;
+    setOpenDropdownTaskId(null);
     const initialConfig = fieldDef.hasOptions
       ? JSON.stringify({ subtype: fieldDef.key, options: ["Option 1", "Option 2"] })
       : JSON.stringify({ subtype: fieldDef.key });
@@ -407,123 +485,316 @@ export default function OnboardingTemplatesPage() {
   };
 
   const handleArchive = async (id: string) => {
-    if (!confirm("Archive this template?")) return;
+    if (!confirm("Archive this form template?")) return;
     await fetch(`/api/restaurant/onboarding/templates/${id}`, { method: "DELETE" });
     setSelected(null);
     fetchTemplates();
   };
 
-  if (loading) return <main className="flex min-h-screen items-center justify-center bg-gray-50 text-gray-500 font-semibold">Loading Form Builder...</main>;
-
-  const isReorderingActive = draggedIndex !== null;
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f0ebf8] text-gray-600 font-medium text-sm">
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 border-2 border-[#673ab7] border-t-transparent rounded-full animate-spin" />
+          <span>Loading Google Form Builder...</span>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
-      {/* Top Navbar */}
-      <header className="border-b border-gray-200 bg-white sticky top-0 z-40 px-6 py-4 flex flex-wrap justify-between items-center gap-4 shadow-sm">
-        <div className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="text-gray-600 hover:text-gray-900 transition-colors cursor-pointer text-sm font-semibold">
-            ← Back
-          </button>
-          <div className="h-4 w-px bg-gray-200" />
-          <div>
-            <h1 className="text-lg font-bold text-gray-900">Form & Template Builder</h1>
-            <p className="text-xs text-gray-500">Create employee onboarding forms</p>
+    <div className="min-h-screen bg-[#f0ebf8] text-gray-900 font-sans selection:bg-[#673ab7]/20">
+      {/* ── GOOGLE FORMS TOP HEADER ────────────────────────────────────────── */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-xs">
+        <div className="px-6 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => router.back()}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600 cursor-pointer"
+              title="Back"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="w-8 h-8 rounded-lg bg-[#673ab7] flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-xs">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={selected?.name || "Untitled Form"}
+                  onChange={(e) => handleFormTitleChange(e.target.value)}
+                  onBlur={handleSaveFormHeader}
+                  className="text-base font-medium text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-b-[#673ab7] focus:outline-none truncate max-w-xs sm:max-w-md px-1"
+                />
+                {selected?.isDefault && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-[#673ab7] uppercase">
+                    Default
+                  </span>
+                )}
+              </div>
+              <span className="text-[11px] text-gray-400 block px-1">All changes saved in cloud</span>
+            </div>
+          </div>
+
+          {/* Form Switcher & Actions */}
+          <div className="flex items-center gap-3 shrink-0">
+            {templates.length > 0 && (
+              <select
+                value={selected?.id || ""}
+                onChange={(e) => {
+                  const tpl = templates.find((t) => t.id === e.target.value);
+                  if (tpl) {
+                    setSelected(tpl);
+                    if (tpl.tasks.length > 0) setActiveTaskId(tpl.tasks[0].id);
+                  }
+                }}
+                className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-800 focus:outline-none focus:border-[#673ab7] cursor-pointer"
+              >
+                {templates.map((tpl) => (
+                  <option key={tpl.id} value={tpl.id}>
+                    {tpl.name} ({tpl.tasks.length} questions)
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <button
+              onClick={() => setViewMode(viewMode === "edit" ? "preview" : "edit")}
+              className={`p-2 rounded-full transition-colors cursor-pointer ${
+                viewMode === "preview" ? "bg-purple-100 text-[#673ab7]" : "hover:bg-gray-100 text-gray-600"
+              }`}
+              title="Preview Form"
+            >
+              <Eye className="w-5 h-5" />
+            </button>
+
+            <button
+              onClick={() => {
+                setCreateForm({ name: "", description: "", isDefault: false });
+                setShowCreateModal(true);
+              }}
+              className="px-4 py-2 bg-[#673ab7] hover:bg-[#5e35b1] text-white font-semibold text-xs rounded-lg transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>New Form</span>
+            </button>
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-3">
-          {/* Template Select Dropdown */}
-          <select
-            value={selected?.id || ""}
-            onChange={(e) => {
-              const tpl = templates.find((t) => t.id === e.target.value);
-              if (tpl) { setSelected(tpl); if (tpl.tasks.length > 0) setActiveTaskId(tpl.tasks[0].id); }
-            }}
-            className="bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 focus:outline-none focus:border-indigo-600 cursor-pointer"
-          >
-            {templates.map((tpl) => (
-              <option key={tpl.id} value={tpl.id}>{tpl.name} ({tpl.tasks.length} questions)</option>
-            ))}
-          </select>
-
-          <div className="bg-gray-100 border border-gray-200 p-1 rounded-xl flex items-center gap-1">
+        {/* Google Forms Sub-Navigation Tabs */}
+        {selected && (
+          <div className="flex items-center justify-center gap-8 border-t border-gray-100 text-sm font-medium text-gray-600">
             <button
-              onClick={() => setViewMode("edit")}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                viewMode === "edit" ? "bg-indigo-600 text-white shadow" : "text-gray-600 hover:text-gray-900"
+              onClick={() => {
+                setActiveTab("questions");
+                setViewMode("edit");
+              }}
+              className={`py-2.5 px-4 border-b-2 transition-colors cursor-pointer ${
+                activeTab === "questions" && viewMode === "edit"
+                  ? "border-[#673ab7] text-[#673ab7] font-semibold"
+                  : "border-transparent hover:text-gray-900"
               }`}
             >
-              Edit Form
+              Questions
             </button>
+
             <button
-              onClick={() => setViewMode("preview")}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                viewMode === "preview" ? "bg-indigo-600 text-white shadow" : "text-gray-600 hover:text-gray-900"
+              onClick={() => {
+                setActiveTab("responses");
+                setViewMode("edit");
+              }}
+              className={`py-2.5 px-4 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeTab === "responses"
+                  ? "border-[#673ab7] text-[#673ab7] font-semibold"
+                  : "border-transparent hover:text-gray-900"
               }`}
             >
-              Preview Form
+              <span>Responses</span>
+              <span className="w-5 h-5 rounded-full bg-gray-200 text-gray-700 text-xs font-bold flex items-center justify-center">
+                {selected._count?.onboardings || 0}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab("settings");
+                setViewMode("edit");
+              }}
+              className={`py-2.5 px-4 border-b-2 transition-colors cursor-pointer ${
+                activeTab === "settings"
+                  ? "border-[#673ab7] text-[#673ab7] font-semibold"
+                  : "border-transparent hover:text-gray-900"
+              }`}
+            >
+              Settings
             </button>
           </div>
-
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl cursor-pointer transition-all shadow-sm"
-          >
-            + Create Form
-          </button>
-        </div>
+        )}
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">{error}</div>}
+      {/* ── MAIN GOOGLE FORM CANVAS ────────────────────────────────────────── */}
+      <main className="max-w-2xl mx-auto px-4 py-6">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-4 py-3 rounded-xl mb-4 font-semibold">
+            {error}
+          </div>
+        )}
 
         {selected ? (
-          viewMode === "edit" ? (
-            <div className="space-y-6">
-              {/* Reorder Mode Banner */}
-              {isReorderingActive && (
-                <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs px-4 py-2.5 rounded-xl font-semibold text-center animate-pulse">
-                  Hold and drag card to target position. Release to save reordered positions.
-                </div>
-              )}
-
-              {/* Form Title Card */}
-              <div className="bg-white border-t-4 border-t-indigo-600 border-x border-b border-gray-200 rounded-2xl p-6 shadow-sm space-y-4">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-600 mb-1">Form Title</label>
-                  <input
-                    type="text"
-                    value={selected.name}
-                    onChange={(e) => handleFormTitleChange(e.target.value)}
-                    onBlur={handleSaveFormHeader}
-                    placeholder="Form Title *"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xl font-bold text-gray-900 focus:bg-white focus:outline-none focus:border-indigo-600 transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">Form Description</label>
-                  <input
-                    type="text"
-                    placeholder="Provide instructions for the employee (optional)..."
-                    value={selected.description || ""}
-                    onChange={(e) => handleFormDescriptionChange(e.target.value)}
-                    onBlur={handleSaveFormHeader}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 focus:bg-white focus:outline-none focus:border-indigo-600 transition-all"
-                  />
-                </div>
-
-                <div className="flex justify-between items-center pt-2 text-xs text-gray-500 border-t border-gray-100">
-                  <span className="font-semibold">{selected.tasks.length} Questions Configured</span>
-                  <button onClick={() => handleArchive(selected.id)} className="text-red-600 hover:text-red-700 font-semibold cursor-pointer">
-                    Archive Form
-                  </button>
+          viewMode === "preview" ? (
+            /* ── PREVIEW MODE ── */
+            <div className="space-y-4">
+              <div className="bg-white border-t-[10px] border-t-[#673ab7] border-x border-b border-gray-200 rounded-xl p-8 shadow-sm space-y-3">
+                <span className="text-xs text-[#673ab7] font-bold uppercase tracking-widest block">Live Employee Preview</span>
+                <h1 className="text-3xl font-semibold text-gray-900">{selected.name}</h1>
+                {selected.description && <p className="text-sm text-gray-600">{selected.description}</p>}
+                <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500 font-medium">
+                  <span>Candidate Form View</span>
+                  <span className="text-red-500 font-semibold">* Indicates required field</span>
                 </div>
               </div>
 
-              {/* Question Cards Stack */}
+              {selected.tasks.map((task, idx) => {
+                let parsedConfig = { subtype: "short_answer", options: ["Option 1", "Option 2"] };
+                try {
+                  if (task.fieldConfig) parsedConfig = JSON.parse(task.fieldConfig);
+                } catch {}
+
+                return (
+                  <div key={task.id} className="bg-white border border-gray-200 rounded-xl p-6 shadow-xs space-y-3">
+                    <label className="block text-base font-normal text-gray-900">
+                      {idx + 1}. {task.title} {task.isRequired && <span className="text-red-500">*</span>}
+                    </label>
+                    {task.description && <p className="text-xs text-gray-500">{task.description}</p>}
+
+                    {/* Form Field Preview Mock */}
+                    <div className="pt-2">
+                      {parsedConfig.subtype === "short_answer" && (
+                        <input type="text" placeholder="Short answer text" disabled className="w-full sm:w-2/3 border-b border-gray-300 py-1.5 text-sm text-gray-400 outline-none bg-transparent" />
+                      )}
+                      {parsedConfig.subtype === "paragraph" && (
+                        <textarea placeholder="Long answer text" disabled rows={2} className="w-full border-b border-gray-300 py-1.5 text-sm text-gray-400 outline-none bg-transparent resize-none" />
+                      )}
+                      {(parsedConfig.subtype === "multiple_choice" || parsedConfig.subtype === "checkboxes") && (
+                        <div className="space-y-2">
+                          {(parsedConfig.options || []).map((opt: string, oIdx: number) => (
+                            <label key={oIdx} className="flex items-center gap-3 text-sm text-gray-700">
+                              <input type={parsedConfig.subtype === "checkboxes" ? "checkbox" : "radio"} disabled className="accent-[#673ab7] w-4 h-4" />
+                              <span>{opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      {parsedConfig.subtype === "dropdown" && (
+                        <select disabled className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-500">
+                          <option>Choose an option...</option>
+                          {(parsedConfig.options || []).map((opt: string, oIdx: number) => (
+                            <option key={oIdx}>{opt}</option>
+                          ))}
+                        </select>
+                      )}
+                      {task.taskType === "DOCUMENT" && (
+                        <div className="p-4 border border-dashed border-gray-300 bg-gray-50 rounded-lg text-center text-xs text-gray-500">
+                          Click to select and upload file attachment (PDF / Image)
+                        </div>
+                      )}
+                      {task.taskType === "SIGNATURE" && (
+                        <div className="h-24 border border-gray-300 bg-white rounded-lg flex items-center justify-center text-xs text-gray-400">
+                          Digital Signature Pad
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              <button disabled className="w-full py-3 bg-[#673ab7] text-white font-semibold text-sm rounded-xl cursor-not-allowed opacity-75 shadow-sm">
+                Submit Form (Preview Mode Only)
+              </button>
+            </div>
+          ) : activeTab === "responses" ? (
+            /* ── RESPONSES TAB ── */
+            <div className="bg-white border border-gray-200 rounded-xl p-8 space-y-6 shadow-xs">
+              <div className="flex items-center justify-between border-b border-gray-200 pb-4">
+                <div>
+                  <h2 className="text-2xl font-semibold text-gray-900">Form Responses</h2>
+                  <p className="text-xs text-gray-500 mt-1">Candidates onboarded with this form template</p>
+                </div>
+                <span className="text-3xl font-bold text-[#673ab7]">{selected._count?.onboardings || 0}</span>
+              </div>
+
+              <div className="py-12 text-center space-y-3">
+                <div className="w-14 h-14 bg-purple-50 text-[#673ab7] rounded-full flex items-center justify-center mx-auto text-xl font-bold">
+                  📊
+                </div>
+                <h3 className="text-base font-semibold text-gray-900">
+                  {selected._count?.onboardings || 0} Total Candidate Submissions
+                </h3>
+                <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                  To view individual employee checklist submissions and completed documents, go to the Employee Directory Onboarding tab.
+                </p>
+                <button
+                  onClick={() => router.push(`/restaurant/${searchParams.get("subdomain") || ""}/workforce/employees?tab=onboarding`)}
+                  className="px-4 py-2 bg-[#673ab7] text-white text-xs font-semibold rounded-lg shadow-xs cursor-pointer"
+                >
+                  View Onboarding Sessions &rarr;
+                </button>
+              </div>
+            </div>
+          ) : activeTab === "settings" ? (
+            /* ── SETTINGS TAB ── */
+            <div className="bg-white border border-gray-200 rounded-xl p-8 space-y-6 shadow-xs">
+              <div className="border-b border-gray-200 pb-4">
+                <h2 className="text-2xl font-semibold text-gray-900">Form Settings</h2>
+                <p className="text-xs text-gray-500 mt-1">Manage defaults and form actions</p>
+              </div>
+
+              <div className="space-y-4 text-xs">
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-gray-900">Default Onboarding Template</h4>
+                    <p className="text-gray-500">Automatically select this form when creating new hires</p>
+                  </div>
+                  <span className={`px-3 py-1 rounded-full font-bold ${selected.isDefault ? "bg-purple-100 text-[#673ab7]" : "bg-gray-200 text-gray-600"}`}>
+                    {selected.isDefault ? "Default Form" : "Standard Form"}
+                  </span>
+                </div>
+
+                <div className="pt-4 flex justify-between items-center border-t border-gray-100">
+                  <button
+                    onClick={() => handleArchive(selected.id)}
+                    className="px-4 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 font-bold rounded-lg cursor-pointer transition-colors"
+                  >
+                    Archive Form Template
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* ── QUESTIONS EDIT CANVAS (GOOGLE FORM STYLE) ── */
+            <div className="relative space-y-4">
+              {/* 1. Main Header Card */}
+              <div className="bg-white border-t-[10px] border-t-[#673ab7] border-x border-b border-gray-200 rounded-xl p-6 shadow-xs space-y-3 relative">
+                <input
+                  type="text"
+                  value={selected.name}
+                  onChange={(e) => handleFormTitleChange(e.target.value)}
+                  onBlur={handleSaveFormHeader}
+                  placeholder="Form title"
+                  className="w-full text-3xl font-semibold text-gray-900 focus:border-b-2 focus:border-b-[#673ab7] border-b border-transparent outline-none py-1 transition-all"
+                />
+                <input
+                  type="text"
+                  value={selected.description || ""}
+                  onChange={(e) => handleFormDescriptionChange(e.target.value)}
+                  onBlur={handleSaveFormHeader}
+                  placeholder="Form description (instructions for employee)..."
+                  className="w-full text-sm text-gray-600 focus:border-b-2 focus:border-b-[#673ab7] border-b border-transparent outline-none py-1 transition-all"
+                />
+              </div>
+
+              {/* 2. Questions Stack */}
               {selected.tasks.map((task, idx) => {
                 const isActive = activeTaskId === task.id;
                 const isDragging = draggedIndex === idx;
@@ -534,376 +805,299 @@ export default function OnboardingTemplatesPage() {
                   if (task.fieldConfig) parsedConfig = JSON.parse(task.fieldConfig);
                 } catch {}
 
-                const currentFieldDef = GOOGLE_FIELD_TYPES.find((f) => f.key === parsedConfig.subtype) || GOOGLE_FIELD_TYPES[0];
+                const currentFieldDef =
+                  GOOGLE_FIELD_TYPES.find((f) => f.key === parsedConfig.subtype) || GOOGLE_FIELD_TYPES[0];
 
                 return (
-                  <div
-                    key={task.id}
-                    onDragOver={(e) => handleDragOver(e, idx)}
-                    onDrop={(e) => handleDrop(e, idx)}
-                    onClick={() => setActiveTaskId(task.id)}
-                    className={`bg-white border rounded-2xl transition-all duration-200 shadow-sm ${
-                      isDragging
-                        ? "border-2 border-indigo-600 bg-indigo-50 shadow-md ring-2 ring-indigo-200 opacity-50"
-                        : isDragTarget
-                        ? "border-t-4 border-t-indigo-600 border-indigo-300 bg-indigo-50/30"
-                        : isActive
-                        ? "border-indigo-600 ring-2 ring-indigo-100"
-                        : "border-gray-200 hover:border-gray-300 cursor-pointer"
-                    } ${isReorderingActive ? "p-3.5" : "p-6 space-y-4"}`}
-                  >
-                    {/* Header Row (Drag handle & title) */}
-                    <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                  <div key={task.id} className="relative group/card">
+                    <div
+                      onDragOver={(e) => handleDragOver(e, idx)}
+                      onDrop={(e) => handleDrop(e, idx)}
+                      onClick={() => setActiveTaskId(task.id)}
+                      className={`bg-white rounded-xl border transition-all duration-150 relative ${
+                        isDragging
+                          ? "border-2 border-[#673ab7] bg-purple-50/50 shadow-md opacity-50"
+                          : isDragTarget
+                          ? "border-t-4 border-t-[#673ab7] border-purple-300"
+                          : isActive
+                          ? "border-l-[6px] border-l-[#4285f4] border-gray-200 shadow-md p-6 space-y-5"
+                          : "border-gray-200 hover:border-gray-300 shadow-xs p-5 space-y-3 cursor-pointer"
+                      }`}
+                    >
+                      {/* Drag handle dots at center top */}
                       <div
                         draggable
                         onDragStart={(e) => handleDragStart(e, idx)}
                         onDragEnd={handleDragEnd}
-                        className="flex items-center gap-3 cursor-grab active:cursor-grabbing text-gray-600 font-mono text-xs select-none flex-1"
+                        className="flex justify-center text-gray-400 hover:text-gray-700 cursor-grab active:cursor-grabbing select-none"
+                        title="Drag to reorder question"
                       >
-                        <span className="font-bold tracking-widest text-base text-gray-400 hover:text-indigo-600">:::</span>
-                        <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center font-mono">
-                          {idx + 1}
-                        </span>
-                        <span className="font-bold text-sm text-gray-900 line-clamp-1">{task.title || "Untitled Question"}</span>
+                        <GripHorizontal className="w-5 h-5" />
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-gray-100 border border-gray-200 text-indigo-700 rounded">
-                          {currentFieldDef.badge}
-                        </span>
+                      {/* Top Row: Question Title & Field Type Select */}
+                      {isActive ? (
+                        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                          <input
+                            type="text"
+                            value={task.title}
+                            onChange={(e) => handleTaskTitleChange(task.id, e.target.value)}
+                            onBlur={(e) => handleSyncTaskField(task.id, { title: e.target.value })}
+                            placeholder="Question"
+                            className="flex-1 bg-[#f8f9fa] border-b border-gray-400 focus:border-b-2 focus:border-b-[#673ab7] px-3.5 py-3 text-base text-gray-900 outline-none rounded-t-md font-medium w-full"
+                          />
 
-                        {/* Quick Up / Down Reorder Buttons */}
-                        <div className="flex items-center gap-1 ml-2">
-                          <button
-                            type="button"
-                            disabled={idx === 0}
-                            onClick={(e) => { e.stopPropagation(); handleMoveTask(idx, idx - 1); }}
-                            className="px-2 py-1 bg-gray-100 hover:bg-gray-200 disabled:opacity-30 rounded text-xs font-bold text-gray-700 transition-all cursor-pointer"
-                            title="Move Up"
-                          >
-                            ↑
-                          </button>
-                          <button
-                            type="button"
-                            disabled={idx === selected.tasks.length - 1}
-                            onClick={(e) => { e.stopPropagation(); handleMoveTask(idx, idx + 1); }}
-                            className="px-2 py-1 bg-gray-100 hover:bg-gray-200 disabled:opacity-30 rounded text-xs font-bold text-gray-700 transition-all cursor-pointer"
-                            title="Move Down"
-                          >
-                            ↓
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Question Card Full Body */}
-                    {!isReorderingActive && (
-                      <div className="space-y-4 pt-1">
-                        {/* Question Title & Field Type Select */}
-                        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-                          <div className="flex items-center gap-2 flex-1 w-full">
-                            <input
-                              type="text"
-                              value={task.title}
-                              onChange={(e) => handleTaskTitleChange(task.id, e.target.value)}
-                              onBlur={(e) => handleSyncTaskField(task.id, { title: e.target.value })}
-                              placeholder="Question / Field Label *"
-                              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-bold text-gray-900 focus:bg-white focus:outline-none focus:border-indigo-600"
-                            />
-                          </div>
-
-                          <div className="w-full sm:w-auto">
-                            <select
-                              value={currentFieldDef.key}
-                              onChange={(e) => {
-                                const newDef = GOOGLE_FIELD_TYPES.find((f) => f.key === e.target.value);
-                                if (newDef) handleTaskFieldDefChange(task.id, newDef);
+                          {/* Custom Google Forms Dropdown Picker */}
+                          <div className="relative w-full sm:w-56 shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenDropdownTaskId(openDropdownTaskId === task.id ? null : task.id);
                               }}
-                              className="w-full sm:w-auto bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-indigo-600 cursor-pointer"
+                              className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 bg-white border border-gray-300 hover:border-gray-400 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer shadow-xs"
                             >
-                              {GOOGLE_FIELD_TYPES.map((f) => (
-                                <option key={f.key} value={f.key}>
-                                  [{f.badge}] {f.label}
-                                </option>
-                              ))}
-                            </select>
+                              <div className="flex items-center gap-2 truncate">
+                                {currentFieldDef.icon}
+                                <span className="truncate">{currentFieldDef.label}</span>
+                              </div>
+                              <ChevronDown className="w-4 h-4 text-gray-500 shrink-0" />
+                            </button>
+
+                            {/* Dropdown Menu Popup */}
+                            {openDropdownTaskId === task.id && (
+                              <div className="absolute right-0 top-12 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2 animate-in fade-in zoom-in-95 duration-100">
+                                {GOOGLE_FIELD_TYPES.map((f) => (
+                                  <div
+                                    key={f.key}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleTaskFieldDefChange(task.id, f);
+                                    }}
+                                    className={`px-4 py-2.5 text-xs font-medium flex items-center gap-3 cursor-pointer hover:bg-purple-50 transition-colors ${
+                                      currentFieldDef.key === f.key ? "bg-purple-50/80 text-[#673ab7] font-semibold" : "text-gray-700"
+                                    }`}
+                                  >
+                                    {f.icon}
+                                    <div>
+                                      <span className="block">{f.label}</span>
+                                      <span className="text-[10px] text-gray-400 block">{f.desc}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <h3 className="text-base font-normal text-gray-900">
+                              {task.title || "Untitled question"}{" "}
+                              {task.isRequired && <span className="text-red-500">*</span>}
+                            </h3>
+                            {task.description && <p className="text-xs text-gray-500">{task.description}</p>}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-500 shrink-0">
+                            {currentFieldDef.icon}
+                            <span className="font-semibold">{currentFieldDef.label}</span>
+                          </div>
+                        </div>
+                      )}
 
-                        {/* Optional Help Text */}
+                      {/* Optional Help Text Input (When Active) */}
+                      {isActive && (
                         <div>
                           <input
                             type="text"
                             value={task.description || ""}
                             onChange={(e) => handleTaskDescriptionChange(task.id, e.target.value)}
                             onBlur={(e) => handleSyncTaskField(task.id, { description: e.target.value })}
-                            placeholder="Help text or instructions for employee (optional)..."
-                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-xs text-gray-600 focus:bg-white focus:outline-none focus:border-indigo-600"
+                            placeholder="Form description / help text (optional)..."
+                            className="w-full text-xs text-gray-600 border-b border-gray-200 focus:border-b-[#673ab7] outline-none py-1"
                           />
                         </div>
+                      )}
 
-                        {/* Custom Choice Option Builder */}
-                        {currentFieldDef.hasOptions && (
-                          <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
-                            <div className="flex justify-between items-center">
-                              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-600">Choice Options</span>
-                              <button
-                                type="button"
-                                onClick={() => handleAddOption(task.id, task.fieldConfig)}
-                                className="text-xs font-bold text-indigo-600 hover:text-indigo-700 cursor-pointer"
-                              >
-                                + Add Choice Option
-                              </button>
-                            </div>
-
-                            <div className="space-y-2">
-                              {(parsedConfig.options || []).map((opt: string, optIdx: number) => (
-                                <div key={optIdx} className="flex items-center gap-2">
-                                  <span className="text-xs text-gray-400 font-mono">{optIdx + 1}.</span>
+                      {/* Question Options / Body */}
+                      <div className="pt-1">
+                        {/* Choice Options (Multiple choice, Checkboxes, Dropdown) */}
+                        {currentFieldDef.hasOptions ? (
+                          <div className="space-y-2.5">
+                            {(parsedConfig.options || []).map((opt: string, optIdx: number) => (
+                              <div key={optIdx} className="flex items-center gap-3">
+                                {currentFieldDef.key === "checkboxes" ? (
+                                  <SquareCheck className="w-4 h-4 text-gray-400 shrink-0" />
+                                ) : (
+                                  <Circle className="w-4 h-4 text-gray-400 shrink-0" />
+                                )}
+                                {isActive ? (
                                   <input
                                     type="text"
                                     value={opt}
                                     onChange={(e) => handleUpdateOption(task.id, optIdx, e.target.value, task.fieldConfig)}
                                     onBlur={() => handleSyncTaskField(task.id, { fieldConfig: task.fieldConfig })}
-                                    className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-900 focus:outline-none focus:border-indigo-600"
+                                    className="flex-1 text-sm text-gray-800 border-b border-transparent hover:border-gray-300 focus:border-b-[#673ab7] outline-none py-1"
                                   />
-                                  {(parsedConfig.options || []).length > 1 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoveOption(task.id, optIdx, task.fieldConfig)}
-                                      className="text-gray-400 hover:text-red-500 text-xs px-2 py-1 cursor-pointer"
-                                    >
-                                      ✕
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                                ) : (
+                                  <span className="text-sm text-gray-700">{opt}</span>
+                                )}
+                                {isActive && (parsedConfig.options || []).length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveOption(task.id, optIdx, task.fieldConfig)}
+                                    className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                            ))}
 
-                        {/* Input Field Visual Mock */}
-                        {!currentFieldDef.hasOptions && (
-                          <div className="pt-1">
+                            {isActive && (
+                              <button
+                                type="button"
+                                onClick={() => handleAddOption(task.id, task.fieldConfig)}
+                                className="text-xs font-semibold text-gray-500 hover:text-[#673ab7] cursor-pointer pt-1 block"
+                              >
+                                + Add option
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          /* Non-option Field Types Mock Body */
+                          <div className="py-2">
                             {currentFieldDef.key === "short_answer" && (
-                              <input type="text" disabled placeholder="Short answer text response..." className="w-full bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-gray-400 cursor-not-allowed" />
+                              <div className="w-2/3 border-b border-dashed border-gray-300 text-xs text-gray-400 py-1">
+                                Short-answer text
+                              </div>
                             )}
                             {currentFieldDef.key === "paragraph" && (
-                              <textarea disabled placeholder="Paragraph text response..." rows={2} className="w-full bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-400 cursor-not-allowed resize-none" />
-                            )}
-                            {currentFieldDef.key === "signature" && (
-                              <div className="h-24 bg-gray-50 border border-dashed border-gray-300 rounded-xl flex items-center justify-center text-xs text-gray-400 font-mono">Digital Signature Canvas Pad</div>
+                              <div className="w-full border-b border-dashed border-gray-300 text-xs text-gray-400 py-1">
+                                Long-answer text
+                              </div>
                             )}
                             {currentFieldDef.key === "file_upload" && (
-                              <div className="space-y-2">
-                                <input
-                                  type="file"
-                                  ref={(el) => { fileInputRefs.current[task.id] = el; }}
-                                  onChange={(e) => {
-                                    if (e.target.files?.[0]) {
-                                      setPreviewFiles((prev) => ({ ...prev, [task.id]: e.target.files![0].name }));
-                                    }
-                                  }}
-                                  className="hidden"
-                                />
-                                <div
-                                  onClick={() => fileInputRefs.current[task.id]?.click()}
-                                  className="p-4 bg-gray-50 hover:bg-gray-100 border border-dashed border-gray-300 rounded-xl text-center text-xs text-gray-600 hover:text-indigo-600 cursor-pointer transition-all"
-                                >
-                                  {previewFiles[task.id] ? (
-                                    <span className="font-bold text-indigo-600">Selected File: {previewFiles[task.id]}</span>
-                                  ) : (
-                                    "Click to select file attachment"
-                                  )}
-                                </div>
+                              <div className="p-4 bg-gray-50 border border-dashed border-gray-300 rounded-lg text-center text-xs text-gray-500 flex items-center justify-center gap-2">
+                                <UploadCloud className="w-4 h-4 text-gray-400" />
+                                <span>File upload attachment box (PDF, Images, IDs)</span>
+                              </div>
+                            )}
+                            {currentFieldDef.key === "signature" && (
+                              <div className="p-4 bg-gray-50 border border-dashed border-gray-300 rounded-lg text-center text-xs text-gray-500 flex items-center justify-center gap-2">
+                                <PenTool className="w-4 h-4 text-gray-400" />
+                                <span>Digital Signature Pad</span>
                               </div>
                             )}
                             {currentFieldDef.key === "date" && (
-                              <input type="date" disabled className="bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-400 cursor-not-allowed" />
+                              <div className="w-40 border-b border-dashed border-gray-300 text-xs text-gray-400 py-1 flex items-center gap-2">
+                                <Calendar className="w-4 h-4 text-gray-400" />
+                                <span>Month, day, year</span>
+                              </div>
                             )}
                             {currentFieldDef.key === "time" && (
-                              <input type="time" disabled className="bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-400 cursor-not-allowed" />
-                            )}
-                            {currentFieldDef.key === "agreement" && (
-                              <label className="flex items-center gap-2 text-xs text-gray-500 cursor-not-allowed">
-                                <input type="checkbox" disabled checked className="accent-indigo-600" />
-                                Confirmation check box
-                              </label>
+                              <div className="w-32 border-b border-dashed border-gray-300 text-xs text-gray-400 py-1 flex items-center gap-2">
+                                <Clock className="w-4 h-4 text-gray-400" />
+                                <span>Time</span>
+                              </div>
                             )}
                           </div>
                         )}
+                      </div>
 
-                        {/* Card Actions Footer */}
-                        <div className="flex justify-between items-center pt-3 border-t border-gray-100 text-xs">
-                          <label className="flex items-center gap-2 text-gray-700 font-semibold cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={task.isRequired}
-                              onChange={(e) => handleTaskRequiredChange(task.id, e.target.checked)}
-                              className="accent-indigo-600 w-4 h-4"
-                            />
-                            Mandatory / Required Field
-                          </label>
+                      {/* Card Bottom Actions Footer (Google Forms Toolbar) */}
+                      {isActive && (
+                        <div className="flex items-center justify-end gap-4 pt-4 border-t border-gray-100 text-gray-600">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDuplicateTask(task);
+                            }}
+                            className="p-1.5 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+                            title="Duplicate"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </button>
 
                           <button
                             type="button"
-                            onClick={(e) => { e.stopPropagation(); handleDeleteField(task.id); }}
-                            className="px-3 py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 font-bold rounded-lg transition-all cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteField(task.id);
+                            }}
+                            className="p-1.5 hover:bg-gray-100 hover:text-red-600 rounded-full transition-colors cursor-pointer"
+                            title="Delete"
                           >
-                            Delete Question
+                            <Trash2 className="w-4 h-4" />
                           </button>
+
+                          <div className="h-5 w-px bg-gray-300" />
+
+                          {/* Required Toggle Switch */}
+                          <label className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer select-none">
+                            <span>Required</span>
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleTaskRequiredChange(task.id, !task.isRequired);
+                              }}
+                              className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${
+                                task.isRequired ? "bg-[#673ab7]" : "bg-gray-300"
+                              }`}
+                            >
+                              <div
+                                className={`w-4 h-4 rounded-full bg-white shadow-xs transition-transform ${
+                                  task.isRequired ? "translate-x-4" : "translate-x-0"
+                                }`}
+                              />
+                            </div>
+                          </label>
                         </div>
+                      )}
+                    </div>
+
+                    {/* Google Forms Floating Vertical Toolbar on Active Card Right Side */}
+                    {isActive && (
+                      <div className="absolute right-[-54px] top-4 bg-white border border-gray-200 rounded-xl shadow-md p-1.5 flex flex-col items-center gap-2 z-20">
+                        <button
+                          type="button"
+                          onClick={() => handleAddField(GOOGLE_FIELD_TYPES[0])}
+                          className="p-2 hover:bg-purple-50 text-gray-700 hover:text-[#673ab7] rounded-lg transition-colors cursor-pointer"
+                          title="Add question"
+                        >
+                          <PlusCircle className="w-5 h-5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleAddField(GOOGLE_FIELD_TYPES[5])} // File upload
+                          className="p-2 hover:bg-purple-50 text-gray-700 hover:text-[#673ab7] rounded-lg transition-colors cursor-pointer"
+                          title="Add file upload"
+                        >
+                          <UploadCloud className="w-5 h-5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleAddField(GOOGLE_FIELD_TYPES[6])} // Signature
+                          className="p-2 hover:bg-purple-50 text-gray-700 hover:text-[#673ab7] rounded-lg transition-colors cursor-pointer"
+                          title="Add digital signature"
+                        >
+                          <PenTool className="w-5 h-5" />
+                        </button>
                       </div>
                     )}
                   </div>
                 );
               })}
-
-              {/* Clean Add Question Section */}
-              <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4 shadow-sm">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 text-center">
-                  + Add New Question Field
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                  {GOOGLE_FIELD_TYPES.map((f) => (
-                    <button
-                      key={f.key}
-                      onClick={() => handleAddField(f)}
-                      disabled={addingTask}
-                      className="p-3 bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 rounded-xl transition-all flex flex-col items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
-                    >
-                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-white border border-gray-200 text-indigo-600 rounded">
-                        {f.badge}
-                      </span>
-                      <span className="text-xs font-bold text-gray-900 text-center">{f.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Live Form Preview */
-            <div className="bg-white border border-gray-200 rounded-2xl p-8 space-y-6 shadow-sm">
-              <div className="border-b border-gray-200 pb-4 space-y-1">
-                <span className="text-xs text-indigo-600 font-bold uppercase tracking-widest">Live Employee Preview</span>
-                <h2 className="text-2xl font-bold text-gray-900">{selected.name}</h2>
-                {selected.description && <p className="text-sm text-gray-600">{selected.description}</p>}
-              </div>
-
-              <div className="space-y-5">
-                {selected.tasks.map((task, idx) => {
-                  let parsedConfig = { subtype: "short_answer", options: ["Option 1", "Option 2"] };
-                  try {
-                    if (task.fieldConfig) parsedConfig = JSON.parse(task.fieldConfig);
-                  } catch {}
-
-                  return (
-                    <div key={task.id} className="space-y-3 p-5 bg-gray-50 rounded-xl border border-gray-200">
-                      <label className="block text-sm font-bold text-gray-900">
-                        {idx + 1}. {task.title} {task.isRequired && <span className="text-red-500">*</span>}
-                      </label>
-                      {task.description && <p className="text-xs text-gray-500">{task.description}</p>}
-
-                      {parsedConfig.subtype === "short_answer" && (
-                        <input type="text" placeholder="Short answer response..." className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-indigo-600" />
-                      )}
-
-                      {parsedConfig.subtype === "paragraph" && (
-                        <textarea placeholder="Paragraph response..." rows={3} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-indigo-600 resize-none" />
-                      )}
-
-                      {parsedConfig.subtype === "multiple_choice" && (
-                        <div className="space-y-2">
-                          {(parsedConfig.options || []).map((opt: string, oIdx: number) => (
-                            <label key={oIdx} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                              <input type="radio" name={`q_${task.id}`} className="accent-indigo-600 w-4 h-4" />
-                              {opt}
-                            </label>
-                          ))}
-                        </div>
-                      )}
-
-                      {parsedConfig.subtype === "checkboxes" && (
-                        <div className="space-y-2">
-                          {(parsedConfig.options || []).map((opt: string, oIdx: number) => (
-                            <label key={oIdx} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                              <input type="checkbox" className="accent-indigo-600 w-4 h-4" />
-                              {opt}
-                            </label>
-                          ))}
-                        </div>
-                      )}
-
-                      {parsedConfig.subtype === "dropdown" && (
-                        <select className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-indigo-600">
-                          <option value="">Select an option...</option>
-                          {(parsedConfig.options || []).map((opt: string, oIdx: number) => (
-                            <option key={oIdx} value={opt}>{opt}</option>
-                          ))}
-                        </select>
-                      )}
-
-                      {task.taskType === "DATE" && (
-                        <input type="date" className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-indigo-600" />
-                      )}
-
-                      {parsedConfig.subtype === "time" && (
-                        <input type="time" className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-indigo-600" />
-                      )}
-
-                      {task.taskType === "SIGNATURE" && (
-                        <div className="h-32 border border-gray-200 bg-white rounded-xl flex items-center justify-center text-xs text-gray-400 font-mono">
-                          Digital Signature Canvas Pad
-                        </div>
-                      )}
-
-                      {task.taskType === "DOCUMENT" && (
-                        <div className="space-y-2">
-                          <input
-                            type="file"
-                            ref={(el) => { fileInputRefs.current[`prev_${task.id}`] = el; }}
-                            onChange={(e) => {
-                              if (e.target.files?.[0]) {
-                                setPreviewFiles((prev) => ({ ...prev, [`prev_${task.id}`]: e.target.files![0].name }));
-                              }
-                            }}
-                            className="hidden"
-                          />
-                          <div
-                            onClick={() => fileInputRefs.current[`prev_${task.id}`]?.click()}
-                            className="p-5 border border-dashed border-gray-300 bg-white hover:border-indigo-500 rounded-xl text-center text-xs text-gray-600 hover:text-indigo-600 cursor-pointer transition-all"
-                          >
-                            {previewFiles[`prev_${task.id}`] ? (
-                              <span className="font-bold text-indigo-600">Attached File: {previewFiles[`prev_${task.id}`]}</span>
-                            ) : (
-                              "Click to select and upload file attachment"
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {parsedConfig.subtype === "agreement" && (
-                        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer pt-1">
-                          <input type="checkbox" className="accent-indigo-600 w-4 h-4" />
-                          I confirm and agree to the above details
-                        </label>
-                      )}
-                    </div>
-                  );
-                })}
-
-                <button disabled className="w-full py-3 bg-emerald-600 text-white font-bold text-sm rounded-xl cursor-not-allowed opacity-75">
-                  Submit Form (Preview Mode Only)
-                </button>
-              </div>
             </div>
           )
         ) : (
-          <div className="text-center py-20 px-6 border-2 border-dashed border-gray-300 rounded-3xl bg-white shadow-xs space-y-4 max-w-xl mx-auto my-12">
-            <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+          /* Empty State */
+          <div className="text-center py-20 px-6 border-2 border-dashed border-gray-300 rounded-2xl bg-white shadow-xs space-y-4 max-w-lg mx-auto my-8">
+            <div className="w-16 h-16 bg-purple-50 text-[#673ab7] rounded-2xl flex items-center justify-center mx-auto shadow-inner">
+              <FolderPlus className="w-8 h-8" />
             </div>
             <div className="space-y-1">
               <h3 className="text-lg font-bold text-gray-900">No Form Template Selected</h3>
@@ -916,7 +1110,7 @@ export default function OnboardingTemplatesPage() {
                 setCreateForm({ name: "", description: "", isDefault: false });
                 setShowCreateModal(true);
               }}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#673ab7] hover:bg-[#5e35b1] text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
             >
               + Create Form Template
             </button>
@@ -924,46 +1118,63 @@ export default function OnboardingTemplatesPage() {
         )}
       </main>
 
-      {/* New Template Modal */}
+      {/* ── CREATE FORM TEMPLATE MODAL ────────────────────────────────────── */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md space-y-5 shadow-2xl">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md space-y-5 shadow-2xl animate-in zoom-in-95 duration-150">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Create Onboarding Form</h2>
-              <p className="text-xs text-gray-500 mt-1">Set title and default parameters</p>
+              <h2 className="text-xl font-bold text-gray-900">Create Google Form</h2>
+              <p className="text-xs text-gray-500 mt-1">Set form title and parameters</p>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 text-xs">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">Form Name *</label>
+                <label className="block font-bold text-gray-700 uppercase tracking-wider mb-1">Form Name *</label>
                 <input
+                  type="text"
                   placeholder="e.g. Kitchen Staff Onboarding"
                   value={createForm.name}
                   onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 focus:bg-white focus:outline-none focus:border-indigo-600"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 focus:bg-white focus:outline-none focus:border-[#673ab7]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">Description</label>
+                <label className="block font-bold text-gray-700 uppercase tracking-wider mb-1">Description</label>
                 <textarea
                   placeholder="Instructions for employee (optional)..."
                   value={createForm.description}
                   onChange={(e) => setCreateForm((f) => ({ ...f, description: e.target.value }))}
                   rows={2}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 focus:bg-white focus:outline-none focus:border-indigo-600 resize-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 focus:bg-white focus:outline-none focus:border-[#673ab7] resize-none"
                 />
               </div>
 
-              <label className="flex items-center gap-2 text-sm text-gray-700 font-semibold cursor-pointer">
-                <input type="checkbox" checked={createForm.isDefault} onChange={(e) => setCreateForm((f) => ({ ...f, isDefault: e.target.checked }))} className="accent-indigo-600 w-4 h-4" />
-                Set as default template for new hires
+              <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={createForm.isDefault}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, isDefault: e.target.checked }))}
+                  className="accent-[#673ab7] w-4 h-4"
+                />
+                Set as default onboarding form template
               </label>
             </div>
 
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setShowCreateModal(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-all cursor-pointer">Cancel</button>
-              <button onClick={handleCreateTemplate} disabled={submitting} className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-all cursor-pointer disabled:opacity-50">{submitting ? "Creating..." : "Create Form"}</button>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-xs font-semibold hover:bg-gray-50 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateTemplate}
+                disabled={submitting}
+                className="flex-1 py-2.5 rounded-xl bg-[#673ab7] hover:bg-[#5e35b1] text-white text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 shadow-xs"
+              >
+                {submitting ? "Creating..." : "Create Form"}
+              </button>
             </div>
           </div>
         </div>
