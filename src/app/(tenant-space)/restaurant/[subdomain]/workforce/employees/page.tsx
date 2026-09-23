@@ -390,10 +390,13 @@ export default function AppleEmployeeDirectoryPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to import employees");
 
-      const { importedCount, skippedCount } = data.results || {};
-      let msg = `Successfully imported ${importedCount} employee${importedCount === 1 ? "" : "s"}!`;
+      const { importedCount, createdCount, updatedCount, skippedCount } = data.results || {};
+      let msg = `Successfully processed ${importedCount || 0} employee records!`;
+      if (createdCount !== undefined && updatedCount !== undefined) {
+        msg = `Successfully processed ${importedCount} staff (${createdCount} new profile${createdCount === 1 ? "" : "s"} created, ${updatedCount} existing profile${updatedCount === 1 ? "" : "s"} updated).`;
+      }
       if (skippedCount > 0) {
-        msg += ` (${skippedCount} row${skippedCount === 1 ? "" : "s"} skipped due to missing required fields).`;
+        msg += ` (${skippedCount} row${skippedCount === 1 ? "" : "s"} skipped).`;
       }
       setImportSuccessMsg(msg);
       setParsedRows([]);

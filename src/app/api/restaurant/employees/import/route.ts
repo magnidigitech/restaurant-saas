@@ -6,6 +6,49 @@ import { MasterDataService } from "@/modules/master-data/service";
 
 export const dynamic = "force-dynamic";
 
+interface ExistingEmpInfo {
+  id: string;
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+  personalEmail: string | null;
+  phone: string | null;
+}
+
+function findExistingEmployee(
+  rowCode: string | null,
+  rowEmail: string | null,
+  rowFirstName: string,
+  rowLastName: string,
+  list: ExistingEmpInfo[]
+): ExistingEmpInfo | null {
+  // 1. Match by explicit employee code if provided in row (e.g. EMP-00001)
+  if (rowCode) {
+    const match = list.find((e) => e.employeeCode.toLowerCase() === rowCode.toLowerCase());
+    if (match) return match;
+  }
+
+  // 2. Match by personal email (case-insensitive)
+  if (rowEmail) {
+    const match = list.find(
+      (e) => e.personalEmail && e.personalEmail.toLowerCase() === rowEmail.toLowerCase()
+    );
+    if (match) return match;
+  }
+
+  // 3. Match by First Name + Last Name (case-insensitive)
+  if (rowFirstName) {
+    const match = list.find(
+      (e) =>
+        e.firstName.toLowerCase() === rowFirstName.toLowerCase() &&
+        (e.lastName || "").toLowerCase() === (rowLastName || "").toLowerCase()
+    );
+    if (match) return match;
+  }
+
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getTenantSession();
@@ -31,7 +74,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No employee records provided in import payload" }, { status: 400 });
     }
 
-    // 1. Subscription Check
+    // Fetch existing active employees for smart duplicate detection
+    const existingEmployees: ExistingEmpInfo[] = await prisma.employee.findMany({
+      where: { restaurantId, archivedAt: null },
+      select: {
+        id: true,
+        employeeCode: true,
+        firstName: true,
+        lastName: true,
+        personalEmail: true,
+        phone: true,
+      },
+    });
+
+    // Determine how many rows are NEW employees vs UPDATES
+    let newEmployeesToCreate = 0;
+    for (const row of rows) {
+      const fName = String(
+        row.firstName || row["First Name"] || row["firstname"] || row.first_name || ""
+      ).trim();
+      if (!fName) continue;
+      const lName = String(
+        row.lastName || row["Last Name"] || row["lastname"] || row.last_name || ""
+      ).trim();
+      const pEmail =
+        String(
+          row.personalEmail || row.email || row["Email"] || row["Personal Email"] || ""
+        ).trim() || null;
+      const eCode =
+        String(
+          row.employeeCode || row.code || row["Employee Code"] || row["Code"] || row["EMP ID"] || ""
+        ).trim() || null;
+
+      const matched = findExistingEmployee(eCode, pEmail, fName, lName, existingEmployees);
+      if (!matched) {
+        newEmployeesToCreate++;
+      }
+    }
+
+    // 1. Subscription Check (only check limit against NEW employee creations)
     const sub = await prisma.restaurantSubscription.findFirst({
       where: { restaurantId, status: "ACTIVE" },
       include: { plan: true },
@@ -39,14 +120,12 @@ export async function POST(req: NextRequest) {
     });
 
     const maxEmployees = sub?.plan.maxEmployees ?? 30;
-    const currentCount = await prisma.employee.count({
-      where: { restaurantId, archivedAt: null },
-    });
+    const currentCount = existingEmployees.length;
 
-    if (currentCount + rows.length > maxEmployees) {
+    if (currentCount + newEmployeesToCreate > maxEmployees) {
       return NextResponse.json(
         {
-          error: `Import exceeds subscription limit of ${maxEmployees} total employees. Currently registered: ${currentCount}. Trying to import: ${rows.length}. Please upgrade subscription.`,
+          error: `Import would exceed subscription limit of ${maxEmployees} total employees. Currently registered: ${currentCount}. Trying to create: ${newEmployeesToCreate} new profiles. Please upgrade subscription.`,
         },
         { status: 400 }
       );
@@ -60,6 +139,8 @@ export async function POST(req: NextRequest) {
 
     const results = {
       importedCount: 0,
+      createdCount: 0,
+      updatedCount: 0,
       skippedCount: 0,
       errors: [] as string[],
     };
@@ -94,6 +175,11 @@ export async function POST(req: NextRequest) {
         const parsed = new Date(rawJoiningDate);
         if (!isNaN(parsed.getTime())) joiningDate = parsed;
       }
+
+      const rawCode =
+        String(
+          row.employeeCode || row.code || row["Employee Code"] || row["Code"] || row["EMP ID"] || ""
+        ).trim() || null;
 
       // Resolve WorkerType
       const rawWt = String(
@@ -136,68 +222,170 @@ export async function POST(req: NextRequest) {
         if (matched) outletId = matched.id;
       }
 
-      // Generate unique employee code
-      totalCount++;
-      let employeeCode = `EMP-${String(totalCount).padStart(5, "0")}`;
-      while (
-        await prisma.employee.findUnique({
-          where: { restaurantId_employeeCode: { restaurantId, employeeCode } },
-        })
-      ) {
-        totalCount++;
-        employeeCode = `EMP-${String(totalCount).padStart(5, "0")}`;
-      }
+      const existingMatch = findExistingEmployee(
+        rawCode,
+        personalEmail,
+        firstName,
+        lastName,
+        existingEmployees
+      );
 
       try {
-        await prisma.$transaction(async (tx) => {
-          const emp = await tx.employee.create({
-            data: {
-              restaurantId,
-              employeeCode,
-              firstName,
-              lastName: lastName || "",
-              personalEmail,
-              phone,
-              gender: ["MALE", "FEMALE", "OTHER"].includes(gender || "") ? gender : null,
-              joiningDate,
-              workerType,
-              kioskPin: row.kioskPin ? String(row.kioskPin).slice(0, 4) : null,
-            },
+        if (existingMatch) {
+          // --- UPDATE EXISTING EMPLOYEE ---
+          await prisma.$transaction(async (tx) => {
+            const updatedEmp = await tx.employee.update({
+              where: { id: existingMatch.id },
+              data: {
+                firstName,
+                lastName: lastName || "",
+                ...(personalEmail ? { personalEmail } : {}),
+                ...(phone ? { phone } : {}),
+                ...(gender && ["MALE", "FEMALE", "OTHER"].includes(gender) ? { gender } : {}),
+                joiningDate,
+                workerType,
+                ...(row.kioskPin ? { kioskPin: String(row.kioskPin).slice(0, 4) } : {}),
+              },
+            });
+
+            // Update local state cache
+            existingMatch.firstName = updatedEmp.firstName;
+            existingMatch.lastName = updatedEmp.lastName;
+            if (updatedEmp.personalEmail) existingMatch.personalEmail = updatedEmp.personalEmail;
+            if (updatedEmp.phone) existingMatch.phone = updatedEmp.phone;
+
+            // Update Employment Record
+            if (departmentId || designationId || outletId) {
+              const currentRec = await tx.employmentRecord.findFirst({
+                where: { employeeId: existingMatch.id, status: "ACTIVE" },
+              });
+              if (currentRec) {
+                await tx.employmentRecord.update({
+                  where: { id: currentRec.id },
+                  data: {
+                    departmentId: departmentId || currentRec.departmentId,
+                    designationId: designationId || currentRec.designationId,
+                    primaryOutletId: outletId || currentRec.primaryOutletId,
+                    employmentType: workerType,
+                  },
+                });
+              } else {
+                await tx.employmentRecord.create({
+                  data: {
+                    restaurantId,
+                    employeeId: existingMatch.id,
+                    departmentId,
+                    designationId,
+                    primaryOutletId: outletId,
+                    employmentType: workerType,
+                    effectiveFrom: joiningDate,
+                    status: "ACTIVE",
+                  },
+                });
+              }
+            }
+
+            // Update Primary Outlet Assignment
+            if (outletId) {
+              const currentAssign = await tx.employeeOutletAssignment.findFirst({
+                where: { employeeId: existingMatch.id, isPrimary: true },
+              });
+              if (currentAssign) {
+                await tx.employeeOutletAssignment.update({
+                  where: { id: currentAssign.id },
+                  data: { outletId },
+                });
+              } else {
+                await tx.employeeOutletAssignment.create({
+                  data: {
+                    restaurantId,
+                    employeeId: existingMatch.id,
+                    outletId,
+                    isPrimary: true,
+                    assignmentType: "PRIMARY",
+                    effectiveFrom: joiningDate,
+                  },
+                });
+              }
+            }
           });
 
-          if (departmentId || designationId || outletId) {
-            await tx.employmentRecord.create({
-              data: {
-                restaurantId,
-                employeeId: emp.id,
-                departmentId,
-                designationId,
-                primaryOutletId: outletId,
-                employmentType: workerType,
-                effectiveFrom: joiningDate,
-                status: "ACTIVE",
-              },
-            });
+          results.updatedCount++;
+          results.importedCount++;
+        } else {
+          // --- CREATE NEW EMPLOYEE ---
+          totalCount++;
+          let employeeCode = rawCode || `EMP-${String(totalCount).padStart(5, "0")}`;
+          while (
+            await prisma.employee.findUnique({
+              where: { restaurantId_employeeCode: { restaurantId, employeeCode } },
+            })
+          ) {
+            totalCount++;
+            employeeCode = `EMP-${String(totalCount).padStart(5, "0")}`;
           }
 
-          if (outletId) {
-            await tx.employeeOutletAssignment.create({
+          await prisma.$transaction(async (tx) => {
+            const emp = await tx.employee.create({
               data: {
                 restaurantId,
-                employeeId: emp.id,
-                outletId,
-                isPrimary: true,
-                assignmentType: "PRIMARY",
-                effectiveFrom: joiningDate,
+                employeeCode,
+                firstName,
+                lastName: lastName || "",
+                personalEmail,
+                phone,
+                gender: ["MALE", "FEMALE", "OTHER"].includes(gender || "") ? gender : null,
+                joiningDate,
+                workerType,
+                kioskPin: row.kioskPin ? String(row.kioskPin).slice(0, 4) : null,
               },
             });
-          }
-        });
 
-        results.importedCount++;
+            if (departmentId || designationId || outletId) {
+              await tx.employmentRecord.create({
+                data: {
+                  restaurantId,
+                  employeeId: emp.id,
+                  departmentId,
+                  designationId,
+                  primaryOutletId: outletId,
+                  employmentType: workerType,
+                  effectiveFrom: joiningDate,
+                  status: "ACTIVE",
+                },
+              });
+            }
+
+            if (outletId) {
+              await tx.employeeOutletAssignment.create({
+                data: {
+                  restaurantId,
+                  employeeId: emp.id,
+                  outletId,
+                  isPrimary: true,
+                  assignmentType: "PRIMARY",
+                  effectiveFrom: joiningDate,
+                },
+              });
+            }
+
+            // Cache newly created employee so subsequent rows in the same sheet update it
+            existingEmployees.push({
+              id: emp.id,
+              employeeCode: emp.employeeCode,
+              firstName: emp.firstName,
+              lastName: emp.lastName,
+              personalEmail: emp.personalEmail,
+              phone: emp.phone,
+            });
+          });
+
+          results.createdCount++;
+          results.importedCount++;
+        }
       } catch (err: any) {
         results.errors.push(
-          `Row ${i + 1} (${firstName} ${lastName}): ${err.message || "Failed to create"}`
+          `Row ${i + 1} (${firstName} ${lastName}): ${err.message || "Failed to process"}`
         );
         results.skippedCount++;
       }
@@ -212,3 +400,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
   }
 }
+
