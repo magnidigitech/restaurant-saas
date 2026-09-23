@@ -257,6 +257,7 @@ export const HROnboardingService = {
     }
 
     if (!session) throw new Error("Session not found or access denied");
+    session.progresses.sort((a, b) => a.task.sortOrder - b.task.sortOrder);
     return session;
   },
 
@@ -277,6 +278,7 @@ export const HROnboardingService = {
       },
     });
     if (!session) throw new Error("Onboarding portal link invalid or expired");
+    session.progresses.sort((a, b) => a.task.sortOrder - b.task.sortOrder);
     return session;
   },
 
@@ -300,8 +302,8 @@ export const HROnboardingService = {
         },
       });
 
-      // Auto-create task progress rows for all template tasks
-      const tasks = await tx.onboardingTask.findMany({ where: { templateId } });
+      // Auto-create task progress rows for all template tasks sorted by sortOrder
+      const tasks = await tx.onboardingTask.findMany({ where: { templateId }, orderBy: { sortOrder: "asc" } });
       if (tasks.length > 0) {
         await tx.onboardingTaskProgress.createMany({
           data: tasks.map((t) => ({

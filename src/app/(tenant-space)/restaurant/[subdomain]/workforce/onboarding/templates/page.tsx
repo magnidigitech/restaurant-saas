@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type TaskType = "FORM_INPUT" | "SIGNATURE" | "DOCUMENT" | "DATE" | "CHECKBOX";
 
@@ -50,6 +50,8 @@ const GOOGLE_FIELD_TYPES: GoogleFieldType[] = [
 
 export default function OnboardingTemplatesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedTemplateId = searchParams.get("templateId");
 
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,6 +80,14 @@ export default function OnboardingTemplatesPage() {
       if (res.ok) {
         const list: Template[] = (await res.json()).templates || [];
         setTemplates(list);
+        if (requestedTemplateId) {
+          const match = list.find((t) => t.id === requestedTemplateId);
+          if (match) {
+            setSelected(match);
+            if (match.tasks.length > 0) setActiveTaskId(match.tasks[0].id);
+            return;
+          }
+        }
         if (selected) {
           const fresh = list.find((t) => t.id === selected.id);
           if (fresh) {
@@ -889,8 +899,27 @@ export default function OnboardingTemplatesPage() {
             </div>
           )
         ) : (
-          <div className="text-center py-20 border border-dashed border-gray-300 rounded-2xl text-gray-400">
-            No template selected. Create a new form template to get started.
+          <div className="text-center py-20 px-6 border-2 border-dashed border-gray-300 rounded-3xl bg-white shadow-xs space-y-4 max-w-xl mx-auto my-12">
+            <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-gray-900">No Form Template Selected</h3>
+              <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                Create a custom employee onboarding form template with short answers, file uploads, multiple choices, and digital signatures.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setCreateForm({ name: "", description: "", isDefault: false });
+                setShowCreateModal(true);
+              }}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+            >
+              + Create Form Template
+            </button>
           </div>
         )}
       </main>

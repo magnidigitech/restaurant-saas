@@ -36,15 +36,29 @@ export default function OnboardingTab({ subdomain, onCountChange }: OnboardingTa
   const [sessions, setSessions] = useState<Session[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const [showStartModal, setShowStartModal] = useState(false);
-  const [confirmDeleteSession, setConfirmDeleteSession] = useState<Session | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  // Modals & search states
+  const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+  const [templateSearchQuery, setTemplateSearchQuery] = useState("");
+  
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [createdSessionData, setCreatedSessionData] = useState<{
+    id: string;
+    accessToken: string;
+    employeeName: string;
+    employeeCode: string;
+    personalEmail?: string;
+    phone?: string;
+    templateName: string;
+  } | null>(null);
 
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [startForm, setStartForm] = useState({ employeeId: "", templateId: "" });
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [sendingEmailInModal, setSendingEmailInModal] = useState(false);
+  const [emailSentSuccessInModal, setEmailSentSuccessInModal] = useState(false);
+  const [emailErrorInModal, setEmailErrorInModal] = useState("");
+  const [copiedModalLink, setCopiedModalLink] = useState(false);
+
+  // Search filter inside start onboarding modal
+  const [empSearch, setEmpSearch] = useState("");
+  const [tplSearch, setTplSearch] = useState("");
 
   const fetchData = async () => {
     try {
@@ -88,17 +102,66 @@ export default function OnboardingTab({ subdomain, onCountChange }: OnboardingTa
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to initiate onboarding");
+      
+      const empObj = employees.find((e) => e.id === startForm.employeeId);
+      const tplObj = templates.find((t) => t.id === startForm.templateId);
+      const sessObj = data.onboarding || data.session;
+
       setShowStartModal(false);
       setStartForm({ employeeId: "", templateId: "" });
       await fetchData();
-      if (data.session?.id) {
-        router.push(`/restaurant/${subdomain}/workforce/onboarding/${data.session.id}`);
+
+      if (sessObj) {
+        setCreatedSessionData({
+          id: sessObj.id,
+          accessToken: sessObj.accessToken,
+          employeeName: empObj ? `${empObj.firstName} ${empObj.lastName}` : "Employee",
+          employeeCode: empObj?.employeeCode || "",
+          personalEmail: empObj?.personalEmail || undefined,
+          phone: empObj?.phone || empObj?.alternatePhone || undefined,
+          templateName: tplObj?.name || "Onboarding Form",
+        });
+        setEmailSentSuccessInModal(data.emailSent || false);
+        setEmailErrorInModal("");
+        setShowSuccessModal(true);
       }
     } catch (e: any) {
       setError(e.message || "Failed to start onboarding session");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSendEmailInModal = async () => {
+    if (!createdSessionData) return;
+    setSendingEmailInModal(true);
+    setEmailErrorInModal("");
+    try {
+      const res = await fetch(`/api/restaurant/onboarding/sessions/${createdSessionData.id}/send-email`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send email");
+      setEmailSentSuccessInModal(true);
+    } catch (err: any) {
+      setEmailErrorInModal(err.message || "Failed to send email");
+    } finally {
+      setSendingEmailInModal(false);
+    }
+  };
+
+  const getModalPortalUrl = () => {
+    if (typeof window === "undefined" || !createdSessionData) return "";
+    return `${window.location.origin}/onboarding/portal/${createdSessionData.accessToken}`;
+  };
+
+  const getWhatsAppLink = () => {
+    if (!createdSessionData) return "#";
+    const rawPhone = createdSessionData.phone || "";
+    const cleanPhone = rawPhone.replace(/[^0-9]/g, "");
+    const portalUrl = getModalPortalUrl();
+    const msg = `Hello ${createdSessionData.employeeName}! 📋 Your employee onboarding form "${createdSessionData.templateName}" is ready.\n\nPlease click the link below to complete your details and submit documents:\n🔗 ${portalUrl}\n\nThank you!`;
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
   };
 
   const handleDeleteSession = async () => {
@@ -192,7 +255,10 @@ export default function OnboardingTab({ subdomain, onCountChange }: OnboardingTa
 
         <div className="flex items-center gap-2.5">
           <button
-            onClick={() => router.push(`/restaurant/${subdomain}/workforce/onboarding/templates`)}
+            onClick={() => {
+              setTemplateSearchQuery("");
+              setShowTemplatesModal(true);
+            }}
             className={`px-4 py-2 rounded-xl text-xs font-medium border transition cursor-pointer ${
               isDark
                 ? "bg-white/[0.04] text-white border-white/[0.08] hover:bg-white/[0.08]"
@@ -465,6 +531,248 @@ export default function OnboardingTab({ subdomain, onCountChange }: OnboardingTa
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Checklist Templates Search & Select Modal */}
+      {showTemplatesModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div
+            className={`w-full max-w-xl p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
+              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold">Onboarding Form & Checklist Templates</h3>
+                <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Search existing forms or open a template to customize fields
+                </p>
+              </div>
+              <button
+                onClick={() => router.push(`/restaurant/${subdomain}/workforce/onboarding/templates`)}
+                className="px-3.5 py-1.5 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer"
+              >
+                + Create New Form
+              </button>
+            </div>
+
+            {/* Search Input Box on Top */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="🔍 Search existing forms by name or description..."
+                value={templateSearchQuery}
+                onChange={(e) => setTemplateSearchQuery(e.target.value)}
+                className={`w-full px-4 py-2.5 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                  isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                }`}
+              />
+            </div>
+
+            {/* Templates List */}
+            <div className="max-h-80 overflow-y-auto space-y-2.5 pr-1">
+              {templates.filter((t) =>
+                t.name.toLowerCase().includes(templateSearchQuery.toLowerCase()) ||
+                ((t as any).description || "").toLowerCase().includes(templateSearchQuery.toLowerCase())
+              ).length === 0 ? (
+                <div className={`p-8 text-center text-xs border border-dashed rounded-2xl ${isDark ? "border-white/[0.08] text-[#8F95A3]" : "border-slate-200 text-slate-400"}`}>
+                  No onboarding form templates found matching "{templateSearchQuery}"
+                </div>
+              ) : (
+                templates
+                  .filter((t) =>
+                    t.name.toLowerCase().includes(templateSearchQuery.toLowerCase()) ||
+                    ((t as any).description || "").toLowerCase().includes(templateSearchQuery.toLowerCase())
+                  )
+                  .map((tpl) => (
+                    <div
+                      key={tpl.id}
+                      onClick={() => {
+                        setShowTemplatesModal(false);
+                        router.push(`/restaurant/${subdomain}/workforce/onboarding/templates?templateId=${tpl.id}`);
+                      }}
+                      className={`p-4 rounded-2xl border transition flex items-center justify-between cursor-pointer group ${
+                        isDark
+                          ? "bg-[#0A0C12] border-white/[0.06] hover:border-[#0071E3] hover:bg-white/[0.02]"
+                          : "bg-slate-50 border-slate-200 hover:border-[#0071E3] hover:bg-blue-50/50"
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-xs font-bold group-hover:text-[#0071E3] transition-colors">
+                            {tpl.name}
+                          </h4>
+                          {(tpl as any).isDefault && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                              Default
+                            </span>
+                          )}
+                        </div>
+                        {(tpl as any).description && (
+                          <p className={`text-[11px] line-clamp-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                            {(tpl as any).description}
+                          </p>
+                        )}
+                        <span className={`text-[10px] block ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                          Used by {tpl._count?.onboardings || 0} candidate onboardings
+                        </span>
+                      </div>
+                      <span className="text-xs font-semibold text-[#0071E3] group-hover:underline shrink-0">
+                        Open Form &rarr;
+                      </span>
+                    </div>
+                  ))
+              )}
+            </div>
+
+            <div className="flex items-center justify-end pt-2 border-t border-black/[0.06] dark:border-white/[0.06]">
+              <button
+                onClick={() => setShowTemplatesModal(false)}
+                className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                  isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Post-Initiate Email / WhatsApp Confirmation Modal */}
+      {showSuccessModal && createdSessionData && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div
+            className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 ${
+              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 rounded-2xl flex items-center justify-center mx-auto border border-emerald-500/20 text-xl font-bold">
+                ✓
+              </div>
+              <h3 className="text-lg font-bold">Onboarding Session Created!</h3>
+              <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                Form <strong className={isDark ? "text-white" : "text-slate-900"}>{createdSessionData.templateName}</strong> assigned to <strong className={isDark ? "text-white" : "text-slate-900"}>{createdSessionData.employeeName}</strong> ({createdSessionData.employeeCode}).
+              </p>
+            </div>
+
+            {/* Employee Info Box */}
+            <div className={`p-4 rounded-2xl border text-xs space-y-1.5 ${isDark ? "bg-[#0A0C12] border-white/[0.06]" : "bg-slate-50 border-slate-200"}`}>
+              <div className="flex justify-between">
+                <span className={isDark ? "text-[#8F95A3]" : "text-slate-500"}>Employee:</span>
+                <span className="font-semibold">{createdSessionData.employeeName}</span>
+              </div>
+              {createdSessionData.personalEmail && (
+                <div className="flex justify-between">
+                  <span className={isDark ? "text-[#8F95A3]" : "text-slate-500"}>Email:</span>
+                  <span className="font-semibold">{createdSessionData.personalEmail}</span>
+                </div>
+              )}
+              {createdSessionData.phone && (
+                <div className="flex justify-between">
+                  <span className={isDark ? "text-[#8F95A3]" : "text-slate-500"}>Mobile:</span>
+                  <span className="font-semibold">{createdSessionData.phone}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Shareable Link Box */}
+            <div className="space-y-1.5">
+              <label className={`block text-[11px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                Candidate Onboarding Link
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  readOnly
+                  value={getModalPortalUrl()}
+                  className={`flex-1 px-3 py-2 text-xs font-mono rounded-xl border transition ${
+                    isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                  }`}
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(getModalPortalUrl());
+                    setCopiedModalLink(true);
+                    setTimeout(() => setCopiedModalLink(false), 2000);
+                  }}
+                  className="px-3.5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer shrink-0"
+                >
+                  {copiedModalLink ? "Copied!" : "Copy"}
+                </button>
+              </div>
+            </div>
+
+            {/* Notification Actions: Email & WhatsApp */}
+            <div className="space-y-2 pt-1">
+              <span className={`block text-[11px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                Send Form Link to Employee
+              </span>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                {/* Send Email Button */}
+                <button
+                  type="button"
+                  onClick={handleSendEmailInModal}
+                  disabled={sendingEmailInModal || emailSentSuccessInModal || !createdSessionData.personalEmail}
+                  className={`py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 border cursor-pointer ${
+                    emailSentSuccessInModal
+                      ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 cursor-default"
+                      : isDark
+                      ? "bg-indigo-600/20 text-indigo-300 border-indigo-500/30 hover:bg-indigo-600/30"
+                      : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                  } disabled:opacity-50`}
+                >
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  {sendingEmailInModal ? "Sending..." : emailSentSuccessInModal ? "✓ Email Sent" : "Send Email"}
+                </button>
+
+                {/* Send WhatsApp Button */}
+                <a
+                  href={getWhatsAppLink()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 border cursor-pointer ${
+                    isDark
+                      ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-600/30"
+                      : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                  }`}
+                >
+                  <svg className="w-4 h-4 shrink-0 fill-current" viewBox="0 0 24 24">
+                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l.299.476-1.152 4.21 4.299-1.127.397.235z"/>
+                  </svg>
+                  Send WhatsApp
+                </a>
+              </div>
+
+              {emailErrorInModal && (
+                <p className="text-[11px] text-rose-500 font-semibold">{emailErrorInModal}</p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+                  isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Done
+              </button>
+              <button
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  router.push(`/restaurant/${subdomain}/workforce/onboarding/${createdSessionData.id}`);
+                }}
+                className="px-5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer"
+              >
+                View Session &rarr;
+              </button>
+            </div>
           </div>
         </div>
       )}

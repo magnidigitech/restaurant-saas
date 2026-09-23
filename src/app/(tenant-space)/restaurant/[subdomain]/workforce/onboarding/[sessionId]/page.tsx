@@ -433,78 +433,159 @@ export default function OnboardingSessionDetailPage() {
           </div>
         </div>
 
-        {/* Task Checklist Items */}
-        <div className="space-y-3">
-          <h3 className={`text-xs font-bold uppercase tracking-wider px-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-            Onboarding Checklist ({total} Items)
-          </h3>
+          {/* Task Checklist Items */}
+          <div className="space-y-3">
+            <h3 className={`text-xs font-bold uppercase tracking-wider px-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+              Onboarding Checklist ({total} Items)
+            </h3>
 
-          {onboarding.progresses.map((p, idx) => (
-            <div
-              key={p.id}
-              className={`p-5 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
-              }`}
-            >
-              <div className="flex items-start gap-3.5">
-                <span className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-bold text-xs flex-shrink-0 ${
-                  isDark ? "bg-white/[0.04] text-[#8F95A3] border border-white/[0.08]" : "bg-slate-100 text-slate-600 border border-slate-200"
-                }`}>
-                  {idx + 1}
-                </span>
+            {[...onboarding.progresses]
+              .sort((a, b) => a.task.sortOrder - b.task.sortOrder)
+              .map((p, idx) => {
+                // Helper to parse JSON array or custom response format
+                let parsedResponseArray: string[] | null = null;
+                if (p.responseValue && p.responseValue.startsWith("[")) {
+                  try {
+                    const arr = JSON.parse(p.responseValue);
+                    if (Array.isArray(arr)) parsedResponseArray = arr;
+                  } catch {}
+                }
 
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
-                      {p.task.title}
-                    </p>
-                    {p.task.isRequired && (
-                      <span className="text-[10px] font-bold uppercase px-2 py-0.2 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                        Required
+                const isSignature = p.task.taskType === "SIGNATURE" || (p.responseValue && p.responseValue.startsWith("data:image/"));
+                const isFileUrl = p.responseValue && (p.responseValue.startsWith("http://") || p.responseValue.startsWith("https://") || p.responseValue.startsWith("/uploads/"));
+
+                return (
+                  <div
+                    key={p.id}
+                    className={`p-5 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                      isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                      <span className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-bold text-xs flex-shrink-0 ${
+                        isDark ? "bg-white/[0.04] text-[#8F95A3] border border-white/[0.08]" : "bg-slate-100 text-slate-600 border border-slate-200"
+                      }`}>
+                        {idx + 1}
                       </span>
-                    )}
+
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                            {p.task.title}
+                          </p>
+                          {p.task.isRequired && (
+                            <span className="text-[10px] font-bold uppercase px-2 py-0.2 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                              Required
+                            </span>
+                          )}
+                        </div>
+                        {p.task.description && (
+                          <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                            {p.task.description}
+                          </p>
+                        )}
+
+                        {/* File Upload Attachment Display */}
+                        {p.fileUpload ? (
+                          <div className={`mt-2 p-3 rounded-xl border flex items-center justify-between gap-3 max-w-md ${
+                            isDark ? "bg-[#0A0C12] border-indigo-500/30 text-white" : "bg-indigo-50/60 border-indigo-200 text-slate-900"
+                          }`}>
+                            <div className="flex items-center gap-2.5 overflow-hidden">
+                              <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 text-xs font-bold">
+                                📎
+                              </div>
+                              <div className="truncate">
+                                <p className="text-xs font-bold truncate">{p.fileUpload.fileName}</p>
+                                <span className={`text-[10px] block ${isDark ? "text-indigo-300" : "text-indigo-700"}`}>Uploaded File Attachment</span>
+                              </div>
+                            </div>
+                            <a
+                              href={p.fileUpload.fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold rounded-lg transition-all shrink-0 cursor-pointer shadow-xs"
+                            >
+                              View Attachment ↗
+                            </a>
+                          </div>
+                        ) : isFileUrl ? (
+                          <div className={`mt-2 p-3 rounded-xl border flex items-center justify-between gap-3 max-w-md ${
+                            isDark ? "bg-[#0A0C12] border-indigo-500/30 text-white" : "bg-indigo-50/60 border-indigo-200 text-slate-900"
+                          }`}>
+                            <div className="flex items-center gap-2.5 overflow-hidden">
+                              <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 text-xs font-bold">
+                                📄
+                              </div>
+                              <div className="truncate">
+                                <p className="text-xs font-bold truncate">Uploaded Attachment Document</p>
+                              </div>
+                            </div>
+                            <a
+                              href={p.responseValue}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold rounded-lg transition-all shrink-0 cursor-pointer shadow-xs"
+                            >
+                              View File ↗
+                            </a>
+                          </div>
+                        ) : isSignature ? (
+                          <div className={`mt-2 p-3 rounded-xl border max-w-xs space-y-1 ${
+                            isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-slate-50 border-slate-200"
+                          }`}>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Candidate Digital Signature</span>
+                            {p.responseValue && p.responseValue.startsWith("data:image/") ? (
+                              <img src={p.responseValue} alt="Signature" className="h-16 object-contain rounded border bg-white p-1" />
+                            ) : (
+                              <p className="text-xs font-bold text-emerald-500">✓ Signed digitally</p>
+                            )}
+                          </div>
+                        ) : parsedResponseArray ? (
+                          <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                            <span className={`text-xs font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>Selected Options:</span>
+                            {parsedResponseArray.map((opt, oIdx) => (
+                              <span key={oIdx} className="text-xs font-semibold px-2.5 py-0.5 rounded-lg bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                                {opt}
+                              </span>
+                            ))}
+                          </div>
+                        ) : p.responseValue ? (
+                          <p className="text-xs text-[#0071E3] font-medium pt-0.5">
+                            Response: {p.responseValue}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full border ${
+                        p.status === "COMPLETED"
+                          ? isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-100 text-emerald-800 border-emerald-200"
+                          : p.status === "PENDING"
+                          ? isDark ? "bg-amber-500/15 text-amber-300 border-amber-500/25" : "bg-amber-100 text-amber-800 border-amber-200"
+                          : isDark ? "bg-rose-500/15 text-rose-300 border-rose-500/25" : "bg-rose-100 text-rose-800 border-rose-200"
+                      }`}>
+                        {p.status}
+                      </span>
+
+                      <button
+                        onClick={() => {
+                          setActionTask(p);
+                          setTaskNote(p.notes || "");
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                          isDark
+                            ? "bg-white/[0.04] text-white border-white/[0.08] hover:bg-white/[0.08]"
+                            : "bg-slate-100 text-slate-800 border-slate-200 hover:bg-slate-200"
+                        }`}
+                      >
+                        Review / Update
+                      </button>
+                    </div>
                   </div>
-                  {p.task.description && (
-                    <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                      {p.task.description}
-                    </p>
-                  )}
-                  {p.responseValue && (
-                    <p className="text-xs text-[#0071E3] font-medium">
-                      Response: {p.responseValue}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full border ${
-                  p.status === "COMPLETED"
-                    ? isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-100 text-emerald-800 border-emerald-200"
-                    : p.status === "PENDING"
-                    ? isDark ? "bg-amber-500/15 text-amber-300 border-amber-500/25" : "bg-amber-100 text-amber-800 border-amber-200"
-                    : isDark ? "bg-rose-500/15 text-rose-300 border-rose-500/25" : "bg-rose-100 text-rose-800 border-rose-200"
-                }`}>
-                  {p.status}
-                </span>
-
-                <button
-                  onClick={() => {
-                    setActionTask(p);
-                    setTaskNote(p.notes || "");
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
-                    isDark
-                      ? "bg-white/[0.04] text-white border-white/[0.08] hover:bg-white/[0.08]"
-                      : "bg-slate-100 text-slate-800 border-slate-200 hover:bg-slate-200"
-                  }`}
-                >
-                  Review / Update
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+                );
+              })}
+          </div>
 
         {/* HR Approval Controls if Pending Approval */}
         {canApprove && (
