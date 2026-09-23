@@ -1947,6 +1947,12 @@ export default function AppleEmployeeDirectoryPage() {
                 >
                   {importing ? "Importing..." : `Confirm & Import ${parsedRows.length} Employees`}
                 </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Archive / Restore Custom Confirmation Modal */}
       {confirmArchiveModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
