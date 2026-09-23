@@ -6,7 +6,7 @@ import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import ModuleAccessGuard from "@/components/ModuleAccessGuard";
 import OnboardingTab from "./OnboardingTab";
-import { Users, UserCheck, ArrowLeft, Search, Filter, Plus, RotateCcw, Upload, FileSpreadsheet, Download } from "lucide-react";
+import { Users, UserCheck, ArrowLeft, Search, Filter, Plus, RotateCcw, Upload, FileSpreadsheet, Download, CheckCircle2 } from "lucide-react";
 import * as XLSX from "xlsx";
 
 interface Department {
@@ -289,6 +289,12 @@ export default function AppleEmployeeDirectoryPage() {
   const [designations, setDesignations] = useState<Designation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+
+  const flashSuccess = (msg: string) => {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(""), 6000);
+  };
 
   const [statusFilter, setStatusFilter] = useState<"active" | "archived" | "all">("active");
   const [activeStaffCount, setActiveStaffCount] = useState<number>(0);
@@ -394,15 +400,16 @@ export default function AppleEmployeeDirectoryPage() {
       if (!res.ok) throw new Error(data.error || "Failed to import employees");
 
       const { importedCount, createdCount, updatedCount, skippedCount } = data.results || {};
-      let msg = `Successfully processed ${importedCount || 0} employee records!`;
+      let msg = `Import Successful! Processed ${importedCount || 0} employee records.`;
       if (createdCount !== undefined && updatedCount !== undefined) {
-        msg = `Successfully processed ${importedCount} staff (${createdCount} new profile${createdCount === 1 ? "" : "s"} created, ${updatedCount} existing profile${updatedCount === 1 ? "" : "s"} updated).`;
+        msg = `Import Successful! Registered ${createdCount} new staff profiles and updated ${updatedCount} existing staff profiles.`;
       }
       if (skippedCount > 0) {
         msg += ` (${skippedCount} row${skippedCount === 1 ? "" : "s"} skipped).`;
       }
-      setImportSuccessMsg(msg);
+      flashSuccess(msg);
       setParsedRows([]);
+      setShowImportModal(false);
       fetchEmployees();
       fetchFilters();
     } catch (err: any) {
@@ -565,6 +572,7 @@ export default function AppleEmployeeDirectoryPage() {
       if (!res.ok) throw new Error(data.error || "Failed to add employee");
 
       setShowModal(false);
+      flashSuccess(`Employee "${formData.firstName} ${formData.lastName}" registered successfully.`);
       setFormData({
         firstName: "",
         lastName: "",
@@ -915,6 +923,22 @@ export default function AppleEmployeeDirectoryPage() {
           </div>
 
         </div>
+
+        {successMsg && (
+          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs rounded-2xl flex items-center justify-between animate-in fade-in">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+              <span className="font-semibold">{successMsg}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSuccessMsg("")}
+              className="opacity-60 hover:opacity-100 text-xs font-bold cursor-pointer px-1.5 py-0.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {error && (
           <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-xl">
