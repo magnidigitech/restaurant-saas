@@ -48,53 +48,69 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search") || "";
     const departmentId = searchParams.get("departmentId");
     const outletId = searchParams.get("outletId");
+    const statusParam = searchParams.get("status"); // "active" | "archived" | "all"
     const includeArchived = searchParams.get("includeArchived") === "true";
 
-    const employees = await prisma.employee.findMany({
-      where: {
-        restaurantId: session.activeRestaurantId,
-        ...(!includeArchived && { archivedAt: null }),
-        ...(search && {
-          OR: [
-            { firstName: { contains: search, mode: "insensitive" } },
-            { lastName: { contains: search, mode: "insensitive" } },
-            { employeeCode: { contains: search, mode: "insensitive" } },
-            { personalEmail: { contains: search, mode: "insensitive" } },
-          ],
-        }),
-        ...(departmentId && {
-          employmentRecords: {
-            some: { departmentId, status: "ACTIVE" },
-          },
-        }),
-        ...(outletId && {
-          outletAssignments: {
-            some: { outletId },
-          },
-        }),
-      },
-      include: {
-        employmentRecords: {
-          where: { status: "ACTIVE" },
-          include: {
-            department: true,
-            designation: true,
-            primaryOutlet: true,
-          },
-          orderBy: { effectiveFrom: "desc" },
-          take: 1,
-        },
-        outletAssignments: {
-          include: { outlet: true },
-        },
-        memberships: {
-          include: { user: true },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    let archiveCondition: any = { archivedAt: null };
+    if (statusParam === "archived") {
+      archiveCondition = { archivedAt: { not: null } };
+    } else if (statusParam === "all" || includeArchived) {
+      archiveCondition = {};
+    }
 
-    return NextResponse.json({ employees });
+    const [employees, activeCount, archivedCount] = await Promise.all([
+      prisma.employee.findMany({
+        where: {
+          restaurantId: session.activeRestaurantId,
+          ...archiveCondition,
+          ...(search && {
+            OR: [
+              { firstName: { contains: search, mode: "insensitive" } },
+              { lastName: { contains: search, mode: "insensitive" } },
+              { employeeCode: { contains: search, mode: "insensitive" } },
+              { personalEmail: { contains: search, mode: "insensitive" } },
+            ],
+          }),
+          ...(departmentId && {
+            employmentRecords: {
+              some: { departmentId, status: "ACTIVE" },
+            },
+          }),
+          ...(outletId && {
+            outletAssignments: {
+              some: { outletId },
+            },
+          }),
+        },
+        include: {
+          employmentRecords: {
+            where: { status: "ACTIVE" },
+            include: {
+              department: true,
+              designation: true,
+              primaryOutlet: true,
+            },
+            orderBy: { effectiveFrom: "desc" },
+            take: 1,
+          },
+          outletAssignments: {
+            include: { outlet: true },
+          },
+          memberships: {
+            include: { user: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.employee.count({
+        where: { restaurantId: session.activeRestaurantId, archivedAt: null },
+      }),
+      prisma.employee.count({
+        where: { restaurantId: session.activeRestaurantId, archivedAt: { not: null } },
+      }),
+    ]);
+
+    return NextResponse.json({ employees, activeCount, archivedCount });
   } catch (error: any) {
     console.error("List Employees Error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

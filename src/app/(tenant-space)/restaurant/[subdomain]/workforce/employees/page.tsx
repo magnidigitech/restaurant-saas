@@ -290,6 +290,9 @@ export default function AppleEmployeeDirectoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [statusFilter, setStatusFilter] = useState<"active" | "archived" | "all">("active");
+  const [activeStaffCount, setActiveStaffCount] = useState<number>(0);
+  const [archivedStaffCount, setArchivedStaffCount] = useState<number>(0);
   const [search, setSearch] = useState("");
   const [selectedDept, setSelectedDept] = useState("");
   const [selectedOutlet, setSelectedOutlet] = useState("");
@@ -297,7 +300,7 @@ export default function AppleEmployeeDirectoryPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   const activeFilterCount =
-    (selectedDept ? 1 : 0) + (selectedOutlet ? 1 : 0) + (selectedWorkerType ? 1 : 0);
+    (selectedDept ? 1 : 0) + (selectedOutlet ? 1 : 0) + (selectedWorkerType ? 1 : 0) + (statusFilter !== "active" ? 1 : 0);
 
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -493,15 +496,42 @@ export default function AppleEmployeeDirectoryPage() {
       if (search) qParams.append("search", search);
       if (selectedDept) qParams.append("departmentId", selectedDept);
       if (selectedOutlet) qParams.append("outletId", selectedOutlet);
+      qParams.append("status", statusFilter);
 
       const res = await fetch(`/api/restaurant/employees?${qParams.toString()}`);
       const data = await res.json();
-      if (res.ok) setEmployees(data.employees || []);
-      else setError(data.error || "Failed to load employees");
+      if (res.ok) {
+        setEmployees(data.employees || []);
+        if (data.activeCount !== undefined) setActiveStaffCount(data.activeCount);
+        if (data.archivedCount !== undefined) setArchivedStaffCount(data.archivedCount);
+      } else {
+        setError(data.error || "Failed to load employees");
+      }
     } catch {
       setError("Network error loading employees");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleArchive = async (id: string, name: string, isArchived: boolean) => {
+    const actionName = isArchived ? "restore" : "archive";
+    if (!confirm(`Are you sure you want to ${actionName} ${name}?`)) return;
+
+    try {
+      const res = await fetch(`/api/restaurant/employees/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived: !isArchived }),
+      });
+      if (res.ok) {
+        fetchEmployees();
+      } else {
+        const d = await res.json();
+        alert(d.error || `Failed to ${actionName} employee`);
+      }
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -511,7 +541,7 @@ export default function AppleEmployeeDirectoryPage() {
 
   useEffect(() => {
     fetchEmployees();
-  }, [search, selectedDept, selectedOutlet]);
+  }, [search, selectedDept, selectedOutlet, statusFilter]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -712,11 +742,14 @@ export default function AppleEmployeeDirectoryPage() {
         </div>
 
         {/* Interactive Stats Grid - Merged Data Overview */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
           <div
-            onClick={() => switchTab("directory")}
+            onClick={() => {
+              setActiveTab("directory");
+              setStatusFilter("active");
+            }}
             className={`p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition cursor-pointer space-y-1 ${
-              activeTab === "directory"
+              activeTab === "directory" && statusFilter === "active"
                 ? isDark
                   ? "bg-[#0071E3]/15 border-[#0071E3]/50 shadow-sm shadow-[#0071E3]/10"
                   : "bg-blue-50/80 border-blue-300 shadow-sm"
@@ -726,13 +759,13 @@ export default function AppleEmployeeDirectoryPage() {
             }`}
           >
             <p className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Total Staff
+              Active Staff
             </p>
             <p className={`text-lg sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-              {stats.total}
+              {activeStaffCount}
             </p>
             <p className={`text-[10px] sm:text-[11px] truncate ${isDark ? "text-[#6C7280]" : "text-slate-400"}`}>
-              Registered profiles
+              Active profiles
             </p>
           </div>
 
@@ -760,7 +793,10 @@ export default function AppleEmployeeDirectoryPage() {
           </div>
 
           <div
-            onClick={() => switchTab("directory")}
+            onClick={() => {
+              setActiveTab("directory");
+              setStatusFilter("active");
+            }}
             className={`p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition cursor-pointer space-y-1 ${
               isDark
                 ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/10"
@@ -775,6 +811,32 @@ export default function AppleEmployeeDirectoryPage() {
             </p>
             <p className={`text-[10px] sm:text-[11px] truncate ${isDark ? "text-[#6C7280]" : "text-slate-400"}`}>
               Full-Time staff
+            </p>
+          </div>
+
+          <div
+            onClick={() => {
+              setActiveTab("directory");
+              setStatusFilter("archived");
+            }}
+            className={`p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition cursor-pointer space-y-1 ${
+              activeTab === "directory" && statusFilter === "archived"
+                ? isDark
+                  ? "bg-amber-500/15 border-amber-500/50 shadow-sm"
+                  : "bg-amber-50 border-amber-300 shadow-sm"
+                : isDark
+                ? "bg-[#121622]/60 border-white/[0.06] hover:border-white/10"
+                : "bg-white border-slate-200/80 hover:border-slate-300"
+            }`}
+          >
+            <p className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-amber-400" : "text-amber-600"}`}>
+              Archived Staff
+            </p>
+            <p className={`text-lg sm:text-2xl font-bold tracking-tight ${isDark ? "text-amber-300" : "text-amber-700"}`}>
+              {archivedStaffCount}
+            </p>
+            <p className={`text-[10px] sm:text-[11px] truncate ${isDark ? "text-[#6C7280]" : "text-slate-400"}`}>
+              Inactive profiles
             </p>
           </div>
 
@@ -866,6 +928,76 @@ export default function AppleEmployeeDirectoryPage() {
           <>
         {/* Search & Action Bar with Add Employee & Filter Icon */}
         <div className="space-y-3">
+          {/* Quick Status Pill Bar (Active / Archived / All) */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+            <button
+              type="button"
+              onClick={() => setStatusFilter("active")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                statusFilter === "active"
+                  ? "bg-[#0071E3] text-white shadow-xs"
+                  : isDark
+                  ? "bg-white/5 text-[#8F95A3] hover:text-white border border-white/5"
+                  : "bg-slate-200/70 text-slate-700 hover:bg-slate-200 border border-slate-200"
+              }`}
+            >
+              <span>Active Staff</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                  statusFilter === "active"
+                    ? "bg-white/20 text-white"
+                    : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                }`}
+              >
+                {activeStaffCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStatusFilter("archived")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                statusFilter === "archived"
+                  ? "bg-amber-600 text-white shadow-xs"
+                  : isDark
+                  ? "bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20"
+                  : "bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200"
+              }`}
+            >
+              <span>Archived Staff</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                  statusFilter === "archived"
+                    ? "bg-white/20 text-white"
+                    : "bg-amber-500/20 text-amber-700 dark:text-amber-300"
+                }`}
+              >
+                {archivedStaffCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStatusFilter("all")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                statusFilter === "all"
+                  ? "bg-slate-800 dark:bg-slate-700 text-white shadow-xs"
+                  : isDark
+                  ? "bg-white/5 text-[#8F95A3] hover:text-white border border-white/5"
+                  : "bg-slate-200/70 text-slate-700 hover:bg-slate-200 border border-slate-200"
+              }`}
+            >
+              <span>All Staff Profiles</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                  statusFilter === "all" ? "bg-white/20 text-white" : "bg-black/5 dark:bg-white/10"
+                }`}
+              >
+                {activeStaffCount + archivedStaffCount}
+              </span>
+            </button>
+          </div>
+
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full">
             {/* Search Input (order-2 on mobile, order-1 on desktop) */}
             <div className="relative flex-1 order-2 sm:order-1">
@@ -976,6 +1108,7 @@ export default function AppleEmployeeDirectoryPage() {
                       setSelectedDept("");
                       setSelectedOutlet("");
                       setSelectedWorkerType("");
+                      setStatusFilter("active");
                     }}
                     className="text-xs text-[#0071E3] dark:text-blue-400 hover:underline font-semibold cursor-pointer flex items-center gap-1"
                   >
@@ -985,7 +1118,24 @@ export default function AppleEmployeeDirectoryPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className={`block text-[11px] font-semibold mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Profile Status
+                  </label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as any)}
+                    className={`w-full px-3 py-2 text-xs font-medium rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  >
+                    <option value="active">Active Staff Only</option>
+                    <option value="archived">Archived Staff Only</option>
+                    <option value="all">All Profiles (Active & Archived)</option>
+                  </select>
+                </div>
+
                 <div>
                   <label className={`block text-[11px] font-semibold mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                     Department
@@ -1066,8 +1216,14 @@ export default function AppleEmployeeDirectoryPage() {
               isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80"
             }`}
           >
-            <p className="font-semibold text-sm">No employees found</p>
-            <p>Click &quot;+ Add Employee&quot; to register a staff profile.</p>
+            <p className="font-semibold text-sm">
+              {statusFilter === "archived" ? "No archived employees found" : "No employees found"}
+            </p>
+            <p>
+              {statusFilter === "archived"
+                ? "Archived staff members will be listed here when deactivated."
+                : 'Click "+ Add Employee" to register a staff profile.'}
+            </p>
           </div>
         ) : (
           <>
@@ -1102,7 +1258,11 @@ export default function AppleEmployeeDirectoryPage() {
                             <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
                               {emp.employeeCode}
                             </span>
-                            {hasLogin ? (
+                            {emp.archivedAt ? (
+                              <span className="text-[10px] font-bold text-amber-500">
+                                Archived
+                              </span>
+                            ) : hasLogin ? (
                               <span className="text-[10px] font-semibold text-emerald-500">
                                 Active User
                               </span>
@@ -1115,9 +1275,15 @@ export default function AppleEmployeeDirectoryPage() {
                         </div>
                       </div>
 
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border shrink-0 ${wtBadge.cls}`}>
-                        {wtBadge.label}
-                      </span>
+                      {emp.archivedAt ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md border bg-amber-500/15 text-amber-500 border-amber-500/30 shrink-0">
+                          Archived
+                        </span>
+                      ) : (
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border shrink-0 ${wtBadge.cls}`}>
+                          {wtBadge.label}
+                        </span>
+                      )}
                     </div>
 
                     {/* Details Info Grid */}
@@ -1150,18 +1316,35 @@ export default function AppleEmployeeDirectoryPage() {
                       )}
                     </div>
 
-                    {/* View Profile Action */}
-                    <button
-                      onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees/${emp.id}`)}
-                      className={`w-full py-2 rounded-xl text-xs font-medium border transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
-                        isDark
-                          ? "bg-white/[0.04] text-[#BAC0CD] hover:text-white hover:bg-white/[0.08] border-white/[0.08]"
-                          : "bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-100 border-slate-200 shadow-xs"
-                      }`}
-                    >
-                      <span>View Profile</span>
-                      <span>→</span>
-                    </button>
+                    {/* Actions */}
+                    <div className="flex items-center gap-2">
+                      {emp.archivedAt ? (
+                        <button
+                          onClick={() => handleToggleArchive(emp.id, `${emp.firstName} ${emp.lastName}`, true)}
+                          className="flex-1 py-2 rounded-xl text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 transition cursor-pointer text-center"
+                        >
+                          Restore Staff
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleToggleArchive(emp.id, `${emp.firstName} ${emp.lastName}`, false)}
+                          className="px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
+                        >
+                          Archive
+                        </button>
+                      )}
+                      <button
+                        onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees/${emp.id}`)}
+                        className={`flex-1 py-2 rounded-xl text-xs font-medium border transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                          isDark
+                            ? "bg-white/[0.04] text-[#BAC0CD] hover:text-white hover:bg-white/[0.08] border-white/[0.08]"
+                            : "bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-100 border-slate-200 shadow-xs"
+                        }`}
+                      >
+                        <span>View Profile</span>
+                        <span>→</span>
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -1245,7 +1428,11 @@ export default function AppleEmployeeDirectoryPage() {
                           </td>
 
                           <td className="p-4">
-                            {hasLogin ? (
+                            {emp.archivedAt ? (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                                Archived Staff
+                              </span>
+                            ) : hasLogin ? (
                               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
                                 isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-100 text-emerald-800 border-emerald-200"
                               }`}>
@@ -1261,16 +1448,34 @@ export default function AppleEmployeeDirectoryPage() {
                           </td>
 
                           <td className="p-4 text-right">
-                            <button
-                              onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees/${emp.id}`)}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition cursor-pointer ${
-                                isDark
-                                  ? "bg-white/[0.04] text-[#BAC0CD] hover:text-white hover:bg-white/[0.08] border-white/[0.08]"
-                                  : "bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-100 border-slate-200"
-                              }`}
-                            >
-                              View Profile →
-                            </button>
+                            <div className="flex items-center justify-end gap-2">
+                              {emp.archivedAt ? (
+                                <button
+                                  onClick={() => handleToggleArchive(emp.id, `${emp.firstName} ${emp.lastName}`, true)}
+                                  className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 transition cursor-pointer"
+                                >
+                                  Restore Staff
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleToggleArchive(emp.id, `${emp.firstName} ${emp.lastName}`, false)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                                  title="Archive staff member"
+                                >
+                                  Archive
+                                </button>
+                              )}
+                              <button
+                                onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees/${emp.id}`)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition cursor-pointer ${
+                                  isDark
+                                    ? "bg-white/[0.04] text-[#BAC0CD] hover:text-white hover:bg-white/[0.08] border-white/[0.08]"
+                                    : "bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-100 border-slate-200"
+                                }`}
+                              >
+                                View Profile →
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
