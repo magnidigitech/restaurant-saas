@@ -74,6 +74,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
 
   // Auto-expand current active module accordion tab based on pathname
   const initialExpandedMenu = useMemo(() => {
+    if (!pathname) return null;
     if (pathname.includes("/inventory")) return "inventory";
     if (pathname.includes("/shifts")) return "shifts";
     if (pathname.includes("/workforce") || pathname.includes("/attendance") || pathname.includes("/leaves")) return "workforce";
@@ -147,6 +148,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
   };
 
   const [activeModules, setActiveModules] = useState<string[] | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean>(true);
 
   // Automatic Branding Fetch & Cache across all pages
   const [internalBranding, setInternalBranding] = useState<RestaurantNavbarProps["branding"] | null>(
@@ -204,6 +206,9 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
           if (data.modules) {
             const keys = data.modules.map((m: any) => m.key.toLowerCase());
             setActiveModules(keys);
+          }
+          if (data.isAdmin !== undefined) {
+            setIsAdmin(!!data.isAdmin);
           }
         }
       })
@@ -353,10 +358,17 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
 
   // Filter modules based on tenant permissions
   const filteredNavLinks = useMemo(() => {
-    if (activeModules === null) {
-      return allNavLinks;
+    let links = allNavLinks;
+
+    // Hide Administration / Settings section for non-admin employees
+    if (!isAdmin) {
+      links = links.filter((item) => item.id !== "settings");
     }
-    return allNavLinks.filter((item) => {
+
+    if (activeModules === null) {
+      return links;
+    }
+    return links.filter((item) => {
       if (!item.moduleKey) return true;
       const k = item.moduleKey.toLowerCase();
       return (
@@ -367,10 +379,11 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
         (k === "workforce" && activeModules.includes("hr_onboarding"))
       );
     });
-  }, [allNavLinks, activeModules]);
+  }, [allNavLinks, activeModules, isAdmin]);
 
   // Helper to check if a main module link is active
   const isNavActive = (link: NavItem) => {
+    if (!pathname) return false;
     if (link.id === "dashboard") {
       return pathname.endsWith("/dashboard") || pathname === "/";
     }
@@ -807,7 +820,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
                   {hasSubs && isExpanded && (
                     <div className="pl-3.5 pr-1 py-1 space-y-0.5 border-l-2 ml-4 my-1 border-slate-200 dark:border-white/10 transition-all">
                       {item.children!.map((sub) => {
-                        const isChildActive = pathname.startsWith(sub.href);
+                        const isChildActive = !!pathname && pathname.startsWith(sub.href);
                         return (
                           <button
                             key={sub.label}

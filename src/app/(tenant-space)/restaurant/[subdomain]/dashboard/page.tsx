@@ -1007,8 +1007,166 @@ export default function AppleTenantDashboard() {
           {/* TAB 1: DATA-FIRST DASHBOARD (DEFAULT)                              */}
           {/* =================================================================== */}
           {activeTab === "operations" && (
-            <div className="space-y-6 animate-in fade-in duration-150">
-              {/* 1. TOP ROW: 6 KPI CARDS WITH SMOOTH MINI SPARKLINE SVGS */}
+            !isAdmin ? (
+              <div className="space-y-6 animate-in fade-in duration-200">
+                {/* Banner Card */}
+                <div
+                  className={`p-8 sm:p-10 rounded-3xl border relative overflow-hidden ${
+                    isDark
+                      ? "bg-gradient-to-br from-[#0E121D] via-[#121827] to-[#0E121D] border-white/[0.08]"
+                      : "bg-gradient-to-br from-white via-slate-50 to-white border-slate-200/90 shadow-sm"
+                  }`}
+                >
+                  {/* Background Decorative Accent */}
+                  <div
+                    className="absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl opacity-10 pointer-events-none"
+                    style={{ backgroundColor: brandColor }}
+                  />
+
+                  <div className="relative z-10 max-w-2xl space-y-4">
+                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wide uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Employee Dashboard — Coming Soon</span>
+                    </div>
+
+                    <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                      Personalized Role & Module Workspace
+                    </h2>
+
+                    <p className={`text-sm leading-relaxed ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+                      Your customized employee dashboard is currently under development. Soon, you will be able to view live shift rosters, punch logs, task checklists, and performance insights tailored strictly to your role and assigned modules.
+                    </p>
+
+                    <div className="pt-2 flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-black/[0.03] dark:bg-white/[0.04] px-3.5 py-2 rounded-xl border border-black/[0.06] dark:border-white/[0.06]">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        <span>Role-Tailored View</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-black/[0.03] dark:bg-white/[0.04] px-3.5 py-2 rounded-xl border border-black/[0.06] dark:border-white/[0.06]">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        <span>Assigned Modules Hub</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-black/[0.03] dark:bg-white/[0.04] px-3.5 py-2 rounded-xl border border-black/[0.06] dark:border-white/[0.06]">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        <span>Shift & Attendance Sync</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Access Modules for Employee */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">
+                      Your Assigned Workspace Modules
+                    </h3>
+                    <span className="text-xs font-medium text-slate-400">
+                      {modules.length} {modules.length === 1 ? "Module" : "Modules"} Enabled
+                    </span>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {hasShiftAccess && (
+                      <div
+                        onClick={() => router.push(p("/shifts/rosters"))}
+                        className={`p-5 rounded-2xl border transition cursor-pointer hover:scale-[1.01] flex flex-col justify-between group ${
+                          isDark
+                            ? "bg-[#0E121D] border-white/[0.08] hover:border-white/[0.15]"
+                            : "bg-white border-slate-200/90 shadow-2xs hover:border-slate-300"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                            <CalendarDays className="w-5 h-5" />
+                          </div>
+                          <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                        </div>
+                        <div className="mt-4">
+                          <h4 className="font-bold text-sm text-slate-900 dark:text-white">Shifts & Rosters</h4>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            Access weekly rosters, schedule shifts, and request shift swaps.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {(hasWorkforceAccess || allowedKeys.has("attendance") || allowedKeys.has("leave_management")) && (
+                      <div
+                        onClick={() => router.push(p("/attendance"))}
+                        className={`p-5 rounded-2xl border transition cursor-pointer hover:scale-[1.01] flex flex-col justify-between group ${
+                          isDark
+                            ? "bg-[#0E121D] border-white/[0.08] hover:border-white/[0.15]"
+                            : "bg-white border-slate-200/90 shadow-2xs hover:border-slate-300"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                            <Clock className="w-5 h-5" />
+                          </div>
+                          <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                        </div>
+                        <div className="mt-4">
+                          <h4 className="font-bold text-sm text-slate-900 dark:text-white">Attendance & Leaves</h4>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            Clock in/out timesheets, view attendance records, and submit leave requests.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {hasOperationsAccess && (
+                      <div
+                        onClick={() => router.push(p("/operations"))}
+                        className={`p-5 rounded-2xl border transition cursor-pointer hover:scale-[1.01] flex flex-col justify-between group ${
+                          isDark
+                            ? "bg-[#0E121D] border-white/[0.08] hover:border-white/[0.15]"
+                            : "bg-white border-slate-200/90 shadow-2xs hover:border-slate-300"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center">
+                            <ClipboardCheck className="w-5 h-5" />
+                          </div>
+                          <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                        </div>
+                        <div className="mt-4">
+                          <h4 className="font-bold text-sm text-slate-900 dark:text-white">Kitchen Operations & SOPs</h4>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            Execute station checklists, food hygiene audits, and dish preparation SOPs.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {hasPosAccess && (
+                      <div
+                        onClick={() => router.push(p("/pos"))}
+                        className={`p-5 rounded-2xl border transition cursor-pointer hover:scale-[1.01] flex flex-col justify-between group ${
+                          isDark
+                            ? "bg-[#0E121D] border-white/[0.08] hover:border-white/[0.15]"
+                            : "bg-white border-slate-200/90 shadow-2xs hover:border-slate-300"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                            <Store className="w-5 h-5" />
+                          </div>
+                          <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                        </div>
+                        <div className="mt-4">
+                          <h4 className="font-bold text-sm text-slate-900 dark:text-white">POS Terminal & KDS</h4>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            Launch order entry, kitchen display tickets and table status.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6 animate-in fade-in duration-150">
+                {/* 1. TOP ROW: 6 KPI CARDS WITH SMOOTH MINI SPARKLINE SVGS */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-3.5">
                 {/* 1. Today's Sales */}
                 <div
@@ -2103,6 +2261,7 @@ export default function AppleTenantDashboard() {
                 </div>
               )}
             </div>
+            )
           )}
           {/* Calendar Style Date Range Filter Modal (Matching POS) */}
           {isDateModalOpen && (
