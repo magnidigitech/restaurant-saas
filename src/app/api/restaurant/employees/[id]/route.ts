@@ -57,6 +57,15 @@ export async function GET(
         },
         emergencyContacts: true,
         documents: true,
+        onboardings: {
+          include: {
+            template: { select: { id: true, name: true } },
+            progresses: {
+              include: { task: true, fileUpload: true },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
         memberships: {
           include: { user: true },
         },

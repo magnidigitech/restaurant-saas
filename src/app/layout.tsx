@@ -245,36 +245,6 @@ const jsonLd = {
           }
         }
       ]
-    },
-    {
-      "@type": "BreadcrumbList",
-      "@id": "https://restobird.com/#breadcrumb",
-      "itemListElement": [
-        {
-          "@type": "ListItem",
-          "position": 1,
-          "name": "Home",
-          "item": "https://restobird.com"
-        },
-        {
-          "@type": "ListItem",
-          "position": 2,
-          "name": "POS Integrations",
-          "item": "https://restobird.com/pos"
-        },
-        {
-          "@type": "ListItem",
-          "position": 3,
-          "name": "Inventory & Recipe Depletion",
-          "item": "https://restobird.com/inventory"
-        },
-        {
-          "@type": "ListItem",
-          "position": 4,
-          "name": "Payroll & Tip Pooling",
-          "item": "https://restobird.com/payroll"
-        }
-      ]
     }
   ],
 };

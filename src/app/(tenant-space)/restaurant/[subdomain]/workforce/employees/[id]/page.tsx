@@ -63,8 +63,57 @@ export default function AppleEmployeeDetailPage({
   };
 
   useEffect(() => {
-    if (id) fetchEmployee();
+    if (id) {
+      fetchEmployee();
+    }
   }, [id]);
+
+  // Active tab persistence logic
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchTab = new URLSearchParams(window.location.search).get("tab");
+      const savedTab = localStorage.getItem(`emp_profile_tab_${id}`);
+      const t = searchTab || savedTab;
+      if (t && ["profile", "payroll", "history", "outlets", "emergency", "documents"].includes(t)) {
+        setActiveTab(t as any);
+      }
+    }
+  }, [id]);
+
+  const handleTabChange = (tab: "profile" | "payroll" | "history" | "outlets" | "emergency" | "documents") => {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`emp_profile_tab_${id}`, tab);
+    }
+    router.replace(`/restaurant/${subdomain}/workforce/employees/${id}?tab=${tab}`, { scroll: false });
+  };
+
+  const formatDocumentTitle = (rawTitle: string, fileUrl?: string, origFileName?: string) => {
+    const empName = `${employee?.firstName || ""} ${employee?.lastName || ""}`.trim() || "Employee";
+    const empCode = employee?.employeeCode || "EMP-00000";
+    let ext = "pdf";
+    if (origFileName && origFileName.includes(".")) {
+      ext = origFileName.split(".").pop() || "pdf";
+    } else if (fileUrl && fileUrl.includes(".")) {
+      const cleanUrl = fileUrl.split("?")[0];
+      ext = cleanUrl.split(".").pop() || "pdf";
+    }
+    const cleanTitle = (rawTitle || "Document").replace(/[^a-zA-Z0-9\s_-]/g, "").trim();
+    return `${cleanTitle} - ${empName} - ${empCode}.${ext}`;
+  };
+
+  const formatResponseText = (responseVal: string) => {
+    if (!responseVal) return "";
+    if (responseVal.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(responseVal);
+        if (Array.isArray(parsed)) {
+          return parsed.join(", ");
+        }
+      } catch {}
+    }
+    return responseVal;
+  };
 
   const handleUpdateCapacity = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -349,7 +398,7 @@ export default function AppleEmployeeDetailPage({
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => handleTabChange(tab.id as any)}
               className={`px-4 py-2 rounded-xl text-xs font-medium transition cursor-pointer flex-shrink-0 flex items-center gap-1.5 ${
                 activeTab === tab.id
                   ? "bg-[#0071E3] text-white shadow-xs"
@@ -967,48 +1016,184 @@ export default function AppleEmployeeDetailPage({
 
         {/* TAB CONTENT: Documents */}
         {activeTab === "documents" && (
-          <div
-            className={`p-6 rounded-3xl border transition space-y-4 ${
-              isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
-            }`}
-          >
-            <div className="flex justify-between items-center">
-              <h3 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
-                Employee Documents
-              </h3>
-              <button
-                onClick={() => setShowModal("document")}
-                className="px-3 py-1.5 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer"
-              >
-                + Add Document
-              </button>
+          <div className="space-y-6">
+            {/* Onboarding Form Responses & Documents */}
+            <div
+              className={`p-6 rounded-3xl border transition space-y-4 ${
+                isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+              }`}
+            >
+              <div className="flex justify-between items-center border-b pb-3 border-slate-200/80 dark:border-white/[0.06]">
+                <div>
+                  <h3 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                    Onboarding Form Submissions & Documents
+                  </h3>
+                  <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    Form answers and uploaded documents submitted by candidate during onboarding.
+                  </p>
+                </div>
+              </div>
+
+              {(!employee.onboardings || employee.onboardings.length === 0) ? (
+                <p className={`text-xs py-2 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                  No onboarding form submissions recorded for this employee.
+                </p>
+              ) : (
+                <div className="space-y-6">
+                  {employee.onboardings.map((ob: any) => (
+                    <div
+                      key={ob.id}
+                      className={`p-5 rounded-2xl border transition space-y-4 ${
+                        isDark ? "bg-[#0A0C12]/60 border-white/[0.06]" : "bg-slate-50/80 border-slate-200/80"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#0071E3]" />
+                          <h4 className={`text-xs font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                            {ob.template?.name || "Onboarding Form"}
+                          </h4>
+                        </div>
+                        <span className={`text-[11px] font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                          Submitted {ob.submittedAt ? new Date(ob.submittedAt).toLocaleDateString() : new Date(ob.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      {/* Questions & Responses */}
+                      <div className="space-y-3 pt-1">
+                        {ob.progresses?.map((p: any) => {
+                          const formattedTitle = p.task?.title || "Question";
+                          const formattedAns = formatResponseText(p.responseValue || "");
+                          const fileObj = p.fileUpload;
+
+                          return (
+                            <div
+                              key={p.id}
+                              className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+                                isDark ? "bg-[#121622] border-white/[0.06]" : "bg-white border-slate-200"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                                  {formattedTitle}
+                                </span>
+                                <span
+                                  className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${
+                                    p.status === "COMPLETED"
+                                      ? "bg-emerald-500/15 text-emerald-500"
+                                      : p.status === "REJECTED"
+                                      ? "bg-rose-500/15 text-rose-500"
+                                      : "bg-slate-500/15 text-slate-400"
+                                  }`}
+                                >
+                                  {p.status}
+                                </span>
+                              </div>
+
+                              {/* Answer Text */}
+                              {p.responseValue && (
+                                p.responseValue.startsWith("data:image/") ? (
+                                  <div className="pt-1">
+                                    <span className="text-[10px] font-semibold text-slate-400 block mb-1 uppercase">Signature</span>
+                                    <img src={p.responseValue} alt="Signature" className="max-h-20 border rounded-lg p-1 bg-white" />
+                                  </div>
+                                ) : (
+                                  <p className={`font-medium ${isDark ? "text-[#58A6FF]" : "text-[#0071E3]"}`}>
+                                    <span className={isDark ? "text-slate-400" : "text-slate-600"}>Response: </span>
+                                    {formattedAns}
+                                  </p>
+                                )
+                              )}
+
+                              {/* Uploaded File Attachment */}
+                              {fileObj && (
+                                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-white/[0.04] mt-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg">📄</span>
+                                    <div>
+                                      <p className={`font-bold text-xs ${isDark ? "text-white" : "text-slate-900"}`}>
+                                        {formatDocumentTitle(formattedTitle, fileObj.fileUrl, fileObj.fileName)}
+                                      </p>
+                                      <p className={`text-[10px] ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                                        Uploaded {fileObj.fileName || "File Attachment"}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <a
+                                    href={fileObj.fileUrl}
+                                    download={formatDocumentTitle(formattedTitle, fileObj.fileUrl, fileObj.fileName)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="px-3 py-1.5 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer"
+                                  >
+                                    Download ↗
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {employee.documents?.length === 0 ? (
-              <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-                No verification documents uploaded.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {employee.documents.map((d: any) => (
-                  <div
-                    key={d.id}
-                    className={`p-4 rounded-2xl border transition flex items-center justify-between ${
-                      isDark ? "bg-[#0A0C12]/50 border-white/[0.06]" : "bg-slate-50 border-slate-200/80"
-                    }`}
-                  >
-                    <div>
-                      <p className={`text-xs font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
-                        {d.type.replace(/_/g, " ")} — {d.documentNumber || "No ID Number"}
-                      </p>
-                      <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                        Uploaded {new Date(d.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+            {/* Standard Verification Documents */}
+            <div
+              className={`p-6 rounded-3xl border transition space-y-4 ${
+                isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+              }`}
+            >
+              <div className="flex justify-between items-center">
+                <h3 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                  Verification ID Documents
+                </h3>
+                <button
+                  onClick={() => setShowModal("document")}
+                  className="px-3 py-1.5 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer"
+                >
+                  + Add Document
+                </button>
               </div>
-            )}
+
+              {employee.documents?.length === 0 ? (
+                <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                  No additional verification documents uploaded.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {employee.documents.map((d: any) => (
+                    <div
+                      key={d.id}
+                      className={`p-4 rounded-2xl border transition flex items-center justify-between ${
+                        isDark ? "bg-[#0A0C12]/50 border-white/[0.06]" : "bg-slate-50 border-slate-200/80"
+                      }`}
+                    >
+                      <div>
+                        <p className={`text-xs font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                          {d.type.replace(/_/g, " ")} — {d.documentNumber || "No ID Number"}
+                        </p>
+                        <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                          Uploaded {new Date(d.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      {d.fileUrl && (
+                        <a
+                          href={d.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1 bg-[#0071E3] text-white rounded-xl text-xs font-semibold"
+                        >
+                          View ↗
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>

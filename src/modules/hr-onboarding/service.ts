@@ -326,7 +326,7 @@ export const HROnboardingService = {
     const session = await prisma.employeeOnboarding.findFirstOrThrow({
       where: { id: sessionId, restaurantId },
     });
-    if (!["IN_PROGRESS", "REJECTED"].includes(session.status)) {
+    if (!["IN_PROGRESS", "PENDING_APPROVAL", "APPROVED", "REJECTED"].includes(session.status)) {
       throw new Error("Cannot update tasks for this session in its current state");
     }
 
@@ -338,9 +338,9 @@ export const HROnboardingService = {
       where: { id: progress.id },
       data: {
         status: data.status,
-        notes: data.notes,
-        responseValue: data.responseValue ?? null,
-        fileUploadId: data.fileUploadId ?? null,
+        ...(data.notes !== undefined && { notes: data.notes }),
+        ...(data.responseValue !== undefined && { responseValue: data.responseValue }),
+        ...(data.fileUploadId !== undefined && { fileUploadId: data.fileUploadId }),
         completedAt: data.status === "COMPLETED" ? new Date() : null,
       },
     });
@@ -354,7 +354,7 @@ export const HROnboardingService = {
     const session = await prisma.employeeOnboarding.findFirstOrThrow({
       where: { accessToken },
     });
-    if (!["IN_PROGRESS", "REJECTED"].includes(session.status)) {
+    if (!["IN_PROGRESS", "PENDING_APPROVAL", "APPROVED", "REJECTED"].includes(session.status)) {
       throw new Error("Cannot update tasks for this session in its current state");
     }
 
@@ -366,9 +366,9 @@ export const HROnboardingService = {
       where: { id: progress.id },
       data: {
         status: data.status,
-        notes: data.notes,
-        responseValue: data.responseValue ?? null,
-        fileUploadId: data.fileUploadId ?? null,
+        ...(data.notes !== undefined && { notes: data.notes }),
+        ...(data.responseValue !== undefined && { responseValue: data.responseValue }),
+        ...(data.fileUploadId !== undefined && { fileUploadId: data.fileUploadId }),
         completedAt: data.status === "COMPLETED" ? new Date() : null,
       },
     });

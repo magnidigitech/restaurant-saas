@@ -236,7 +236,7 @@ export default function OnboardingTab({ subdomain, onCountChange }: OnboardingTa
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-150">
+    <div className="space-y-6">
       {/* Top action row */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         {/* Filter Pills */}

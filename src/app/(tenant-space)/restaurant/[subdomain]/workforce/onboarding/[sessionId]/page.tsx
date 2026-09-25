@@ -703,9 +703,71 @@ export default function OnboardingSessionDetailPage() {
               </button>
             </div>
 
-            <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              {actionTask.task.title}
-            </p>
+            <div>
+              <p className={`text-xs font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                {actionTask.task.title}
+              </p>
+              {actionTask.task.description && (
+                <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  {actionTask.task.description}
+                </p>
+              )}
+            </div>
+
+            {/* Candidate Submitted Response Display */}
+            {actionTask.responseValue && (
+              <div
+                className={`p-3 rounded-2xl border text-xs space-y-1 ${
+                  isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-slate-50 border-slate-200"
+                }`}
+              >
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Submitted Response
+                </span>
+                {actionTask.responseValue.startsWith("data:image/") ? (
+                  <img src={actionTask.responseValue} alt="Signature" className="max-h-24 border rounded-xl p-1 bg-white" />
+                ) : (
+                  <p className="font-semibold text-xs text-[#0071E3] dark:text-[#58A6FF] whitespace-pre-wrap">
+                    {(() => {
+                      const val = actionTask.responseValue;
+                      if (val.startsWith("[")) {
+                        try {
+                          const parsed = JSON.parse(val);
+                          if (Array.isArray(parsed)) return parsed.join(", ");
+                        } catch {}
+                      }
+                      return val;
+                    })()}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Candidate File Upload Display */}
+            {actionTask.fileUpload && (
+              <div
+                className={`p-3 rounded-2xl border text-xs flex items-center justify-between ${
+                  isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-slate-50 border-slate-200"
+                }`}
+              >
+                <div className="space-y-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Uploaded Attachment
+                  </span>
+                  <span className={`font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                    {actionTask.fileUpload.fileName || "Uploaded File"}
+                  </span>
+                </div>
+                <a
+                  href={actionTask.fileUpload.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1.5 bg-[#0071E3] hover:bg-[#0077ED] text-white rounded-xl text-xs font-semibold transition"
+                >
+                  View Attachment ↗
+                </a>
+              </div>
+            )}
 
             <div>
               <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
@@ -715,6 +777,7 @@ export default function OnboardingSessionDetailPage() {
                 rows={2}
                 value={taskNote}
                 onChange={(e) => setTaskNote(e.target.value)}
+                placeholder="Optional notes..."
                 className={`w-full p-3 text-xs rounded-xl border transition ${
                   isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
                 }`}
@@ -725,21 +788,21 @@ export default function OnboardingSessionDetailPage() {
               <button
                 onClick={() => handleUpdateTask(actionTask.taskId, "COMPLETED")}
                 disabled={updating}
-                className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl"
+                className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
               >
                 Mark Completed
               </button>
               <button
                 onClick={() => handleUpdateTask(actionTask.taskId, "WAIVED")}
                 disabled={updating}
-                className="flex-1 py-2 bg-slate-600 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl"
+                className="flex-1 py-2 bg-slate-600 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
               >
                 Waive Task
               </button>
               <button
                 onClick={() => handleUpdateTask(actionTask.taskId, "REJECTED")}
                 disabled={updating}
-                className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl"
+                className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
               >
                 Reject Task
               </button>

@@ -1,14 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import {
   PlusCircle,
   Copy,
   Trash2,
   Eye,
   Settings as SettingsIcon,
-  HelpCircle,
   UploadCloud,
   FileText,
   CheckSquare,
@@ -21,9 +20,12 @@ import {
   AlignJustify,
   CheckCircle2,
   FolderPlus,
-  Palette,
   GripHorizontal,
   ArrowLeft,
+  ArrowUp,
+  ArrowDown,
+  User,
+  ExternalLink,
 } from "lucide-react";
 
 type TaskType = "FORM_INPUT" | "SIGNATURE" | "DOCUMENT" | "DATE" | "CHECKBOX";
@@ -73,7 +75,9 @@ const GOOGLE_FIELD_TYPES: GoogleFieldType[] = [
 
 export default function OnboardingTemplatesPage() {
   const router = useRouter();
+  const params = useParams();
   const searchParams = useSearchParams();
+  const subdomain = (params?.subdomain as string) || "";
   const requestedTemplateId = searchParams.get("templateId");
 
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -93,15 +97,18 @@ export default function OnboardingTemplatesPage() {
   // Field type dropdown menu open state per task
   const [openDropdownTaskId, setOpenDropdownTaskId] = useState<string | null>(null);
 
+  // Floating sidebar add-question menu open/hover state
+  const [showAddMenu, setShowAddMenu] = useState(false);
+
+  // Responses tab candidate sessions
+  const [templateSessions, setTemplateSessions] = useState<any[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+
   // Template creation modal
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({ name: "", description: "", isDefault: false });
   const [submitting, setSubmitting] = useState(false);
   const [addingTask, setAddingTask] = useState(false);
-
-  // Preview Upload file mock
-  const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
-  const [previewFiles, setPreviewFiles] = useState<{ [key: string]: string }>({});
 
   const fetchTemplates = async () => {
     try {
@@ -146,9 +153,30 @@ export default function OnboardingTemplatesPage() {
     }
   };
 
+  const fetchTemplateSessions = async (tplId: string) => {
+    setLoadingSessions(true);
+    try {
+      const res = await fetch(`/api/restaurant/onboarding/sessions?templateId=${tplId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTemplateSessions(data.sessions || []);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
   useEffect(() => {
     fetchTemplates();
   }, []);
+
+  useEffect(() => {
+    if (selected && activeTab === "responses") {
+      fetchTemplateSessions(selected.id);
+    }
+  }, [selected?.id, activeTab]);
 
   const handleCreateTemplate = async () => {
     if (!createForm.name) {
@@ -188,6 +216,7 @@ export default function OnboardingTemplatesPage() {
   const handleAddField = async (fieldDef: GoogleFieldType) => {
     if (!selected) return;
     setAddingTask(true);
+    setShowAddMenu(false);
     setError("");
     const initialConfig = fieldDef.hasOptions
       ? JSON.stringify({ subtype: fieldDef.key, options: ["Option 1", "Option 2"] })
@@ -199,7 +228,7 @@ export default function OnboardingTemplatesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "add_task",
-          title: `Untitled question`,
+          title: `Untitled ${fieldDef.label}`,
           description: "",
           taskType: fieldDef.taskType,
           isRequired: false,
@@ -368,7 +397,13 @@ export default function OnboardingTemplatesPage() {
   const handleAddOption = (taskId: string, currentConfig?: string) => {
     let cfg: { subtype: string; options: string[] } = { subtype: "multiple_choice", options: ["Option 1"] };
     try {
-      if (currentConfig) cfg = JSON.parse(currentConfig);
+      if (currentConfig) {
+        const parsed = JSON.parse(currentConfig);
+        cfg = {
+          subtype: parsed.subtype || "multiple_choice",
+          options: Array.isArray(parsed.options) ? parsed.options : ["Option 1"],
+        };
+      }
     } catch {}
     if (!Array.isArray(cfg.options)) cfg.options = [];
     cfg.options.push(`Option ${cfg.options.length + 1}`);
@@ -387,7 +422,13 @@ export default function OnboardingTemplatesPage() {
   const handleUpdateOption = (taskId: string, optIdx: number, val: string, currentConfig?: string) => {
     let cfg: { subtype: string; options: string[] } = { subtype: "multiple_choice", options: [] };
     try {
-      if (currentConfig) cfg = JSON.parse(currentConfig);
+      if (currentConfig) {
+        const parsed = JSON.parse(currentConfig);
+        cfg = {
+          subtype: parsed.subtype || "multiple_choice",
+          options: Array.isArray(parsed.options) ? parsed.options : [],
+        };
+      }
     } catch {}
     if (!Array.isArray(cfg.options)) cfg.options = [];
     cfg.options[optIdx] = val;
@@ -405,7 +446,13 @@ export default function OnboardingTemplatesPage() {
   const handleRemoveOption = (taskId: string, optIdx: number, currentConfig?: string) => {
     let cfg: { subtype: string; options: string[] } = { subtype: "multiple_choice", options: [] };
     try {
-      if (currentConfig) cfg = JSON.parse(currentConfig);
+      if (currentConfig) {
+        const parsed = JSON.parse(currentConfig);
+        cfg = {
+          subtype: parsed.subtype || "multiple_choice",
+          options: Array.isArray(parsed.options) ? parsed.options : [],
+        };
+      }
     } catch {}
     if (Array.isArray(cfg.options)) {
       cfg.options.splice(optIdx, 1);
@@ -489,6 +536,25 @@ export default function OnboardingTemplatesPage() {
     await fetch(`/api/restaurant/onboarding/templates/${id}`, { method: "DELETE" });
     setSelected(null);
     fetchTemplates();
+  };
+
+  // Safe Field Config parser
+  const getParsedConfig = (fieldConfig?: string) => {
+    let parsedConfig: { subtype: string; options: string[] } = { subtype: "short_answer", options: ["Option 1", "Option 2"] };
+    try {
+      if (fieldConfig) {
+        const parsed = JSON.parse(fieldConfig);
+        if (parsed && typeof parsed === "object") {
+          parsedConfig = {
+            subtype: parsed.subtype || "short_answer",
+            options: Array.isArray(parsed.options) ? parsed.options : ["Option 1", "Option 2"],
+          };
+        }
+      }
+    } catch {
+      parsedConfig = { subtype: "short_answer", options: ["Option 1", "Option 2"] };
+    }
+    return parsedConfig;
   };
 
   if (loading) {
@@ -656,10 +722,7 @@ export default function OnboardingTemplatesPage() {
               </div>
 
               {selected.tasks.map((task, idx) => {
-                let parsedConfig = { subtype: "short_answer", options: ["Option 1", "Option 2"] };
-                try {
-                  if (task.fieldConfig) parsedConfig = JSON.parse(task.fieldConfig);
-                } catch {}
+                const parsedConfig = getParsedConfig(task.fieldConfig);
 
                 return (
                   <div key={task.id} className="bg-white border border-gray-200 rounded-xl p-6 shadow-xs space-y-3">
@@ -724,23 +787,79 @@ export default function OnboardingTemplatesPage() {
                 <span className="text-3xl font-bold text-[#673ab7]">{selected._count?.onboardings || 0}</span>
               </div>
 
-              <div className="py-12 text-center space-y-3">
-                <div className="w-14 h-14 bg-purple-50 text-[#673ab7] rounded-full flex items-center justify-center mx-auto text-xl font-bold">
-                  📊
+              {loadingSessions ? (
+                <div className="py-8 text-center text-xs text-gray-400 animate-pulse">Loading candidate submissions...</div>
+              ) : templateSessions.length === 0 ? (
+                <div className="py-12 text-center space-y-3">
+                  <div className="w-14 h-14 bg-purple-50 text-[#673ab7] rounded-full flex items-center justify-center mx-auto text-xl font-bold">
+                    📊
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-900">0 Candidate Submissions Yet</h3>
+                  <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                    Initiate onboarding for an employee to send them this form.
+                  </p>
+                  <button
+                    onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees?tab=onboarding`)}
+                    className="px-4 py-2 bg-[#673ab7] text-white text-xs font-semibold rounded-lg shadow-xs cursor-pointer"
+                  >
+                    Go to HR Onboarding &rarr;
+                  </button>
                 </div>
-                <h3 className="text-base font-semibold text-gray-900">
-                  {selected._count?.onboardings || 0} Total Candidate Submissions
-                </h3>
-                <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                  To view individual employee checklist submissions and completed documents, go to the Employee Directory Onboarding tab.
-                </p>
-                <button
-                  onClick={() => router.push(`/restaurant/${searchParams.get("subdomain") || ""}/workforce/employees?tab=onboarding`)}
-                  className="px-4 py-2 bg-[#673ab7] text-white text-xs font-semibold rounded-lg shadow-xs cursor-pointer"
-                >
-                  View Onboarding Sessions &rarr;
-                </button>
-              </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center px-1 text-xs font-bold uppercase tracking-wider text-gray-500">
+                    <span>Candidate Name</span>
+                    <span>Submission Status</span>
+                  </div>
+
+                  {templateSessions.map((sess) => (
+                    <div
+                      key={sess.id}
+                      onClick={() => {
+                        if (sess.employee?.id) {
+                          router.push(`/restaurant/${subdomain}/workforce/employees/${sess.employee.id}?tab=documents`);
+                        }
+                      }}
+                      className="p-4 bg-gray-50 hover:bg-purple-50/60 border border-gray-200 hover:border-[#673ab7] rounded-xl transition-all flex items-center justify-between gap-4 cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-[#673ab7]/10 text-[#673ab7] flex items-center justify-center font-bold text-xs shrink-0">
+                          <User className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-gray-900 group-hover:text-[#673ab7] transition-colors flex items-center gap-1.5">
+                            {sess.employee?.firstName} {sess.employee?.lastName}
+                            <span className="text-xs font-mono font-normal text-gray-400">({sess.employee?.employeeCode})</span>
+                          </p>
+                          <p className="text-[11px] text-gray-500">
+                            Started: {sess.startedAt ? new Date(sess.startedAt).toLocaleDateString() : "Recently"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${
+                          sess.status === "APPROVED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-blue-50 text-blue-700 border-blue-200"
+                        }`}>
+                          {sess.status.replace(/_/g, " ")}
+                        </span>
+                        <span className="text-xs text-[#673ab7] font-semibold group-hover:underline flex items-center gap-1">
+                          View Documents <ExternalLink className="w-3.5 h-3.5" />
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="pt-4 text-center">
+                    <button
+                      onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees?tab=onboarding`)}
+                      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg cursor-pointer transition-colors"
+                    >
+                      View All Onboarding Sessions &rarr;
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : activeTab === "settings" ? (
             /* ── SETTINGS TAB ── */
@@ -800,11 +919,7 @@ export default function OnboardingTemplatesPage() {
                 const isDragging = draggedIndex === idx;
                 const isDragTarget = dragOverIndex === idx;
 
-                let parsedConfig = { subtype: "short_answer", options: ["Option 1", "Option 2"] };
-                try {
-                  if (task.fieldConfig) parsedConfig = JSON.parse(task.fieldConfig);
-                } catch {}
-
+                const parsedConfig = getParsedConfig(task.fieldConfig);
                 const currentFieldDef =
                   GOOGLE_FIELD_TYPES.find((f) => f.key === parsedConfig.subtype) || GOOGLE_FIELD_TYPES[0];
 
@@ -825,14 +940,44 @@ export default function OnboardingTemplatesPage() {
                       }`}
                     >
                       {/* Drag handle dots at center top */}
-                      <div
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, idx)}
-                        onDragEnd={handleDragEnd}
-                        className="flex justify-center text-gray-400 hover:text-gray-700 cursor-grab active:cursor-grabbing select-none"
-                        title="Drag to reorder question"
-                      >
-                        <GripHorizontal className="w-5 h-5" />
+                      <div className="flex items-center justify-between">
+                        <div
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, idx)}
+                          onDragEnd={handleDragEnd}
+                          className="flex justify-center text-gray-400 hover:text-gray-700 cursor-grab active:cursor-grabbing select-none flex-1 py-1"
+                          title="Drag to reorder question"
+                        >
+                          <GripHorizontal className="w-5 h-5" />
+                        </div>
+
+                        {/* Quick 1-click Move Up / Move Down buttons */}
+                        <div className="flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            disabled={idx === 0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveTask(idx, idx - 1);
+                            }}
+                            className="p-1 hover:bg-gray-100 disabled:opacity-30 rounded text-gray-600 transition-colors cursor-pointer"
+                            title="Move Up"
+                          >
+                            <ArrowUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={idx === selected.tasks.length - 1}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveTask(idx, idx + 1);
+                            }}
+                            className="p-1 hover:bg-gray-100 disabled:opacity-30 rounded text-gray-600 transition-colors cursor-pointer"
+                            title="Move Down"
+                          >
+                            <ArrowDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Top Row: Question Title & Field Type Select */}
@@ -847,7 +992,7 @@ export default function OnboardingTemplatesPage() {
                             className="flex-1 bg-[#f8f9fa] border-b border-gray-400 focus:border-b-2 focus:border-b-[#673ab7] px-3.5 py-3 text-base text-gray-900 outline-none rounded-t-md font-medium w-full"
                           />
 
-                          {/* Custom Google Forms Dropdown Picker */}
+                          {/* Custom Google Forms Dropdown Picker with Viewport Auto-Height Limit */}
                           <div className="relative w-full sm:w-56 shrink-0">
                             <button
                               type="button"
@@ -864,9 +1009,9 @@ export default function OnboardingTemplatesPage() {
                               <ChevronDown className="w-4 h-4 text-gray-500 shrink-0" />
                             </button>
 
-                            {/* Dropdown Menu Popup */}
+                            {/* Dropdown Menu Popup (Scrollable, never overflows screen) */}
                             {openDropdownTaskId === task.id && (
-                              <div className="absolute right-0 top-12 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-2 animate-in fade-in zoom-in-95 duration-100">
+                              <div className="absolute right-0 top-12 w-64 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 py-2 max-h-64 overflow-y-auto animate-in fade-in duration-100">
                                 {GOOGLE_FIELD_TYPES.map((f) => (
                                   <div
                                     key={f.key}
@@ -1060,20 +1205,45 @@ export default function OnboardingTemplatesPage() {
                     {/* Google Forms Floating Vertical Toolbar on Active Card Right Side */}
                     {isActive && (
                       <div className="absolute right-[-54px] top-4 bg-white border border-gray-200 rounded-xl shadow-md p-1.5 flex flex-col items-center gap-2 z-20">
-                        <button
-                          type="button"
-                          onClick={() => handleAddField(GOOGLE_FIELD_TYPES[0])}
-                          className="p-2 hover:bg-purple-50 text-gray-700 hover:text-[#673ab7] rounded-lg transition-colors cursor-pointer"
-                          title="Add question"
-                        >
-                          <PlusCircle className="w-5 h-5" />
-                        </button>
+                        {/* Hover/Click Add Question Options Popover */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setShowAddMenu((prev) => !prev)}
+                            className="p-2 hover:bg-purple-50 text-[#673ab7] rounded-lg transition-colors cursor-pointer"
+                            title="Add Question Field"
+                          >
+                            <PlusCircle className="w-5 h-5" />
+                          </button>
+
+                          {/* Hover Popover of All 10 Field Options (Fits Screen & Scrollable) */}
+                          {showAddMenu && (
+                            <div className="absolute right-full top-0 mr-3 w-64 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 p-2 max-h-72 overflow-y-auto animate-in fade-in duration-100 space-y-1">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-3 block py-1">
+                                Choose Question Type
+                              </span>
+                              {GOOGLE_FIELD_TYPES.map((f) => (
+                                <div
+                                  key={f.key}
+                                  onClick={() => handleAddField(f)}
+                                  className="px-3 py-2 text-xs font-medium flex items-center gap-2.5 rounded-lg cursor-pointer hover:bg-purple-50 transition-colors text-gray-700"
+                                >
+                                  {f.icon}
+                                  <div>
+                                    <span className="block font-semibold">{f.label}</span>
+                                    <span className="text-[10px] text-gray-400 block">{f.desc}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
 
                         <button
                           type="button"
                           onClick={() => handleAddField(GOOGLE_FIELD_TYPES[5])} // File upload
                           className="p-2 hover:bg-purple-50 text-gray-700 hover:text-[#673ab7] rounded-lg transition-colors cursor-pointer"
-                          title="Add file upload"
+                          title="Add file upload field"
                         >
                           <UploadCloud className="w-5 h-5" />
                         </button>
@@ -1082,7 +1252,7 @@ export default function OnboardingTemplatesPage() {
                           type="button"
                           onClick={() => handleAddField(GOOGLE_FIELD_TYPES[6])} // Signature
                           className="p-2 hover:bg-purple-50 text-gray-700 hover:text-[#673ab7] rounded-lg transition-colors cursor-pointer"
-                          title="Add digital signature"
+                          title="Add digital signature field"
                         >
                           <PenTool className="w-5 h-5" />
                         </button>
