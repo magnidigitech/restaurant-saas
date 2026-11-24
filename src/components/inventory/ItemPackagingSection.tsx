@@ -76,6 +76,28 @@ export default function ItemPackagingSection({
   const [isOuterDropdownOpen, setIsOuterDropdownOpen] = useState(false);
   const [innerSearch, setInnerSearch] = useState("");
   const [isInnerDropdownOpen, setIsInnerDropdownOpen] = useState(false);
+  const [unitSearch, setUnitSearch] = useState("");
+  const [isUnitDropdownOpen, setIsUnitDropdownOpen] = useState(false);
+
+  // Helper to format unit display label without duplicate short codes
+  const formatUnitOption = (u: UnitOfMeasure) => {
+    const def = UNIT_DEFINITIONS[u];
+    if (!def) return u;
+    const label = def.label;
+    const short = def.shortLabel;
+    if (label.toLowerCase().includes(`(${short.toLowerCase()})`)) {
+      return label;
+    }
+    return `${label} (${short})`;
+  };
+
+  // Group compatible purchase units
+  const compatibleUnitKeys = useMemo(() => {
+    const stockCat = UNIT_DEFINITIONS[stockUnit]?.category;
+    return (Object.keys(UNIT_DEFINITIONS) as UnitOfMeasure[]).filter(
+      (u) => UNIT_DEFINITIONS[u].category === stockCat
+    );
+  }, [stockUnit]);
 
   // Filtered packaging types
   const filteredOuterTypes = useMemo(() => {
@@ -89,6 +111,25 @@ export default function ItemPackagingSection({
       t.toLowerCase().includes(innerSearch.toLowerCase())
     );
   }, [innerSearch]);
+
+  const filteredCompatibleUnits = useMemo(() => {
+    const s = unitSearch.toLowerCase().trim();
+    return compatibleUnitKeys.filter((u) => {
+      const label = formatUnitOption(u).toLowerCase();
+      return label.includes(s) || u.toLowerCase().includes(s);
+    });
+  }, [compatibleUnitKeys, unitSearch]);
+
+  const filteredOtherUnits = useMemo(() => {
+    const s = unitSearch.toLowerCase().trim();
+    const allUnits = (Object.keys(UNIT_DEFINITIONS) as UnitOfMeasure[]).filter(
+      (u) => !compatibleUnitKeys.includes(u)
+    );
+    return allUnits.filter((u) => {
+      const label = formatUnitOption(u).toLowerCase();
+      return label.includes(s) || u.toLowerCase().includes(s);
+    });
+  }, [compatibleUnitKeys, unitSearch]);
 
   // Compute live calculation
   const calcResult = useMemo(() => {
@@ -132,6 +173,12 @@ export default function ItemPackagingSection({
     setIsActive(true);
     setIsAdding(false);
     setEditingIndex(null);
+    setOuterSearch("");
+    setIsOuterDropdownOpen(false);
+    setInnerSearch("");
+    setIsInnerDropdownOpen(false);
+    setUnitSearch("");
+    setIsUnitDropdownOpen(false);
   };
 
   const handleStartEdit = (index: number) => {
@@ -150,6 +197,12 @@ export default function ItemPackagingSection({
     setIsActive(p.isActive);
     setEditingIndex(index);
     setIsAdding(true);
+    setOuterSearch("");
+    setIsOuterDropdownOpen(false);
+    setInnerSearch("");
+    setIsInnerDropdownOpen(false);
+    setUnitSearch("");
+    setIsUnitDropdownOpen(false);
   };
 
   const handleSavePack = (e: React.FormEvent) => {
@@ -203,14 +256,6 @@ export default function ItemPackagingSection({
     updated[index].isActive = !updated[index].isActive;
     onChange(updated);
   };
-
-  // Group compatible purchase units
-  const compatibleUnitKeys = useMemo(() => {
-    const stockCat = UNIT_DEFINITIONS[stockUnit]?.category;
-    return (Object.keys(UNIT_DEFINITIONS) as UnitOfMeasure[]).filter(
-      (u) => UNIT_DEFINITIONS[u].category === stockCat
-    );
-  }, [stockUnit]);
 
   return (
     <div className="space-y-4 pt-4 border-t border-black/[0.06] dark:border-white/[0.06]">
@@ -334,12 +379,23 @@ export default function ItemPackagingSection({
       {/* Add / Edit Pack Drawer Form */}
       {isAdding && (
         <div
-          className={`p-4 rounded-3xl border space-y-4 animate-in fade-in duration-150 ${
+          className={`p-4 rounded-3xl border space-y-4 animate-in fade-in duration-150 relative ${
             isDark
               ? "bg-[#090B10] border-[#0071E3]/40 shadow-xl"
               : "bg-blue-50/30 border-blue-200 shadow-sm"
           }`}
         >
+          {/* Backdrop for closing open custom dropdowns on outside click */}
+          {(isOuterDropdownOpen || isInnerDropdownOpen || isUnitDropdownOpen) && (
+            <div
+              className="fixed inset-0 z-20"
+              onClick={() => {
+                setIsOuterDropdownOpen(false);
+                setIsInnerDropdownOpen(false);
+                setIsUnitDropdownOpen(false);
+              }}
+            />
+          )}
           <div className="flex items-center justify-between pb-2 border-b border-black/[0.06] dark:border-white/[0.06]">
             <div className="flex items-center gap-2">
               <Package className="w-4 h-4 text-[#0071E3]" />
@@ -466,14 +522,18 @@ export default function ItemPackagingSection({
             {!isNested ? (
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                 {/* Outer Container Type (Searchable) */}
-                <div className="sm:col-span-5 relative">
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                <div className="sm:col-span-4 relative">
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1 truncate">
                     Packaging Container
                   </label>
                   <div className="relative">
                     <button
                       type="button"
-                      onClick={() => setIsOuterDropdownOpen(!isOuterDropdownOpen)}
+                      onClick={() => {
+                        setIsOuterDropdownOpen(!isOuterDropdownOpen);
+                        setIsInnerDropdownOpen(false);
+                        setIsUnitDropdownOpen(false);
+                      }}
                       className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl border cursor-pointer ${
                         isDark
                           ? "bg-white/[0.04] border-white/[0.08] text-white"
@@ -490,8 +550,8 @@ export default function ItemPackagingSection({
                           isDark ? "bg-[#141824] border-white/[0.1]" : "bg-white border-slate-200"
                         }`}
                       >
-                        <div className="px-2 py-1 sticky top-0 bg-inherit border-b border-black/[0.06] dark:border-white/[0.06] flex items-center gap-1.5 mb-1">
-                          <Search className="w-3.5 h-3.5 text-slate-400" />
+                        <div className="px-2 py-1 sticky top-0 bg-inherit border-b border-black/[0.06] dark:border-white/[0.06] flex items-center gap-1.5 mb-1 backdrop-blur-md">
+                          <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                           <input
                             type="text"
                             placeholder="Search container..."
@@ -564,37 +624,115 @@ export default function ItemPackagingSection({
                   />
                 </div>
 
-                {/* Measurement Unit for Pack Contents */}
-                <div className="sm:col-span-4">
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    Contents Unit of Measure
+                {/* Measurement Unit for Pack Contents (Searchable Dropdown) */}
+                <div className="sm:col-span-5 relative">
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1 truncate">
+                    Contents Unit
                   </label>
-                  <select
-                    value={packUnit}
-                    onChange={(e) => setPackUnit(e.target.value as UnitOfMeasure)}
-                    className={`w-full px-3 py-2 text-xs rounded-xl border focus:outline-none focus:ring-1 focus:ring-[#0071E3] cursor-pointer ${
-                      isDark
-                        ? "bg-[#141824] border-white/[0.08] text-white"
-                        : "bg-white border-slate-200 text-slate-900"
-                    }`}
-                  >
-                    <optgroup label="Compatible with Stock Unit">
-                      {compatibleUnitKeys.map((u) => (
-                        <option key={u} value={u}>
-                          {UNIT_DEFINITIONS[u]?.label} ({formatUnit(u)})
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Other Units">
-                      {(Object.keys(UNIT_DEFINITIONS) as UnitOfMeasure[])
-                        .filter((u) => !compatibleUnitKeys.includes(u))
-                        .map((u) => (
-                          <option key={u} value={u}>
-                            {UNIT_DEFINITIONS[u]?.label} ({formatUnit(u)})
-                          </option>
-                        ))}
-                    </optgroup>
-                  </select>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUnitDropdownOpen(!isUnitDropdownOpen);
+                        setIsOuterDropdownOpen(false);
+                        setIsInnerDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl border cursor-pointer ${
+                        isDark
+                          ? "bg-white/[0.04] border-white/[0.08] text-white"
+                          : "bg-white border-slate-200 text-slate-900"
+                      }`}
+                    >
+                      <span className="truncate">{formatUnitOption(packUnit)}</span>
+                      <ChevronDown className="w-3.5 h-3.5 opacity-60 shrink-0 ml-1" />
+                    </button>
+
+                    {isUnitDropdownOpen && (
+                      <div
+                        className={`absolute z-30 left-0 right-0 mt-1 max-h-56 overflow-auto rounded-2xl border shadow-xl p-1.5 ${
+                          isDark ? "bg-[#141824] border-white/[0.1]" : "bg-white border-slate-200"
+                        }`}
+                      >
+                        <div className="px-2 py-1 sticky top-0 bg-inherit border-b border-black/[0.06] dark:border-white/[0.06] flex items-center gap-1.5 mb-1 backdrop-blur-md">
+                          <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <input
+                            type="text"
+                            placeholder="Search unit..."
+                            value={unitSearch}
+                            onChange={(e) => setUnitSearch(e.target.value)}
+                            className="w-full text-xs bg-transparent focus:outline-none"
+                            autoFocus
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          {filteredCompatibleUnits.length > 0 && (
+                            <div>
+                              <div className="px-2.5 py-1 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                Compatible with Stock Unit
+                              </div>
+                              <div className="space-y-0.5">
+                                {filteredCompatibleUnits.map((u) => (
+                                  <button
+                                    key={u}
+                                    type="button"
+                                    onClick={() => {
+                                      setPackUnit(u);
+                                      setIsUnitDropdownOpen(false);
+                                      setUnitSearch("");
+                                    }}
+                                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between cursor-pointer ${
+                                      packUnit === u
+                                        ? "bg-[#0071E3] text-white font-bold"
+                                        : "hover:bg-black/[0.04] dark:hover:bg-white/[0.04] text-slate-800 dark:text-slate-200"
+                                    }`}
+                                  >
+                                    <span className="truncate">{formatUnitOption(u)}</span>
+                                    {packUnit === u && <Check className="w-3.5 h-3.5 shrink-0 ml-1" />}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {filteredOtherUnits.length > 0 && (
+                            <div>
+                              <div className="px-2.5 py-1 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                Other Units
+                              </div>
+                              <div className="space-y-0.5">
+                                {filteredOtherUnits.map((u) => (
+                                  <button
+                                    key={u}
+                                    type="button"
+                                    onClick={() => {
+                                      setPackUnit(u);
+                                      setIsUnitDropdownOpen(false);
+                                      setUnitSearch("");
+                                    }}
+                                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between cursor-pointer ${
+                                      packUnit === u
+                                        ? "bg-[#0071E3] text-white font-bold"
+                                        : "hover:bg-black/[0.04] dark:hover:bg-white/[0.04] text-slate-800 dark:text-slate-200"
+                                    }`}
+                                  >
+                                    <span className="truncate">{formatUnitOption(u)}</span>
+                                    {packUnit === u && <Check className="w-3.5 h-3.5 shrink-0 ml-1" />}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {filteredCompatibleUnits.length === 0 && filteredOtherUnits.length === 0 && (
+                            <div className="py-3 text-center text-xs text-slate-400">
+                              No matching units found
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : (
@@ -608,7 +746,11 @@ export default function ItemPackagingSection({
                     <div className="relative">
                       <button
                         type="button"
-                        onClick={() => setIsOuterDropdownOpen(!isOuterDropdownOpen)}
+                        onClick={() => {
+                          setIsOuterDropdownOpen(!isOuterDropdownOpen);
+                          setIsInnerDropdownOpen(false);
+                          setIsUnitDropdownOpen(false);
+                        }}
                         className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl border cursor-pointer ${
                           isDark
                             ? "bg-white/[0.04] border-white/[0.08] text-white"
@@ -625,8 +767,8 @@ export default function ItemPackagingSection({
                             isDark ? "bg-[#141824] border-white/[0.1]" : "bg-white border-slate-200"
                           }`}
                         >
-                          <div className="px-2 py-1 sticky top-0 bg-inherit border-b border-black/[0.06] dark:border-white/[0.06] flex items-center gap-1.5 mb-1">
-                            <Search className="w-3.5 h-3.5 text-slate-400" />
+                          <div className="px-2 py-1 sticky top-0 bg-inherit border-b border-black/[0.06] dark:border-white/[0.06] flex items-center gap-1.5 mb-1 backdrop-blur-md">
+                            <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                             <input
                               type="text"
                               placeholder="Search container..."
@@ -702,7 +844,11 @@ export default function ItemPackagingSection({
                       <div className="relative flex-1 min-w-0">
                         <button
                           type="button"
-                          onClick={() => setIsInnerDropdownOpen(!isInnerDropdownOpen)}
+                          onClick={() => {
+                            setIsInnerDropdownOpen(!isInnerDropdownOpen);
+                            setIsOuterDropdownOpen(false);
+                            setIsUnitDropdownOpen(false);
+                          }}
                           className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl border cursor-pointer ${
                             isDark
                               ? "bg-white/[0.04] border-white/[0.08] text-white"
@@ -719,8 +865,8 @@ export default function ItemPackagingSection({
                               isDark ? "bg-[#141824] border-white/[0.1]" : "bg-white border-slate-200"
                             }`}
                           >
-                            <div className="px-2 py-1 sticky top-0 bg-inherit border-b border-black/[0.06] dark:border-white/[0.06] flex items-center gap-1.5 mb-1">
-                              <Search className="w-3.5 h-3.5 text-slate-400" />
+                            <div className="px-2 py-1 sticky top-0 bg-inherit border-b border-black/[0.06] dark:border-white/[0.06] flex items-center gap-1.5 mb-1 backdrop-blur-md">
+                              <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                               <input
                                 type="text"
                                 placeholder="Search..."
@@ -798,37 +944,115 @@ export default function ItemPackagingSection({
                     />
                   </div>
 
-                  {/* Measurement Unit for Pack Contents */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Contents Unit of Measure
+                  {/* Measurement Unit for Pack Contents (Searchable Dropdown) */}
+                  <div className="relative">
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1 truncate">
+                      Contents Unit
                     </label>
-                    <select
-                      value={packUnit}
-                      onChange={(e) => setPackUnit(e.target.value as UnitOfMeasure)}
-                      className={`w-full px-3 py-2 text-xs rounded-xl border focus:outline-none focus:ring-1 focus:ring-[#0071E3] cursor-pointer ${
-                        isDark
-                          ? "bg-[#141824] border-white/[0.08] text-white"
-                          : "bg-white border-slate-200 text-slate-900"
-                      }`}
-                    >
-                      <optgroup label="Compatible with Stock Unit">
-                        {compatibleUnitKeys.map((u) => (
-                          <option key={u} value={u}>
-                            {UNIT_DEFINITIONS[u]?.label} ({formatUnit(u)})
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Other Units">
-                        {(Object.keys(UNIT_DEFINITIONS) as UnitOfMeasure[])
-                          .filter((u) => !compatibleUnitKeys.includes(u))
-                          .map((u) => (
-                            <option key={u} value={u}>
-                              {UNIT_DEFINITIONS[u]?.label} ({formatUnit(u)})
-                            </option>
-                          ))}
-                      </optgroup>
-                    </select>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsUnitDropdownOpen(!isUnitDropdownOpen);
+                          setIsOuterDropdownOpen(false);
+                          setIsInnerDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl border cursor-pointer ${
+                          isDark
+                            ? "bg-white/[0.04] border-white/[0.08] text-white"
+                            : "bg-white border-slate-200 text-slate-900"
+                        }`}
+                      >
+                        <span className="truncate">{formatUnitOption(packUnit)}</span>
+                        <ChevronDown className="w-3.5 h-3.5 opacity-60 shrink-0 ml-1" />
+                      </button>
+
+                      {isUnitDropdownOpen && (
+                        <div
+                          className={`absolute z-30 left-0 right-0 mt-1 max-h-56 overflow-auto rounded-2xl border shadow-xl p-1.5 ${
+                            isDark ? "bg-[#141824] border-white/[0.1]" : "bg-white border-slate-200"
+                          }`}
+                        >
+                          <div className="px-2 py-1 sticky top-0 bg-inherit border-b border-black/[0.06] dark:border-white/[0.06] flex items-center gap-1.5 mb-1 backdrop-blur-md">
+                            <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <input
+                              type="text"
+                              placeholder="Search unit..."
+                              value={unitSearch}
+                              onChange={(e) => setUnitSearch(e.target.value)}
+                              className="w-full text-xs bg-transparent focus:outline-none"
+                              autoFocus
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            {filteredCompatibleUnits.length > 0 && (
+                              <div>
+                                <div className="px-2.5 py-1 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                  Compatible with Stock Unit
+                                </div>
+                                <div className="space-y-0.5">
+                                  {filteredCompatibleUnits.map((u) => (
+                                    <button
+                                      key={u}
+                                      type="button"
+                                      onClick={() => {
+                                        setPackUnit(u);
+                                        setIsUnitDropdownOpen(false);
+                                        setUnitSearch("");
+                                      }}
+                                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between cursor-pointer ${
+                                        packUnit === u
+                                          ? "bg-[#0071E3] text-white font-bold"
+                                          : "hover:bg-black/[0.04] dark:hover:bg-white/[0.04] text-slate-800 dark:text-slate-200"
+                                      }`}
+                                    >
+                                      <span className="truncate">{formatUnitOption(u)}</span>
+                                      {packUnit === u && <Check className="w-3.5 h-3.5 shrink-0 ml-1" />}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {filteredOtherUnits.length > 0 && (
+                              <div>
+                                <div className="px-2.5 py-1 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                  Other Units
+                                </div>
+                                <div className="space-y-0.5">
+                                  {filteredOtherUnits.map((u) => (
+                                    <button
+                                      key={u}
+                                      type="button"
+                                      onClick={() => {
+                                        setPackUnit(u);
+                                        setIsUnitDropdownOpen(false);
+                                        setUnitSearch("");
+                                      }}
+                                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between cursor-pointer ${
+                                        packUnit === u
+                                          ? "bg-[#0071E3] text-white font-bold"
+                                          : "hover:bg-black/[0.04] dark:hover:bg-white/[0.04] text-slate-800 dark:text-slate-200"
+                                      }`}
+                                    >
+                                      <span className="truncate">{formatUnitOption(u)}</span>
+                                      {packUnit === u && <Check className="w-3.5 h-3.5 shrink-0 ml-1" />}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {filteredCompatibleUnits.length === 0 && filteredOtherUnits.length === 0 && (
+                              <div className="py-3 text-center text-xs text-slate-400">
+                                No matching units found
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
