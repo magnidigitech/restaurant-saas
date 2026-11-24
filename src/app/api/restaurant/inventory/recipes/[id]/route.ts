@@ -4,7 +4,6 @@ import { getTenantSession } from "@/core/auth/session";
 import { verifyAccess } from "@/core/permissions/check";
 import { calculateRecipeCost, syncRecipeCosting } from "@/core/inventory/recipeCosting";
 import { z } from "zod";
-
 import { UnitOfMeasure } from "@prisma/client";
 
 const updateRecipeItemSchema = z.object({
@@ -12,21 +11,30 @@ const updateRecipeItemSchema = z.object({
   componentType: z.enum(["INVENTORY_ITEM", "SUB_RECIPE"]),
   inventoryItemId: z.string().optional().nullable(),
   subRecipeId: z.string().optional().nullable(),
-  quantity: z.number().positive(),
+  packId: z.string().optional().nullable(),
+  quantity: z.number().min(0),
+  packQuantity: z.number().min(0).optional().nullable(),
   unitOfMeasure: z.nativeEnum(UnitOfMeasure),
   wastagePercent: z.number().min(0).max(100).default(0),
-  notes: z.string().optional(),
+  notes: z.string().optional().nullable(),
+  originalText: z.string().optional().nullable(),
+  statedQuantityRaw: z.string().optional().nullable(),
+  isUnresolved: z.boolean().default(false),
+  unresolvedReason: z.string().optional().nullable(),
 });
 
 const updateRecipeSchema = z.object({
   name: z.string().min(2).optional(),
   type: z.enum(["DISH", "SUB_RECIPE"]).optional(),
-  description: z.string().optional(),
+  description: z.string().optional().nullable(),
+  instructions: z.string().optional().nullable(),
   yieldQuantity: z.number().positive().optional(),
   yieldUnit: z.nativeEnum(UnitOfMeasure).optional(),
-  servingSize: z.string().optional(),
-  prepTimeMin: z.number().int().min(0).optional(),
+  servingSize: z.string().optional().nullable(),
+  prepTimeMin: z.number().int().min(0).optional().nullable(),
   sellingPrice: z.number().min(0).optional(),
+  targetFoodCostPercent: z.number().min(1).max(100).optional().nullable(),
+  isDraft: z.boolean().optional(),
   items: z.array(updateRecipeItemSchema).optional(),
 });
 
@@ -57,7 +65,14 @@ export async function GET(
       include: {
         items: {
           include: {
-            inventoryItem: true,
+            inventoryItem: {
+              include: {
+                purchasePacks: {
+                  where: { isActive: true },
+                },
+              },
+            },
+            pack: true,
             subRecipe: true,
           },
         },
@@ -113,6 +128,7 @@ export async function PATCH(
 
     const existing = await prisma.recipe.findFirst({
       where: { id, restaurantId: session.activeRestaurantId, archivedAt: null },
+      include: { items: true },
     });
 
     if (!existing) {
@@ -134,43 +150,91 @@ export async function PATCH(
       }
     }
 
+    // If attempting to publish (or recipe is not draft and stays published), block if any unresolved line exists
+    const willBePublished = data.isDraft !== undefined ? !data.isDraft : !existing.isDraft;
+    if (willBePublished && data.items) {
+      const unresolvedLines = data.items.filter((i) => i.isUnresolved || (!i.inventoryItemId && !i.subRecipeId));
+      if (unresolvedLines.length > 0) {
+        return NextResponse.json(
+          {
+            error: "Cannot publish recipe with unresolved ingredient lines or unmapped stock items. Please resolve all issues or save as Draft.",
+            unresolvedCount: unresolvedLines.length,
+            unresolvedLines: unresolvedLines.map((u) => u.originalText || u.unresolvedReason || "Unknown line"),
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Update recipe header & items in transaction
+    const targetPublishedId = existing.isDraft && existing.publishedRecipeId && data.isDraft === false
+      ? existing.publishedRecipeId
+      : null;
+
     await prisma.$transaction(async (tx) => {
+      // If promoting draft of an existing published recipe, update master published recipe
+      const recipeToUpdateId = targetPublishedId || id;
+
       await tx.recipe.update({
-        where: { id },
+        where: { id: recipeToUpdateId },
         data: {
-          ...(data.name && { name: data.name }),
+          ...(data.name && !targetPublishedId && { name: data.name }),
           ...(data.type && { type: data.type }),
           ...(data.description !== undefined && { description: data.description }),
+          ...(data.instructions !== undefined && { instructions: data.instructions }),
           ...(data.yieldQuantity !== undefined && { yieldQuantity: data.yieldQuantity }),
           ...(data.yieldUnit && { yieldUnit: data.yieldUnit }),
           ...(data.servingSize !== undefined && { servingSize: data.servingSize }),
           ...(data.prepTimeMin !== undefined && { prepTimeMin: data.prepTimeMin }),
           ...(data.sellingPrice !== undefined && { sellingPrice: data.sellingPrice }),
+          ...(data.targetFoodCostPercent !== undefined && { targetFoodCostPercent: data.targetFoodCostPercent }),
+          ...(data.isDraft !== undefined && !targetPublishedId && { isDraft: data.isDraft }),
         },
       });
 
       if (data.items) {
-        // Replace items
-        await tx.recipeItem.deleteMany({ where: { recipeId: id } });
+        // Replace items on active recipe
+        await tx.recipeItem.deleteMany({ where: { recipeId: recipeToUpdateId } });
         await tx.recipeItem.createMany({
           data: data.items.map((i) => ({
-            recipeId: id,
+            recipeId: recipeToUpdateId,
             componentType: i.componentType,
             inventoryItemId: i.componentType === "INVENTORY_ITEM" ? i.inventoryItemId : null,
             subRecipeId: i.componentType === "SUB_RECIPE" ? i.subRecipeId : null,
+            packId: i.packId || null,
             quantity: i.quantity,
+            packQuantity: i.packQuantity || null,
             unitOfMeasure: i.unitOfMeasure,
             wastagePercent: i.wastagePercent,
-            notes: i.notes,
+            notes: i.notes || null,
+            originalText: i.originalText || null,
+            statedQuantityRaw: i.statedQuantityRaw || null,
+            isUnresolved: i.isUnresolved,
+            unresolvedReason: i.unresolvedReason || null,
           })),
+        });
+      }
+
+      // If promoted, archive the draft copy
+      if (targetPublishedId) {
+        await tx.recipe.update({
+          where: { id },
+          data: {
+            archivedAt: new Date(),
+          },
         });
       }
     });
 
-    const breakdown = await syncRecipeCosting(id);
+    const activeId = targetPublishedId || id;
+    const breakdown = await syncRecipeCosting(activeId);
 
-    return NextResponse.json({ success: true, message: "Recipe updated successfully", breakdown });
+    return NextResponse.json({
+      success: true,
+      message: targetPublishedId ? "Draft recipe promoted and published to live menu" : "Recipe updated successfully",
+      promotedToPublishedId: targetPublishedId,
+      breakdown,
+    });
   } catch (error: any) {
     console.error("Update Recipe Error:", error);
     return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
@@ -203,7 +267,9 @@ export async function DELETE(
       where: { id, restaurantId: session.activeRestaurantId, archivedAt: null },
       include: {
         usedInRecipeItems: {
-          include: { recipe: true },
+          include: {
+            recipe: true,
+          },
         },
       },
     });
@@ -214,13 +280,13 @@ export async function DELETE(
 
     if (existing.usedInRecipeItems && existing.usedInRecipeItems.length > 0) {
       const activeParents = existing.usedInRecipeItems
-        .filter((u) => !u.recipe.archivedAt)
+        .filter((u) => u.recipe.archivedAt === null)
         .map((u) => u.recipe.name);
 
       if (activeParents.length > 0) {
         return NextResponse.json(
           {
-            error: `Cannot archive sub-recipe "${existing.name}" because it is currently used in ${activeParents.length} recipe(s): ${activeParents.join(", ")}. Please remove it from parent recipes first.`,
+            error: `Cannot archive recipe because it is currently used as a sub-recipe in: ${activeParents.join(", ")}. Please remove it from parent formulas first.`,
           },
           { status: 400 }
         );
@@ -235,6 +301,6 @@ export async function DELETE(
     return NextResponse.json({ success: true, message: "Recipe archived successfully" });
   } catch (error: any) {
     console.error("Delete Recipe Error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
   }
 }

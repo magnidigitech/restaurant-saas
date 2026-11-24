@@ -1,5 +1,7 @@
 import { UnitOfMeasure } from "@prisma/client";
 
+export { UnitOfMeasure };
+
 export type UnitCategory = "WEIGHT" | "VOLUME" | "COUNT" | "PACKAGE";
 
 export interface UnitInfo {
@@ -64,6 +66,17 @@ export function convertQuantity(quantity: number, from: UnitOfMeasure, to: UnitO
 
   const baseValue = quantity * fromDef.baseFactor;
   return baseValue / toDef.baseFactor;
+}
+
+/**
+ * Calculates gross raw input quantity required to produce a net usable quantity,
+ * accounting for kitchen prep loss / shrinkage percentage: Gross = Usable ÷ (1 - Loss%).
+ * For example: 80g usable with 20% peeling loss requires 80 ÷ (1 - 0.20) = 100g raw input.
+ */
+export function calculateGrossQuantity(usableQuantity: number, prepLossPercent: number): number {
+  const loss = Math.min(99.9, Math.max(0, prepLossPercent || 0));
+  if (loss <= 0) return usableQuantity;
+  return usableQuantity / (1 - loss / 100);
 }
 
 /**

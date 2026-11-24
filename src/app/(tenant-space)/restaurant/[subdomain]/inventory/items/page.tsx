@@ -256,10 +256,13 @@ export default function InventoryItemsPage({
   // Prevent background scrolling when modal popup is open
   useEffect(() => {
     if (editingItem || showCreate || showBulkModal) {
-      const originalOverflow = document.body.style.overflow;
+      const origBodyOverflow = document.body.style.overflow;
+      const origHtmlOverflow = document.documentElement.style.overflow;
       document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
       return () => {
-        document.body.style.overflow = originalOverflow;
+        document.body.style.overflow = origBodyOverflow;
+        document.documentElement.style.overflow = origHtmlOverflow;
       };
     }
   }, [editingItem, showCreate, showBulkModal]);
@@ -1094,9 +1097,9 @@ export default function InventoryItemsPage({
 
         {/* EDIT ITEM MODAL / BOTTOM SHEET */}
         {editingItem && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end md:items-center justify-center z-50 p-0 md:p-4 animate-in fade-in duration-150">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end md:items-center justify-center z-50 p-0 md:p-4 animate-in fade-in duration-150 overscroll-contain">
             <div
-              className={`w-full max-w-lg p-6 sm:p-8 rounded-t-[32px] md:rounded-3xl border-t md:border shadow-2xl space-y-4 max-h-[88vh] md:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 md:zoom-in-95 duration-200 ${
+              className={`w-full max-w-lg p-6 sm:p-8 rounded-t-[32px] md:rounded-3xl border-t md:border shadow-2xl space-y-4 max-h-[88vh] md:max-h-[90vh] overflow-y-auto overscroll-contain animate-in slide-in-from-bottom-8 md:zoom-in-95 duration-200 ${
                 isDark ? "bg-[#121622] border-white/[0.1] text-white" : "bg-white border-slate-200 text-slate-900"
               }`}
             >
@@ -1360,11 +1363,11 @@ export default function InventoryItemsPage({
 
         {/* BULK IMPORT VIA EXCEL / CSV MODAL (Full Screen / Adaptive Modal) */}
         {showBulkModal && (
-          <div className={`fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in duration-150 ${
+          <div className={`fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in duration-150 overscroll-contain ${
             isBulkFullScreen || previewFile || importReport ? "p-0 md:p-3 lg:p-4" : "p-0 md:p-4 items-end md:items-center"
           }`}>
             <div
-              className={`w-full flex flex-col shadow-2xl animate-in duration-200 ${
+              className={`w-full flex flex-col shadow-2xl animate-in duration-200 overscroll-contain ${
                 isBulkFullScreen || previewFile || importReport
                   ? "h-full md:h-[96vh] md:max-w-[98vw] rounded-none md:rounded-3xl border md:border p-4 sm:p-6 lg:p-7 overflow-hidden"
                   : "max-w-2xl p-6 sm:p-8 rounded-t-[32px] md:rounded-3xl border-t md:border max-h-[88vh] md:max-h-[90vh] overflow-y-auto space-y-6"
@@ -2212,9 +2215,9 @@ export default function InventoryItemsPage({
 
         {/* CREATE SINGLE ITEM MODAL / BOTTOM SHEET */}
         {showCreate && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end md:items-center justify-center z-50 p-0 md:p-4 animate-in fade-in duration-150">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end md:items-center justify-center z-50 p-0 md:p-4 animate-in fade-in duration-150 overscroll-contain">
             <div
-              className={`w-full max-w-lg p-6 sm:p-8 rounded-t-[32px] md:rounded-3xl border-t md:border shadow-2xl space-y-4 max-h-[88vh] md:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 md:zoom-in-95 duration-200 ${
+              className={`w-full max-w-lg p-6 sm:p-8 rounded-t-[32px] md:rounded-3xl border-t md:border shadow-2xl space-y-4 max-h-[88vh] md:max-h-[90vh] overflow-y-auto overscroll-contain animate-in slide-in-from-bottom-8 md:zoom-in-95 duration-200 ${
                 isDark ? "bg-[#121622] border-white/[0.1] text-white" : "bg-white border-slate-200 text-slate-900"
               }`}
             >

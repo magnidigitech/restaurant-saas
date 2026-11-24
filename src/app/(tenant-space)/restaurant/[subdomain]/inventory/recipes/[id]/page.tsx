@@ -13,12 +13,16 @@ interface ComponentCost {
   quantity: number;
   unitOfMeasure: string;
   wastagePercent: number;
+  grossQuantity?: number;
   baseUnit: string;
   baseUnitCost: number;
   effectiveUnitCost: number;
   netCost: number;
   wastageCost: number;
   totalCost: number;
+  packName?: string | null;
+  packQuantity?: number | null;
+  hasMissingCost?: boolean;
   unitPricingMatrix?: UnitEquivalentPricing[];
   subComponents?: ComponentCost[];
 }
@@ -28,13 +32,18 @@ interface RecipeDetail {
   name: string;
   type: "DISH" | "SUB_RECIPE";
   description?: string;
+  instructions?: string;
   yieldQuantity: number;
   yieldUnit: string;
+  servingSize?: string;
+  prepTimeMin?: number;
   sellingPrice: number;
   costPerUnit: number;
   totalCost: number;
   grossMarginPercent: number;
   foodCostPercent: number;
+  isDraft: boolean;
+  sourceType?: string;
   unitPricingMatrix?: UnitEquivalentPricing[];
   createdAt: string;
   usedInRecipeItems?: { id: string; recipe: { id: string; name: string } }[];
@@ -174,6 +183,12 @@ export default function RecipeDetailPage({
               }`}>
                 {recipe.type === "SUB_RECIPE" ? "Sub-Recipe Prep" : "Menu Dish"}
               </span>
+
+              {recipe.isDraft && (
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                  Draft Formula (Not Active in POS)
+                </span>
+              )}
             </div>
 
             <h1 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
@@ -185,12 +200,34 @@ export default function RecipeDetailPage({
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => router.push(`/restaurant/${subdomain}/pos`)}
-              className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
-            >
-              Order in POS
-            </button>
+            {recipe.isDraft ? (
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`/api/restaurant/inventory/recipes/${recipeId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ isDraft: false }),
+                    });
+                    const d = await res.json();
+                    if (!res.ok) throw new Error(d.error || "Failed to publish");
+                    fetchRecipeDetail();
+                  } catch (e: any) {
+                    setError(e.message || "Publishing failed");
+                  }
+                }}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
+              >
+                Publish Recipe
+              </button>
+            ) : (
+              <button
+                onClick={() => router.push(`/restaurant/${subdomain}/pos`)}
+                className="px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer"
+              >
+                Order in POS
+              </button>
+            )}
             <button
               onClick={() => setShowArchiveModal(true)}
               className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition cursor-pointer flex items-center gap-1.5 ${
@@ -280,6 +317,22 @@ export default function RecipeDetailPage({
             </div>
           )}
         </div>
+
+        {/* Preparation Instructions if present */}
+        {recipe.instructions && (
+          <div
+            className={`p-6 rounded-3xl border transition space-y-2 ${
+              isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+            }`}
+          >
+            <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+              Preparation Method & Kitchen Steps
+            </h2>
+            <div className={`text-xs whitespace-pre-wrap leading-relaxed ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+              {recipe.instructions}
+            </div>
+          </div>
+        )}
 
         {/* Dedicated Multi-Format Unit Pricing Matrix Section */}
         <div

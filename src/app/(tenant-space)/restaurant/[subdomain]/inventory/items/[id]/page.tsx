@@ -485,10 +485,10 @@ export default function InventoryItemDetailPage({
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-xs font-bold">{pack.packageType}</span>
-                      {pack.customLabel && (
+                      <span className="text-xs font-bold">{pack.packType}</span>
+                      {pack.customTypeLabel && (
                         <span className={`block text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                          ({pack.customLabel})
+                          ({pack.customTypeLabel})
                         </span>
                       )}
                     </div>
@@ -504,7 +504,7 @@ export default function InventoryItemDetailPage({
                   </div>
 
                   <p className="text-xs font-semibold text-[#0071E3]">
-                    {pack.packDescription || `Factor: ${pack.conversionFactor} ${item.unitOfMeasure}`}
+                    {pack.previewString || `Factor: ${pack.conversionFactor} ${item.unitOfMeasure}`}
                   </p>
 
                   <div className="flex items-center gap-2 pt-1">
@@ -513,9 +513,9 @@ export default function InventoryItemDetailPage({
                         Catch Weight
                       </span>
                     )}
-                    {pack.defaultPricePerPack && (
+                    {(pack as any).defaultPricePerPack && (
                       <span className={`text-[11px] font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                        ${Number(pack.defaultPricePerPack).toFixed(2)}/pack
+                        ${Number((pack as any).defaultPricePerPack).toFixed(2)}/pack
                       </span>
                     )}
                   </div>

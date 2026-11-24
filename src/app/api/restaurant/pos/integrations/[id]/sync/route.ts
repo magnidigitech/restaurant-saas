@@ -19,7 +19,7 @@ export async function POST(
     const accessCheck = await verifyAccess(
       session.userId,
       session.activeRestaurantId,
-      { requiredRoles: ["OWNER", "MANAGER", "ADMIN", "STAFF"] },
+      { moduleKey: "pos" },
       session.tokenVersion
     );
     if (!accessCheck.authorized) {

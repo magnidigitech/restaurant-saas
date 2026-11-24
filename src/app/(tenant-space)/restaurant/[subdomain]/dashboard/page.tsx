@@ -2500,7 +2500,7 @@ export default function AppleTenantDashboard() {
                           setCustomStartDate(null);
                           setCustomEndDate(null);
                           fetchData("today", null, null);
-                        } else if (calendarTab === "yesterday") {
+                        } else if ((calendarTab as string) === "yesterday") {
                           setSalesPeriod("yesterday");
                           setCustomStartDate(null);
                           setCustomEndDate(null);

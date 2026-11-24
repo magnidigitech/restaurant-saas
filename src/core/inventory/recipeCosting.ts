@@ -3,6 +3,7 @@ import { UnitOfMeasure, RecipeComponentType } from "@prisma/client";
 import {
   convertUnitCost,
   convertQuantity,
+  calculateGrossQuantity,
   formatUnitPricing,
   getUnitPricingMatrix,
   UnitEquivalentPricing,
@@ -15,13 +16,18 @@ export interface ComponentCostResult {
   quantity: number;
   unitOfMeasure: UnitOfMeasure;
   wastagePercent: number;
+  grossQuantity: number;
   baseUnit: UnitOfMeasure;
   baseUnitCost: number; // cost per base unit in inventory/sub-recipe
   effectiveUnitCost: number; // cost per recipe item's unitOfMeasure
   netCost: number; // quantity * effectiveUnitCost
-  wastageCost: number; // netCost * (wastagePercent / 100)
-  totalCost: number; // netCost + wastageCost
-  unitPricingMatrix: UnitEquivalentPricing[]; // Multi-unit conversion equivalents (per OZ, per LB, per G, per KG, per Ladle, etc.)
+  wastageCost: number; // (grossQuantity - quantity) * effectiveUnitCost
+  totalCost: number; // grossQuantity * effectiveUnitCost
+  packId?: string | null;
+  packName?: string | null;
+  packQuantity?: number | null;
+  hasMissingCost: boolean;
+  unitPricingMatrix: UnitEquivalentPricing[]; // Multi-unit conversion equivalents
   subComponents?: ComponentCostResult[];
 }
 
@@ -29,6 +35,7 @@ export interface RecipeCostBreakdown {
   recipeId: string;
   name: string;
   type: "DISH" | "SUB_RECIPE";
+  isDraft: boolean;
   yieldQuantity: number;
   yieldUnit: UnitOfMeasure;
   sellingPrice: number;
@@ -36,19 +43,23 @@ export interface RecipeCostBreakdown {
   costPerUnit: number;
   grossMarginPercent: number;
   foodCostPercent: number;
-  unitPricingMatrix: UnitEquivalentPricing[]; // Multi-unit conversion equivalents for the finished recipe / sub-recipe
+  hasMissingCosts: boolean;
+  unitPricingMatrix: UnitEquivalentPricing[]; // Multi-unit conversion equivalents for finished recipe
   items: ComponentCostResult[];
 }
 
 /**
  * Recursively calculates recipe cost breakdown, multi-unit pricing equivalents, and profit margin metrics.
+ * Uses exact culinary shrinkage math: Gross Quantity = Usable Quantity ÷ (1 - Loss%).
  */
 export async function calculateRecipeCost(
   recipeId: string,
-  visited = new Set<string>()
+  visited = new Set<string>(),
+  visitedPath: string[] = []
 ): Promise<RecipeCostBreakdown> {
   if (visited.has(recipeId)) {
-    throw new Error(`Circular sub-recipe dependency detected on recipe ID: ${recipeId}`);
+    const cycleStr = [...visitedPath, recipeId].join(" ➔ ");
+    throw new Error(`Circular sub-recipe dependency detected: ${cycleStr}`);
   }
   visited.add(recipeId);
 
@@ -58,11 +69,13 @@ export async function calculateRecipeCost(
       items: {
         include: {
           inventoryItem: true,
+          pack: true,
           subRecipe: {
             include: {
               items: {
                 include: {
                   inventoryItem: true,
+                  pack: true,
                   subRecipe: true,
                 },
               },
@@ -79,58 +92,90 @@ export async function calculateRecipeCost(
 
   const itemsCostResult: ComponentCostResult[] = [];
   let calculatedTotalCost = 0;
+  let recipeHasMissingCosts = false;
 
   for (const item of recipe.items) {
-    const qty = Number(item.quantity);
+    let usableQty = Number(item.quantity);
+    let recipeUnit = item.unitOfMeasure;
     const waste = Number(item.wastagePercent || 0);
-    const recipeUnit = item.unitOfMeasure;
+
+    // If item packaging definition is linked
+    if (item.packId && item.pack) {
+      if (item.packQuantity && Number(item.packQuantity) > 0) {
+        const packFactor = Number(item.pack.netQuantityPerPack || item.pack.conversionFactor || 1);
+        usableQty = Number(item.packQuantity) * packFactor;
+        recipeUnit = item.pack.packUnit;
+      }
+    }
+
+    // Exact culinary shrinkage formula
+    const grossQty = calculateGrossQuantity(usableQty, waste);
 
     if (item.componentType === "INVENTORY_ITEM" && item.inventoryItem) {
       const baseUnit = item.inventoryItem.unitOfMeasure;
       const baseCost = Number(item.inventoryItem.costPerUnit || 0);
+      if (baseCost <= 0) recipeHasMissingCosts = true;
+
       const effectiveUnitCost = convertUnitCost(baseCost, baseUnit, recipeUnit);
-      const netCost = qty * effectiveUnitCost;
-      const totalItemCost = netCost * (1 + waste / 100);
+      const netCost = usableQty * effectiveUnitCost;
+      const totalItemCost = grossQty * effectiveUnitCost;
+      const wastageCost = totalItemCost - netCost;
 
       itemsCostResult.push({
         componentType: "INVENTORY_ITEM",
         id: item.inventoryItem.id,
         name: item.inventoryItem.name,
-        quantity: qty,
+        quantity: usableQty,
         unitOfMeasure: recipeUnit,
         wastagePercent: waste,
+        grossQuantity: grossQty,
         baseUnit,
         baseUnitCost: baseCost,
         effectiveUnitCost,
         netCost,
-        wastageCost: totalItemCost - netCost,
+        wastageCost,
         totalCost: totalItemCost,
+        packId: item.packId,
+        packName: item.pack?.name || null,
+        packQuantity: item.packQuantity ? Number(item.packQuantity) : null,
+        hasMissingCost: baseCost <= 0,
         unitPricingMatrix: getUnitPricingMatrix(baseCost, baseUnit),
       });
 
       calculatedTotalCost += totalItemCost;
     } else if (item.componentType === "SUB_RECIPE" && item.subRecipe) {
-      // Recursively calculate sub-recipe cost
-      const subBreakdown = await calculateRecipeCost(item.subRecipe.id, new Set(visited));
+      // Recursively calculate sub-recipe cost with path tracing
+      const subBreakdown = await calculateRecipeCost(
+        item.subRecipe.id,
+        new Set(visited),
+        [...visitedPath, recipe.name]
+      );
+      if (subBreakdown.hasMissingCosts) recipeHasMissingCosts = true;
+
       const baseUnit = subBreakdown.yieldUnit;
       const baseCost = subBreakdown.costPerUnit; // cost per single yield unit of sub-recipe
+      if (baseCost <= 0) recipeHasMissingCosts = true;
+
       const effectiveUnitCost = convertUnitCost(baseCost, baseUnit, recipeUnit);
-      const netCost = qty * effectiveUnitCost;
-      const totalItemCost = netCost * (1 + waste / 100);
+      const netCost = usableQty * effectiveUnitCost;
+      const totalItemCost = grossQty * effectiveUnitCost;
+      const wastageCost = totalItemCost - netCost;
 
       itemsCostResult.push({
         componentType: "SUB_RECIPE",
         id: item.subRecipe.id,
         name: item.subRecipe.name,
-        quantity: qty,
+        quantity: usableQty,
         unitOfMeasure: recipeUnit,
         wastagePercent: waste,
+        grossQuantity: grossQty,
         baseUnit,
         baseUnitCost: baseCost,
         effectiveUnitCost,
         netCost,
-        wastageCost: totalItemCost - netCost,
+        wastageCost,
         totalCost: totalItemCost,
+        hasMissingCost: baseCost <= 0,
         unitPricingMatrix: getUnitPricingMatrix(baseCost, baseUnit),
         subComponents: subBreakdown.items,
       });
@@ -155,6 +200,7 @@ export async function calculateRecipeCost(
     recipeId: recipe.id,
     name: recipe.name,
     type: recipe.type,
+    isDraft: recipe.isDraft,
     yieldQuantity: yieldQty,
     yieldUnit: recipe.yieldUnit,
     sellingPrice,
@@ -162,6 +208,7 @@ export async function calculateRecipeCost(
     costPerUnit,
     grossMarginPercent,
     foodCostPercent,
+    hasMissingCosts: recipeHasMissingCosts,
     unitPricingMatrix: getUnitPricingMatrix(costPerUnit, recipe.yieldUnit),
     items: itemsCostResult,
   };

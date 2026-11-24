@@ -17,7 +17,7 @@ export async function DELETE(
     const accessCheck = await verifyAccess(
       session.userId,
       session.activeRestaurantId,
-      { requiredRoles: ["OWNER", "MANAGER", "ADMIN"] },
+      { moduleKey: "pos" },
       session.tokenVersion
     );
     if (!accessCheck.authorized) {
@@ -52,7 +52,7 @@ export async function PATCH(
     const accessCheck = await verifyAccess(
       session.userId,
       session.activeRestaurantId,
-      { requiredRoles: ["OWNER", "MANAGER", "ADMIN"] },
+      { moduleKey: "pos" },
       session.tokenVersion
     );
     if (!accessCheck.authorized) {

@@ -47,6 +47,7 @@ interface InventoryItem {
   costPerUnit: number;
   reorderPoint?: number;
   parLevel?: number;
+  purchasePacks?: any[];
 }
 
 interface VendorItemMap {
@@ -55,6 +56,9 @@ interface VendorItemMap {
   itemId: string;
   unitCost?: number | null;
   isPreferred?: boolean;
+  packId?: string | null;
+  pricingBasis?: string | null;
+  pack?: any;
 }
 
 export default function PurchaseOrdersDirectoryPage({

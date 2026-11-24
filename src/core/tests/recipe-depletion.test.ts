@@ -306,6 +306,273 @@ async function runTests() {
     });
     assert(Number(beefStock._sum.quantity) === 98.0, "Beef stock is exactly 98.0 LB remaining (started 100, deducted 2.0)");
 
+    // Test Idempotency: Retrying the same order does NOT deplete again
+    const retryDepletion = await depleteOrderInventory(posOrder.id, user.id);
+    assert(retryDepletion.depletedItemsCount === 0, "Idempotency verified: re-running depletion on completed order is a no-op");
+    const beefStockRetry = await prisma.stockLedger.aggregate({
+      where: { itemId: ribeye.id, outletId: outlet.id },
+      _sum: { quantity: true },
+    });
+    assert(Number(beefStockRetry._sum.quantity) === 98.0, "Beef stock remains untouched on idempotent retry");
+
+    console.log("\n── Section 6: Kitchen Line Deterministic Parser Verification ──");
+    const { parseIngredientLine, parsePastedRecipeText } = await import("@/core/inventory/recipeParser");
+
+    // Sample line 1: 1½ lb Roma tomatoes, diced
+    const p1 = parseIngredientLine("1½ lb Roma tomatoes, diced");
+    assert(p1.quantity === 1.5, "1½ lb parsed as 1.5");
+    assert(p1.unitOfMeasure === "LB", "Unit recognized as LB");
+    assert(p1.name.toLowerCase() === "roma tomatoes", "Ingredient name isolated as Roma tomatoes");
+    assert(p1.prepNotes === "diced", "Prep note isolated as diced");
+    assert(!p1.isUnresolved, "Line is fully resolved");
+
+    // Sample line 2: 2 x 400 g cans chopped tomatoes
+    const p2 = parseIngredientLine("2 x 400 g cans chopped tomatoes");
+    assert(p2.quantity === 800, "Multipack 2 x 400g calculated as 800g total");
+    assert(p2.unitOfMeasure === "G", "Unit recognized as G");
+    assert(p2.isMultipack === true, "Identified as multipack");
+    assert(p2.multipackCount === 2 && p2.multipackSize === 400, "2 cans of 400g captured");
+
+    // Sample line 3: 1 cup + 2 tbsp cream
+    const p3 = parseIngredientLine("1 cup + 2 tbsp cream");
+    // 1 cup = 8 fl oz (16 tbsp), 2 tbsp = 1 fl oz (1/8 cup = 0.125 cup). Total = 1.125 cups
+    assert(p3.quantity === 1.125, "1 cup + 2 tbsp calculated as 1.125 cups");
+    assert(p3.unitOfMeasure === "CUP", "Combined into CUP");
+    assert(p3.name === "cream", "Name isolated as cream");
+
+    // Sample line 4: 2 ladles house gravy
+    const p4 = parseIngredientLine("2 ladles house gravy");
+    assert(p4.quantity === 2, "2 ladles captured as quantity 2");
+    assert(p4.unitOfMeasure === "LADLE", "Unit recognized as LADLE");
+    assert(p4.ladleInfo !== undefined && p4.ladleInfo.includes("4 fl oz scoop"), "Configured kitchen ladle scoop size displayed");
+
+    // Sample line 5: 2–3 cloves garlic
+    const p5 = parseIngredientLine("2–3 cloves garlic");
+    assert(p5.isRange === true, "Range 2–3 detected");
+    assert(p5.isUnresolved === true, "Range flagged as unresolved");
+    assert(Boolean(p5.unresolvedReason?.includes("exact number")), "Unresolved reason explains exact number required");
+
+    // Sample line 6: Salt to taste
+    const p6 = parseIngredientLine("Salt to taste");
+    assert(p6.isToTaste === true, "'to taste' detected");
+    assert(p6.isUnresolved === true, "'to taste' flagged as unresolved for stock tracking");
+
+    // Full Document Parser Test
+    const fullText = `Signature Truffle Burger
+Yield: 4 servings
+Prep Time: 25 mins
+
+Ingredients:
+- 1½ lb Roma tomatoes, diced
+- 2 x 400 g cans chopped tomatoes
+- 1 cup + 2 tbsp cream
+- 2 ladles house gravy
+- 2–3 cloves garlic
+- Salt to taste
+
+Instructions:
+1. Sear the prime beef patties over high heat.
+2. Simmer tomatoes with garlic and gravy.
+3. Assemble with cream and serve.`;
+
+    const parsedDoc = parsePastedRecipeText(fullText);
+    assert(parsedDoc.title === "Signature Truffle Burger", "Doc title extracted: Signature Truffle Burger");
+    assert(parsedDoc.yieldQuantity === 4, "Yield quantity extracted: 4");
+    assert(parsedDoc.yieldUnit === "PORTION", "Yield unit extracted: PORTION");
+    assert(parsedDoc.ingredients.length === 6, "All 6 ingredient lines parsed");
+    assert(parsedDoc.instructions.includes("Sear the prime beef patties"), "Preparation instructions extracted");
+
+    console.log("\n── Section 7: Item-Specific Purchase Packaging in Recipes ──");
+    // Item 1: Tomatoes with 40 lb Box pack
+    const tomatoes = await prisma.inventoryItem.create({
+      data: {
+        restaurantId: restaurant.id,
+        name: "Roma Tomatoes Fresh",
+        unitOfMeasure: "LB",
+        costPerUnit: 1.5,
+        reorderPoint: 10,
+        parLevel: 50,
+      },
+    });
+
+    const tomatoBoxPack = await prisma.itemPurchasePack.create({
+      data: {
+        restaurantId: restaurant.id,
+        itemId: tomatoes.id,
+        name: "40 lb Box",
+        packType: "Box",
+        packUnit: "LB",
+        netQuantityPerPack: 40.0,
+        conversionFactor: 40.0,
+      },
+    });
+
+    // Item 2: Potatoes with 20 lb Box pack
+    const potatoes = await prisma.inventoryItem.create({
+      data: {
+        restaurantId: restaurant.id,
+        name: "Russet Potatoes",
+        unitOfMeasure: "LB",
+        costPerUnit: 0.8,
+        reorderPoint: 10,
+        parLevel: 50,
+      },
+    });
+
+    const potatoBoxPack = await prisma.itemPurchasePack.create({
+      data: {
+        restaurantId: restaurant.id,
+        itemId: potatoes.id,
+        name: "20 lb Box",
+        packType: "Box",
+        packUnit: "LB",
+        netQuantityPerPack: 20.0,
+        conversionFactor: 20.0,
+      },
+    });
+
+    // Create Recipe linking 1 Tomato Box (40 lb) and 1 Potato Box (20 lb)
+    const boxRecipe = await prisma.recipe.create({
+      data: {
+        restaurantId: restaurant.id,
+        name: "Bulk Tomato Potato Mash Batch",
+        type: "SUB_RECIPE",
+        yieldQuantity: 1,
+        yieldUnit: "PIECES",
+        items: {
+          create: [
+            {
+              componentType: "INVENTORY_ITEM",
+              inventoryItemId: tomatoes.id,
+              packId: tomatoBoxPack.id,
+              packQuantity: 1, // 1 Box = 40 lb
+              quantity: 40,
+              unitOfMeasure: "LB",
+            },
+            {
+              componentType: "INVENTORY_ITEM",
+              inventoryItemId: potatoes.id,
+              packId: potatoBoxPack.id,
+              packQuantity: 1, // 1 Box = 20 lb
+              quantity: 20,
+              unitOfMeasure: "LB",
+            },
+          ],
+        },
+      },
+    });
+
+    const boxCosting = await syncRecipeCosting(boxRecipe.id);
+    // Tomatoes: 40 lb * $1.50 = $60. Potatoes: 20 lb * $0.80 = $16. Total = $76
+    assert(Math.abs(boxCosting.totalCost - 76.0) < 0.05, `Tomato Box (40 lb) + Potato Box (20 lb) costs exactly $76.00 (got $${boxCosting.totalCost.toFixed(2)})`);
+
+    const boxExploded = await explodeRecipeToRawIngredients(boxRecipe.id, 1);
+    assert(boxExploded.get(tomatoes.id)?.quantity === 40, "1 Tomato Box resolves to exactly 40 lb in inventory depletion");
+    assert(boxExploded.get(potatoes.id)?.quantity === 20, "1 Potato Box resolves to exactly 20 lb in inventory depletion");
+
+    console.log("\n── Section 8: Culinary Shrinkage (Prep Loss Math) ──");
+    // 80g usable with 20% peeling loss:
+    // Required raw input: 80 / (1 - 0.20) = 100g raw input
+    const { calculateGrossQuantity } = await import("@/core/inventory/units");
+    const grossNeeded = calculateGrossQuantity(80, 20);
+    assert(Math.abs(grossNeeded - 100) < 0.001, "80g usable with 20% prep loss requires exactly 100g gross raw input (80 ÷ (1 - 0.20))");
+
+    console.log("\n── Section 9: Catering Event Scaling (150 Guests) & Multi-Dish Rollup ──");
+    const { calculateEventIngredients } = await import("@/modules/catering/service");
+
+    // Create Catering Order for 150 guests with Truffle Burger
+    const cateringOrder = await prisma.cateringOrder.create({
+      data: {
+        restaurantId: restaurant.id,
+        outletId: outlet.id,
+        orderNumber: "CAT-TEST-150",
+        eventName: "Annual Gala 150 Pax",
+        clientName: "Executive Client",
+        eventDate: new Date(),
+        guestCount: 150,
+        items: {
+          create: [
+            {
+              recipeId: burgerDish.id,
+              itemName: "Signature Truffle Burger",
+              quantity: 150,
+              unitPrice: 24.0,
+              totalPrice: 3600.0,
+            },
+          ],
+        },
+      },
+    });
+
+    const cateringPlan = await calculateEventIngredients(restaurant.id, cateringOrder.id, {
+      productionBufferPercent: 10, // 10% safety buffer -> 165 planned servings
+    });
+
+    assert(cateringPlan.guestCount === 150, "Catering guest count is 150");
+    assert(cateringPlan.plannedServings === 165, "10% production buffer yields 165 planned servings");
+
+    // Ribeye needed: 165 servings * (2 lb / 4) = 82.5 LB
+    const ribeyeReq = cateringPlan.rawMaterials.find((r) => r.inventoryItemId === ribeye.id);
+    assert(ribeyeReq !== undefined && Math.abs(ribeyeReq.requiredQuantity - 82.5) < 0.1, "165 planned burgers requires 82.5 LB Ribeye");
+
+    console.log("\n── Section 10: Draft Protection & Publication Enforcement ──");
+    // Create draft recipe
+    const draftRecipe = await prisma.recipe.create({
+      data: {
+        restaurantId: restaurant.id,
+        name: "Unpublished Experimental Sauce",
+        type: "SUB_RECIPE",
+        isDraft: true,
+        yieldQuantity: 1,
+        yieldUnit: "L",
+        items: {
+          create: [
+            {
+              componentType: "INVENTORY_ITEM",
+              inventoryItemId: marinade.id,
+              quantity: 1,
+              unitOfMeasure: "GAL",
+              isUnresolved: true,
+              unresolvedReason: "Awaiting kitchen chef signoff",
+            },
+          ],
+        },
+      },
+    });
+
+    // Verify draft cannot be depleted
+    let draftDepleteBlocked = false;
+    try {
+      await explodeRecipeToRawIngredients(draftRecipe.id, 1);
+    } catch (e: any) {
+      if (e.message.includes("Cannot deplete inventory for draft recipe")) {
+        draftDepleteBlocked = true;
+      }
+    }
+    assert(draftDepleteBlocked, "Draft recipe is strictly blocked from inventory depletion");
+
+    console.log("\n── Section 11: Excel Import Engine & Template Generation ──");
+    const { generateRecipeImportTemplate, parseRecipeExcelFile } = await import("@/core/inventory/recipeExcelImporter");
+    const templateBuffer = generateRecipeImportTemplate();
+    assert(templateBuffer.length > 500, "Excel template generated successfully as valid binary buffer");
+
+    // Parse template with importer
+    const excelParsed = parseRecipeExcelFile(templateBuffer, {
+      inventoryItems: [
+        {
+          id: ribeye.id,
+          name: "USDA Prime Ribeye Beef",
+          unitOfMeasure: "LB",
+          costPerUnit: 12.0,
+        },
+      ],
+      subRecipes: [],
+      existingRecipeNames: new Set(["existing recipe"]),
+    });
+    assert(excelParsed.sheetNames.includes("Recipes"), "Excel parser detected 'Recipes' sheet");
+    assert(excelParsed.groupedRecipes.length > 0, "Excel parser extracted grouped recipes from sheet");
+    assert(excelParsed.groupedRecipes[0].rows.length > 0, "Ingredient rows extracted with quantities and units");
+
     console.log("\n=========================================================");
     console.log(`  Test Results: ${passed} Passed, ${failed} Failed`);
     console.log("=========================================================\n");
@@ -328,3 +595,4 @@ runTests().catch((e) => {
   console.error("Test execution failed:", e);
   process.exit(1);
 });
+

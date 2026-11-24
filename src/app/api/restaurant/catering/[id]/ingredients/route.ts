@@ -24,9 +24,13 @@ export async function GET(
     }
 
     const { id } = await params;
+    const { searchParams } = new URL(req.url);
+    const buffer = parseFloat(searchParams.get("buffer") || "0");
+
     const ingredientReport = await calculateEventIngredients(
       session.activeRestaurantId,
-      id
+      id,
+      { productionBufferPercent: isNaN(buffer) ? 0 : buffer }
     );
 
     return NextResponse.json({ success: true, report: ingredientReport });

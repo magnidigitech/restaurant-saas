@@ -307,7 +307,7 @@ export const VendorService = {
     });
 
     const outletNameMap = new Map<string, string>();
-    outlets.forEach((o) => outletNameMap.set(o.name.trim().toLowerCase(), o.id));
+    outlets.forEach((o: any) => outletNameMap.set(o.name.trim().toLowerCase(), o.id));
 
     const existingIdMap = new Map<string, any>();
     const existingNameMap = new Map<string, any>();
@@ -375,7 +375,7 @@ export const VendorService = {
               const oId = outletNameMap.get(pLower)!;
               if (!matchedIds.includes(oId)) matchedIds.push(oId);
             } else {
-              const byId = outlets.find((o) => o.id === p);
+              const byId = outlets.find((o: any) => o.id === p);
               if (byId && !matchedIds.includes(byId.id)) matchedIds.push(byId.id);
             }
           }
@@ -473,10 +473,10 @@ export const VendorService = {
           const sortedNew = resolvedOutletIds.slice().sort().join(",");
           if (sortedCurr !== sortedNew) {
             const currNames = currIds.length > 0
-              ? currIds.map((id) => outlets.find((o) => o.id === id)?.name || id).join(", ")
+              ? currIds.map((id: string) => outlets.find((o: any) => o.id === id)?.name || id).join(", ")
               : "All Locations";
             const newNames = resolvedOutletIds.length > 0
-              ? resolvedOutletIds.map((id) => outlets.find((o) => o.id === id)?.name || id).join(", ")
+              ? resolvedOutletIds.map((id: string) => outlets.find((o: any) => o.id === id)?.name || id).join(", ")
               : "All Locations";
             overrides.push({
               field: "locations",

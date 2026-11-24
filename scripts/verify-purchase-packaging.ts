@@ -109,7 +109,7 @@ async function runVerification() {
         conversionFactor: 40,
         defaultPricePerPack: 50.0,
         isVariableWeight: false,
-      },
+      } as any,
     ],
   });
   const tomatoPack = tomatoItem.purchasePacks[0];
@@ -128,7 +128,7 @@ async function runVerification() {
         conversionFactor: 20,
         defaultPricePerPack: 16.0,
         isVariableWeight: false,
-      },
+      } as any,
     ],
   });
   const potatoPack = potatoItem.purchasePacks[0];
@@ -195,7 +195,7 @@ async function runVerification() {
         conversionFactor: 1000,
         defaultPricePerPack: 45.0,
         isVariableWeight: false,
-      },
+      } as any,
     ],
   });
   const cupsPack = cupsItem.purchasePacks[0];
@@ -284,7 +284,7 @@ async function runVerification() {
         defaultPricePerPack: 180.0,
         isVariableWeight: true,
         weightUnit: "LB",
-      },
+      } as any,
     ],
   });
   const meatPack = meatItem.purchasePacks[0];
@@ -468,7 +468,7 @@ async function runVerification() {
         packType: "Crate",
         conversionFactor: 100,
         packageQty: 1,
-      },
+      } as any,
     ],
   });
   const tenantBPack = tenantBItem.purchasePacks[0];

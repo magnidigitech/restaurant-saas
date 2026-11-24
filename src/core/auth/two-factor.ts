@@ -101,7 +101,7 @@ export async function verifyTotpCode(secret: string, token: string): Promise<boo
       return false;
     }
 
-    const result = await verify({
+    const result = await (verify as any)({
       secret,
       token: cleanToken,
       window: 2,

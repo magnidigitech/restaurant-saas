@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
 
     const report = await InventoryService.bulkImportItems(
       session.activeRestaurantId,
-      result.data.items,
+      result.data.items as any,
       { updateExisting: result.data.updateExisting }
     );
 

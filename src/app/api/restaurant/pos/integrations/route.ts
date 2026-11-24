@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/core/database/client";
 import { getTenantSession } from "@/core/auth/session";
 import { verifyAccess } from "@/core/permissions/check";
 import {
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
     const accessCheck = await verifyAccess(
       session.userId,
       session.activeRestaurantId,
-      { requiredRoles: ["OWNER", "MANAGER", "ADMIN"] },
+      { moduleKey: "pos" },
       session.tokenVersion
     );
     if (!accessCheck.authorized) {
@@ -118,7 +119,7 @@ export async function POST(req: NextRequest) {
       const fieldErrors = parsed.error.flatten().fieldErrors;
       const firstErrorField = Object.keys(fieldErrors)[0];
       const errorMsg = firstErrorField 
-        ? `Invalid payload: '${firstErrorField}' ${fieldErrors[firstErrorField]?.[0] || 'is invalid'}`
+        ? `Invalid payload: '${firstErrorField}' ${(fieldErrors as any)[firstErrorField]?.[0] || 'is invalid'}`
         : "Invalid connection payload";
 
       return NextResponse.json(

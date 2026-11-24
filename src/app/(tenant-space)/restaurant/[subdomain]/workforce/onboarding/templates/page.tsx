@@ -1072,7 +1072,7 @@ export default function OnboardingTemplatesPage() {
                             {(parsedConfig.options || []).map((opt: string, optIdx: number) => (
                               <div key={optIdx} className="flex items-center gap-3">
                                 {currentFieldDef.key === "checkboxes" ? (
-                                  <SquareCheck className="w-4 h-4 text-gray-400 shrink-0" />
+                                  <CheckSquare className="w-4 h-4 text-gray-400 shrink-0" />
                                 ) : (
                                   <Circle className="w-4 h-4 text-gray-400 shrink-0" />
                                 )}

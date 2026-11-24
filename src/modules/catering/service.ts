@@ -1,5 +1,6 @@
 import { prisma } from "@/core/database/client";
 import { CateringOrderStatus, CateringEventType } from "@prisma/client";
+import { convertQuantity } from "@/core/inventory/units";
 
 export interface CreateCateringOrderItemInput {
   recipeId?: string;
@@ -369,7 +370,34 @@ export async function deleteCateringOrder(restaurantId: string, orderId: string)
   return { success: true };
 }
 
-export async function calculateEventIngredients(restaurantId: string, orderId: string) {
+export interface SuggestedPurchasePack {
+  packId: string;
+  packName: string;
+  packType: string;
+  packUnit: string;
+  conversionFactor: number;
+  suggestedWholePacks: number;
+  totalPackQuantity: number;
+  safetySurplus: number;
+}
+
+export interface RawMaterialRequirement {
+  inventoryItemId: string;
+  name: string;
+  categoryName?: string;
+  unitOfMeasure: string;
+  requiredQuantity: number;
+  estimatedUnitCost: number;
+  totalEstimatedCost: number;
+  usedInDishes: string[];
+  suggestedPurchasePack?: SuggestedPurchasePack | null;
+}
+
+export async function calculateEventIngredients(
+  restaurantId: string,
+  orderId: string,
+  options?: { productionBufferPercent?: number }
+) {
   const order = await prisma.cateringOrder.findFirst({
     where: { id: orderId, restaurantId },
     include: {
@@ -379,12 +407,26 @@ export async function calculateEventIngredients(restaurantId: string, orderId: s
             include: {
               items: {
                 include: {
-                  inventoryItem: true,
+                  inventoryItem: {
+                    include: {
+                      purchasePacks: {
+                        where: { isActive: true },
+                      },
+                    },
+                  },
+                  pack: true,
                   subRecipe: {
                     include: {
                       items: {
                         include: {
-                          inventoryItem: true,
+                          inventoryItem: {
+                            include: {
+                              purchasePacks: {
+                                where: { isActive: true },
+                              },
+                            },
+                          },
+                          pack: true,
                         },
                       },
                     },
@@ -413,32 +455,51 @@ export async function calculateEventIngredients(restaurantId: string, orderId: s
       estimatedUnitCost: number;
       totalEstimatedCost: number;
       usedInDishes: string[];
+      purchasePacks?: any[];
     }
   >();
 
   const guestCount = order.guestCount || 50;
+  const bufferPercent = Math.max(0, options?.productionBufferPercent || 0);
+  const bufferMultiplier = 1 + bufferPercent / 100;
+  const plannedServings = Math.round(guestCount * bufferMultiplier);
 
   for (const item of order.items) {
     if (!item.recipe) continue;
 
     const recipe = item.recipe;
     const yieldQty = Number(recipe.yieldQuantity || 1);
-    // Multiplier based on Pax vs Recipe yield quantity
-    const itemQty = Number(item.quantity || guestCount);
+    // Multiply by guest count with buffer
+    const baseItemQty = Number(item.quantity || guestCount);
+    const itemQty = baseItemQty * bufferMultiplier;
     const multiplier = itemQty / yieldQty;
 
     const processRecipeItem = (recItem: any, dishName: string, scaleFactor: number) => {
       if (recItem.componentType === "INVENTORY_ITEM" && recItem.inventoryItem) {
         const inv = recItem.inventoryItem;
-        const baseQty = Number(recItem.quantity || 0);
+        let usableQty = Number(recItem.quantity || 0);
+        let recUnit = recItem.unitOfMeasure || inv.unitOfMeasure;
+
+        // Resolve item purchase packaging if specified on recipe line
+        if (recItem.packId && recItem.pack && recItem.packQuantity) {
+          const packFactor = Number(recItem.pack.netQuantityPerPack || recItem.pack.conversionFactor || 1);
+          usableQty = Number(recItem.packQuantity) * packFactor;
+          recUnit = recItem.pack.packUnit;
+        }
+
         const wastagePct = Number(recItem.wastagePercent || 0);
-        const grossQty = baseQty * (1 + wastagePct / 100) * scaleFactor;
-        const unitCost = Number(recItem.unitCost || inv.costPrice || 0);
+        // Usable ÷ (1 - Loss%)
+        const grossLossDivisor = wastagePct > 0 && wastagePct < 100 ? 1 - wastagePct / 100 : 1;
+        const grossQtyInRecUnit = (usableQty / grossLossDivisor) * scaleFactor;
+
+        // Convert gross quantity to inventory item's base unit of measure
+        const grossQtyInBaseUnit = convertQuantity(grossQtyInRecUnit, recUnit, inv.unitOfMeasure);
+        const unitCost = Number(inv.costPerUnit || recItem.unitCost || 0);
 
         const existingReq = rawMaterialRequirementsMap.get(inv.id);
         if (existingReq) {
-          existingReq.requiredQuantity += grossQty;
-          existingReq.totalEstimatedCost += grossQty * unitCost;
+          existingReq.requiredQuantity += grossQtyInBaseUnit;
+          existingReq.totalEstimatedCost += grossQtyInBaseUnit * unitCost;
           if (!existingReq.usedInDishes.includes(dishName)) {
             existingReq.usedInDishes.push(dishName);
           }
@@ -447,11 +508,12 @@ export async function calculateEventIngredients(restaurantId: string, orderId: s
             inventoryItemId: inv.id,
             name: inv.name,
             categoryName: inv.categoryId ? "Raw Ingredient" : "General",
-            unitOfMeasure: recItem.unitOfMeasure || inv.unitOfMeasure,
-            requiredQuantity: grossQty,
+            unitOfMeasure: inv.unitOfMeasure,
+            requiredQuantity: grossQtyInBaseUnit,
             estimatedUnitCost: unitCost,
-            totalEstimatedCost: grossQty * unitCost,
+            totalEstimatedCost: grossQtyInBaseUnit * unitCost,
             usedInDishes: [dishName],
+            purchasePacks: inv.purchasePacks || [],
           });
         }
       } else if (recItem.componentType === "SUB_RECIPE" && recItem.subRecipe) {
@@ -471,11 +533,43 @@ export async function calculateEventIngredients(restaurantId: string, orderId: s
     }
   }
 
-  const rawMaterials = Array.from(rawMaterialRequirementsMap.values()).map((rm) => ({
-    ...rm,
-    requiredQuantity: Number(rm.requiredQuantity.toFixed(3)),
-    totalEstimatedCost: Number(rm.totalEstimatedCost.toFixed(2)),
-  }));
+  const rawMaterials: RawMaterialRequirement[] = Array.from(rawMaterialRequirementsMap.values()).map((rm) => {
+    let suggestedPurchasePack: SuggestedPurchasePack | null = null;
+
+    if (rm.purchasePacks && rm.purchasePacks.length > 0) {
+      // Pick best active purchase pack (e.g. primary box or case)
+      const primaryPack = rm.purchasePacks[0];
+      const factor = Number(primaryPack.netQuantityPerPack || primaryPack.conversionFactor || 1);
+      if (factor > 0) {
+        const wholePacks = Math.ceil(rm.requiredQuantity / factor);
+        const totalPackQty = Number((wholePacks * factor).toFixed(3));
+        const surplus = Number(Math.max(0, totalPackQty - rm.requiredQuantity).toFixed(3));
+
+        suggestedPurchasePack = {
+          packId: primaryPack.id,
+          packName: primaryPack.name,
+          packType: primaryPack.packType,
+          packUnit: primaryPack.packUnit,
+          conversionFactor: factor,
+          suggestedWholePacks: wholePacks,
+          totalPackQuantity: totalPackQty,
+          safetySurplus: surplus,
+        };
+      }
+    }
+
+    return {
+      inventoryItemId: rm.inventoryItemId,
+      name: rm.name,
+      categoryName: rm.categoryName,
+      unitOfMeasure: rm.unitOfMeasure,
+      requiredQuantity: Number(rm.requiredQuantity.toFixed(3)),
+      estimatedUnitCost: Number(rm.estimatedUnitCost.toFixed(2)),
+      totalEstimatedCost: Number(rm.totalEstimatedCost.toFixed(2)),
+      usedInDishes: rm.usedInDishes,
+      suggestedPurchasePack,
+    };
+  });
 
   const totalRawCost = rawMaterials.reduce((sum, r) => sum + r.totalEstimatedCost, 0);
 
@@ -484,6 +578,8 @@ export async function calculateEventIngredients(restaurantId: string, orderId: s
     orderNumber: order.orderNumber,
     eventName: order.eventName,
     guestCount,
+    productionBufferPercent: bufferPercent,
+    plannedServings,
     rawMaterials,
     totalRawCost: Number(totalRawCost.toFixed(2)),
   };

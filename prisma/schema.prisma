@@ -1421,6 +1421,7 @@ model ItemPurchasePack {
   item                 InventoryItem       @relation(fields: [itemId], references: [id], onDelete: Cascade)
   vendorItems          VendorItem[]
   poItems              PurchaseOrderItem[]
+  recipeItems          RecipeItem[]
 
   @@index([restaurantId])
   @@index([itemId])
@@ -1892,59 +1893,73 @@ enum RecipeComponentType {
 }
 
 model Recipe {
-  id                 String        @id @default(uuid())
-  restaurantId       String        @map("restaurant_id")
-  name               String
-  type               RecipeType    @default(DISH)
-  description        String?
-  yieldQuantity      Decimal       @default(1) @map("yield_quantity")
-  yieldUnit          UnitOfMeasure @default(PIECES) @map("yield_unit")
-  servingSize        String?       @map("serving_size")
-  prepTimeMin        Int?          @map("prep_time_min")
-  sellingPrice       Decimal       @default(0) @map("selling_price")
-  costPerUnit        Decimal       @default(0) @map("cost_per_unit")
-  totalCost          Decimal       @default(0) @map("total_cost")
-  grossMarginPercent Decimal       @default(0) @map("gross_margin_percent")
-  archivedAt         DateTime?     @map("archived_at")
-  createdAt          DateTime      @default(now()) @map("created_at")
-  updatedAt          DateTime      @updatedAt @map("updated_at")
+  id                    String        @id @default(uuid())
+  restaurantId          String        @map("restaurant_id")
+  name                  String
+  type                  RecipeType    @default(DISH)
+  description           String?
+  instructions          String?
+  yieldQuantity         Decimal       @default(1) @map("yield_quantity")
+  yieldUnit             UnitOfMeasure @default(PIECES) @map("yield_unit")
+  servingSize           String?       @map("serving_size")
+  prepTimeMin           Int?          @map("prep_time_min")
+  sellingPrice          Decimal       @default(0) @map("selling_price")
+  costPerUnit           Decimal       @default(0) @map("cost_per_unit")
+  totalCost             Decimal       @default(0) @map("total_cost")
+  grossMarginPercent    Decimal       @default(0) @map("gross_margin_percent")
+  targetFoodCostPercent Decimal?      @default(28) @map("target_food_cost_percent")
+  isDraft               Boolean       @default(false) @map("is_draft")
+  publishedRecipeId     String?       @map("published_recipe_id")
+  sourceType            String?       @default("MANUAL") @map("source_type")
+  archivedAt            DateTime?     @map("archived_at")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
 
   // Relations
-  restaurant         Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  items              RecipeItem[]   @relation("ParentRecipe")
-  usedInRecipeItems  RecipeItem[]   @relation("ComponentSubRecipe")
-  posOrderItems      PosOrderItem[]
-  cateringOrderItems CateringOrderItem[]
+  restaurant           Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  items                RecipeItem[]          @relation("ParentRecipe")
+  usedInRecipeItems    RecipeItem[]          @relation("ComponentSubRecipe")
+  posOrderItems        PosOrderItem[]
+  cateringOrderItems   CateringOrderItem[]
   cateringPackageItems CateringPackageItem[]
 
   @@unique([restaurantId, name])
   @@index([restaurantId])
+  @@index([isDraft])
   @@map("recipes")
 }
 
 model RecipeItem {
-  id              String              @id @default(uuid())
-  recipeId        String              @map("recipe_id")
-  componentType   RecipeComponentType @default(INVENTORY_ITEM) @map("component_type")
-  inventoryItemId String?             @map("inventory_item_id")
-  subRecipeId     String?             @map("sub_recipe_id")
-  quantity        Decimal
-  unitOfMeasure   UnitOfMeasure       @map("unit_of_measure")
-  wastagePercent  Decimal             @default(0) @map("wastage_percent")
-  unitCost        Decimal             @default(0) @map("unit_cost")
-  totalCost       Decimal             @default(0) @map("total_cost")
-  notes           String?
-  createdAt       DateTime            @default(now()) @map("created_at")
-  updatedAt       DateTime            @updatedAt @map("updated_at")
+  id                String              @id @default(uuid())
+  recipeId          String              @map("recipe_id")
+  componentType     RecipeComponentType @default(INVENTORY_ITEM) @map("component_type")
+  inventoryItemId   String?             @map("inventory_item_id")
+  subRecipeId       String?             @map("sub_recipe_id")
+  packId            String?             @map("pack_id")
+  quantity          Decimal
+  packQuantity      Decimal?            @map("pack_quantity")
+  unitOfMeasure     UnitOfMeasure       @map("unit_of_measure")
+  wastagePercent    Decimal             @default(0) @map("wastage_percent")
+  unitCost          Decimal             @default(0) @map("unit_cost")
+  totalCost         Decimal             @default(0) @map("total_cost")
+  notes             String?
+  originalText      String?             @map("original_text")
+  statedQuantityRaw String?             @map("stated_quantity_raw")
+  isUnresolved      Boolean             @default(false) @map("is_unresolved")
+  unresolvedReason  String?             @map("unresolved_reason")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
 
   // Relations
-  recipe        Recipe         @relation("ParentRecipe", fields: [recipeId], references: [id], onDelete: Cascade)
-  inventoryItem InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
-  subRecipe     Recipe?        @relation("ComponentSubRecipe", fields: [subRecipeId], references: [id], onDelete: Cascade)
+  recipe        Recipe            @relation("ParentRecipe", fields: [recipeId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem?    @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  subRecipe     Recipe?           @relation("ComponentSubRecipe", fields: [subRecipeId], references: [id], onDelete: Cascade)
+  pack          ItemPurchasePack? @relation(fields: [packId], references: [id], onDelete: SetNull)
 
   @@index([recipeId])
   @@index([inventoryItemId])
   @@index([subRecipeId])
+  @@index([packId])
   @@map("recipe_items")
 }
 
