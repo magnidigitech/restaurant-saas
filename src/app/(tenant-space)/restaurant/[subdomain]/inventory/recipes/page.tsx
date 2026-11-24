@@ -187,6 +187,12 @@ export default function RecipesDirectoryPage({
 
   useEffect(() => {
     fetchData();
+    if (typeof window !== "undefined") {
+      const editId = new URLSearchParams(window.location.search).get("edit");
+      if (editId) {
+        handleEditRecipe({ id: editId } as any);
+      }
+    }
   }, []);
 
   const subRecipesList = recipes.filter((r) => r.type === "SUB_RECIPE" && !r.isDraft);
