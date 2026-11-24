@@ -2,12 +2,15 @@
 
 import React, { useState, useEffect, use, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import {
   UnitEquivalentPricing,
+  UnitOfMeasure,
   formatUnit,
   getUnitPricingMatrix,
+  UNIT_DEFINITIONS,
 } from "@/core/inventory/units";
 import {
   ChefHat,
@@ -23,22 +26,22 @@ import {
   CheckCircle2,
   Trash2,
   ExternalLink,
-  FileSpreadsheet,
-  Sparkles,
-  ArrowLeft,
-  Tag,
+  ChevronDown,
+  ChevronUp,
+  MoreVertical,
   ShoppingBag,
   FlaskConical,
   Flame,
-  ArrowUpRight,
-  PieChart,
   Plus,
+  ArrowRight,
+  Info,
 } from "lucide-react";
 
 interface ComponentCost {
   componentType: "INVENTORY_ITEM" | "SUB_RECIPE";
   id: string;
   name: string;
+  sku?: string | null;
   quantity: number;
   unitOfMeasure: string;
   wastagePercent: number;
@@ -51,6 +54,10 @@ interface ComponentCost {
   totalCost: number;
   packName?: string | null;
   packQuantity?: number | null;
+  originalText?: string | null;
+  statedQuantityRaw?: string | null;
+  isUnresolved?: boolean;
+  unresolvedReason?: string | null;
   hasMissingCost?: boolean;
   unitPricingMatrix?: UnitEquivalentPricing[];
   subComponents?: ComponentCost[];
@@ -66,16 +73,140 @@ interface RecipeDetail {
   yieldUnit: string;
   servingSize?: string;
   prepTimeMin?: number;
-  sellingPrice: number;
-  costPerUnit: number;
-  totalCost: number;
-  grossMarginPercent: number;
-  foodCostPercent: number;
-  targetFoodCostPercent?: number;
+  sellingPrice: number | null;
+  costPerUnit: number | null;
+  totalCost: number | null;
+  grossMarginPercent: number | null;
+  foodCostPercent: number | null;
+  targetFoodCostPercent?: number | null;
   isDraft: boolean;
   sourceType?: string;
   createdAt: string;
-  usedInRecipeItems?: { id: string; recipe: { id: string; name: string } }[];
+  usedInRecipeItems?: { id: string; recipe: { id: string; name: string; type: string } }[];
+}
+
+interface RecipeCostBreakdownData {
+  recipeId: string;
+  name: string;
+  type: "DISH" | "SUB_RECIPE";
+  isDraft: boolean;
+  yieldQuantity: number;
+  yieldUnit: UnitOfMeasure;
+  sellingPrice: number;
+  totalCost: number;
+  costPerUnit: number;
+  grossMarginPercent: number;
+  foodCostPercent: number;
+  hasMissingCosts: boolean;
+  unitPricingMatrix: UnitEquivalentPricing[];
+  items: ComponentCost[];
+  costSource: "FORMULA_CALCULATED" | "STORED_SNAPSHOT" | "UNAVAILABLE";
+  storedTotalCost?: number;
+  storedCostPerUnit?: number;
+}
+
+/**
+ * Natural language unit formatting helper.
+ * Strictly uses stored recipe units — never invents or silently relabels units.
+ */
+function getUnitDisplayInfo(unitRaw: string, type: "DISH" | "SUB_RECIPE", qty = 1) {
+  const u = (unitRaw || "").toUpperCase();
+  const isDish = type === "DISH";
+
+  let singular = "unit";
+  let plural = "units";
+  let short = formatUnit(u as any) || u.toLowerCase();
+  let costNoun = "unit";
+  let profitNoun = "unit";
+
+  if (u === "PORTION") {
+    singular = "serving";
+    plural = "servings";
+    short = "serving";
+    costNoun = "serving";
+    profitNoun = "serving";
+  } else if (u === "PIECES" || u === "EACH") {
+    singular = "piece";
+    plural = "pieces";
+    short = "pcs";
+    costNoun = "piece";
+    profitNoun = "piece";
+  } else if (u === "DOZEN") {
+    singular = "dozen";
+    plural = "dozens";
+    short = "doz";
+    costNoun = "dozen";
+    profitNoun = "dozen";
+  } else if (u === "L") {
+    singular = "litre";
+    plural = "litres";
+    short = "L";
+    costNoun = "litre";
+    profitNoun = "litre";
+  } else if (u === "ML") {
+    singular = "millilitre";
+    plural = "millilitres";
+    short = "mL";
+    costNoun = "millilitre";
+    profitNoun = "millilitre";
+  } else if (u === "KG") {
+    singular = "kilogram";
+    plural = "kilograms";
+    short = "kg";
+    costNoun = "kilogram";
+    profitNoun = "kilogram";
+  } else if (u === "G") {
+    singular = "gram";
+    plural = "grams";
+    short = "g";
+    costNoun = "gram";
+    profitNoun = "gram";
+  } else if (u === "LB") {
+    singular = "pound";
+    plural = "pounds";
+    short = "lb";
+    costNoun = "pound";
+    profitNoun = "pound";
+  } else if (u === "OZ") {
+    singular = "ounce";
+    plural = "ounces";
+    short = "oz";
+    costNoun = "ounce";
+    profitNoun = "ounce";
+  } else if (u === "GAL" || u === "IMP_GAL") {
+    singular = "gallon";
+    plural = "gallons";
+    short = u === "IMP_GAL" ? "Imp gal" : "US gal";
+    costNoun = "gallon";
+    profitNoun = "gallon";
+  } else if (u === "CUP") {
+    singular = "cup";
+    plural = "cups";
+    short = "cup";
+    costNoun = "cup";
+    profitNoun = "cup";
+  } else if (u === "LADLE") {
+    singular = "ladle";
+    plural = "ladles";
+    short = "ladle";
+    costNoun = "ladle";
+    profitNoun = "ladle";
+  }
+
+  const nounForCount = qty === 1 ? singular : plural;
+  const batchLabel = `${qty} ${nounForCount} per batch`;
+  const costLabel = isDish ? `Food cost per ${costNoun}` : `Cost per ${costNoun}`;
+  const profitLabel = `Gross profit per ${profitNoun}`;
+
+  return {
+    singular,
+    plural,
+    short,
+    nounForCount,
+    batchLabel,
+    costLabel,
+    profitLabel,
+  };
 }
 
 export default function RecipeDetailPage({
@@ -88,25 +219,22 @@ export default function RecipeDetailPage({
   const { isDark } = useTheme();
 
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
-  const [breakdownItems, setBreakdownItems] = useState<ComponentCost[]>([]);
-  const [unitMatrix, setUnitMatrix] = useState<UnitEquivalentPricing[]>([]);
+  const [breakdown, setBreakdown] = useState<RecipeCostBreakdownData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [showOverflowMenu, setShowOverflowMenu] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   const fetchRecipeDetail = async () => {
     try {
       const res = await fetch(`/api/restaurant/inventory/recipes/${recipeId}`);
       const data = await res.json();
       if (res.ok && data.recipe) {
-        setRecipe({
-          ...data.recipe,
-          foodCostPercent: data.breakdown?.foodCostPercent || 0,
-        });
-        setBreakdownItems(data.breakdown?.items || []);
-        setUnitMatrix(data.breakdown?.unitPricingMatrix || []);
+        setRecipe(data.recipe);
+        setBreakdown(data.breakdown || null);
       } else {
         setError(data.error || "Recipe not found");
       }
@@ -120,6 +248,10 @@ export default function RecipeDetailPage({
   useEffect(() => {
     if (recipeId) fetchRecipeDetail();
   }, [recipeId]);
+
+  const toggleRowExpanded = (id: string) => {
+    setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const handleArchive = async () => {
     setArchiving(true);
@@ -144,6 +276,7 @@ export default function RecipeDetailPage({
 
   const handlePublish = async () => {
     setPublishing(true);
+    setShowOverflowMenu(false);
     setError("");
     try {
       const res = await fetch(`/api/restaurant/inventory/recipes/${recipeId}`, {
@@ -161,65 +294,132 @@ export default function RecipeDetailPage({
     }
   };
 
-  // Robust financial and culinary calculations with fallbacks
+  // -------------------------------------------------------------------------
+  // Unified Costing Derivations (Source of Truth)
+  // -------------------------------------------------------------------------
   const isDish = recipe?.type === "DISH";
   const isSubRecipe = recipe?.type === "SUB_RECIPE";
+  const yieldQty = Number(recipe?.yieldQuantity || 1);
+  const yieldUnitRaw = recipe?.yieldUnit || "PORTION";
 
-  const effectiveCostPerUnit = useMemo(() => {
-    if (!recipe) return 0;
-    if (recipe.costPerUnit && Number(recipe.costPerUnit) > 0) {
-      return Number(recipe.costPerUnit);
+  const unitInfo = useMemo(() => {
+    return getUnitDisplayInfo(yieldUnitRaw, recipe?.type || "DISH", yieldQty);
+  }, [yieldUnitRaw, recipe?.type, yieldQty]);
+
+  const ingredientsList = useMemo(() => {
+    return breakdown?.items || [];
+  }, [breakdown]);
+
+  // Determine Verified Cost & Source
+  const costState = useMemo(() => {
+    if (!recipe) {
+      return {
+        unitCost: null as number | null,
+        batchCost: null as number | null,
+        source: "UNAVAILABLE" as const,
+        isVerifiedZero: false,
+      };
     }
-    if (recipe.totalCost && Number(recipe.totalCost) > 0 && recipe.yieldQuantity) {
-      return Number(recipe.totalCost) / Math.max(1, Number(recipe.yieldQuantity));
+
+    // 1. Live Formula Calculation
+    if (breakdown && breakdown.items && breakdown.items.length > 0) {
+      return {
+        unitCost: Number(breakdown.costPerUnit || 0),
+        batchCost: Number(breakdown.totalCost || 0),
+        source: "FORMULA_CALCULATED" as const,
+        isVerifiedZero: breakdown.costPerUnit === 0 && !breakdown.hasMissingCosts,
+      };
     }
-    return 0;
-  }, [recipe]);
 
-  const effectiveTotalCost = useMemo(() => {
-    if (!recipe) return 0;
-    if (recipe.totalCost && Number(recipe.totalCost) > 0) {
-      return Number(recipe.totalCost);
+    // 2. Stored Baseline Snapshot (e.g. from template/Excel import without items yet)
+    const storedUnit = recipe.costPerUnit !== null ? Number(recipe.costPerUnit) : null;
+    const storedTotal = recipe.totalCost !== null ? Number(recipe.totalCost) : null;
+
+    if ((storedUnit !== null && storedUnit > 0) || (storedTotal !== null && storedTotal > 0)) {
+      const resolvedUnit = storedUnit !== null && storedUnit > 0
+        ? storedUnit
+        : (storedTotal !== null && yieldQty > 0 ? storedTotal / yieldQty : 0);
+      const resolvedBatch = storedTotal !== null && storedTotal > 0
+        ? storedTotal
+        : (storedUnit !== null ? storedUnit * yieldQty : 0);
+
+      return {
+        unitCost: resolvedUnit,
+        batchCost: resolvedBatch,
+        source: "STORED_SNAPSHOT" as const,
+        isVerifiedZero: false,
+      };
     }
-    return effectiveCostPerUnit * Math.max(1, Number(recipe.yieldQuantity || 1));
-  }, [recipe, effectiveCostPerUnit]);
 
-  const effectiveSellingPrice = Number(recipe?.sellingPrice || 0);
+    // 3. Unavailable / Not Configured
+    return {
+      unitCost: null,
+      batchCost: null,
+      source: "UNAVAILABLE" as const,
+      isVerifiedZero: false,
+    };
+  }, [recipe, breakdown, yieldQty]);
 
-  const effectiveFoodCostPercent = useMemo(() => {
-    if (effectiveSellingPrice <= 0 || effectiveCostPerUnit <= 0) return 0;
-    return (effectiveCostPerUnit / effectiveSellingPrice) * 100;
-  }, [effectiveSellingPrice, effectiveCostPerUnit]);
+  // Derived Financials for Dishes (Same Basis: Selling Unit)
+  const financialMetrics = useMemo(() => {
+    const rawSellingPrice = recipe?.sellingPrice;
+    const sellingPrice = rawSellingPrice !== null && rawSellingPrice !== undefined && Number(rawSellingPrice) > 0
+      ? Number(rawSellingPrice)
+      : null;
 
-  const effectiveGrossMarginPercent = useMemo(() => {
-    if (effectiveSellingPrice <= 0) return 0;
-    return Math.max(
-      0,
-      ((effectiveSellingPrice - effectiveCostPerUnit) / effectiveSellingPrice) * 100
-    );
-  }, [effectiveSellingPrice, effectiveCostPerUnit]);
+    const unitCost = costState.unitCost;
 
-  const effectiveProfitPerServing = useMemo(() => {
-    return Math.max(0, effectiveSellingPrice - effectiveCostPerUnit);
-  }, [effectiveSellingPrice, effectiveCostPerUnit]);
-
-  const targetFoodCost = Number(recipe?.targetFoodCostPercent || 28);
-  const suggestedSellingPrice = useMemo(() => {
-    if (targetFoodCost <= 0 || effectiveCostPerUnit <= 0) return 0;
-    return effectiveCostPerUnit / (targetFoodCost / 100);
-  }, [targetFoodCost, effectiveCostPerUnit]);
-
-  // Unit matrix normalization (prevents $0.00 cards when unit cost is known)
-  const computedUnitMatrix = useMemo(() => {
-    if (!recipe) return [];
-    if (unitMatrix && unitMatrix.length > 0 && unitMatrix.some((u) => u.unitCost > 0)) {
-      return unitMatrix;
+    if (sellingPrice === null || unitCost === null || unitCost <= 0) {
+      return {
+        sellingPrice,
+        foodCostPercent: null as number | null,
+        grossMarginPercent: null as number | null,
+        grossProfit: null as number | null,
+        isProfitable: false,
+      };
     }
-    if (effectiveCostPerUnit > 0) {
-      return getUnitPricingMatrix(effectiveCostPerUnit, (recipe.yieldUnit as any) || "PORTION");
+
+    const foodCostPercent = (unitCost / sellingPrice) * 100;
+    const grossMarginPercent = ((sellingPrice - unitCost) / sellingPrice) * 100;
+    const grossProfit = sellingPrice - unitCost;
+
+    return {
+      sellingPrice,
+      foodCostPercent,
+      grossMarginPercent,
+      grossProfit,
+      isProfitable: grossProfit > 0,
+    };
+  }, [recipe?.sellingPrice, costState.unitCost]);
+
+  // Filtered Cost by Unit (Only Dimensional Equivalents)
+  const costByUnitList = useMemo(() => {
+    if (!recipe || costState.unitCost === null || costState.unitCost <= 0) {
+      return [];
     }
-    return unitMatrix;
-  }, [unitMatrix, effectiveCostPerUnit, recipe]);
+
+    const baseUnit = (recipe.yieldUnit as UnitOfMeasure) || "PORTION";
+    const baseCategory = UNIT_DEFINITIONS[baseUnit]?.category;
+    const fullMatrix = getUnitPricingMatrix(costState.unitCost, baseUnit);
+
+    return fullMatrix.filter((item) => {
+      const itemCategory = UNIT_DEFINITIONS[item.unit]?.category;
+      if (itemCategory !== baseCategory) return false;
+
+      // Only show serving/portion if base unit is count or portion
+      if (item.unit === "PORTION" && baseCategory !== "COUNT") {
+        return false;
+      }
+      return true;
+    });
+  }, [recipe, costState.unitCost]);
+
+  // Stated plain language formula count
+  const ingredientsSummaryText = useMemo(() => {
+    const count = ingredientsList.length;
+    const ingWord = count === 1 ? "ingredient" : "ingredients";
+    return `${unitInfo.batchLabel} · ${count} ${ingWord}`;
+  }, [unitInfo.batchLabel, ingredientsList.length]);
 
   if (loading) {
     return (
@@ -228,10 +428,8 @@ export default function RecipeDetailPage({
           isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
         }`}
       >
-        <div className="w-9 h-9 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-          Loading Recipe Formulation Dossier...
-        </p>
+        <div className="w-8 h-8 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-xs text-slate-500 font-medium">Loading recipe details...</p>
       </div>
     );
   }
@@ -243,15 +441,15 @@ export default function RecipeDetailPage({
           isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
         }`}
       >
-        <RestaurantNavbar activeSection="Recipe Details" />
+        <RestaurantNavbar activeSection="Recipes" />
         <main className="max-w-4xl mx-auto p-6 space-y-4">
-          <button
-            onClick={() => router.push(`/restaurant/${subdomain}/inventory/recipes`)}
-            className="text-xs text-[#0071E3] hover:underline cursor-pointer flex items-center gap-1 font-semibold"
+          <Link
+            href={`/restaurant/${subdomain}/inventory/recipes`}
+            className="text-xs text-[#0071E3] hover:underline font-semibold"
           >
-            <ArrowLeft className="w-3.5 h-3.5" /> Back to Recipe Builder
-          </button>
-          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-2xl">
+            ← Back to recipes
+          </Link>
+          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs rounded-2xl">
             {error || "Recipe not found"}
           </div>
         </main>
@@ -265,188 +463,162 @@ export default function RecipeDetailPage({
         isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
       }`}
     >
-      <RestaurantNavbar activeSection="Recipe Details" />
+      <RestaurantNavbar activeSection="Recipes" />
 
-      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Breadcrumb Navigation Trail */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <nav className="flex items-center gap-2 text-xs">
-            <button
-              onClick={() => router.push(`/restaurant/${subdomain}/inventory/recipes`)}
-              className="text-[#0071E3] hover:underline font-semibold cursor-pointer flex items-center gap-1"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Recipe Studio</span>
-            </button>
-            <span className="text-slate-400 dark:text-slate-600">/</span>
-            <span className="text-slate-600 dark:text-slate-300 font-medium truncate max-w-[200px] sm:max-w-xs">
-              {recipe.name}
-            </span>
-          </nav>
-
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-slate-400 dark:text-slate-500">
-              Created {new Date(recipe.createdAt).toLocaleDateString()}
-            </span>
-          </div>
-        </div>
-
-        {/* Executive Header Banner */}
-        <div
-          className={`p-6 sm:p-7 rounded-3xl border transition shadow-sm ${
+      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-5">
+        {/* Compact Breadcrumb & Header Bar */}
+        <header
+          className={`p-5 sm:p-6 rounded-2xl border transition ${
             isDark
-              ? "bg-[#121622]/80 border-white/[0.08]"
-              : "bg-white border-slate-200/90 shadow-slate-900/5"
+              ? "bg-[#121622] border-white/[0.08]"
+              : "bg-white border-slate-200 shadow-2xs"
           }`}
         >
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-            <div className="space-y-2.5 min-w-0">
-              {/* Type and Status Badges */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {isSubRecipe ? (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
-                    <ChefHat className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
-                    <span>Kitchen Prep Sub-Recipe</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                    <Utensils className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    <span>Menu Dish Formulation</span>
-                  </span>
-                )}
-
-                {recipe.isDraft ? (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                    <Clock className="w-3 h-3 shrink-0" />
-                    <span>Draft (Not Live in POS)</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-500/10 text-[#0071E3] dark:text-[#70B4FF] border border-blue-500/20">
-                    <CheckCircle2 className="w-3 h-3 shrink-0" />
-                    <span>Published & Live BOM</span>
-                  </span>
-                )}
-
-                {recipe.sourceType === "PASTED" && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20">
-                    <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />
-                    <span>Pasted Extraction</span>
-                  </span>
-                )}
-                {recipe.sourceType === "EXCEL" && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20">
-                    <FileSpreadsheet className="w-3 h-3 text-emerald-500 shrink-0" />
-                    <span>Excel Import</span>
-                  </span>
-                )}
-              </div>
-
-              {/* Recipe Title & Subtitle */}
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div className="space-y-1.5 min-w-0 flex-1">
+              {/* Breadcrumb + Classification Pills */}
+              <div className="flex items-center gap-2 flex-wrap text-xs">
+                <Link
+                  href={`/restaurant/${subdomain}/inventory/recipes`}
+                  className="text-slate-500 dark:text-slate-400 hover:text-[#0071E3] font-medium transition"
+                >
+                  Recipes
+                </Link>
+                <span className="text-slate-300 dark:text-slate-600">/</span>
+                <span className="text-slate-600 dark:text-slate-300 truncate max-w-[180px] sm:max-w-xs">
                   {recipe.name}
-                </h1>
-                {recipe.description && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
-                    {recipe.description}
-                  </p>
-                )}
+                </span>
+
+                <span
+                  className={`ml-1 text-[11px] font-semibold px-2 py-0.5 rounded-md border ${
+                    isDish
+                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
+                      : "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20"
+                  }`}
+                >
+                  {isDish ? "Menu dish" : "Prep recipe"}
+                </span>
+
+                <span
+                  className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border ${
+                    recipe.isDraft
+                      ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+                      : "bg-blue-500/10 text-[#0071E3] dark:text-[#70B4FF] border-blue-500/20"
+                  }`}
+                >
+                  {recipe.isDraft ? "Draft" : "Published"}
+                </span>
               </div>
 
-              {/* Quick Info Chips */}
-              <div className="flex items-center gap-2 flex-wrap pt-1 text-xs text-slate-600 dark:text-slate-300">
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 dark:bg-white/[0.05] font-medium">
-                  <Layers className="w-3.5 h-3.5 text-[#0071E3]" />
-                  <span>
-                    Batch Yield:{" "}
-                    <strong className="text-slate-900 dark:text-white">
-                      {recipe.yieldQuantity} {formatUnit(recipe.yieldUnit as any)}
-                    </strong>
-                  </span>
-                </div>
+              {/* Recipe Title */}
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white break-words">
+                {recipe.name}
+              </h1>
 
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 dark:bg-white/[0.05] font-medium">
-                  <FlaskConical className="w-3.5 h-3.5 text-purple-500" />
-                  <span>
-                    Formula:{" "}
-                    <strong className="text-slate-900 dark:text-white">
-                      {breakdownItems.length} components
-                    </strong>
-                  </span>
-                </div>
+              {/* Plain Language Stated Yield & Ingredient Count */}
+              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
+                <span className="font-medium text-slate-700 dark:text-slate-300">
+                  {ingredientsSummaryText}
+                </span>
 
                 {recipe.servingSize && (
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 dark:bg-white/[0.05] font-medium">
-                    <Scale className="w-3.5 h-3.5 text-amber-500" />
-                    <span>
-                      Serving Size:{" "}
-                      <strong className="text-slate-900 dark:text-white">
-                        {recipe.servingSize}
-                      </strong>
-                    </span>
-                  </div>
+                  <>
+                    <span>·</span>
+                    <span>Serving: {recipe.servingSize}</span>
+                  </>
                 )}
 
                 {recipe.prepTimeMin && (
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 dark:bg-white/[0.05] font-medium">
-                    <Clock className="w-3.5 h-3.5 text-blue-500" />
-                    <span>
-                      Active Prep:{" "}
-                      <strong className="text-slate-900 dark:text-white">
-                        {recipe.prepTimeMin} mins
-                      </strong>
+                  <>
+                    <span>·</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      {recipe.prepTimeMin} min prep
                     </span>
-                  </div>
+                  </>
                 )}
               </div>
             </div>
 
-            {/* Action Buttons */}
+            {/* Header Actions */}
             <div className="flex items-center gap-2.5 w-full lg:w-auto shrink-0 flex-wrap sm:flex-nowrap">
+              {/* Primary Action: Edit Recipe */}
               <button
                 type="button"
                 onClick={() =>
                   router.push(`/restaurant/${subdomain}/inventory/recipes?edit=${recipe.id}`)
                 }
-                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-[#0071E3] hover:bg-[#0077ED] text-white shadow-sm transition active:scale-[0.98] cursor-pointer"
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-[#0071E3] hover:bg-[#0077ED] text-white shadow-2xs transition active:scale-[0.98] cursor-pointer"
               >
                 <Edit3 className="w-3.5 h-3.5" />
-                <span>Edit Formula</span>
+                <span>Edit recipe</span>
               </button>
 
-              {recipe.isDraft ? (
-                <button
-                  type="button"
-                  disabled={publishing}
-                  onClick={handlePublish}
-                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>{publishing ? "Publishing..." : "Publish to POS"}</span>
-                </button>
-              ) : isDish ? (
+              {/* Secondary Action: Order in POS (Published Dishes Only) */}
+              {isDish && !recipe.isDraft && (
                 <button
                   type="button"
                   onClick={() => router.push(`/restaurant/${subdomain}/pos`)}
-                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-white/[0.08] dark:hover:bg-white/[0.12] text-slate-800 dark:text-slate-200 transition active:scale-[0.98] cursor-pointer"
+                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-300 dark:border-white/[0.12] bg-white dark:bg-[#121622] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.04] transition active:scale-[0.98] cursor-pointer"
                 >
-                  <ShoppingBag className="w-3.5 h-3.5 text-blue-500" />
+                  <ShoppingBag className="w-3.5 h-3.5 text-[#0071E3]" />
                   <span>Order in POS</span>
                 </button>
-              ) : null}
+              )}
 
-              <button
-                type="button"
-                onClick={() => setShowArchiveModal(true)}
-                className="px-3.5 py-2.5 rounded-xl text-xs font-medium border border-rose-200 dark:border-rose-500/20 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition cursor-pointer flex items-center justify-center gap-1.5"
-                title="Archive Recipe"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span className="sm:hidden">Archive</span>
-              </button>
+              {/* Overflow Menu Button */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowOverflowMenu(!showOverflowMenu)}
+                  className="p-2 rounded-xl border border-slate-200 dark:border-white/[0.08] hover:bg-slate-50 dark:hover:bg-white/[0.04] text-slate-500 transition cursor-pointer"
+                  title="More actions"
+                  aria-label="More actions"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </button>
+
+                {showOverflowMenu && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-20"
+                      onClick={() => setShowOverflowMenu(false)}
+                    />
+                    <div
+                      className={`absolute right-0 top-full mt-1.5 w-48 rounded-2xl border shadow-xl p-1 z-30 ${
+                        isDark ? "bg-[#181D2D] border-white/[0.1]" : "bg-white border-slate-200"
+                      }`}
+                    >
+                      {recipe.isDraft && (
+                        <button
+                          type="button"
+                          disabled={publishing}
+                          onClick={handlePublish}
+                          className="w-full text-left px-3 py-2 text-xs rounded-xl hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-2 cursor-pointer transition"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>{publishing ? "Publishing..." : "Publish recipe"}</span>
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowOverflowMenu(false);
+                          setShowArchiveModal(true);
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs rounded-xl hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-medium flex items-center gap-2 cursor-pointer transition"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Archive recipe</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </header>
 
         {error && (
           <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs rounded-2xl flex items-center gap-2">
@@ -455,674 +627,625 @@ export default function RecipeDetailPage({
           </div>
         )}
 
-        {/* Dynamic Financial & Operational KPI Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {isDish ? (
-            <>
-              {/* Dish KPI 1: Batch Formulation Cost */}
-              <div
-                className={`p-5 rounded-3xl border transition ${
-                  isDark
-                    ? "bg-[#121622]/80 border-white/[0.08]"
-                    : "bg-white border-slate-200/90 shadow-2xs"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Batch Formulation Cost
-                  </span>
-                  <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-[#0071E3] flex items-center justify-center">
-                    <DollarSign className="w-4 h-4" />
-                  </div>
-                </div>
-                <p className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-slate-900 dark:text-white mt-2">
-                  ${effectiveTotalCost.toFixed(2)}
-                </p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Full batch cost for {recipe.yieldQuantity} {formatUnit(recipe.yieldUnit as any)}
-                </p>
-              </div>
-
-              {/* Dish KPI 2: Portion Food Cost */}
-              <div
-                className={`p-5 rounded-3xl border transition ${
-                  isDark
-                    ? "bg-[#121622]/80 border-white/[0.08]"
-                    : "bg-white border-slate-200/90 shadow-2xs"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Portion Food Cost
-                  </span>
-                  <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-                    <Utensils className="w-4 h-4" />
-                  </div>
-                </div>
-                <p className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-[#0071E3] mt-2">
-                  ${effectiveCostPerUnit.toFixed(2)}
-                </p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Raw ingredient cost per {formatUnit(recipe.yieldUnit as any)} serving
-                </p>
-              </div>
-
-              {/* Dish KPI 3: Menu Retail Price */}
-              <div
-                className={`p-5 rounded-3xl border transition ${
-                  isDark
-                    ? "bg-[#121622]/80 border-white/[0.08]"
-                    : "bg-white border-slate-200/90 shadow-2xs"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Menu Retail Price
-                  </span>
-                  <div className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center">
-                    <Tag className="w-4 h-4" />
-                  </div>
-                </div>
-                <p className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-slate-900 dark:text-white mt-2">
-                  ${effectiveSellingPrice.toFixed(2)}
-                </p>
-                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Food Cost:
-                  </span>
-                  <span
-                    className={`text-[11px] font-bold font-mono px-2 py-0.5 rounded-full ${
-                      effectiveFoodCostPercent <= 28
-                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                        : effectiveFoodCostPercent <= 35
-                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                        : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
-                    }`}
-                  >
-                    {effectiveFoodCostPercent.toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-
-              {/* Dish KPI 4: Gross Margin & Contribution Profit */}
-              <div
-                className={`p-5 rounded-3xl border transition ${
-                  isDark
-                    ? "bg-[#121622]/80 border-white/[0.08]"
-                    : "bg-white border-slate-200/90 shadow-2xs"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Gross Profit Margin
-                  </span>
-                  <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-                    <TrendingUp className="w-4 h-4" />
-                  </div>
-                </div>
-                <p
-                  className={`text-2xl sm:text-3xl font-extrabold font-mono tracking-tight mt-2 ${
-                    effectiveGrossMarginPercent >= 70
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : effectiveGrossMarginPercent >= 60
-                      ? "text-[#0071E3]"
-                      : "text-amber-500"
-                  }`}
-                >
-                  {effectiveGrossMarginPercent.toFixed(1)}%
-                </p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-medium">
-                  Profit:{" "}
-                  <strong className="text-slate-900 dark:text-white font-mono">
-                    +${effectiveProfitPerServing.toFixed(2)}
-                  </strong>{" "}
-                  / plate
-                </p>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Sub-Recipe KPI 1: Batch Prep Cost */}
-              <div
-                className={`p-5 rounded-3xl border transition ${
-                  isDark
-                    ? "bg-[#121622]/80 border-white/[0.08]"
-                    : "bg-white border-slate-200/90 shadow-2xs"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Batch Prep Cost
-                  </span>
-                  <div className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center">
-                    <ChefHat className="w-4 h-4" />
-                  </div>
-                </div>
-                <p className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-slate-900 dark:text-white mt-2">
-                  ${effectiveTotalCost.toFixed(2)}
-                </p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Total raw ingredients for full prep batch
-                </p>
-              </div>
-
-              {/* Sub-Recipe KPI 2: Internal Unit Yield Cost */}
-              <div
-                className={`p-5 rounded-3xl border transition ${
-                  isDark
-                    ? "bg-[#121622]/80 border-white/[0.08]"
-                    : "bg-white border-slate-200/90 shadow-2xs"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Cost / Prep Yield Unit
-                  </span>
-                  <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-[#0071E3] flex items-center justify-center">
-                    <Scale className="w-4 h-4" />
-                  </div>
-                </div>
-                <p className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-[#0071E3] mt-2">
-                  ${effectiveCostPerUnit.toFixed(2)}
-                </p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Internal cost per {formatUnit(recipe.yieldUnit as any)} of prepared base
-                </p>
-              </div>
-
-              {/* Sub-Recipe KPI 3: Standard Batch Yield */}
-              <div
-                className={`p-5 rounded-3xl border transition ${
-                  isDark
-                    ? "bg-[#121622]/80 border-white/[0.08]"
-                    : "bg-white border-slate-200/90 shadow-2xs"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Batch Yield Output
-                  </span>
-                  <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-                    <Layers className="w-4 h-4" />
-                  </div>
-                </div>
-                <p className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-slate-900 dark:text-white mt-2">
-                  {recipe.yieldQuantity} {formatUnit(recipe.yieldUnit as any)}
-                </p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  {recipe.servingSize ? `Portion: ${recipe.servingSize}` : "Kitchen batch formulation standard"}
-                </p>
-              </div>
-
-              {/* Sub-Recipe KPI 4: Active Dish Connections */}
-              <div
-                className={`p-5 rounded-3xl border transition ${
-                  isDark
-                    ? "bg-[#121622]/80 border-white/[0.08]"
-                    : "bg-white border-slate-200/90 shadow-2xs"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Active Menu Connections
-                  </span>
-                  <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
-                    <Share2 className="w-4 h-4" />
-                  </div>
-                </div>
-                <p className="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-slate-900 dark:text-white mt-2">
-                  {recipe.usedInRecipeItems?.length || 0} Dishes
-                </p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  {recipe.usedInRecipeItems && recipe.usedInRecipeItems.length > 0
-                    ? "Linked to active menu formulas"
-                    : "Standalone prep component"}
-                </p>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Target Food Cost & Pricing Advisor Banner (For Dishes) */}
-        {isDish && effectiveSellingPrice > 0 && (
-          <div
-            className={`p-5 rounded-3xl border transition flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
-              isDark
-                ? "bg-[#0A0C12] border-white/[0.08]"
-                : "bg-blue-50/60 border-blue-200/80"
-            }`}
-          >
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <PieChart className="w-4 h-4 text-[#0071E3]" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-                  Target Food Cost & Menu Pricing Intelligence
-                </h3>
-              </div>
-              <p className="text-xs text-slate-600 dark:text-slate-300">
-                At your target of <strong>{targetFoodCost}% Food Cost</strong>, suggested menu retail
-                price is{" "}
-                <strong className="text-slate-900 dark:text-white font-mono">
-                  ${suggestedSellingPrice.toFixed(2)}
-                </strong>
-                . Current menu price is{" "}
-                <strong className="font-mono text-slate-900 dark:text-white">
-                  ${effectiveSellingPrice.toFixed(2)}
-                </strong>{" "}
-                yielding{" "}
-                <strong className="font-mono text-emerald-600 dark:text-emerald-400">
-                  +${effectiveProfitPerServing.toFixed(2)}
-                </strong>{" "}
-                net gross margin per portion.
-              </p>
-            </div>
-
-            <div className="shrink-0 flex items-center gap-3">
-              <div className="text-right">
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Target Price
-                </span>
-                <span className="text-base font-extrabold font-mono text-[#0071E3]">
-                  ${suggestedSellingPrice.toFixed(2)}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Parent Dish Usages (For Sub-Recipes) */}
-        {isSubRecipe && (
-          <div
-            className={`p-6 rounded-3xl border transition space-y-3 ${
-              isDark
-                ? "bg-[#121622]/80 border-white/[0.08]"
-                : "bg-white border-slate-200/90 shadow-2xs"
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Share2 className="w-4 h-4 text-purple-500" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-                  Parent Menu Dish Usages
-                </h3>
-              </div>
-              <span className="text-xs text-slate-400">
-                {recipe.usedInRecipeItems?.length || 0} connections
-              </span>
-            </div>
-
-            {recipe.usedInRecipeItems && recipe.usedInRecipeItems.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
-                {recipe.usedInRecipeItems.map((u) => (
-                  <button
-                    key={u.id}
-                    type="button"
-                    onClick={() =>
-                      router.push(
-                        `/restaurant/${subdomain}/inventory/recipes/${u.recipe.id}`
-                      )
-                    }
-                    className={`p-3 rounded-2xl border text-left flex items-center justify-between gap-2 transition hover:scale-[1.01] active:scale-[0.99] cursor-pointer ${
-                      isDark
-                        ? "bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]"
-                        : "bg-slate-50 border-slate-200 hover:bg-blue-50/50 hover:border-blue-200"
-                    }`}
-                  >
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                        {u.recipe.name}
-                      </div>
-                      <div className="text-[11px] text-purple-600 dark:text-purple-400 mt-0.5">
-                        Active Menu Dish
-                      </div>
-                    </div>
-                    <ArrowUpRight className="w-4 h-4 text-slate-400 shrink-0" />
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-slate-500 dark:text-slate-400 pt-1">
-                This sub-recipe is currently standalone and not yet linked to any finished menu dishes.
-                You can add it as a component inside any dish formula in the Recipe Studio.
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Preparation Instructions */}
-        {recipe.instructions && (
-          <div
-            className={`p-6 rounded-3xl border transition space-y-3 ${
-              isDark
-                ? "bg-[#121622]/80 border-white/[0.08]"
-                : "bg-white border-slate-200/90 shadow-2xs"
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Flame className="w-4 h-4 text-amber-500" />
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-                Chef Preparation Method & Kitchen Steps
-              </h2>
-            </div>
-            <div className="space-y-2 pt-1">
-              {recipe.instructions
-                .split("\n")
-                .map((line) => line.trim())
-                .filter(Boolean)
-                .map((step, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-3.5 rounded-2xl border flex items-start gap-3 text-xs leading-relaxed ${
-                      isDark
-                        ? "bg-white/[0.02] border-white/[0.05] text-slate-200"
-                        : "bg-slate-50/80 border-slate-200/70 text-slate-800"
-                    }`}
-                  >
-                    <span className="w-6 h-6 rounded-full bg-[#0071E3]/10 text-[#0071E3] font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
-                      {idx + 1}
-                    </span>
-                    <span className="min-w-0 flex-1">{step}</span>
-                  </div>
-                ))}
-            </div>
-          </div>
-        )}
-
-        {/* Kitchen Scoop & Culinary Yield Conversion Matrix */}
-        <div
-          className={`p-6 rounded-3xl border transition space-y-4 ${
-            isDark
-              ? "bg-[#121622]/80 border-white/[0.08]"
-              : "bg-white border-slate-200/90 shadow-2xs"
-          }`}
-        >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-            <div>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Scale className="w-4 h-4 text-[#0071E3]" />
-                <span>
-                  {isSubRecipe
-                    ? "Kitchen Scoop & Prep Yield Conversions"
-                    : "Portion & Catering Pricing Equivalents"}
-                </span>
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Normalized food costing across kitchen scoops, ladles, weight, and volume measures.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
-            {computedUnitMatrix.map((item) => (
-              <div
-                key={item.unit}
-                className={`p-3.5 rounded-2xl border transition flex flex-col justify-between space-y-1.5 ${
-                  item.isPrimary
-                    ? isDark
-                      ? "bg-[#0071E3]/15 border-[#0071E3]/50 shadow-xs"
-                      : "bg-blue-50/90 border-[#0071E3] shadow-xs"
-                    : isDark
-                    ? "bg-[#0A0C12] border-white/[0.06] hover:bg-white/[0.03]"
-                    : "bg-slate-50/80 border-slate-200 hover:bg-slate-100/80"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-1">
-                  <span
-                    className={`text-[10px] font-bold uppercase tracking-wider truncate ${
-                      item.isPrimary
-                        ? "text-[#0071E3] dark:text-[#70B4FF]"
-                        : "text-slate-500 dark:text-slate-400"
-                    }`}
-                  >
-                    Per {item.label}
-                  </span>
-                  {item.isPrimary && (
-                    <span className="w-2 h-2 rounded-full bg-[#0071E3] shrink-0" />
-                  )}
-                </div>
-
-                <p
-                  className={`text-base sm:text-lg font-extrabold font-mono tracking-tight ${
-                    item.isPrimary
-                      ? "text-[#0071E3] dark:text-[#70B4FF]"
-                      : isDark
-                      ? "text-white"
-                      : "text-slate-900"
-                  }`}
-                >
-                  {item.formattedPricing}
-                </p>
-
-                {item.description && (
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
-                    {item.description}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Ingredients & Formula Bill of Materials (BOM) Breakdown */}
-        <div
-          className={`p-6 rounded-3xl border transition space-y-4 ${
-            isDark
-              ? "bg-[#121622]/80 border-white/[0.08]"
-              : "bg-white border-slate-200/90 shadow-2xs"
-          }`}
-        >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
-                <FlaskConical className="w-4 h-4 text-purple-500" />
-                <span>Formula Ingredients & Bill of Materials (BOM)</span>
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Components, prep trim shrinkage, and stock depletion quantities.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                router.push(`/restaurant/${subdomain}/inventory/recipes?edit=${recipe.id}`)
-              }
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-white/[0.08] dark:hover:bg-white/[0.12] text-slate-800 dark:text-slate-200 transition cursor-pointer self-start sm:self-auto"
-            >
-              <Plus className="w-3.5 h-3.5 text-[#0071E3]" />
-              <span>Add / Edit Components</span>
-            </button>
-          </div>
-
-          {breakdownItems.length === 0 ? (
-            /* Empty State */
-            <div
-              className={`p-8 sm:p-12 rounded-3xl border border-dashed text-center flex flex-col items-center justify-center space-y-3 ${
+        {/* 2-Column Responsive Layout: Wider Left (Formula) + Narrower Right (Costing) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          {/* LEFT COLUMN: Ingredients, Preparation, Used In */}
+          <div className="lg:col-span-7 xl:col-span-8 space-y-5">
+            {/* Ingredients Section */}
+            <section
+              className={`p-5 sm:p-6 rounded-2xl border transition ${
                 isDark
-                  ? "bg-white/[0.01] border-white/[0.1]"
-                  : "bg-slate-50/50 border-slate-300"
+                  ? "bg-[#121622] border-white/[0.08]"
+                  : "bg-white border-slate-200 shadow-2xs"
               }`}
             >
-              <div className="w-12 h-12 rounded-2xl bg-[#0071E3]/10 text-[#0071E3] flex items-center justify-center">
-                <FlaskConical className="w-6 h-6" />
+              <div className="flex items-center justify-between pb-3 border-b border-black/[0.06] dark:border-white/[0.06] mb-4">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Ingredients
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Formula items, trim shrinkage, and raw stock quantities.
+                  </p>
+                </div>
+
+                {ingredientsList.length > 0 && (
+                  <span className="text-xs text-slate-400 tabular-nums">
+                    {ingredientsList.length} total
+                  </span>
+                )}
               </div>
-              <div className="max-w-md space-y-1">
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                  No Formula Components Configured Yet
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  This formulation has zero raw items or sub-recipes linked. Open the Recipe Studio
-                  to connect inventory items, packaging definitions, and prep loss percentages.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(`/restaurant/${subdomain}/inventory/recipes?edit=${recipe.id}`)
-                }
-                className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-[#0071E3] hover:bg-[#0077ED] text-white transition active:scale-[0.98] cursor-pointer shadow-sm"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Formulate Ingredients Now</span>
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* Desktop Table View */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr
-                      className={`border-b text-[11px] font-bold uppercase tracking-wider ${
-                        isDark
-                          ? "border-white/[0.08] text-slate-400"
-                          : "border-slate-200 text-slate-500"
-                      }`}
-                    >
-                      <th className="pb-3 px-3">Component Item</th>
-                      <th className="pb-3 px-3">Classification</th>
-                      <th className="pb-3 px-3">Usable Quantity</th>
-                      <th className="pb-3 px-3">Trim Loss %</th>
-                      <th className="pb-3 px-3">Gross Depletion</th>
-                      <th className="pb-3 px-3">Effective Cost / Unit</th>
-                      <th className="pb-3 px-3 text-right">Extended Cost</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
-                    {breakdownItems.map((item, idx) => (
-                      <tr
-                        key={idx}
-                        className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition"
-                      >
-                        <td className="py-3.5 px-3">
-                          <div className="font-bold text-slate-900 dark:text-white">
-                            {item.name}
+
+              {ingredientsList.length === 0 ? (
+                /* Empty Ingredients State */
+                <div className="py-8 sm:py-10 text-center space-y-3">
+                  <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/[0.05] text-slate-400 flex items-center justify-center mx-auto">
+                    <FlaskConical className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-xs font-bold text-slate-900 dark:text-white">
+                      No ingredients added yet
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                      This recipe does not have any inventory items or prep recipes linked.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.push(`/restaurant/${subdomain}/inventory/recipes?edit=${recipe.id}`)
+                    }
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-[#0071E3] hover:bg-[#0077ED] text-white shadow-2xs transition active:scale-[0.98] cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add ingredients</span>
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Desktop Table View */}
+                  <div className="hidden sm:block overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-black/[0.06] dark:border-white/[0.06] text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                          <th className="pb-2.5 px-2">Ingredient</th>
+                          <th className="pb-2.5 px-2">Recipe quantity</th>
+                          <th className="pb-2.5 px-2">Prep loss</th>
+                          <th className="pb-2.5 px-2">Stock quantity</th>
+                          <th className="pb-2.5 px-2 text-right">Line cost</th>
+                          <th className="pb-2.5 px-2 w-8" />
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
+                        {ingredientsList.map((item, idx) => {
+                          const isExpanded = !!expandedRows[item.id || String(idx)];
+                          const rowKey = item.id || String(idx);
+                          return (
+                            <React.Fragment key={rowKey}>
+                              <tr
+                                onClick={() => toggleRowExpanded(rowKey)}
+                                className="hover:bg-slate-50 dark:hover:bg-white/[0.02] cursor-pointer transition"
+                              >
+                                <td className="py-3 px-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-slate-900 dark:text-white">
+                                      {item.name}
+                                    </span>
+                                    <span
+                                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
+                                        item.componentType === "SUB_RECIPE"
+                                          ? "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20"
+                                          : "bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/[0.08]"
+                                      }`}
+                                    >
+                                      {item.componentType === "SUB_RECIPE" ? "Prep recipe" : "Item"}
+                                    </span>
+                                  </div>
+                                  {item.packName && (
+                                    <div className="text-[11px] text-purple-600 dark:text-purple-400 font-mono mt-0.5">
+                                      Pack: {item.packQuantity}× {item.packName}
+                                    </div>
+                                  )}
+                                  {item.isUnresolved && (
+                                    <div className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mt-0.5 flex items-center gap-1">
+                                      <AlertCircle className="w-3 h-3" />
+                                      <span>{item.unresolvedReason || "Unresolved item"}</span>
+                                    </div>
+                                  )}
+                                </td>
+
+                                <td className="py-3 px-2 font-mono tabular-nums text-slate-800 dark:text-slate-200">
+                                  {item.quantity} {formatUnit(item.unitOfMeasure as any)}
+                                </td>
+
+                                <td className="py-3 px-2 font-mono tabular-nums">
+                                  {item.wastagePercent > 0 ? (
+                                    <span className="text-amber-600 dark:text-amber-400 font-medium">
+                                      +{item.wastagePercent}%
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400">—</span>
+                                  )}
+                                </td>
+
+                                <td className="py-3 px-2 font-mono tabular-nums text-slate-700 dark:text-slate-300">
+                                  {item.grossQuantity !== undefined
+                                    ? `${item.grossQuantity.toFixed(2)} ${formatUnit(item.unitOfMeasure as any)}`
+                                    : `${item.quantity} ${formatUnit(item.unitOfMeasure as any)}`}
+                                </td>
+
+                                <td className="py-3 px-2 text-right font-mono tabular-nums font-bold text-slate-900 dark:text-white">
+                                  ${item.totalCost.toFixed(2)}
+                                </td>
+
+                                <td className="py-3 px-2 text-right text-slate-400">
+                                  {isExpanded ? (
+                                    <ChevronUp className="w-3.5 h-3.5 ml-auto" />
+                                  ) : (
+                                    <ChevronDown className="w-3.5 h-3.5 ml-auto" />
+                                  )}
+                                </td>
+                              </tr>
+
+                              {/* Expandable Details Row */}
+                              {isExpanded && (
+                                <tr className="bg-slate-50/70 dark:bg-white/[0.02]">
+                                  <td colSpan={6} className="p-3 text-[11px] space-y-1.5 border-b border-black/[0.06] dark:border-white/[0.06]">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-slate-600 dark:text-slate-400">
+                                      <div>
+                                        <span className="block text-[10px] uppercase font-bold text-slate-400">
+                                          Base unit cost
+                                        </span>
+                                        <span className="font-mono tabular-nums text-slate-800 dark:text-slate-200">
+                                          ${item.baseUnitCost.toFixed(2)} / {formatUnit(item.baseUnit as any)}
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <span className="block text-[10px] uppercase font-bold text-slate-400">
+                                          Effective cost / unit
+                                        </span>
+                                        <span className="font-mono tabular-nums text-slate-800 dark:text-slate-200">
+                                          ${item.effectiveUnitCost.toFixed(item.effectiveUnitCost < 0.1 ? 4 : 2)} / {formatUnit(item.unitOfMeasure as any)}
+                                        </span>
+                                      </div>
+                                      {item.sku && (
+                                        <div>
+                                          <span className="block text-[10px] uppercase font-bold text-slate-400">
+                                            Inventory SKU
+                                          </span>
+                                          <span className="font-mono text-slate-800 dark:text-slate-200">
+                                            {item.sku}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {item.wastageCost > 0 && (
+                                        <div>
+                                          <span className="block text-[10px] uppercase font-bold text-slate-400">
+                                            Shrinkage cost
+                                          </span>
+                                          <span className="font-mono tabular-nums text-amber-600 dark:text-amber-400">
+                                            +${item.wastageCost.toFixed(2)}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {(item.originalText || item.statedQuantityRaw) && (
+                                      <div className="pt-1.5 text-slate-500">
+                                        <span className="text-[10px] font-semibold text-slate-400 mr-1.5">
+                                          Source line:
+                                        </span>
+                                        <span className="italic">
+                                          {item.originalText || item.statedQuantityRaw}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile Compact Ingredient Rows (Zero Horizontal Scrolling) */}
+                  <div className="sm:hidden space-y-2">
+                    {ingredientsList.map((item, idx) => {
+                      const isExpanded = !!expandedRows[item.id || String(idx)];
+                      const rowKey = item.id || String(idx);
+                      return (
+                        <div
+                          key={rowKey}
+                          className={`p-3 rounded-xl border transition ${
+                            isDark
+                              ? "bg-white/[0.02] border-white/[0.06]"
+                              : "bg-slate-50/70 border-slate-200"
+                          }`}
+                        >
+                          <div
+                            onClick={() => toggleRowExpanded(rowKey)}
+                            className="flex items-center justify-between gap-2 cursor-pointer"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-semibold text-xs text-slate-900 dark:text-white truncate">
+                                  {item.name}
+                                </span>
+                                <span
+                                  className={`text-[9px] font-semibold px-1 py-0.2 rounded border shrink-0 ${
+                                    item.componentType === "SUB_RECIPE"
+                                      ? "bg-purple-500/10 text-purple-700 border-purple-500/20"
+                                      : "bg-slate-100 text-slate-600 border-slate-200"
+                                  }`}
+                                >
+                                  {item.componentType === "SUB_RECIPE" ? "Prep" : "Item"}
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-slate-500 font-mono tabular-nums mt-0.5">
+                                {item.quantity} {formatUnit(item.unitOfMeasure as any)}
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0 flex items-center gap-2">
+                              <span className="font-bold text-xs font-mono tabular-nums text-slate-900 dark:text-white">
+                                ${item.totalCost.toFixed(2)}
+                              </span>
+                              {isExpanded ? (
+                                <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                              )}
+                            </div>
                           </div>
-                          {item.packName && (
-                            <div className="text-[10px] text-purple-600 dark:text-purple-400 font-mono mt-0.5">
-                              Pack: {item.packQuantity}× {item.packName}
+
+                          {/* Expanded Mobile Details */}
+                          {isExpanded && (
+                            <div className="pt-2.5 mt-2 border-t border-black/[0.06] dark:border-white/[0.06] text-[11px] space-y-1.5">
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">Stock quantity:</span>
+                                <span className="font-mono tabular-nums text-slate-800 dark:text-slate-200">
+                                  {item.grossQuantity !== undefined
+                                    ? `${item.grossQuantity.toFixed(2)} ${formatUnit(item.unitOfMeasure as any)}`
+                                    : `${item.quantity} ${formatUnit(item.unitOfMeasure as any)}`}
+                                </span>
+                              </div>
+
+                              {item.wastagePercent > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">Prep loss:</span>
+                                  <span className="font-mono tabular-nums text-amber-600">
+                                    +{item.wastagePercent}% loss (+${item.wastageCost.toFixed(2)})
+                                  </span>
+                                </div>
+                              )}
+
+                              <div className="flex justify-between">
+                                <span className="text-slate-400">Effective unit cost:</span>
+                                <span className="font-mono tabular-nums text-slate-800 dark:text-slate-200">
+                                  ${item.effectiveUnitCost.toFixed(2)} / {formatUnit(item.unitOfMeasure as any)}
+                                </span>
+                              </div>
+
+                              {item.packName && (
+                                <div className="text-purple-600 font-mono text-[10px]">
+                                  Pack: {item.packQuantity}× {item.packName}
+                                </div>
+                              )}
+
+                              {item.originalText && (
+                                <div className="text-slate-400 text-[10px] italic pt-1">
+                                  "{item.originalText}"
+                                </div>
+                              )}
                             </div>
                           )}
-                        </td>
-                        <td className="py-3.5 px-3">
-                          <span
-                            className={`inline-block text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
-                              item.componentType === "SUB_RECIPE"
-                                ? isDark
-                                  ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
-                                  : "bg-purple-100 text-purple-700 border-purple-200"
-                                : isDark
-                                ? "bg-white/[0.04] text-slate-300 border-white/[0.08]"
-                                : "bg-slate-100 text-slate-700 border-slate-200"
-                            }`}
-                          >
-                            {item.componentType === "SUB_RECIPE"
-                              ? "Sub-Recipe"
-                              : "Raw Item"}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-3 font-mono font-semibold text-slate-900 dark:text-white">
-                          {item.quantity} {formatUnit(item.unitOfMeasure as any)}
-                        </td>
-                        <td className="py-3.5 px-3 font-mono">
-                          {item.wastagePercent > 0 ? (
-                            <span className="text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/10 px-2 py-0.5 rounded-full">
-                              +{item.wastagePercent}% loss
-                            </span>
-                          ) : (
-                            <span className="text-slate-400">—</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-3 font-mono text-slate-700 dark:text-slate-300">
-                          {item.grossQuantity !== undefined
-                            ? `${item.grossQuantity.toFixed(2)} ${formatUnit(
-                                item.unitOfMeasure as any
-                              )}`
-                            : `${item.quantity} ${formatUnit(
-                                item.unitOfMeasure as any
-                              )}`}
-                        </td>
-                        <td className="py-3.5 px-3 font-mono text-slate-600 dark:text-slate-300">
-                          ${item.effectiveUnitCost.toFixed(
-                            item.effectiveUnitCost < 0.1 ? 4 : 2
-                          )}{" "}
-                          / {formatUnit(item.unitOfMeasure as any)}
-                        </td>
-                        <td className="py-3.5 px-3 text-right font-mono font-extrabold text-slate-900 dark:text-white">
-                          ${item.totalCost.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile Card View */}
-              <div className="md:hidden space-y-2.5">
-                {breakdownItems.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-4 rounded-2xl border space-y-2.5 ${
-                      isDark
-                        ? "bg-[#0A0C12] border-white/[0.06]"
-                        : "bg-slate-50/80 border-slate-200"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="font-bold text-xs text-slate-900 dark:text-white truncate">
-                          {item.name}
                         </div>
-                        {item.packName && (
-                          <div className="text-[10px] text-purple-600 dark:text-purple-400 font-mono mt-0.5">
-                            Pack: {item.packQuantity}× {item.packName}
-                          </div>
-                        )}
-                      </div>
-                      <span
-                        className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full shrink-0 border ${
-                          item.componentType === "SUB_RECIPE"
-                            ? "bg-purple-500/10 text-purple-600 border-purple-500/20"
-                            : "bg-slate-200/80 text-slate-700 border-slate-300"
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </section>
+
+            {/* Preparation Instructions Section */}
+            {recipe.instructions && (
+              <section
+                className={`p-5 sm:p-6 rounded-2xl border transition ${
+                  isDark
+                    ? "bg-[#121622] border-white/[0.08]"
+                    : "bg-white border-slate-200 shadow-2xs"
+                }`}
+              >
+                <div className="flex items-center gap-2 pb-3 border-b border-black/[0.06] dark:border-white/[0.06] mb-3">
+                  <Flame className="w-4 h-4 text-amber-500" />
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Preparation
+                  </h2>
+                </div>
+                <div className="space-y-2">
+                  {recipe.instructions
+                    .split("\n")
+                    .map((l) => l.trim())
+                    .filter(Boolean)
+                    .map((step, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-xl border flex items-start gap-2.5 text-xs leading-relaxed ${
+                          isDark
+                            ? "bg-white/[0.02] border-white/[0.05] text-slate-200"
+                            : "bg-slate-50/70 border-slate-200 text-slate-800"
                         }`}
                       >
-                        {item.componentType === "SUB_RECIPE" ? "Sub-Recipe" : "Raw"}
+                        <span className="w-5 h-5 rounded-full bg-[#0071E3]/10 text-[#0071E3] font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <span className="min-w-0 flex-1">{step}</span>
+                      </div>
+                    ))}
+                </div>
+              </section>
+            )}
+
+            {/* Used In Section (Placed below relevant content for Prep Recipes) */}
+            {isSubRecipe && (
+              <section
+                className={`p-5 sm:p-6 rounded-2xl border transition ${
+                  isDark
+                    ? "bg-[#121622] border-white/[0.08]"
+                    : "bg-white border-slate-200 shadow-2xs"
+                }`}
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-black/[0.06] dark:border-white/[0.06] mb-3">
+                  <div className="flex items-center gap-2">
+                    <Share2 className="w-4 h-4 text-purple-500" />
+                    <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                      Used in
+                    </h2>
+                  </div>
+                  <span className="text-xs text-slate-400">
+                    {recipe.usedInRecipeItems?.length || 0} parent recipes
+                  </span>
+                </div>
+
+                {recipe.usedInRecipeItems && recipe.usedInRecipeItems.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {recipe.usedInRecipeItems.map((u) => (
+                      <Link
+                        key={u.id}
+                        href={`/restaurant/${subdomain}/inventory/recipes/${u.recipe.id}`}
+                        className={`p-3 rounded-xl border text-left flex items-center justify-between gap-2 transition hover:border-[#0071E3] ${
+                          isDark
+                            ? "bg-white/[0.02] border-white/[0.06]"
+                            : "bg-slate-50 border-slate-200"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <span className="text-xs font-semibold text-slate-900 dark:text-white truncate block">
+                            {u.recipe.name}
+                          </span>
+                          <span className="text-[10px] text-purple-600 dark:text-purple-400">
+                            {u.recipe.type === "DISH" ? "Menu dish" : "Sub-recipe"}
+                          </span>
+                        </div>
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    This prep recipe is not currently used in any parent recipes. Link it inside a dish formula in the recipe workspace.
+                  </p>
+                )}
+              </section>
+            )}
+          </div>
+
+          {/* RIGHT COLUMN: Costing, Pricing Summary & Cost by Unit */}
+          <div className="lg:col-span-5 xl:col-span-4 space-y-5">
+            {/* Cost and Pricing Summary Card */}
+            <section
+              className={`p-5 sm:p-6 rounded-2xl border transition ${
+                isDark
+                  ? "bg-[#121622] border-white/[0.08]"
+                  : "bg-white border-slate-200 shadow-2xs"
+              }`}
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-black/[0.06] dark:border-white/[0.06] mb-4">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Cost and pricing summary
+                </h2>
+                {costState.source === "STORED_SNAPSHOT" && (
+                  <span
+                    className="text-[10px] font-medium text-amber-600 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full"
+                    title="Cost figures reflect stored baseline data. Add ingredients to calculate live formula cost."
+                  >
+                    Stored baseline
+                  </span>
+                )}
+                {costState.source === "FORMULA_CALCULATED" && (
+                  <span className="text-[10px] font-medium text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                    Formula-verified
+                  </span>
+                )}
+              </div>
+
+              {/* Informational callout if stored baseline */}
+              {costState.source === "STORED_SNAPSHOT" && (
+                <div className="mb-4 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-400 flex items-start gap-1.5">
+                  <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    Costs reflect stored baseline values. Add ingredients to calculate live formula costs.
+                  </span>
+                </div>
+              )}
+
+              {/* DYNAMIC METRICS FOR MENU DISH */}
+              {isDish ? (
+                <div className="space-y-4">
+                  {/* Batch Food Cost */}
+                  <div className="flex items-baseline justify-between pb-3 border-b border-black/[0.04] dark:border-white/[0.04]">
+                    <span className="text-xs text-slate-600 dark:text-slate-400">
+                      Batch food cost
+                    </span>
+                    <span className="text-base font-bold font-mono tabular-nums text-slate-900 dark:text-white">
+                      {costState.batchCost !== null ? `$${costState.batchCost.toFixed(2)}` : "—"}
+                    </span>
+                  </div>
+
+                  {/* Food Cost per Selling Unit */}
+                  <div className="flex items-baseline justify-between pb-3 border-b border-black/[0.04] dark:border-white/[0.04]">
+                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                      {unitInfo.costLabel}
+                    </span>
+                    <span className="text-lg font-extrabold font-mono tabular-nums text-[#0071E3]">
+                      {costState.unitCost !== null ? `$${costState.unitCost.toFixed(2)}` : "Unavailable"}
+                    </span>
+                  </div>
+
+                  {/* Selling Price */}
+                  <div className="flex items-baseline justify-between pb-3 border-b border-black/[0.04] dark:border-white/[0.04]">
+                    <span className="text-xs text-slate-600 dark:text-slate-400">
+                      Selling price
+                    </span>
+                    <span className="text-base font-bold font-mono tabular-nums text-slate-900 dark:text-white">
+                      {financialMetrics.sellingPrice !== null
+                        ? `$${financialMetrics.sellingPrice.toFixed(2)}`
+                        : "Not set"}
+                    </span>
+                  </div>
+
+                  {/* Food Cost % */}
+                  <div className="flex items-baseline justify-between pb-3 border-b border-black/[0.04] dark:border-white/[0.04]">
+                    <span className="text-xs text-slate-600 dark:text-slate-400">
+                      Food cost %
+                    </span>
+                    <span
+                      className={`text-sm font-bold font-mono tabular-nums ${
+                        financialMetrics.foodCostPercent === null
+                          ? "text-slate-400"
+                          : financialMetrics.foodCostPercent <= 28.6
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : financialMetrics.foodCostPercent <= 35
+                          ? "text-amber-600"
+                          : "text-rose-600"
+                      }`}
+                    >
+                      {financialMetrics.foodCostPercent !== null
+                        ? `${financialMetrics.foodCostPercent.toFixed(1)}%`
+                        : "—"}
+                    </span>
+                  </div>
+
+                  {/* Gross Margin % */}
+                  <div className="flex items-baseline justify-between pb-3 border-b border-black/[0.04] dark:border-white/[0.04]">
+                    <span className="text-xs text-slate-600 dark:text-slate-400">
+                      Gross margin %
+                    </span>
+                    <span
+                      className={`text-sm font-bold font-mono tabular-nums ${
+                        financialMetrics.grossMarginPercent === null
+                          ? "text-slate-400"
+                          : financialMetrics.grossMarginPercent >= 70
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-slate-900 dark:text-white"
+                      }`}
+                    >
+                      {financialMetrics.grossMarginPercent !== null
+                        ? `${financialMetrics.grossMarginPercent.toFixed(1)}%`
+                        : "—"}
+                    </span>
+                  </div>
+
+                  {/* Gross Profit per Selling Unit */}
+                  <div className="flex items-baseline justify-between pt-1">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      {unitInfo.profitLabel}
+                    </span>
+                    <span
+                      className={`text-base font-bold font-mono tabular-nums ${
+                        financialMetrics.grossProfit === null
+                          ? "text-slate-400"
+                          : financialMetrics.isProfitable
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-rose-600"
+                      }`}
+                    >
+                      {financialMetrics.grossProfit !== null
+                        ? `$${financialMetrics.grossProfit.toFixed(2)}`
+                        : "—"}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                /* DYNAMIC METRICS FOR PREP SUB-RECIPE (Omit retail pricing, margin, POS) */
+                <div className="space-y-4">
+                  {/* Batch Cost */}
+                  <div className="flex items-baseline justify-between pb-3 border-b border-black/[0.04] dark:border-white/[0.04]">
+                    <span className="text-xs text-slate-600 dark:text-slate-400">
+                      Batch cost
+                    </span>
+                    <span className="text-base font-bold font-mono tabular-nums text-slate-900 dark:text-white">
+                      {costState.batchCost !== null ? `$${costState.batchCost.toFixed(2)}` : "—"}
+                    </span>
+                  </div>
+
+                  {/* Batch Yield */}
+                  <div className="flex items-baseline justify-between pb-3 border-b border-black/[0.04] dark:border-white/[0.04]">
+                    <span className="text-xs text-slate-600 dark:text-slate-400">
+                      Yield
+                    </span>
+                    <span className="text-sm font-semibold font-mono tabular-nums text-slate-800 dark:text-slate-200">
+                      {recipe.yieldQuantity} {unitInfo.short}
+                    </span>
+                  </div>
+
+                  {/* Cost per Yield Unit */}
+                  <div className="flex items-baseline justify-between pt-1">
+                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                      {unitInfo.costLabel}
+                    </span>
+                    <span className="text-lg font-extrabold font-mono tabular-nums text-[#0071E3]">
+                      {costState.unitCost !== null ? `$${costState.unitCost.toFixed(2)}` : "Unavailable"}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {/* Cost by Unit Section */}
+            <section
+              className={`p-5 sm:p-6 rounded-2xl border transition ${
+                isDark
+                  ? "bg-[#121622] border-white/[0.08]"
+                  : "bg-white border-slate-200 shadow-2xs"
+              }`}
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-black/[0.06] dark:border-white/[0.06] mb-3">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Cost by unit
+                </h2>
+                <span className="text-xs text-slate-400">
+                  {unitInfo.short} basis
+                </span>
+              </div>
+
+              {costByUnitList.length === 0 ? (
+                <p className="text-xs text-slate-400 italic py-2">
+                  Cost by unit unavailable — add ingredients or cost data.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {costByUnitList.map((item) => (
+                    <div
+                      key={item.unit}
+                      className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                        item.isPrimary
+                          ? isDark
+                            ? "bg-[#0071E3]/15 border-[#0071E3]/40"
+                            : "bg-blue-50/80 border-blue-200"
+                          : isDark
+                          ? "bg-white/[0.02] border-white/[0.06]"
+                          : "bg-slate-50 border-slate-200"
+                      }`}
+                    >
+                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate">
+                        Per {item.label}
+                      </span>
+                      <span
+                        className={`text-sm font-bold font-mono tabular-nums mt-1 ${
+                          item.isPrimary ? "text-[#0071E3]" : "text-slate-900 dark:text-white"
+                        }`}
+                      >
+                        {item.formattedPricing}
                       </span>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-black/[0.04] dark:border-white/[0.04]">
-                      <div>
-                        <span className="text-slate-400 block text-[10px] uppercase font-bold">
-                          Quantity
-                        </span>
-                        <span className="font-mono font-semibold text-slate-900 dark:text-white">
-                          {item.quantity} {formatUnit(item.unitOfMeasure as any)}
-                        </span>
-                        {item.wastagePercent > 0 && (
-                          <span className="text-[10px] text-amber-500 block">
-                            +{item.wastagePercent}% trim loss
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="text-right">
-                        <span className="text-slate-400 block text-[10px] uppercase font-bold">
-                          Line Total
-                        </span>
-                        <span className="font-mono font-extrabold text-sm text-[#0071E3]">
-                          ${item.totalCost.toFixed(2)}
-                        </span>
-                        <span className="text-[10px] text-slate-400 block font-mono">
-                          ${item.effectiveUnitCost.toFixed(2)} /{" "}
-                          {formatUnit(item.unitOfMeasure as any)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
         </div>
       </main>
 
@@ -1130,42 +1253,30 @@ export default function RecipeDetailPage({
       {showArchiveModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150 overscroll-contain">
           <div
-            className={`w-full max-w-md p-6 rounded-3xl border shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 ${
-              isDark
-                ? "bg-[#121622] border-white/[0.08] text-white"
-                : "bg-white border-slate-200 text-slate-900"
+            className={`w-full max-w-md p-6 rounded-2xl border shadow-xl space-y-4 animate-in zoom-in-95 duration-150 ${
+              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
             }`}
           >
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center justify-center shrink-0">
-                <Trash2 className="w-6 h-6" />
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
               </div>
-
               <div className="space-y-1 min-w-0 flex-1">
-                <h2 className="text-base font-bold tracking-tight text-slate-900 dark:text-white">
-                  Archive Recipe Formulation
-                </h2>
-                <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-                  Are you sure you want to archive{" "}
-                  <strong className="text-slate-900 dark:text-white">
-                    {recipe.name}
-                  </strong>
-                  ? It will no longer be available for POS register depletion or sub-recipe
-                  composition in dishes.
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Archive recipe
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Are you sure you want to archive <strong>{recipe.name}</strong>? It will no longer be available for POS register sales or sub-recipe formula composition.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-black/[0.06] dark:border-white/[0.06]">
               <button
                 type="button"
                 disabled={archiving}
                 onClick={() => setShowArchiveModal(false)}
-                className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
-                  isDark
-                    ? "bg-white/[0.04] text-slate-300 hover:text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -1173,9 +1284,9 @@ export default function RecipeDetailPage({
                 type="button"
                 disabled={archiving}
                 onClick={handleArchive}
-                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
               >
-                {archiving ? "Archiving..." : "Archive Recipe"}
+                {archiving ? "Archiving..." : "Archive recipe"}
               </button>
             </div>
           </div>

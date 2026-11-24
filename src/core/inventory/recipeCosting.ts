@@ -13,6 +13,7 @@ export interface ComponentCostResult {
   componentType: RecipeComponentType;
   id: string; // inventoryItemId or subRecipeId
   name: string;
+  sku?: string | null;
   quantity: number;
   unitOfMeasure: UnitOfMeasure;
   wastagePercent: number;
@@ -26,6 +27,10 @@ export interface ComponentCostResult {
   packId?: string | null;
   packName?: string | null;
   packQuantity?: number | null;
+  originalText?: string | null;
+  statedQuantityRaw?: string | null;
+  isUnresolved?: boolean;
+  unresolvedReason?: string | null;
   hasMissingCost: boolean;
   unitPricingMatrix: UnitEquivalentPricing[]; // Multi-unit conversion equivalents
   subComponents?: ComponentCostResult[];
@@ -46,6 +51,9 @@ export interface RecipeCostBreakdown {
   hasMissingCosts: boolean;
   unitPricingMatrix: UnitEquivalentPricing[]; // Multi-unit conversion equivalents for finished recipe
   items: ComponentCostResult[];
+  costSource: "FORMULA_CALCULATED" | "STORED_SNAPSHOT" | "UNAVAILABLE";
+  storedTotalCost?: number;
+  storedCostPerUnit?: number;
 }
 
 /**
@@ -148,6 +156,7 @@ export async function calculateRecipeCost(
         componentType: "INVENTORY_ITEM",
         id: item.inventoryItem.id,
         name: item.inventoryItem.name,
+        sku: item.inventoryItem.sku || null,
         quantity: usableQty,
         unitOfMeasure: recipeUnit,
         wastagePercent: waste,
@@ -161,6 +170,10 @@ export async function calculateRecipeCost(
         packId: item.packId,
         packName: (pack as any)?.name || (item as any).pack?.name || null,
         packQuantity: item.packQuantity ? Number(item.packQuantity) : null,
+        originalText: (item as any).originalText || null,
+        statedQuantityRaw: (item as any).statedQuantityRaw || null,
+        isUnresolved: (item as any).isUnresolved || false,
+        unresolvedReason: (item as any).unresolvedReason || null,
         hasMissingCost: baseCost <= 0,
         unitPricingMatrix: getUnitPricingMatrix(baseCost, baseUnit),
       });
@@ -198,6 +211,10 @@ export async function calculateRecipeCost(
         netCost,
         wastageCost,
         totalCost: totalItemCost,
+        originalText: (item as any).originalText || null,
+        statedQuantityRaw: (item as any).statedQuantityRaw || null,
+        isUnresolved: (item as any).isUnresolved || false,
+        unresolvedReason: (item as any).unresolvedReason || null,
         hasMissingCost: baseCost <= 0,
         unitPricingMatrix: getUnitPricingMatrix(baseCost, baseUnit),
         subComponents: subBreakdown.items,
@@ -208,15 +225,30 @@ export async function calculateRecipeCost(
   }
 
   const yieldQty = Number(recipe.yieldQuantity || 1);
-  const costPerUnit = yieldQty > 0 ? calculatedTotalCost / yieldQty : calculatedTotalCost;
+  const storedTotalCost = Number(recipe.totalCost || 0);
+  const storedCostPerUnit = Number(recipe.costPerUnit || 0);
   const sellingPrice = Number(recipe.sellingPrice || 0);
+
+  let costSource: "FORMULA_CALCULATED" | "STORED_SNAPSHOT" | "UNAVAILABLE" = "UNAVAILABLE";
+  let finalTotalCost = 0;
+  let finalCostPerUnit = 0;
+
+  if (itemsCostResult.length > 0) {
+    costSource = "FORMULA_CALCULATED";
+    finalTotalCost = calculatedTotalCost;
+    finalCostPerUnit = yieldQty > 0 ? calculatedTotalCost / yieldQty : calculatedTotalCost;
+  } else if (storedTotalCost > 0 || storedCostPerUnit > 0) {
+    costSource = "STORED_SNAPSHOT";
+    finalTotalCost = storedTotalCost > 0 ? storedTotalCost : storedCostPerUnit * yieldQty;
+    finalCostPerUnit = storedCostPerUnit > 0 ? storedCostPerUnit : (yieldQty > 0 ? finalTotalCost / yieldQty : 0);
+  }
 
   let grossMarginPercent = 0;
   let foodCostPercent = 0;
 
-  if (sellingPrice > 0) {
-    grossMarginPercent = Math.max(0, ((sellingPrice - costPerUnit) / sellingPrice) * 100);
-    foodCostPercent = Math.min(100, (costPerUnit / sellingPrice) * 100);
+  if (sellingPrice > 0 && finalCostPerUnit > 0) {
+    grossMarginPercent = Math.max(0, ((sellingPrice - finalCostPerUnit) / sellingPrice) * 100);
+    foodCostPercent = Math.min(100, (finalCostPerUnit / sellingPrice) * 100);
   }
 
   return {
@@ -227,13 +259,16 @@ export async function calculateRecipeCost(
     yieldQuantity: yieldQty,
     yieldUnit: recipe.yieldUnit,
     sellingPrice,
-    totalCost: calculatedTotalCost,
-    costPerUnit,
+    totalCost: finalTotalCost,
+    costPerUnit: finalCostPerUnit,
     grossMarginPercent,
     foodCostPercent,
     hasMissingCosts: recipeHasMissingCosts,
-    unitPricingMatrix: getUnitPricingMatrix(costPerUnit, recipe.yieldUnit),
+    unitPricingMatrix: getUnitPricingMatrix(finalCostPerUnit, recipe.yieldUnit),
     items: itemsCostResult,
+    costSource,
+    storedTotalCost: storedTotalCost > 0 ? storedTotalCost : undefined,
+    storedCostPerUnit: storedCostPerUnit > 0 ? storedCostPerUnit : undefined,
   };
 }
 
