@@ -69,13 +69,11 @@ export async function calculateRecipeCost(
       items: {
         include: {
           inventoryItem: true,
-          pack: true,
           subRecipe: {
             include: {
               items: {
                 include: {
                   inventoryItem: true,
-                  pack: true,
                   subRecipe: true,
                 },
               },
@@ -90,6 +88,29 @@ export async function calculateRecipeCost(
     throw new Error(`Recipe not found: ${recipeId}`);
   }
 
+  // Pre-fetch linked packs safely in memory
+  const allPackIds = new Set<string>();
+  for (const item of recipe.items) {
+    if ((item as any).packId) allPackIds.add((item as any).packId);
+    if (item.subRecipe && item.subRecipe.items) {
+      for (const subItem of item.subRecipe.items) {
+        if ((subItem as any).packId) allPackIds.add((subItem as any).packId);
+      }
+    }
+  }
+
+  let packsMap = new Map<string, any>();
+  if (allPackIds.size > 0) {
+    try {
+      const packs = await prisma.itemPurchasePack.findMany({
+        where: { id: { in: Array.from(allPackIds) } },
+      });
+      packsMap = new Map(packs.map((p) => [p.id, p]));
+    } catch {
+      // ignore if pack query fails
+    }
+  }
+
   const itemsCostResult: ComponentCostResult[] = [];
   let calculatedTotalCost = 0;
   let recipeHasMissingCosts = false;
@@ -99,12 +120,14 @@ export async function calculateRecipeCost(
     let recipeUnit = item.unitOfMeasure;
     const waste = Number(item.wastagePercent || 0);
 
+    const pack = (item as any).pack || (item.packId ? packsMap.get(item.packId) : null);
+
     // If item packaging definition is linked
-    if (item.packId && item.pack) {
+    if (item.packId && pack) {
       if (item.packQuantity && Number(item.packQuantity) > 0) {
-        const packFactor = Number(item.pack.netQuantityPerPack || item.pack.conversionFactor || 1);
+        const packFactor = Number(pack.netQuantityPerPack || pack.conversionFactor || 1);
         usableQty = Number(item.packQuantity) * packFactor;
-        recipeUnit = item.pack.packUnit;
+        recipeUnit = pack.packUnit;
       }
     }
 
@@ -136,7 +159,7 @@ export async function calculateRecipeCost(
         wastageCost,
         totalCost: totalItemCost,
         packId: item.packId,
-        packName: item.pack?.name || null,
+        packName: (pack as any)?.name || (item as any).pack?.name || null,
         packQuantity: item.packQuantity ? Number(item.packQuantity) : null,
         hasMissingCost: baseCost <= 0,
         unitPricingMatrix: getUnitPricingMatrix(baseCost, baseUnit),

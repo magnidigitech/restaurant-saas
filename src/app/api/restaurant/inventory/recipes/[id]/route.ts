@@ -72,7 +72,6 @@ export async function GET(
                 },
               },
             },
-            pack: true,
             subRecipe: true,
           },
         },
@@ -88,9 +87,40 @@ export async function GET(
       return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
     }
 
+    // Attach pack details in memory if packId exists
+    const packIds = recipe.items
+      .map((i: any) => i.packId)
+      .filter((pid): pid is string => Boolean(pid));
+
+    let packsMap = new Map<string, any>();
+    if (packIds.length > 0) {
+      try {
+        const packs = await prisma.itemPurchasePack.findMany({
+          where: { id: { in: packIds } },
+        });
+        packsMap = new Map(packs.map((p) => [p.id, p]));
+      } catch {
+        // ignore if purchase pack query fails
+      }
+    }
+
+    const itemsWithPacks = recipe.items.map((item: any) => ({
+      ...item,
+      pack:
+        (item as any).pack ||
+        (item.packId ? packsMap.get(item.packId) : null) ||
+        item.inventoryItem?.purchasePacks?.find((p: any) => p.id === item.packId) ||
+        null,
+    }));
+
+    const enrichedRecipe = {
+      ...recipe,
+      items: itemsWithPacks,
+    };
+
     const breakdown = await calculateRecipeCost(id);
 
-    return NextResponse.json({ success: true, recipe, breakdown });
+    return NextResponse.json({ success: true, recipe: enrichedRecipe, breakdown });
   } catch (error: any) {
     console.error("Get Recipe Detail Error:", error);
     return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });

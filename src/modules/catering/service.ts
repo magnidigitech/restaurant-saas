@@ -414,7 +414,6 @@ export async function calculateEventIngredients(
                       },
                     },
                   },
-                  pack: true,
                   subRecipe: {
                     include: {
                       items: {
@@ -426,7 +425,6 @@ export async function calculateEventIngredients(
                               },
                             },
                           },
-                          pack: true,
                         },
                       },
                     },
@@ -481,10 +479,13 @@ export async function calculateEventIngredients(
         let recUnit = recItem.unitOfMeasure || inv.unitOfMeasure;
 
         // Resolve item purchase packaging if specified on recipe line
-        if (recItem.packId && recItem.pack && recItem.packQuantity) {
-          const packFactor = Number(recItem.pack.netQuantityPerPack || recItem.pack.conversionFactor || 1);
+        const pack =
+          recItem.pack ||
+          recItem.inventoryItem?.purchasePacks?.find((p: any) => p.id === recItem.packId);
+        if (recItem.packId && pack && recItem.packQuantity) {
+          const packFactor = Number(pack.netQuantityPerPack || pack.conversionFactor || 1);
           usableQty = Number(recItem.packQuantity) * packFactor;
-          recUnit = recItem.pack.packUnit;
+          recUnit = pack.packUnit;
         }
 
         const wastagePct = Number(recItem.wastagePercent || 0);

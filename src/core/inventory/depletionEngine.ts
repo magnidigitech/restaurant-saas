@@ -42,7 +42,6 @@ export async function explodeRecipeToRawIngredients(
       items: {
         include: {
           inventoryItem: true,
-          pack: true,
           subRecipe: true,
         },
       },
@@ -51,6 +50,23 @@ export async function explodeRecipeToRawIngredients(
 
   const rawMap = new Map<string, { itemId: string; name: string; quantity: number; unit: UnitOfMeasure; wastageIncluded: boolean }>();
   if (!recipe) return rawMap;
+
+  // Pre-load linked packs safely
+  const packIds = recipe.items
+    .map((i: any) => i.packId)
+    .filter((pid): pid is string => Boolean(pid));
+
+  let packsMap = new Map<string, any>();
+  if (packIds.length > 0) {
+    try {
+      const packs = await prisma.itemPurchasePack.findMany({
+        where: { id: { in: packIds } },
+      });
+      packsMap = new Map(packs.map((p) => [p.id, p]));
+    } catch {
+      // ignore
+    }
+  }
 
   if (recipe.isDraft) {
     throw new Error(
@@ -71,12 +87,14 @@ export async function explodeRecipeToRawIngredients(
     let usableQty = Number(item.quantity);
     let recipeUnit = item.unitOfMeasure;
 
+    const pack = (item as any).pack || (item.packId ? packsMap.get(item.packId) : null);
+
     // Resolve item-specific purchase packaging
-    if (item.packId && item.pack) {
+    if (item.packId && pack) {
       if (item.packQuantity && Number(item.packQuantity) > 0) {
-        const packFactor = Number(item.pack.netQuantityPerPack || item.pack.conversionFactor || 1);
+        const packFactor = Number(pack.netQuantityPerPack || pack.conversionFactor || 1);
         usableQty = Number(item.packQuantity) * packFactor;
-        recipeUnit = item.pack.packUnit;
+        recipeUnit = pack.packUnit;
       }
     }
 
