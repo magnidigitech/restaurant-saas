@@ -15,6 +15,24 @@ const createItemSchema = z.object({
   reorderPoint: z.number().min(0).optional(),
   parLevel: z.number().min(0).optional(),
   costPerUnit: z.number().min(0).optional(),
+  purchasePacks: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        packType: z.string().min(1),
+        customTypeLabel: z.string().optional().nullable(),
+        innerPackType: z.string().optional().nullable(),
+        innerCustomTypeLabel: z.string().optional().nullable(),
+        innerPackCount: z.number().optional().nullable(),
+        unitsPerInner: z.number().optional().nullable(),
+        packUnit: z.string(),
+        netQuantityPerPack: z.number(),
+        conversionFactor: z.number(),
+        isVariableWeight: z.boolean().optional(),
+        isActive: z.boolean().optional(),
+      })
+    )
+    .optional(),
 });
 
 export async function GET(req: NextRequest) {

@@ -93,9 +93,19 @@ export default function PurchaseOrdersDirectoryPage({
   const [formOutletId, setFormOutletId] = useState("");
   const [formDeliveryDate, setFormDeliveryDate] = useState("");
   const [formNotes, setFormNotes] = useState("");
-  // Checklist State: itemId -> { selected: boolean, quantity: string, unitCost: string }
+  // Checklist State: itemId -> { selected, quantity, unitCost, packId, packCount, pricingBasis }
   const [vendorItemsState, setVendorItemsState] = useState<
-    Record<string, { selected: boolean; quantity: string; unitCost: string }>
+    Record<
+      string,
+      {
+        selected: boolean;
+        quantity: string;
+        unitCost: string;
+        packId?: string;
+        packCount?: string;
+        pricingBasis?: string;
+      }
+    >
   >({});
 
   const fetchMasterData = async () => {
@@ -164,6 +174,17 @@ export default function PurchaseOrdersDirectoryPage({
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
   }, [paramItemId]);
+
+  // Prevent background scrolling when modal popup is open
+  useEffect(() => {
+    if (showCreate) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [showCreate]);
 
   const fetchPOs = async (s = search, st = statusFilter) => {
     try {
@@ -268,18 +289,33 @@ export default function PurchaseOrdersDirectoryPage({
     }
 
     const mappingsForVendor = vendorItemMaps.filter((m) => m.vendorId === selectedVendorId);
-    const newState: Record<string, { selected: boolean; quantity: string; unitCost: string }> = {};
+    const newState: Record<
+      string,
+      {
+        selected: boolean;
+        quantity: string;
+        unitCost: string;
+        packId?: string;
+        packCount?: string;
+        pricingBasis?: string;
+      }
+    > = {};
 
     mappingsForVendor.forEach((m) => {
       const itemObj = inventoryItems.find((i) => i.id === m.itemId);
       const metrics = getItemStockMetrics(m.itemId, activeOutletId);
       const cost = (m.unitCost ?? itemObj?.costPerUnit ?? 0).toString();
       const defaultQty = metrics.isLowStock && metrics.suggestedQty > 0 ? metrics.suggestedQty.toString() : "1";
+      const packId = m.packId || "";
+      const pricingBasis = m.pricingBasis || (packId ? "PER_PACK" : "PER_UNIT");
 
       newState[m.itemId] = {
         selected: false,
         quantity: defaultQty,
         unitCost: cost,
+        packId,
+        packCount: "1",
+        pricingBasis,
       };
     });
 
@@ -297,6 +333,8 @@ export default function PurchaseOrdersDirectoryPage({
         const itemObj = inventoryItems.find((i) => i.id === m.itemId);
         const metrics = getItemStockMetrics(m.itemId, formOutletId);
         const cost = copy[m.itemId]?.unitCost ?? (m.unitCost ?? itemObj?.costPerUnit ?? 0).toString();
+        const packId = copy[m.itemId]?.packId ?? m.packId ?? "";
+        const pricingBasis = copy[m.itemId]?.pricingBasis ?? m.pricingBasis ?? (packId ? "PER_PACK" : "PER_UNIT");
 
         if (metrics.isLowStock) {
           lowStockCount++;
@@ -304,12 +342,18 @@ export default function PurchaseOrdersDirectoryPage({
             selected: true,
             quantity: metrics.suggestedQty.toString(),
             unitCost: cost,
+            packId,
+            packCount: "1",
+            pricingBasis,
           };
         } else {
           copy[m.itemId] = {
             selected: false,
             quantity: copy[m.itemId]?.quantity || "1",
             unitCost: cost,
+            packId,
+            packCount: "1",
+            pricingBasis,
           };
         }
       });
@@ -373,6 +417,64 @@ export default function PurchaseOrdersDirectoryPage({
     });
   };
 
+  const handleItemPackChange = (itemId: string, packId: string) => {
+    setVendorItemsState((prev) => {
+      const current = prev[itemId] || { selected: false, quantity: "1", unitCost: "0" };
+      const itemObj = inventoryItems.find((i) => i.id === itemId);
+      const selectedPack = itemObj?.purchasePacks?.find((p: any) => p.id === packId);
+      let pricingBasis = current.pricingBasis || "PER_UNIT";
+      let unitCost = current.unitCost;
+
+      if (selectedPack) {
+        pricingBasis = selectedPack.isVariableWeight ? "PER_WEIGHT_UNIT" : "PER_PACK";
+        if (selectedPack.defaultPricePerPack) {
+          unitCost = String(selectedPack.defaultPricePerPack);
+        }
+      } else {
+        pricingBasis = "PER_UNIT";
+        if (itemObj?.costPerUnit) {
+          unitCost = String(itemObj.costPerUnit);
+        }
+      }
+
+      const packCount = current.packCount || "1";
+      const factor = selectedPack ? Number(selectedPack.conversionFactor) || 1 : 1;
+      const calcQty = selectedPack ? (Number(packCount) * factor).toString() : current.quantity;
+
+      return {
+        ...prev,
+        [itemId]: {
+          ...current,
+          packId,
+          packCount,
+          quantity: calcQty,
+          pricingBasis,
+          unitCost,
+        },
+      };
+    });
+  };
+
+  const handleItemPackCountChange = (itemId: string, count: string) => {
+    setVendorItemsState((prev) => {
+      const current = prev[itemId] || { selected: false, quantity: "1", unitCost: "0" };
+      const itemObj = inventoryItems.find((i) => i.id === itemId);
+      const selectedPack = itemObj?.purchasePacks?.find((p: any) => p.id === current.packId);
+      const factor = selectedPack ? Number(selectedPack.conversionFactor) || 1 : 1;
+      const calcQty = (Number(count) * factor).toString();
+
+      return {
+        ...prev,
+        [itemId]: {
+          ...current,
+          packCount: count,
+          quantity: calcQty,
+          selected: parseFloat(count) > 0 ? true : current.selected,
+        },
+      };
+    });
+  };
+
   const currentVendorItems = useMemo(() => {
     if (!formVendorId) return [];
     return vendorItemMaps
@@ -380,15 +482,43 @@ export default function PurchaseOrdersDirectoryPage({
       .map((m) => {
         const itemObj = inventoryItems.find((i) => i.id === m.itemId);
         const metrics = getItemStockMetrics(m.itemId, formOutletId);
+        const availablePacks = itemObj?.purchasePacks || [];
         const state = vendorItemsState[m.itemId] || {
           selected: false,
           quantity: metrics.suggestedQty.toString(),
           unitCost: (m.unitCost ?? itemObj?.costPerUnit ?? 0).toString(),
+          packId: m.packId || "",
+          packCount: "1",
+          pricingBasis: m.pricingBasis || (m.packId ? "PER_PACK" : "PER_UNIT"),
         };
         const otherPrefMap = vendorItemMaps.find(
           (om) => om.itemId === m.itemId && om.isPreferred && om.vendorId !== formVendorId
         );
         const otherPrefVendor = otherPrefMap ? vendors.find((v) => v.id === otherPrefMap.vendorId) : null;
+
+        const activePack = availablePacks.find((p: any) => p.id === state.packId) || m.pack;
+        const packCountNum = parseFloat(state.packCount || "1") || 1;
+        const conversionFactor = activePack ? Number(activePack.conversionFactor) || 1 : 1;
+        const stockQty = activePack ? packCountNum * conversionFactor : (parseFloat(state.quantity) || 0);
+
+        let rowTotal = 0;
+        const costNum = parseFloat(state.unitCost) || 0;
+        if (activePack) {
+          if (state.pricingBasis === "PER_PACK") {
+            rowTotal = packCountNum * costNum;
+          } else if (state.pricingBasis === "PER_WEIGHT_UNIT") {
+            rowTotal = stockQty * costNum;
+          } else {
+            rowTotal = stockQty * costNum;
+          }
+        } else {
+          rowTotal = (parseFloat(state.quantity) || 0) * costNum;
+        }
+
+        // Live calculation preview: e.g. "3 boxes × 40 lb = 120 lb"
+        const packCalculationPreview = activePack
+          ? `${packCountNum} ${activePack.name || activePack.packType} × ${conversionFactor} ${itemObj?.unitOfMeasure || "units"} = ${stockQty} ${itemObj?.unitOfMeasure || "units"}`
+          : null;
 
         return {
           id: m.id,
@@ -405,7 +535,15 @@ export default function PurchaseOrdersDirectoryPage({
           selected: state.selected,
           quantity: state.quantity,
           unitCost: state.unitCost,
-          rowTotal: (parseFloat(state.quantity) || 0) * (parseFloat(state.unitCost) || 0),
+          packId: state.packId || "",
+          packCount: state.packCount || "1",
+          pricingBasis: state.pricingBasis || (activePack ? "PER_PACK" : "PER_UNIT"),
+          activePack,
+          availablePacks,
+          stockQty,
+          conversionFactor,
+          packCalculationPreview,
+          rowTotal,
         };
       })
       .sort((a, b) => {
@@ -444,7 +582,7 @@ export default function PurchaseOrdersDirectoryPage({
       return;
     }
 
-    const selectedItems = currentVendorItems.filter((i) => i.selected && parseFloat(i.quantity) > 0);
+    const selectedItems = currentVendorItems.filter((i) => i.selected);
 
     if (selectedItems.length === 0) {
       setError("Please check and select at least one item to place an order");
@@ -453,7 +591,11 @@ export default function PurchaseOrdersDirectoryPage({
 
     const validItems = selectedItems.map((item) => ({
       itemId: item.itemId,
-      orderedQuantity: parseFloat(item.quantity),
+      packId: item.packId || undefined,
+      orderedPackCount: item.packId ? (parseFloat(item.packCount) || 1) : undefined,
+      packPrice: item.packId ? (parseFloat(item.unitCost) || 0) : undefined,
+      pricingBasis: (item.pricingBasis as any) || undefined,
+      orderedQuantity: item.packId ? item.stockQty : (parseFloat(item.quantity) || 0),
       unitCost: parseFloat(item.unitCost) || 0,
     }));
 
@@ -1236,16 +1378,16 @@ export default function PurchaseOrdersDirectoryPage({
                                 : "border-l-4 border-l-transparent hover:bg-slate-50/60"
                             }`}
                           >
-                            {/* Col 1: Checkbox + Name + Badges (col-span-6) */}
-                            <div className="sm:col-span-6 flex items-start sm:items-center gap-3 min-w-0" onClick={(e) => e.stopPropagation()}>
+                            {/* Col 1: Checkbox + Name + Badges + Packaging Selector (col-span-6) */}
+                            <div className="sm:col-span-6 flex items-start gap-3 min-w-0" onClick={(e) => e.stopPropagation()}>
                               <input
                                 type="checkbox"
                                 checked={item.selected}
                                 onChange={() => handleToggleItemSelection(item.itemId)}
-                                className="w-4 h-4 rounded border-slate-300 text-[#0071E3] focus:ring-[#0071E3] cursor-pointer mt-0.5 sm:mt-0 shrink-0"
+                                className="w-4 h-4 rounded border-slate-300 text-[#0071E3] focus:ring-[#0071E3] cursor-pointer mt-1 shrink-0"
                               />
 
-                              <div className="space-y-1 min-w-0 flex-1">
+                              <div className="space-y-1.5 min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className={`text-xs font-bold ${
                                     item.selected
@@ -1267,6 +1409,36 @@ export default function PurchaseOrdersDirectoryPage({
                                     </span>
                                   )}
                                 </div>
+
+                                {/* Purchase Pack Selector if Item has Packs */}
+                                {item.availablePacks && item.availablePacks.length > 0 && (
+                                  <div className="flex items-center gap-2 pt-0.5">
+                                    <span className={`text-[10px] font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                                      Pack:
+                                    </span>
+                                    <select
+                                      value={item.packId}
+                                      onChange={(e) => handleItemPackChange(item.itemId, e.target.value)}
+                                      className={`px-2 py-0.5 text-[11px] rounded-lg border transition cursor-pointer max-w-[200px] truncate ${
+                                        isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                                      }`}
+                                    >
+                                      <option value="">Base Stock Unit ({item.unitOfMeasure})</option>
+                                      {item.availablePacks.map((p: any) => (
+                                        <option key={p.id} value={p.id}>
+                                          {p.name || p.packType} ({p.packDescription || `${p.conversionFactor} ${item.unitOfMeasure}`})
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                )}
+
+                                {/* Live Calculated Stock Quantity Preview: e.g. "3 boxes × 40 lb = 120 lb" */}
+                                {item.packCalculationPreview && (
+                                  <div className="flex items-center gap-1.5 text-[10px] font-mono text-[#0071E3] font-semibold bg-blue-500/10 px-2 py-0.5 rounded-md w-fit">
+                                    <span>📦 {item.packCalculationPreview}</span>
+                                  </div>
+                                )}
 
                                 <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
                                   {isLow ? (
@@ -1290,38 +1462,70 @@ export default function PurchaseOrdersDirectoryPage({
                               </div>
                             </div>
 
-                            {/* Col 2: Order Qty (col-span-2) */}
+                            {/* Col 2: Order Qty or Pack Count (col-span-2) */}
                             <div className="sm:col-span-2 flex sm:justify-center items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                              <span className="sm:hidden text-[10px] font-medium text-slate-500 w-16">Qty:</span>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                placeholder="Qty"
-                                value={item.quantity}
-                                onChange={(e) => handleItemQtyChange(item.itemId, e.target.value)}
-                                className={`w-20 px-2 py-1 text-xs font-mono font-bold text-center rounded-lg border transition ${
-                                  item.selected
-                                    ? isDark ? "bg-[#0A0C12] border-[#0071E3] text-white" : "bg-white border-[#0071E3] text-blue-900"
-                                    : isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
-                                }`}
-                              />
+                              <span className="sm:hidden text-[10px] font-medium text-slate-500 w-16">
+                                {item.activePack ? "Packs:" : "Qty:"}
+                              </span>
+                              {item.activePack ? (
+                                <div className="text-center">
+                                  <input
+                                    type="number"
+                                    step="1"
+                                    min="0"
+                                    placeholder="Packs"
+                                    value={item.packCount}
+                                    onChange={(e) => handleItemPackCountChange(item.itemId, e.target.value)}
+                                    className={`w-20 px-2 py-1 text-xs font-mono font-bold text-center rounded-lg border transition ${
+                                      item.selected
+                                        ? isDark ? "bg-[#0A0C12] border-[#0071E3] text-white" : "bg-white border-[#0071E3] text-blue-900"
+                                        : isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                                    }`}
+                                  />
+                                  <span className={`block text-[9px] font-medium mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                                    {item.activePack.name || item.activePack.packType}
+                                  </span>
+                                </div>
+                              ) : (
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="Qty"
+                                  value={item.quantity}
+                                  onChange={(e) => handleItemQtyChange(item.itemId, e.target.value)}
+                                  className={`w-20 px-2 py-1 text-xs font-mono font-bold text-center rounded-lg border transition ${
+                                    item.selected
+                                      ? isDark ? "bg-[#0A0C12] border-[#0071E3] text-white" : "bg-white border-[#0071E3] text-blue-900"
+                                      : isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                                  }`}
+                                />
+                              )}
                             </div>
 
-                            {/* Col 3: Unit Cost (col-span-2) */}
+                            {/* Col 3: Unit Cost / Pack Price (col-span-2) */}
                             <div className="sm:col-span-2 flex sm:justify-center items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                              <span className="sm:hidden text-[10px] font-medium text-slate-500 w-16">Cost:</span>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                placeholder="Cost"
-                                value={item.unitCost}
-                                onChange={(e) => handleItemCostChange(item.itemId, e.target.value)}
-                                className={`w-20 px-2 py-1 text-xs font-mono text-center rounded-lg border transition ${
-                                  isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
-                                }`}
-                              />
+                              <span className="sm:hidden text-[10px] font-medium text-slate-500 w-16">
+                                {item.activePack ? "Price/Pack:" : "Cost:"}
+                              </span>
+                              <div className="text-center">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="Cost"
+                                  value={item.unitCost}
+                                  onChange={(e) => handleItemCostChange(item.itemId, e.target.value)}
+                                  className={`w-20 px-2 py-1 text-xs font-mono text-center rounded-lg border transition ${
+                                    isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                                  }`}
+                                />
+                                {item.activePack && (
+                                  <span className={`block text-[9px] font-medium mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                                    {item.pricingBasis === "PER_PACK" ? "/pack" : item.pricingBasis === "PER_WEIGHT_UNIT" ? `/${item.activePack.weightUnit || 'lb'}` : "/unit"}
+                                  </span>
+                                )}
+                              </div>
                             </div>
 
                             {/* Col 4: Subtotal (col-span-2) */}

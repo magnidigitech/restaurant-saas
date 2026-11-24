@@ -6,6 +6,7 @@ import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import ModuleAccessGuard from "@/components/ModuleAccessGuard";
 import { formatUnit } from "@/core/inventory/units";
+import ItemPackagingSection, { ItemPurchasePackFormValue } from "@/components/inventory/ItemPackagingSection";
 import { ArrowLeft, Package, Boxes, Upload } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -44,20 +45,22 @@ const CULINARY_UOM_GROUPS = [
     options: [
       { value: "LADLE", label: "Ladle (4 oz / ~118 ml scoop)" },
       { value: "CUP", label: "Cup (8 fl oz / ~237 ml)" },
-      { value: "FL_OZ", label: "Fluid Ounces (fl oz)" },
+      { value: "FL_OZ", label: "US Fluid Ounces (US fl oz)" },
       { value: "TBSP", label: "Tablespoon (tbsp - 15 ml)" },
       { value: "TSP", label: "Teaspoon (tsp - 5 ml)" },
-      { value: "GAL", label: "Gallon (gal)" },
+      { value: "GAL", label: "US Gallon (US gal)" },
+      { value: "IMP_GAL", label: "Imperial Gallon (Imp gal)" },
       { value: "QT", label: "Quart (qt)" },
       { value: "PT", label: "Pint (pt)" },
       { value: "L", label: "Liter (L)" },
-      { value: "ML", label: "Milliliter (ml)" },
+      { value: "ML", label: "Milliliter (mL)" },
     ],
   },
   {
     group: "Count & Meal Portions",
     options: [
       { value: "PIECES", label: "Pieces (pcs)" },
+      { value: "EACH", label: "Each (ea)" },
       { value: "DOZEN", label: "Dozen (doz)" },
       { value: "PORTION", label: "Portion / Serving" },
       { value: "BOX", label: "Box" },
@@ -190,6 +193,9 @@ export default function InventoryItemsPage({
     costPerUnit: "",
   });
 
+  const [createPurchasePacks, setCreatePurchasePacks] = useState<ItemPurchasePackFormValue[]>([]);
+  const [editPurchasePacks, setEditPurchasePacks] = useState<ItemPurchasePackFormValue[]>([]);
+
   // Quick Category Creation States
   const [showQuickCategory, setShowQuickCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -247,6 +253,17 @@ export default function InventoryItemsPage({
     fetchData();
   }, []);
 
+  // Prevent background scrolling when modal popup is open
+  useEffect(() => {
+    if (editingItem || showCreate || showBulkModal) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [editingItem, showCreate, showBulkModal]);
+
   const handleSearch = (val: string) => {
     setSearch(val);
     fetchData(val, categoryFilter);
@@ -275,11 +292,13 @@ export default function InventoryItemsPage({
           reorderPoint: Number(form.reorderPoint) || 0,
           parLevel: Number(form.parLevel) || 0,
           costPerUnit: Number(form.costPerUnit) || 0,
+          purchasePacks: createPurchasePacks,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setShowCreate(false);
+      setCreatePurchasePacks([]);
       setForm({
         name: "",
         sku: "",
@@ -298,7 +317,7 @@ export default function InventoryItemsPage({
     }
   };
 
-  const handleOpenEdit = (item: Item) => {
+  const handleOpenEdit = async (item: Item) => {
     setEditingItem(item);
     setEditForm({
       name: item.name,
@@ -311,6 +330,24 @@ export default function InventoryItemsPage({
       costPerUnit: String(item.costPerUnit ?? 0),
     });
     setError("");
+    setEditPurchasePacks((item as any).purchasePacks || []);
+
+    try {
+      const res = await fetch(`/api/restaurant/inventory/items/${item.id}/purchase-packs?includeInactive=true`);
+      if (res.ok) {
+        const d = await res.json();
+        if (d.packs) {
+          setEditPurchasePacks(
+            d.packs.map((p: any) => ({
+              ...p,
+              isNested: Boolean(p.innerPackType),
+            }))
+          );
+        }
+      }
+    } catch {
+      // Keep preloaded
+    }
   };
 
   const handleUpdateItem = async (e: React.FormEvent) => {
@@ -339,6 +376,26 @@ export default function InventoryItemsPage({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+
+      // Sync any new packs created or modified in edit modal
+      for (const pack of editPurchasePacks) {
+        if (!pack.id) {
+          // New pack created during edit
+          await fetch(`/api/restaurant/inventory/items/${editingItem.id}/purchase-packs`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(pack),
+          });
+        } else {
+          // Update existing pack
+          await fetch(`/api/restaurant/inventory/items/${editingItem.id}/purchase-packs/${pack.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(pack),
+          });
+        }
+      }
+
       setEditingItem(null);
       fetchData();
     } catch (err: any) {
@@ -1259,6 +1316,13 @@ export default function InventoryItemsPage({
                     }`}
                   />
                 </div>
+
+                <ItemPackagingSection
+                  stockUnit={editForm.unitOfMeasure as any}
+                  packs={editPurchasePacks}
+                  onChange={setEditPurchasePacks}
+                  isDark={isDark}
+                />
 
                 <div className="flex justify-between items-center pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
                   <button
@@ -2370,6 +2434,13 @@ export default function InventoryItemsPage({
                     }`}
                   />
                 </div>
+
+                <ItemPackagingSection
+                  stockUnit={form.unitOfMeasure as any}
+                  packs={createPurchasePacks}
+                  onChange={setCreatePurchasePacks}
+                  isDark={isDark}
+                />
 
                 <div className="flex justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
                   <button

@@ -2105,6 +2105,7 @@ export default function AppleTenantDashboard() {
                 </div>
               </div>
             </div>
+            )
           )}
 
           {/* =================================================================== */}
@@ -2261,7 +2262,6 @@ export default function AppleTenantDashboard() {
                 </div>
               )}
             </div>
-            )
           )}
           {/* Calendar Style Date Range Filter Modal (Matching POS) */}
           {isDateModalOpen && (

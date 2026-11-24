@@ -185,6 +185,8 @@ model Restaurant {
   userSessions         UserSession[]
   securityPolicy       RestaurantSecurityPolicy?
   securityAuditLogs    SecurityAuditLog[]
+  itemPurchasePacks    ItemPurchasePack[]
+  poReceipts           PurchaseOrderReceipt[]
 
   @@map("restaurants")
 }
@@ -1143,6 +1145,8 @@ model InventoryItem {
   poItems      PurchaseOrderItem[]
   vendorItems  VendorItem[]
   recipeItems  RecipeItem[]
+  purchasePacks ItemPurchasePack[]
+  poReceipts   PurchaseOrderReceipt[]
 
   @@unique([restaurantId, name])
   @@index([restaurantId])
@@ -1228,6 +1232,7 @@ enum UnitOfMeasure {
   L
   ML
   GAL
+  IMP_GAL
   QT
   PT
   CUP
@@ -1238,10 +1243,17 @@ enum UnitOfMeasure {
 
   // Count & Portions
   PIECES
+  EACH
   DOZEN
   PORTION
   BOX
   PACKET
+}
+
+enum PricingBasis {
+  PER_PACK
+  PER_WEIGHT_UNIT
+  PER_UNIT
 }
 
 model Vendor {
@@ -1310,6 +1322,7 @@ model PurchaseOrder {
   outlet     RestaurantOutlet  @relation(fields: [outletId], references: [id], onDelete: Cascade)
   vendor     Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   items      PurchaseOrderItem[]
+  receipts   PurchaseOrderReceipt[]
 
   @@unique([restaurantId, poNumber])
   @@index([restaurantId])
@@ -1319,20 +1332,32 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderItem {
-  id               String   @id @default(uuid())
-  purchaseOrderId  String   @map("purchase_order_id")
-  itemId           String   @map("item_id")
-  orderedQuantity  Decimal  @map("ordered_quantity")
-  receivedQuantity Decimal  @default(0) @map("received_quantity")
-  unitCost         Decimal  @map("unit_cost")
-  totalCost        Decimal  @map("total_cost")
+  id                   String            @id @default(uuid())
+  purchaseOrderId      String            @map("purchase_order_id")
+  itemId               String            @map("item_id")
+  packId               String?           @map("pack_id")
+  packLabel            String?           @map("pack_label")
+  packDetails          String?           @map("pack_details")
+  packConversionFactor Decimal?          @map("pack_conversion_factor")
+  orderedPackCount     Decimal?          @map("ordered_pack_count")
+  receivedPackCount    Decimal?          @default(0) @map("received_pack_count")
+  packPrice            Decimal?          @map("pack_price")
+  pricingBasis         PricingBasis?     @map("pricing_basis")
+  isVariableWeight     Boolean           @default(false) @map("is_variable_weight")
+  actualWeightReceived Decimal?          @default(0) @map("actual_weight_received")
+  orderedQuantity      Decimal           @map("ordered_quantity")
+  receivedQuantity     Decimal           @default(0) @map("received_quantity")
+  unitCost             Decimal           @map("unit_cost")
+  totalCost            Decimal           @map("total_cost")
 
   // Relations
-  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  item          InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  purchaseOrder PurchaseOrder     @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  item          InventoryItem     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  pack          ItemPurchasePack? @relation(fields: [packId], references: [id], onDelete: SetNull)
 
   @@index([purchaseOrderId])
   @@index([itemId])
+  @@index([packId])
   @@map("inventory_purchase_order_items")
 }
 
@@ -1345,27 +1370,89 @@ enum POStatus {
 }
 
 model VendorItem {
-  id           String   @id @default(uuid())
-  restaurantId String   @map("restaurant_id")
-  vendorId     String   @map("vendor_id")
-  itemId       String   @map("item_id")
-  vendorSku    String?  @map("vendor_sku")
-  unitCost     Decimal? @map("unit_cost")
-  leadTimeDays Int?     @map("lead_time_days")
-  isPreferred  Boolean  @default(false) @map("is_preferred")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id           String            @id @default(uuid())
+  restaurantId String            @map("restaurant_id")
+  vendorId     String            @map("vendor_id")
+  itemId       String            @map("item_id")
+  packId       String?           @map("pack_id")
+  pricingBasis PricingBasis      @default(PER_UNIT) @map("pricing_basis")
+  vendorSku    String?           @map("vendor_sku")
+  unitCost     Decimal?          @map("unit_cost")
+  leadTimeDays Int?              @map("lead_time_days")
+  isPreferred  Boolean           @default(false) @map("is_preferred")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
 
   // Relations
-  restaurant Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  vendor     Vendor        @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  item       InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  vendor       Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  item         InventoryItem     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  pack         ItemPurchasePack? @relation(fields: [packId], references: [id], onDelete: SetNull)
 
   @@unique([vendorId, itemId])
   @@index([restaurantId])
   @@index([vendorId])
   @@index([itemId])
+  @@index([packId])
   @@map("inventory_vendor_items")
+}
+
+model ItemPurchasePack {
+  id                   String              @id @default(uuid())
+  restaurantId         String              @map("restaurant_id")
+  itemId               String              @map("item_id")
+  name                 String
+  packType             String              @map("pack_type")
+  customTypeLabel      String?             @map("custom_type_label")
+  innerPackType        String?             @map("inner_pack_type")
+  innerCustomTypeLabel String?             @map("inner_custom_type_label")
+  innerPackCount       Decimal?            @map("inner_pack_count")
+  unitsPerInner        Decimal?            @map("units_per_inner")
+  packUnit             UnitOfMeasure       @map("pack_unit")
+  netQuantityPerPack   Decimal             @map("net_quantity_per_pack")
+  conversionFactor     Decimal             @map("conversion_factor")
+  isVariableWeight     Boolean             @default(false) @map("is_variable_weight")
+  isActive             Boolean             @default(true) @map("is_active")
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant           Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  item                 InventoryItem       @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  vendorItems          VendorItem[]
+  poItems              PurchaseOrderItem[]
+
+  @@index([restaurantId])
+  @@index([itemId])
+  @@map("item_purchase_packs")
+}
+
+model PurchaseOrderReceipt {
+  id                   String        @id @default(uuid())
+  restaurantId         String        @map("restaurant_id")
+  purchaseOrderId      String        @map("purchase_order_id")
+  poItemId             String?       @map("po_item_id")
+  itemId               String        @map("item_id")
+  packsReceived        Decimal?      @map("packs_received")
+  quantityReceived     Decimal       @map("quantity_received")
+  actualWeightReceived Decimal?      @map("actual_weight_received")
+  unitCost             Decimal       @map("unit_cost")
+  totalCost            Decimal       @map("total_cost")
+  idempotencyKey       String?       @unique @map("idempotency_key")
+  notes                String?
+  receivedBy           String        @map("received_by")
+  occurredAt           DateTime      @default(now()) @map("occurred_at")
+  createdAt            DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  restaurant           Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  purchaseOrder        PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  item                 InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([purchaseOrderId])
+  @@index([itemId])
+  @@map("inventory_po_receipts")
 }
 
 // ----------------------------------------------------

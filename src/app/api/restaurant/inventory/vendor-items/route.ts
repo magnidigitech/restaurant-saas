@@ -7,6 +7,8 @@ import { z } from "zod";
 const linkVendorItemSchema = z.object({
   vendorId: z.string().min(1),
   itemId: z.string().optional(),
+  packId: z.string().optional().nullable(),
+  pricingBasis: z.enum(["PER_PACK", "PER_WEIGHT_UNIT", "PER_UNIT"]).optional(),
   vendorSku: z.string().optional().or(z.literal("")),
   unitCost: z.number().min(0).optional(),
   leadTimeDays: z.number().min(0).optional(),
@@ -15,6 +17,8 @@ const linkVendorItemSchema = z.object({
     .array(
       z.object({
         itemId: z.string().min(1),
+        packId: z.string().optional().nullable(),
+        pricingBasis: z.enum(["PER_PACK", "PER_WEIGHT_UNIT", "PER_UNIT"]).optional(),
         vendorSku: z.string().optional().or(z.literal("")),
         unitCost: z.number().min(0).optional(),
         leadTimeDays: z.number().min(0).optional(),
@@ -69,6 +73,8 @@ export async function POST(req: NextRequest) {
     const vendorItem = await VendorService.linkVendorItem(session.activeRestaurantId, {
       vendorId: result.data.vendorId,
       itemId: result.data.itemId,
+      packId: result.data.packId,
+      pricingBasis: result.data.pricingBasis,
       vendorSku: result.data.vendorSku,
       unitCost: result.data.unitCost,
       leadTimeDays: result.data.leadTimeDays,

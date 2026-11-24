@@ -12,8 +12,13 @@ const createPOSchema = z.object({
   items: z.array(
     z.object({
       itemId: z.string().min(1),
-      orderedQuantity: z.number().positive("Quantity must be greater than 0"),
-      unitCost: z.number().min(0, "Unit cost cannot be negative"),
+      packId: z.string().optional().nullable(),
+      orderedPackCount: z.number().positive().optional().nullable(),
+      packPrice: z.number().min(0).optional().nullable(),
+      pricingBasis: z.enum(["PER_PACK", "PER_WEIGHT_UNIT", "PER_UNIT"]).optional().nullable(),
+      isVariableWeight: z.boolean().optional(),
+      orderedQuantity: z.number().positive().optional(),
+      unitCost: z.number().min(0).optional(),
     })
   ).min(1, "Purchase order must contain at least one item"),
 });

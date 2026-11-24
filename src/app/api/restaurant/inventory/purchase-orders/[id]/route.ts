@@ -7,11 +7,15 @@ import { z } from "zod";
 const updatePOSchema = z.object({
   action: z.enum(["update_status", "receive", "receive_items"]),
   status: z.enum(["DRAFT", "SENT", "CANCELLED"]).optional(),
+  idempotencyKey: z.string().optional(),
   items: z
     .array(
       z.object({
-        itemId: z.string(),
-        receivedQuantity: z.number().min(0),
+        poItemId: z.string().optional(),
+        itemId: z.string().optional(),
+        receivingPackCount: z.number().min(0).optional(),
+        actualWeightReceived: z.number().min(0).optional(),
+        receivedQuantity: z.number().min(0).optional(),
         unitCost: z.number().min(0).optional(),
       })
     )
@@ -19,11 +23,15 @@ const updatePOSchema = z.object({
   receiveData: z
     .object({
       status: z.enum(["RECEIVED", "PARTIALLY_RECEIVED"]).optional(),
+      idempotencyKey: z.string().optional(),
       items: z
         .array(
           z.object({
-            itemId: z.string(),
-            receivedQuantity: z.number().min(0),
+            poItemId: z.string().optional(),
+            itemId: z.string().optional(),
+            receivingPackCount: z.number().min(0).optional(),
+            actualWeightReceived: z.number().min(0).optional(),
+            receivedQuantity: z.number().min(0).optional(),
             unitCost: z.number().min(0).optional(),
           })
         )
@@ -61,12 +69,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     if (result.data.action === "receive" || result.data.action === "receive_items") {
       const itemsToReceive = result.data.items || result.data.receiveData?.items;
+      const idempotencyKey = result.data.idempotencyKey || result.data.receiveData?.idempotencyKey;
       const purchaseOrder = await PurchaseService.receivePOItems(
         session.activeRestaurantId,
         session.userId,
         id,
         {
           status: result.data.receiveData?.status,
+          idempotencyKey,
           items: itemsToReceive,
         }
       );

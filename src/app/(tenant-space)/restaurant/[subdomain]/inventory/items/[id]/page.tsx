@@ -32,6 +32,7 @@ interface Category {
 }
 
 import { getUnitPricingMatrix, formatUnit } from "@/core/inventory/units";
+import ItemPackagingSection, { ItemPurchasePackFormValue } from "@/components/inventory/ItemPackagingSection";
 
 const CULINARY_UOM_GROUPS = [
   {
@@ -87,6 +88,7 @@ export default function InventoryItemDetailPage({
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [purchasePacks, setPurchasePacks] = useState<ItemPurchasePackFormValue[]>([]);
 
   const [form, setForm] = useState({
     name: "",
@@ -101,9 +103,10 @@ export default function InventoryItemDetailPage({
 
   const fetchItemDetail = async () => {
     try {
-      const [resItem, resCats] = await Promise.all([
+      const [resItem, resCats, resPacks] = await Promise.all([
         fetch(`/api/restaurant/inventory/items/${itemId}`),
         fetch("/api/restaurant/inventory/categories"),
+        fetch(`/api/restaurant/inventory/items/${itemId}/purchase-packs?includeInactive=true`),
       ]);
       const dataItem = await resItem.json();
       if (resItem.ok && dataItem.item) {
@@ -125,6 +128,18 @@ export default function InventoryItemDetailPage({
       if (resCats.ok) {
         setCategories((await resCats.json()).categories || []);
       }
+
+      if (resPacks.ok) {
+        const dataPacks = await resPacks.json();
+        if (dataPacks.packs) {
+          setPurchasePacks(
+            dataPacks.packs.map((p: any) => ({
+              ...p,
+              isNested: Boolean(p.innerPackType),
+            }))
+          );
+        }
+      }
     } catch {
       setError("Failed to load item detail");
     } finally {
@@ -135,6 +150,17 @@ export default function InventoryItemDetailPage({
   useEffect(() => {
     if (itemId) fetchItemDetail();
   }, [itemId]);
+
+  // Prevent background scrolling when modal is open
+  useEffect(() => {
+    if (showEdit || showArchiveModal) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [showEdit, showArchiveModal]);
 
   const handleUpdateItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,6 +187,24 @@ export default function InventoryItemDetailPage({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+
+      // Save/sync purchase packs
+      for (const pack of purchasePacks) {
+        if (pack.id) {
+          await fetch(`/api/restaurant/inventory/items/${itemId}/purchase-packs/${pack.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(pack),
+          });
+        } else {
+          await fetch(`/api/restaurant/inventory/items/${itemId}/purchase-packs`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(pack),
+          });
+        }
+      }
+
       setShowEdit(false);
       fetchItemDetail();
     } catch (e: any) {
@@ -402,6 +446,85 @@ export default function InventoryItemDetailPage({
           </div>
         </div>
 
+        {/* Configured Purchase Packaging Card */}
+        <div
+          className={`p-6 rounded-3xl border transition space-y-4 ${
+            isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+          }`}
+        >
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+                Purchase Packaging Configurations
+              </h2>
+              <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                Supplier pack sizes and conversion rates linked to this inventory item.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowEdit(true)}
+              className="px-3 py-1.5 bg-[#0071E3]/10 hover:bg-[#0071E3]/20 text-[#0071E3] text-xs font-semibold rounded-xl transition cursor-pointer"
+            >
+              Configure Packs
+            </button>
+          </div>
+
+          {purchasePacks.length === 0 ? (
+            <div className={`p-6 text-center text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+              No supplier purchase packs configured. Click Configure Packs to define case, box, or bulk packaging.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {purchasePacks.map((pack, idx) => (
+                <div
+                  key={pack.id || idx}
+                  className={`p-4 rounded-2xl border transition space-y-2 ${
+                    isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-[#F5F5F7] border-slate-200"
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-xs font-bold">{pack.packageType}</span>
+                      {pack.customLabel && (
+                        <span className={`block text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                          ({pack.customLabel})
+                        </span>
+                      )}
+                    </div>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        pack.isActive !== false
+                          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                          : "bg-slate-500/10 text-slate-400 border border-slate-500/20"
+                      }`}
+                    >
+                      {pack.isActive !== false ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+
+                  <p className="text-xs font-semibold text-[#0071E3]">
+                    {pack.packDescription || `Factor: ${pack.conversionFactor} ${item.unitOfMeasure}`}
+                  </p>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    {pack.isVariableWeight && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        Catch Weight
+                      </span>
+                    )}
+                    {pack.defaultPricePerPack && (
+                      <span className={`text-[11px] font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                        ${Number(pack.defaultPricePerPack).toFixed(2)}/pack
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Stock Movement Ledgers History */}
         <div
           className={`p-6 rounded-3xl border transition space-y-4 ${
@@ -461,7 +584,7 @@ export default function InventoryItemDetailPage({
       {showEdit && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
           <div
-            className={`w-full max-w-lg p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
+            className={`w-full max-w-2xl p-6 rounded-3xl border shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150 ${
               isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
             }`}
           >
@@ -598,6 +721,13 @@ export default function InventoryItemDetailPage({
                   />
                 </div>
               </div>
+
+              <ItemPackagingSection
+                stockUnit={form.unitOfMeasure as any}
+                packs={purchasePacks}
+                onChange={setPurchasePacks}
+                isDark={isDark}
+              />
 
               <div className="flex justify-end gap-2.5 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
                 <button

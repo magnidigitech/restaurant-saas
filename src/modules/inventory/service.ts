@@ -183,6 +183,10 @@ export const InventoryService = {
       where,
       include: {
         category: { select: { id: true, name: true } },
+        purchasePacks: {
+          where: { isActive: true },
+          orderBy: { createdAt: "asc" },
+        },
       },
       orderBy: { name: "asc" },
     });
@@ -224,6 +228,9 @@ export const InventoryService = {
       where: { id, restaurantId, archivedAt: null },
       include: {
         category: { select: { id: true, name: true } },
+        purchasePacks: {
+          orderBy: { createdAt: "asc" },
+        },
         stockLedger: {
           orderBy: { occurredAt: "desc" },
           take: 20,
@@ -246,8 +253,38 @@ export const InventoryService = {
       reorderPoint?: number;
       parLevel?: number;
       costPerUnit?: number;
+      purchasePacks?: Array<{
+        name: string;
+        packType: string;
+        customTypeLabel?: string;
+        innerPackType?: string;
+        innerCustomTypeLabel?: string;
+        innerPackCount?: number;
+        unitsPerInner?: number;
+        packUnit: string;
+        netQuantityPerPack: number;
+        conversionFactor: number;
+        isVariableWeight?: boolean;
+        isActive?: boolean;
+      }>;
     }
   ) {
+    const packsData = (data.purchasePacks || []).map((p) => ({
+      restaurantId,
+      name: p.name,
+      packType: p.packType,
+      customTypeLabel: p.customTypeLabel || null,
+      innerPackType: p.innerPackType || null,
+      innerCustomTypeLabel: p.innerCustomTypeLabel || null,
+      innerPackCount: p.innerPackCount !== undefined && p.innerPackCount !== null ? p.innerPackCount : null,
+      unitsPerInner: p.unitsPerInner !== undefined && p.unitsPerInner !== null ? p.unitsPerInner : null,
+      packUnit: ((p as any).packUnit || (p as any).weightOrVolUnit || data.unitOfMeasure) as any,
+      netQuantityPerPack: (p as any).netQuantityPerPack !== undefined && (p as any).netQuantityPerPack !== null ? (p as any).netQuantityPerPack : ((p as any).netWeightOrVol ?? p.conversionFactor),
+      conversionFactor: p.conversionFactor,
+      isVariableWeight: !!p.isVariableWeight,
+      isActive: p.isActive !== false,
+    }));
+
     return prisma.inventoryItem.create({
       data: {
         restaurantId,
@@ -259,6 +296,11 @@ export const InventoryService = {
         reorderPoint: data.reorderPoint ?? 0,
         parLevel: data.parLevel ?? 0,
         costPerUnit: data.costPerUnit ?? 0,
+        purchasePacks: packsData.length > 0 ? { create: packsData } : undefined,
+      },
+      include: {
+        category: { select: { id: true, name: true } },
+        purchasePacks: true,
       },
     });
   },
@@ -278,7 +320,119 @@ export const InventoryService = {
     }
   ) {
     await prisma.inventoryItem.findFirstOrThrow({ where: { id, restaurantId } });
-    return prisma.inventoryItem.update({ where: { id }, data: data as any });
+    return prisma.inventoryItem.update({
+      where: { id },
+      data: data as any,
+      include: {
+        category: { select: { id: true, name: true } },
+        purchasePacks: true,
+      },
+    });
+  },
+
+  // ── Purchase Packaging Operations ─────────────────────────────────────────
+  async getItemPurchasePacks(restaurantId: string, itemId: string, includeInactive = false) {
+    await prisma.inventoryItem.findFirstOrThrow({ where: { id: itemId, restaurantId } });
+    const where: any = { restaurantId, itemId };
+    if (!includeInactive) {
+      where.isActive = true;
+    }
+    return prisma.itemPurchasePack.findMany({
+      where,
+      orderBy: { createdAt: "asc" },
+    });
+  },
+
+  async createItemPurchasePack(
+    restaurantId: string,
+    itemId: string,
+    data: {
+      name: string;
+      packType: string;
+      customTypeLabel?: string;
+      innerPackType?: string;
+      innerCustomTypeLabel?: string;
+      innerPackCount?: number;
+      unitsPerInner?: number;
+      packUnit: string;
+      netQuantityPerPack: number;
+      conversionFactor: number;
+      isVariableWeight?: boolean;
+      isActive?: boolean;
+    }
+  ) {
+    const item = await prisma.inventoryItem.findFirstOrThrow({ where: { id: itemId, restaurantId } });
+
+    return prisma.itemPurchasePack.create({
+      data: {
+        restaurantId,
+        itemId: item.id,
+        name: data.name,
+        packType: data.packType,
+        customTypeLabel: data.customTypeLabel || null,
+        innerPackType: data.innerPackType || null,
+        innerCustomTypeLabel: data.innerCustomTypeLabel || null,
+        innerPackCount: data.innerPackCount !== undefined && data.innerPackCount !== null ? data.innerPackCount : null,
+        unitsPerInner: data.unitsPerInner !== undefined && data.unitsPerInner !== null ? data.unitsPerInner : null,
+        packUnit: ((data as any).packUnit || (data as any).weightOrVolUnit || item.unitOfMeasure) as any,
+        netQuantityPerPack: (data as any).netQuantityPerPack !== undefined && (data as any).netQuantityPerPack !== null ? (data as any).netQuantityPerPack : ((data as any).netWeightOrVol ?? data.conversionFactor),
+        conversionFactor: data.conversionFactor,
+        isVariableWeight: !!data.isVariableWeight,
+        isActive: data.isActive !== false,
+      },
+    });
+  },
+
+  async updateItemPurchasePack(
+    restaurantId: string,
+    packId: string,
+    data: {
+      name?: string;
+      packType?: string;
+      customTypeLabel?: string | null;
+      innerPackType?: string | null;
+      innerCustomTypeLabel?: string | null;
+      innerPackCount?: number | null;
+      unitsPerInner?: number | null;
+      packUnit?: string;
+      netQuantityPerPack?: number;
+      conversionFactor?: number;
+      isVariableWeight?: boolean;
+      isActive?: boolean;
+    }
+  ) {
+    await prisma.itemPurchasePack.findFirstOrThrow({ where: { id: packId, restaurantId } });
+
+    const updateData: any = { ...data };
+    if (data.packUnit) {
+      updateData.packUnit = data.packUnit as any;
+    }
+
+    return prisma.itemPurchasePack.update({
+      where: { id: packId },
+      data: updateData,
+    });
+  },
+
+  async deleteItemPurchasePack(restaurantId: string, packId: string) {
+    const pack = await prisma.itemPurchasePack.findFirstOrThrow({
+      where: { id: packId, restaurantId },
+      include: {
+        _count: {
+          select: { poItems: true, vendorItems: true },
+        },
+      },
+    });
+
+    // If pack is referenced by historical PO items or vendor items, deactivate rather than hard delete
+    if (pack._count.poItems > 0 || pack._count.vendorItems > 0) {
+      return prisma.itemPurchasePack.update({
+        where: { id: packId },
+        data: { isActive: false },
+      });
+    }
+
+    return prisma.itemPurchasePack.delete({ where: { id: packId } });
   },
 
   async archiveItem(restaurantId: string, id: string) {

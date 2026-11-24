@@ -592,24 +592,58 @@ export const VendorService = {
     if (vendorId) where.vendorId = vendorId;
     if (itemId) where.itemId = itemId;
 
-    try {
-      return await db.vendorItem.findMany({
-        where,
-        include: {
-          vendor: { select: { id: true, name: true, code: true } },
-          item: { select: { id: true, name: true, unitOfMeasure: true, costPerUnit: true, reorderPoint: true, parLevel: true } },
+    const include = {
+      vendor: { select: { id: true, name: true, code: true } },
+      pack: true,
+      item: {
+        select: {
+          id: true,
+          name: true,
+          unitOfMeasure: true,
+          costPerUnit: true,
+          reorderPoint: true,
+          parLevel: true,
+          purchasePacks: {
+            where: { isActive: true },
+            orderBy: { createdAt: "asc" as const },
+          },
         },
+      },
+    };
+
+    const enhanceVendorItem = (vi: any) => {
+      let equivalentPricePerStockUnit: number | null = null;
+      const unitCost = vi.unitCost ? Number(vi.unitCost) : null;
+
+      if (unitCost !== null && vi.pack && !vi.pack.isVariableWeight && vi.pricingBasis === "PER_PACK") {
+        const factor = Number(vi.pack.conversionFactor) || 1;
+        equivalentPricePerStockUnit = factor > 0 ? unitCost / factor : null;
+      } else if (unitCost !== null && (vi.pricingBasis === "PER_WEIGHT_UNIT" || vi.pricingBasis === "PER_UNIT")) {
+        equivalentPricePerStockUnit = unitCost;
+      }
+
+      return {
+        ...vi,
+        equivalentPricePerStockUnit,
+      };
+    };
+
+    try {
+      const items = await db.vendorItem.findMany({
+        where,
+        include,
+        orderBy: { createdAt: "desc" },
       });
+      return items.map(enhanceVendorItem);
     } catch {
       const freshDb = createPrismaClient() as any;
       (globalThis as any).prisma = freshDb;
-      return freshDb.vendorItem.findMany({
+      const items = await freshDb.vendorItem.findMany({
         where,
-        include: {
-          vendor: { select: { id: true, name: true, code: true } },
-          item: { select: { id: true, name: true, unitOfMeasure: true, costPerUnit: true, reorderPoint: true, parLevel: true } },
-        },
+        include,
+        orderBy: { createdAt: "desc" },
       });
+      return items.map(enhanceVendorItem);
     }
   },
 
@@ -618,6 +652,8 @@ export const VendorService = {
     data: {
       vendorId: string;
       itemId: string;
+      packId?: string | null;
+      pricingBasis?: "PER_PACK" | "PER_WEIGHT_UNIT" | "PER_UNIT";
       vendorSku?: string;
       unitCost?: number;
       leadTimeDays?: number;
@@ -626,6 +662,13 @@ export const VendorService = {
   ) {
     let db = getPrisma();
     const executeSingle = async (client: any) => {
+      // Validate pack belongs to restaurant and item if provided
+      if (data.packId) {
+        await client.itemPurchasePack.findFirstOrThrow({
+          where: { id: data.packId, restaurantId, itemId: data.itemId },
+        });
+      }
+
       if (data.isPreferred) {
         await client.vendorItem.updateMany({
           where: { restaurantId, itemId: data.itemId, vendorId: { not: data.vendorId } },
@@ -640,6 +683,8 @@ export const VendorService = {
           },
         },
         update: {
+          packId: data.packId !== undefined ? data.packId : undefined,
+          pricingBasis: data.pricingBasis || (data.packId ? "PER_PACK" : "PER_UNIT"),
           vendorSku: data.vendorSku || null,
           unitCost: data.unitCost !== undefined ? data.unitCost : null,
           leadTimeDays: data.leadTimeDays !== undefined ? data.leadTimeDays : null,
@@ -649,6 +694,8 @@ export const VendorService = {
           restaurantId,
           vendorId: data.vendorId,
           itemId: data.itemId,
+          packId: data.packId || null,
+          pricingBasis: data.pricingBasis || (data.packId ? "PER_PACK" : "PER_UNIT"),
           vendorSku: data.vendorSku || null,
           unitCost: data.unitCost !== undefined ? data.unitCost : null,
           leadTimeDays: data.leadTimeDays !== undefined ? data.leadTimeDays : null,
@@ -657,6 +704,7 @@ export const VendorService = {
         include: {
           vendor: true,
           item: true,
+          pack: true,
         },
       });
     };
@@ -675,6 +723,8 @@ export const VendorService = {
     vendorId: string,
     items: {
       itemId: string;
+      packId?: string | null;
+      pricingBasis?: "PER_PACK" | "PER_WEIGHT_UNIT" | "PER_UNIT";
       vendorSku?: string;
       unitCost?: number;
       leadTimeDays?: number;
@@ -684,6 +734,11 @@ export const VendorService = {
     let db = getPrisma();
     const executeUpserts = async (client: any) => {
       for (const item of items) {
+        if (item.packId) {
+          await client.itemPurchasePack.findFirstOrThrow({
+            where: { id: item.packId, restaurantId, itemId: item.itemId },
+          });
+        }
         if (item.isPreferred) {
           await client.vendorItem.updateMany({
             where: { restaurantId, itemId: item.itemId, vendorId: { not: vendorId } },
@@ -702,6 +757,8 @@ export const VendorService = {
               },
             },
             update: {
+              packId: item.packId !== undefined ? item.packId : undefined,
+              pricingBasis: item.pricingBasis || (item.packId ? "PER_PACK" : "PER_UNIT"),
               vendorSku: item.vendorSku || null,
               unitCost: item.unitCost !== undefined ? item.unitCost : null,
               leadTimeDays: item.leadTimeDays !== undefined ? item.leadTimeDays : null,
@@ -711,6 +768,8 @@ export const VendorService = {
               restaurantId,
               vendorId,
               itemId: item.itemId,
+              packId: item.packId || null,
+              pricingBasis: item.pricingBasis || (item.packId ? "PER_PACK" : "PER_UNIT"),
               vendorSku: item.vendorSku || null,
               unitCost: item.unitCost !== undefined ? item.unitCost : null,
               leadTimeDays: item.leadTimeDays !== undefined ? item.leadTimeDays : null,

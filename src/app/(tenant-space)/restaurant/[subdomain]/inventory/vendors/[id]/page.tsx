@@ -19,12 +19,27 @@ interface VendorItemMap {
   unitCost?: number | null;
   leadTimeDays?: number | null;
   isPreferred: boolean;
+  packId?: string | null;
+  pricingBasis?: "PER_PACK" | "PER_WEIGHT_UNIT" | "PER_UNIT";
+  equivalentPricePerStockUnit?: number | null;
+  pack?: {
+    id: string;
+    name: string;
+    packType: string;
+    customTypeLabel?: string | null;
+    packDescription?: string | null;
+    conversionFactor: number;
+    defaultPricePerPack?: number | null;
+    isVariableWeight?: boolean;
+    weightUnit?: string | null;
+  } | null;
   vendor?: { id: string; name: string; code?: string };
   item?: {
     id: string;
     name: string;
     unitOfMeasure: string;
     costPerUnit: number;
+    purchasePacks?: any[];
   };
 }
 
@@ -50,6 +65,7 @@ interface InventoryItem {
   name: string;
   unitOfMeasure: string;
   costPerUnit: number;
+  purchasePacks?: any[];
 }
 
 interface MultiSelectItemRow {
@@ -60,6 +76,9 @@ interface MultiSelectItemRow {
   isPreferred: boolean;
   unitCost: string;
   vendorSku: string;
+  packId: string;
+  pricingBasis: "PER_PACK" | "PER_WEIGHT_UNIT" | "PER_UNIT";
+  purchasePacks: any[];
   existingPreferredVendor?: string | null;
 }
 
@@ -209,6 +228,7 @@ export default function VendorDetailPage({
       allItems.map((i) => {
         const existing = vendorItems.find((vi) => vi.itemId === i.id);
         const cost = existing?.unitCost ?? i.costPerUnit ?? 0;
+        const packs = (i as any).purchasePacks || [];
         return {
           itemId: i.id,
           name: i.name,
@@ -217,6 +237,9 @@ export default function VendorDetailPage({
           isPreferred: existing ? existing.isPreferred : false,
           unitCost: cost.toString(),
           vendorSku: existing?.vendorSku || "",
+          packId: existing?.packId || "",
+          pricingBasis: (existing?.pricingBasis as any) || (existing?.packId ? "PER_PACK" : "PER_UNIT"),
+          purchasePacks: packs,
           existingPreferredVendor: preferredMap[i.id] || null,
         };
       })
@@ -242,6 +265,21 @@ export default function VendorDetailPage({
           const updated = { ...r, [field]: value };
           if (field === "isPreferred" && value === true) {
             updated.selected = true;
+          }
+          if (field === "packId") {
+            const selectedPack = r.purchasePacks?.find((p: any) => p.id === value);
+            if (selectedPack) {
+              if (selectedPack.isVariableWeight) {
+                updated.pricingBasis = "PER_WEIGHT_UNIT";
+              } else {
+                updated.pricingBasis = "PER_PACK";
+              }
+              if (selectedPack.defaultPricePerPack && (!r.unitCost || Number(r.unitCost) === 0)) {
+                updated.unitCost = String(selectedPack.defaultPricePerPack);
+              }
+            } else {
+              updated.pricingBasis = "PER_UNIT";
+            }
           }
           return updated;
         }
@@ -273,6 +311,8 @@ export default function VendorDetailPage({
             vendorSku: r.vendorSku || undefined,
             unitCost: Number(r.unitCost) || undefined,
             isPreferred: r.isPreferred,
+            packId: r.packId || undefined,
+            pricingBasis: r.pricingBasis,
           })),
         };
 
@@ -561,10 +601,15 @@ export default function VendorDetailPage({
                           <h4 className="font-bold text-xs text-slate-900 dark:text-white truncate">
                             {vi.item?.name}
                           </h4>
-                          <div className="flex items-center gap-2 mt-0.5">
+                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                             <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-blue-500/10 text-[#0071E3] dark:text-[#64B5FF]">
                               Unit: {formatUnit((vi.item?.unitOfMeasure || "PIECES") as any)}
                             </span>
+                            {vi.pack && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                                {vi.pack.name || vi.pack.packType} ({vi.pack.packDescription || `${vi.pack.conversionFactor} ${vi.item?.unitOfMeasure}`})
+                              </span>
+                            )}
                             {vi.vendorSku && (
                               <span className="font-mono text-[10px] opacity-60">
                                 SKU: {vi.vendorSku}
@@ -586,18 +631,30 @@ export default function VendorDetailPage({
                         </div>
                       </div>
 
-                      {/* Card Middle: Contract Cost */}
+                      {/* Card Middle: Contract Cost & Pricing Basis */}
                       <div
-                        className={`p-2 rounded-xl border flex items-center justify-between text-xs ${
+                        className={`p-2.5 rounded-xl border flex items-center justify-between text-xs ${
                           isDark ? "bg-[#121622] border-white/[0.04]" : "bg-white border-slate-200"
                         }`}
                       >
-                        <span className={`text-[10px] font-medium uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                          Negotiated Cost
-                        </span>
-                        <span className={`font-mono text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
-                          ${Number(vi.unitCost ?? vi.item?.costPerUnit ?? 0).toFixed(2)}
-                        </span>
+                        <div>
+                          <span className={`text-[10px] font-medium uppercase tracking-wider block ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                            Negotiated Rate
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400">
+                            {vi.pricingBasis === "PER_PACK" ? "Per Pack" : vi.pricingBasis === "PER_WEIGHT_UNIT" ? `Per ${vi.pack?.weightUnit || "Weight"}` : "Per Unit"}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className={`font-mono text-sm font-bold block ${isDark ? "text-white" : "text-slate-900"}`}>
+                            ${Number(vi.unitCost ?? vi.item?.costPerUnit ?? 0).toFixed(2)}
+                          </span>
+                          {vi.equivalentPricePerStockUnit !== undefined && vi.equivalentPricePerStockUnit !== null && vi.pack && vi.pricingBasis === "PER_PACK" && (
+                            <span className="text-[10px] font-mono text-emerald-500">
+                              (${Number(vi.equivalentPricePerStockUnit).toFixed(2)} / {formatUnit((vi.item?.unitOfMeasure || "PIECES") as any)})
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {/* Card Bottom: Action Buttons */}
@@ -633,9 +690,11 @@ export default function VendorDetailPage({
                         isDark ? "border-white/[0.06] text-[#8F95A3]" : "border-slate-200 text-slate-500"
                       }`}>
                         <th className="pb-3 px-3">Item Name</th>
-                        <th className="pb-3 px-3">Unit</th>
+                        <th className="pb-3 px-3">Packaging</th>
+                        <th className="pb-3 px-3">Stock Unit</th>
                         <th className="pb-3 px-3">Vendor SKU</th>
                         <th className="pb-3 px-3 text-right">Negotiated Cost</th>
+                        <th className="pb-3 px-3 text-center">Pricing Basis</th>
                         <th className="pb-3 px-3 text-center">Preference</th>
                         <th className="pb-3 px-3 text-right">Actions</th>
                       </tr>
@@ -646,14 +705,42 @@ export default function VendorDetailPage({
                           <td className={`py-3.5 px-3 font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
                             {vi.item?.name}
                           </td>
+                          <td className="py-3.5 px-3">
+                            {vi.pack ? (
+                              <div>
+                                <span className="font-semibold text-xs text-[#0071E3] block">
+                                  {vi.pack.name || vi.pack.packType}
+                                </span>
+                                <span className={`text-[10px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                                  {vi.pack.packDescription || `${vi.pack.conversionFactor} ${vi.item?.unitOfMeasure}`}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                                Base Stock Unit
+                              </span>
+                            )}
+                          </td>
                           <td className="py-3.5 px-3 font-mono text-[11px]">
                             {formatUnit((vi.item?.unitOfMeasure || "PIECES") as any)}
                           </td>
                           <td className={`py-3.5 px-3 font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                             {vi.vendorSku || "—"}
                           </td>
-                          <td className={`py-3.5 px-3 text-right font-mono font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
-                            ${Number(vi.unitCost ?? vi.item?.costPerUnit ?? 0).toFixed(2)}
+                          <td className={`py-3.5 px-3 text-right font-mono ${isDark ? "text-white" : "text-slate-900"}`}>
+                            <span className="font-bold">
+                              ${Number(vi.unitCost ?? vi.item?.costPerUnit ?? 0).toFixed(2)}
+                            </span>
+                            {vi.equivalentPricePerStockUnit !== undefined && vi.equivalentPricePerStockUnit !== null && vi.pack && vi.pricingBasis === "PER_PACK" && (
+                              <span className={`block text-[10px] ${isDark ? "text-emerald-400" : "text-emerald-600"}`}>
+                                (${Number(vi.equivalentPricePerStockUnit).toFixed(2)} / {formatUnit((vi.item?.unitOfMeasure || "PIECES") as any)})
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-3 text-center">
+                            <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded border bg-white/[0.04] border-white/[0.08]">
+                              {vi.pricingBasis === "PER_PACK" ? "Per Pack" : vi.pricingBasis === "PER_WEIGHT_UNIT" ? `Per ${vi.pack?.weightUnit || "Weight"}` : "Per Unit"}
+                            </span>
                           </td>
                           <td className="py-3.5 px-3 text-center">
                             {vi.isPreferred ? (
@@ -866,11 +953,52 @@ export default function VendorDetailPage({
 
                       {/* Card Inputs Grid */}
                       <div className="grid grid-cols-2 gap-2.5 pt-1">
+                        <div className="col-span-2 sm:col-span-1">
+                          <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${
+                            isDark ? "text-[#8F95A3]" : "text-slate-500"
+                          }`}>
+                            Purchase Packaging
+                          </label>
+                          <select
+                            value={row.packId}
+                            onChange={(e) => handleRowChange(row.itemId, "packId", e.target.value)}
+                            className={`w-full px-3 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                              isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                            }`}
+                          >
+                            <option value="">Base ({formatUnit(row.unitOfMeasure as any)})</option>
+                            {row.purchasePacks?.map((p: any) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name || p.packType} ({p.packDescription || `${p.conversionFactor} ${row.unitOfMeasure}`})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="col-span-2 sm:col-span-1">
+                          <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${
+                            isDark ? "text-[#8F95A3]" : "text-slate-500"
+                          }`}>
+                            Pricing Basis
+                          </label>
+                          <select
+                            value={row.pricingBasis}
+                            onChange={(e) => handleRowChange(row.itemId, "pricingBasis", e.target.value)}
+                            className={`w-full px-3 py-2 text-xs rounded-xl border transition focus:outline-none focus:border-[#0071E3] ${
+                              isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                            }`}
+                          >
+                            <option value="PER_PACK">Per Pack</option>
+                            <option value="PER_WEIGHT_UNIT">Per Weight Unit</option>
+                            <option value="PER_UNIT">Per Stock Unit</option>
+                          </select>
+                        </div>
+
                         <div>
                           <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${
                             isDark ? "text-[#8F95A3]" : "text-slate-500"
                           }`}>
-                            Unit Cost ($)
+                            Cost Rate ($)
                           </label>
                           <input
                             type="number"
@@ -882,6 +1010,19 @@ export default function VendorDetailPage({
                               isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
                             }`}
                           />
+                          {(() => {
+                            const p = row.purchasePacks?.find((x: any) => x.id === row.packId);
+                            if (p && !p.isVariableWeight && row.pricingBasis === "PER_PACK" && Number(row.unitCost) > 0) {
+                              const factor = Number(p.conversionFactor) || 1;
+                              const equiv = Number(row.unitCost) / factor;
+                              return (
+                                <span className="block text-[10px] text-emerald-500 font-mono mt-0.5">
+                                  ≈ ${equiv.toFixed(2)} / {formatUnit(row.unitOfMeasure as any)}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
 
                         <div>
@@ -914,8 +1055,9 @@ export default function VendorDetailPage({
                       }`}>
                         <th className="py-2.5 px-3 w-8 text-center">Select</th>
                         <th className="py-2.5 px-3">Item Name</th>
-                        <th className="py-2.5 px-3">Unit</th>
-                        <th className="py-2.5 px-3">Unit Cost ($)</th>
+                        <th className="py-2.5 px-3">Packaging</th>
+                        <th className="py-2.5 px-3">Pricing Basis</th>
+                        <th className="py-2.5 px-3">Cost Rate ($)</th>
                         <th className="py-2.5 px-3">Vendor SKU</th>
                         <th className="py-2.5 px-3 text-center">Preferred</th>
                       </tr>
@@ -932,10 +1074,41 @@ export default function VendorDetailPage({
                             />
                           </td>
                           <td className="py-2.5 px-3 font-semibold">
-                            {row.name}
+                            <div>
+                              <span>{row.name}</span>
+                              <span className="block text-[10px] font-mono text-slate-400">
+                                Stock: {formatUnit(row.unitOfMeasure as any)}
+                              </span>
+                            </div>
                           </td>
-                          <td className="py-2.5 px-3 font-mono text-[11px] opacity-75">
-                            {formatUnit(row.unitOfMeasure as any)}
+                          <td className="py-2.5 px-3">
+                            <select
+                              value={row.packId}
+                              onChange={(e) => handleRowChange(row.itemId, "packId", e.target.value)}
+                              className={`w-36 px-2 py-1.5 text-xs rounded-lg border transition ${
+                                isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                              }`}
+                            >
+                              <option value="">Base ({formatUnit(row.unitOfMeasure as any)})</option>
+                              {row.purchasePacks?.map((p: any) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name || p.packType} ({p.packDescription || `${p.conversionFactor} ${row.unitOfMeasure}`})
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <select
+                              value={row.pricingBasis}
+                              onChange={(e) => handleRowChange(row.itemId, "pricingBasis", e.target.value)}
+                              className={`w-32 px-2 py-1.5 text-xs rounded-lg border transition ${
+                                isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                              }`}
+                            >
+                              <option value="PER_PACK">Per Pack</option>
+                              <option value="PER_WEIGHT_UNIT">Per Weight Unit</option>
+                              <option value="PER_UNIT">Per Stock Unit</option>
+                            </select>
                           </td>
                           <td className="py-2.5 px-3">
                             <input
@@ -947,6 +1120,19 @@ export default function VendorDetailPage({
                                 isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
                               }`}
                             />
+                            {(() => {
+                              const p = row.purchasePacks?.find((x: any) => x.id === row.packId);
+                              if (p && !p.isVariableWeight && row.pricingBasis === "PER_PACK" && Number(row.unitCost) > 0) {
+                                const factor = Number(p.conversionFactor) || 1;
+                                const equiv = Number(row.unitCost) / factor;
+                                return (
+                                  <span className="block text-[10px] text-emerald-500 font-mono mt-0.5">
+                                    ≈ ${equiv.toFixed(2)} / {formatUnit(row.unitOfMeasure as any)}
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
                           </td>
                           <td className="py-2.5 px-3">
                             <input

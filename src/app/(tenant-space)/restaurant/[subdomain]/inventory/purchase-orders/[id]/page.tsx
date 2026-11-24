@@ -12,6 +12,16 @@ interface POItem {
   receivedQuantity: number;
   unitCost: number;
   totalCost: number;
+  packId?: string | null;
+  packLabel?: string | null;
+  packDetails?: string | null;
+  packConversionFactor?: number | null;
+  orderedPackCount?: number | null;
+  receivedPackCount?: number | null;
+  packPrice?: number | null;
+  pricingBasis?: "PER_PACK" | "PER_WEIGHT_UNIT" | "PER_UNIT" | null;
+  isVariableWeight?: boolean | null;
+  actualWeightReceived?: number | null;
   item: { id: string; name: string; unitOfMeasure: string };
 }
 
@@ -32,13 +42,89 @@ interface PODetail {
 }
 
 interface ReceiveItemRow {
+  poItemId: string;
   itemId: string;
   itemName: string;
   unitOfMeasure: string;
+  packLabel?: string | null;
+  packDetails?: string | null;
+  packConversionFactor?: number | null;
+  orderedPackCount?: number | null;
+  receivedPackCount?: number | null;
+  remainingPackCount?: number | null;
+  receivingPackCount: string;
+  isVariableWeight: boolean;
+  actualWeightReceived: string;
+  pricingBasis?: string | null;
   orderedQuantity: number;
   previouslyReceived: number;
   receivingQuantity: string;
   unitCost: string;
+  containerType: string;
+}
+
+function getContainerType(item: {
+  packLabel?: string | null;
+  packDetails?: string | null;
+}): string {
+  if (item.packDetails && item.packDetails !== "Custom" && !item.packDetails.includes("×")) {
+    return item.packDetails;
+  }
+  if (item.packLabel) {
+    const clean = item.packLabel.replace(/\(.*\)/g, "").trim();
+    const words = clean.split(/\s+/);
+    const last = words[words.length - 1];
+    if (last && !/^\d+/.test(last) && last.length > 1) {
+      return last;
+    }
+  }
+  return "pack";
+}
+
+function formatPackCount(count: number, containerType: string = "pack"): string {
+  const isSingular = Math.abs(count) === 1;
+  const cleanType = containerType.trim();
+  const lower = cleanType.toLowerCase();
+
+  let plural = `${cleanType}s`;
+  if (lower.endsWith("x") || lower.endsWith("s") || lower.endsWith("sh") || lower.endsWith("ch")) {
+    plural = `${cleanType}es`;
+  } else if (lower.endsWith("y") && !/[aeiou]y$/i.test(lower)) {
+    plural = `${cleanType.slice(0, -1)}ies`;
+  }
+
+  return `${count} ${isSingular ? cleanType : plural}`;
+}
+
+function formatPackUnitOnly(count: number, containerType: string = "pack"): string {
+  const isSingular = Math.abs(count) === 1;
+  const cleanType = containerType.trim();
+  const lower = cleanType.toLowerCase();
+
+  let plural = `${cleanType}s`;
+  if (lower.endsWith("x") || lower.endsWith("s") || lower.endsWith("sh") || lower.endsWith("ch")) {
+    plural = `${cleanType}es`;
+  } else if (lower.endsWith("y") && !/[aeiou]y$/i.test(lower)) {
+    plural = `${cleanType.slice(0, -1)}ies`;
+  }
+
+  return isSingular ? cleanType : plural;
+}
+
+function formatPackLabelClean(
+  packLabel?: string | null,
+  packDetails?: string | null
+): string {
+  if (!packLabel) return "";
+  const label = packLabel.trim();
+  const details = packDetails?.trim();
+
+  // If details is empty or already in label, do not repeat
+  if (!details || label.toLowerCase().includes(details.toLowerCase())) {
+    return label;
+  }
+
+  return `${label} (${details})`;
 }
 
 export default function PurchaseOrderDetailPage({
@@ -100,6 +186,17 @@ export default function PurchaseOrderDetailPage({
     if (poId) fetchPODetail();
   }, [poId]);
 
+  // Prevent background scrolling when modal popup is open
+  useEffect(() => {
+    if (showReceiveModal || confirmDialog.show) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [showReceiveModal, confirmDialog.show]);
+
   const handleShareWhatsApp = () => {
     if (!po) return;
 
@@ -151,9 +248,10 @@ export default function PurchaseOrderDetailPage({
           <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: center; color: #64748B;">${idx + 1}</td>
           <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; font-weight: 600; color: #1E293B;">
             ${pi.item?.name} <span style="font-size: 11px; font-weight: 400; color: #64748B;">(${pi.item?.unitOfMeasure})</span>
+            ${pi.packLabel ? `<br/><span style="font-size: 10px; color: #0071E3; font-weight: 600;">📦 ${formatPackLabelClean(pi.packLabel, pi.packDetails)}</span>` : ""}
           </td>
           <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: right; font-family: monospace; font-weight: 700; color: #0F172A;">
-            ${pi.orderedQuantity}
+            ${pi.orderedPackCount ? `${formatPackCount(Number(pi.orderedPackCount), getContainerType(pi))}<br/><span style="font-size: 10px; font-weight: 400; color: #64748B;">(${pi.orderedQuantity} ${pi.item?.unitOfMeasure})</span>` : pi.orderedQuantity}
           </td>
           <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: right; font-family: monospace; color: #475569;">
             $${Number(pi.unitCost).toFixed(2)}
@@ -416,15 +514,35 @@ export default function PurchaseOrderDetailPage({
     if (!po) return;
     setReceiveRows(
       po.items.map((pi) => {
-        const remaining = Math.max(0, pi.orderedQuantity - (pi.receivedQuantity || 0));
+        const isPack = Boolean(pi.packLabel || pi.orderedPackCount);
+        const orderedPacks = Number(pi.orderedPackCount) || 0;
+        const receivedPacks = Number(pi.receivedPackCount) || 0;
+        const remainingPacks = Math.max(0, orderedPacks - receivedPacks);
+        const remainingQty = Math.max(0, Number(pi.orderedQuantity) - Number(pi.receivedQuantity || 0));
+        const factor = Number(pi.packConversionFactor) || 1;
+        const isVarWeight = Boolean(pi.isVariableWeight);
+        const containerType = getContainerType(pi);
+
         return {
+          poItemId: pi.id,
           itemId: pi.itemId,
           itemName: pi.item?.name || "Item",
           unitOfMeasure: pi.item?.unitOfMeasure || "PIECES",
+          packLabel: pi.packLabel,
+          packDetails: pi.packDetails,
+          packConversionFactor: pi.packConversionFactor,
+          orderedPackCount: pi.orderedPackCount,
+          receivedPackCount: pi.receivedPackCount,
+          remainingPackCount: remainingPacks,
+          receivingPackCount: isPack ? remainingPacks.toString() : "",
+          isVariableWeight: isVarWeight,
+          actualWeightReceived: isVarWeight ? remainingQty.toString() : "",
+          pricingBasis: pi.pricingBasis,
           orderedQuantity: pi.orderedQuantity,
           previouslyReceived: pi.receivedQuantity || 0,
-          receivingQuantity: remaining.toString(),
-          unitCost: pi.unitCost.toString(),
+          receivingQuantity: isPack ? (remainingPacks * factor).toString() : remainingQty.toString(),
+          unitCost: (pi.packPrice ?? pi.unitCost).toString(),
+          containerType,
         };
       })
     );
@@ -432,30 +550,83 @@ export default function PurchaseOrderDetailPage({
     setShowReceiveModal(true);
   };
 
-  const handleReceiveRowChange = (itemId: string, val: string) => {
+  const handleReceiveRowChange = (poItemId: string, val: string) => {
     setReceiveRows((prev) =>
-      prev.map((r) => (r.itemId === itemId ? { ...r, receivingQuantity: val } : r))
+      prev.map((r) => {
+        if (r.poItemId === poItemId) {
+          return { ...r, receivingQuantity: val };
+        }
+        return r;
+      })
     );
   };
 
-  const handleReceiveUnitCostChange = (itemId: string, val: string) => {
+  const handleReceivePackCountChange = (poItemId: string, val: string) => {
     setReceiveRows((prev) =>
-      prev.map((r) => (r.itemId === itemId ? { ...r, unitCost: val } : r))
+      prev.map((r) => {
+        if (r.poItemId === poItemId) {
+          const factor = Number(r.packConversionFactor) || 1;
+          const count = parseFloat(val) || 0;
+          const calculatedQty = (count * factor).toString();
+          return {
+            ...r,
+            receivingPackCount: val,
+            receivingQuantity: r.isVariableWeight ? r.receivingQuantity : calculatedQty,
+          };
+        }
+        return r;
+      })
+    );
+  };
+
+  const handleReceiveActualWeightChange = (poItemId: string, val: string) => {
+    setReceiveRows((prev) =>
+      prev.map((r) => {
+        if (r.poItemId === poItemId) {
+          return {
+            ...r,
+            actualWeightReceived: val,
+            receivingQuantity: val,
+          };
+        }
+        return r;
+      })
+    );
+  };
+
+  const handleReceiveUnitCostChange = (poItemId: string, val: string) => {
+    setReceiveRows((prev) =>
+      prev.map((r) => (r.poItemId === poItemId ? { ...r, unitCost: val } : r))
     );
   };
 
   const handleSubmitReceive = async () => {
     setReceiveError("");
+    const idempotencyKey = `rcpt_${poId}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
     const receivingItems = receiveRows
-      .filter((r) => parseFloat(r.receivingQuantity) > 0)
-      .map((r) => ({
-        itemId: r.itemId,
-        receivedQuantity: parseFloat(r.receivingQuantity),
-        unitCost: parseFloat(r.unitCost || "0"),
-      }));
+      .filter((r) => {
+        if (r.packLabel || r.orderedPackCount) {
+          const packCount = parseFloat(r.receivingPackCount);
+          const actualWeight = parseFloat(r.actualWeightReceived);
+          return packCount > 0 || (r.isVariableWeight && actualWeight > 0);
+        }
+        return parseFloat(r.receivingQuantity) > 0;
+      })
+      .map((r) => {
+        const isPack = Boolean(r.packLabel || r.orderedPackCount);
+        return {
+          poItemId: r.poItemId,
+          itemId: r.itemId,
+          receivingPackCount: isPack ? parseFloat(r.receivingPackCount) || 0 : undefined,
+          actualWeightReceived: r.isVariableWeight ? parseFloat(r.actualWeightReceived) || 0 : undefined,
+          receivedQuantity: parseFloat(r.receivingQuantity) || 0,
+          unitCost: parseFloat(r.unitCost || "0"),
+        };
+      });
 
     if (receivingItems.length === 0) {
-      setReceiveError("Please enter a positive receiving quantity for at least one item");
+      setReceiveError("Please enter a positive receiving quantity or pack count for at least one item");
       return;
     }
 
@@ -469,6 +640,7 @@ export default function PurchaseOrderDetailPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "receive_items",
+          idempotencyKey,
           items: receivingItems,
         }),
       });
@@ -690,24 +862,62 @@ export default function PurchaseOrderDetailPage({
                 {po.items.map((pi) => (
                   <tr key={pi.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition">
                     <td className={`py-3.5 px-3 font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
-                      {pi.item?.name} <span className="text-[10px] opacity-75 font-normal">({pi.item?.unitOfMeasure})</span>
+                      <div>
+                        {pi.item?.name} <span className="text-[10px] opacity-75 font-normal">({pi.item?.unitOfMeasure})</span>
+                      </div>
+                      {pi.packLabel && (
+                        <span className="text-[10px] font-semibold text-[#0071E3] block mt-0.5">
+                          📦 {formatPackLabelClean(pi.packLabel, pi.packDetails)}
+                        </span>
+                      )}
                     </td>
                     <td className={`py-3.5 px-3 text-right font-mono font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
-                      {pi.orderedQuantity}
+                      {pi.orderedPackCount ? (
+                        <>
+                          <span>{formatPackCount(Number(pi.orderedPackCount), getContainerType(pi))}</span>
+                          <span className={`block text-[10px] font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                            ({pi.orderedQuantity} {pi.item?.unitOfMeasure})
+                          </span>
+                        </>
+                      ) : (
+                        <span>{pi.orderedQuantity}</span>
+                      )}
                     </td>
                     <td className="py-3.5 px-3 text-right font-mono">
-                      <span className={`font-bold ${
-                        pi.receivedQuantity >= pi.orderedQuantity
-                          ? "text-emerald-500"
-                          : pi.receivedQuantity > 0
-                          ? "text-amber-500"
-                          : isDark ? "text-[#8F95A3]" : "text-slate-400"
-                      }`}>
-                        {pi.receivedQuantity || 0}
-                      </span>
+                      {pi.orderedPackCount ? (
+                        <>
+                          <span className={`font-bold ${
+                            (pi.receivedPackCount || 0) >= (pi.orderedPackCount || 0)
+                              ? "text-emerald-500"
+                              : (pi.receivedPackCount || 0) > 0
+                              ? "text-amber-500"
+                              : isDark ? "text-[#8F95A3]" : "text-slate-400"
+                          }`}>
+                            {Number(pi.receivedPackCount) || 0} / {formatPackCount(Number(pi.orderedPackCount), getContainerType(pi))}
+                          </span>
+                          <span className={`block text-[10px] font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                            ({pi.receivedQuantity || 0} {pi.item?.unitOfMeasure})
+                          </span>
+                        </>
+                      ) : (
+                        <span className={`font-bold ${
+                          pi.receivedQuantity >= pi.orderedQuantity
+                            ? "text-emerald-500"
+                            : pi.receivedQuantity > 0
+                            ? "text-amber-500"
+                            : isDark ? "text-[#8F95A3]" : "text-slate-400"
+                        }`}>
+                          {pi.receivedQuantity || 0}
+                        </span>
+                      )}
                     </td>
                     <td className={`py-3.5 px-3 text-right font-mono ${isDark ? "text-[#BAC0CD]" : "text-slate-600"}`}>
-                      ${Number(pi.unitCost).toFixed(2)}
+                      ${Number(pi.packPrice ?? pi.unitCost).toFixed(2)}
+                      {pi.orderedPackCount && (
+                        <span className={`block text-[9px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                          {pi.pricingBasis === "PER_PACK" ? `/${getContainerType(pi)}` : pi.pricingBasis === "PER_WEIGHT_UNIT" ? `/${pi.item?.unitOfMeasure}` : "/unit"}
+                        </span>
+                      )}
                     </td>
                     <td className={`py-3.5 px-3 text-right font-mono font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
                       ${Number(pi.totalCost).toFixed(2)}
@@ -724,7 +934,7 @@ export default function PurchaseOrderDetailPage({
       {showReceiveModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
           <div
-            className={`w-full max-w-2xl max-h-[88vh] overflow-y-auto p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
+            className={`w-full max-w-3xl max-h-[88vh] overflow-y-auto p-6 rounded-3xl border shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 ${
               isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
             }`}
           >
@@ -747,54 +957,165 @@ export default function PurchaseOrderDetailPage({
             )}
 
             <div className="overflow-x-auto border rounded-2xl">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-xs whitespace-nowrap">
                 <thead>
                   <tr className={`border-b text-[10px] font-bold uppercase tracking-wider ${
                     isDark ? "bg-[#0A0C12] border-white/[0.06] text-[#8F95A3]" : "bg-slate-50 border-slate-200 text-slate-600"
                   }`}>
-                    <th className="py-2.5 px-3">Item</th>
+                    <th className="py-2.5 px-3">Item &amp; Packaging</th>
                     <th className="py-2.5 px-3 text-right">Ordered</th>
                     <th className="py-2.5 px-3 text-right">Prev. Received</th>
-                    <th className="py-2.5 px-3 text-right">Receive Qty</th>
-                    <th className="py-2.5 px-3 text-right">Actual Unit Price</th>
+                    <th className="py-2.5 px-3 text-right">Remaining</th>
+                    <th className="py-2.5 px-3 text-right">Receiving Delivered</th>
+                    <th className="py-2.5 px-3 text-right">Rate / Cost</th>
                     <th className="py-2.5 px-3 text-right">Line Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
                   {receiveRows.map((r) => {
-                    const recQty = parseFloat(r.receivingQuantity || "0") || 0;
+                    const isPack = Boolean(r.packLabel || r.orderedPackCount);
+                    const factor = Number(r.packConversionFactor) || 1;
+                    const packCount = parseFloat(r.receivingPackCount || "0") || 0;
+                    const actualWeight = parseFloat(r.actualWeightReceived || "0") || 0;
+                    const recQty = isPack
+                      ? (r.isVariableWeight ? actualWeight : packCount * factor)
+                      : (parseFloat(r.receivingQuantity || "0") || 0);
                     const unitPrice = parseFloat(r.unitCost || "0") || 0;
-                    const lineTotal = recQty * unitPrice;
+
+                    let lineTotal = 0;
+                    if (isPack) {
+                      if (r.pricingBasis === "PER_PACK") {
+                        lineTotal = packCount * unitPrice;
+                      } else if (r.pricingBasis === "PER_WEIGHT_UNIT") {
+                        lineTotal = recQty * unitPrice;
+                      } else {
+                        lineTotal = recQty * unitPrice;
+                      }
+                    } else {
+                      lineTotal = recQty * unitPrice;
+                    }
 
                     return (
-                      <tr key={r.itemId}>
+                      <tr key={r.poItemId}>
                         <td className="py-2.5 px-3 font-semibold">
-                          {r.itemName} <span className="text-[10px] opacity-75 font-normal">({r.unitOfMeasure})</span>
+                          <div>
+                            {r.itemName} <span className="text-[10px] opacity-75 font-normal">({r.unitOfMeasure})</span>
+                          </div>
+                          {r.packLabel && (
+                            <span className="text-[10px] font-semibold text-[#0071E3] block">
+                              📦 {formatPackLabelClean(r.packLabel, r.packDetails)}
+                            </span>
+                          )}
                         </td>
-                        <td className="py-2.5 px-3 text-right font-mono">{r.orderedQuantity}</td>
-                        <td className="py-2.5 px-3 text-right font-mono text-slate-400">{r.previouslyReceived}</td>
+
+                        <td className="py-2.5 px-3 text-right font-mono">
+                          {isPack ? (
+                            <>
+                              <span className="font-bold">{formatPackCount(Number(r.orderedPackCount), r.containerType)}</span>
+                              <span className="block text-[10px] text-slate-400 font-normal">
+                                ({r.orderedQuantity} {r.unitOfMeasure})
+                              </span>
+                            </>
+                          ) : (
+                            <span>{r.orderedQuantity}</span>
+                          )}
+                        </td>
+
+                        <td className="py-2.5 px-3 text-right font-mono text-slate-400">
+                          {isPack ? (
+                            <>
+                              <span>{formatPackCount(Number(r.receivedPackCount) || 0, r.containerType)}</span>
+                              <span className="block text-[10px] font-normal">
+                                ({r.previouslyReceived} {r.unitOfMeasure})
+                              </span>
+                            </>
+                          ) : (
+                            <span>{r.previouslyReceived}</span>
+                          )}
+                        </td>
+
+                        <td className="py-2.5 px-3 text-right font-mono">
+                          {isPack ? (
+                            <span className="font-bold text-[#0071E3]">
+                              {formatPackCount(Number(r.remainingPackCount), r.containerType)}
+                            </span>
+                          ) : (
+                            <span>{Math.max(0, r.orderedQuantity - r.previouslyReceived)}</span>
+                          )}
+                        </td>
+
                         <td className="py-2.5 px-3 text-right">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={r.receivingQuantity}
-                            onChange={(e) => handleReceiveRowChange(r.itemId, e.target.value)}
-                            className={`w-20 px-2 py-1 text-xs font-mono rounded-lg border text-right focus:outline-none focus:border-[#0071E3] ${
-                              isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
-                            }`}
-                          />
+                          {isPack ? (
+                            <div className="space-y-1 inline-block text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <input
+                                  type="number"
+                                  step="1"
+                                  min="0"
+                                  placeholder={r.containerType}
+                                  value={r.receivingPackCount}
+                                  onChange={(e) => handleReceivePackCountChange(r.poItemId, e.target.value)}
+                                  className={`w-16 px-2 py-1 text-xs font-mono rounded-lg border text-right focus:outline-none focus:border-[#0071E3] ${
+                                    isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                                  }`}
+                                />
+                                <span className={`text-[10px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                                  {formatPackUnitOnly(parseFloat(r.receivingPackCount) || 1, r.containerType)}
+                                </span>
+                              </div>
+
+                              {r.isVariableWeight ? (
+                                <div className="flex items-center justify-end gap-1 pt-0.5">
+                                  <span className="text-[9px] text-amber-500 font-medium">Actual Net:</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder={r.unitOfMeasure}
+                                    value={r.actualWeightReceived}
+                                    onChange={(e) => handleReceiveActualWeightChange(r.poItemId, e.target.value)}
+                                    className={`w-20 px-2 py-0.5 text-xs font-mono rounded-lg border text-right focus:outline-none focus:border-amber-500 ${
+                                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                                    }`}
+                                  />
+                                  <span className="text-[10px] text-amber-500 font-mono">{r.unitOfMeasure}</span>
+                                </div>
+                              ) : (
+                                <span className="block text-[10px] font-mono text-emerald-500">
+                                  = {(packCount * factor).toFixed(2)} {r.unitOfMeasure}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={r.receivingQuantity}
+                              onChange={(e) => handleReceiveRowChange(r.poItemId, e.target.value)}
+                              className={`w-20 px-2 py-1 text-xs font-mono rounded-lg border text-right focus:outline-none focus:border-[#0071E3] ${
+                                isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+                              }`}
+                            />
+                          )}
                         </td>
+
                         <td className="py-2.5 px-3 text-right">
                           <input
                             type="number"
                             step="0.01"
                             value={r.unitCost}
-                            onChange={(e) => handleReceiveUnitCostChange(r.itemId, e.target.value)}
+                            onChange={(e) => handleReceiveUnitCostChange(r.poItemId, e.target.value)}
                             className={`w-24 px-2 py-1 text-xs font-mono rounded-lg border text-right focus:outline-none focus:border-emerald-500 font-semibold ${
                               isDark ? "bg-[#0A0C12] border-white/[0.08] text-emerald-400" : "bg-white border-slate-200 text-emerald-700"
                             }`}
                           />
+                          {isPack && (
+                            <span className={`block text-[9px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                              {r.pricingBasis === "PER_PACK" ? `/${r.containerType}` : r.pricingBasis === "PER_WEIGHT_UNIT" ? `/${r.unitOfMeasure}` : "/unit"}
+                            </span>
+                          )}
                         </td>
+
                         <td className="py-2.5 px-3 text-right font-mono font-bold">
                           {formatCurrency(lineTotal)}
                         </td>
@@ -819,9 +1140,28 @@ export default function PurchaseOrderDetailPage({
                 <span className="font-mono font-bold text-sm text-emerald-500">
                   {formatCurrency(
                     receiveRows.reduce((acc, r) => {
-                      const recQty = parseFloat(r.receivingQuantity || "0") || 0;
+                      const isPack = Boolean(r.packLabel || r.orderedPackCount);
+                      const factor = Number(r.packConversionFactor) || 1;
+                      const packCount = parseFloat(r.receivingPackCount || "0") || 0;
+                      const actualWeight = parseFloat(r.actualWeightReceived || "0") || 0;
+                      const recQty = isPack
+                        ? (r.isVariableWeight ? actualWeight : packCount * factor)
+                        : (parseFloat(r.receivingQuantity || "0") || 0);
                       const unitPrice = parseFloat(r.unitCost || "0") || 0;
-                      return acc + recQty * unitPrice;
+
+                      let lineTotal = 0;
+                      if (isPack) {
+                        if (r.pricingBasis === "PER_PACK") {
+                          lineTotal = packCount * unitPrice;
+                        } else if (r.pricingBasis === "PER_WEIGHT_UNIT") {
+                          lineTotal = recQty * unitPrice;
+                        } else {
+                          lineTotal = recQty * unitPrice;
+                        }
+                      } else {
+                        lineTotal = recQty * unitPrice;
+                      }
+                      return acc + lineTotal;
                     }, 0)
                   )}
                 </span>
