@@ -14,6 +14,7 @@ import {
   UNIT_DEFINITIONS,
 } from "@/core/inventory/units";
 import {
+  ArrowLeft,
   ChefHat,
   Utensils,
   DollarSign,
@@ -487,9 +488,10 @@ export default function RecipeDetailPage({
               <div className="flex items-center gap-2 flex-wrap text-xs">
                 <Link
                   href={`/restaurant/${subdomain}/inventory/recipes`}
-                  className="text-slate-500 dark:text-slate-400 hover:text-[#0071E3] font-medium transition"
+                  className="text-slate-500 dark:text-slate-400 hover:text-[#0071E3] font-medium transition flex items-center gap-1 group"
                 >
-                  Recipes
+                  <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+                  <span>Recipes</span>
                 </Link>
                 <span className="text-slate-300 dark:text-slate-600">/</span>
                 <span className="text-slate-600 dark:text-slate-300 truncate max-w-[180px] sm:max-w-xs">

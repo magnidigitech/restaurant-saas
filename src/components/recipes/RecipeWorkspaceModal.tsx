@@ -141,6 +141,30 @@ export default function RecipeWorkspaceModal({
     },
   ]);
 
+  // Browser Back button integration: pressing Back closes the modal
+  useEffect(() => {
+    if (!isOpen) return;
+
+    window.history.pushState({ recipeModalOpen: true }, "");
+
+    const handlePopState = () => {
+      onClose();
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [isOpen, onClose]);
+
+  const handleClose = () => {
+    if (typeof window !== "undefined" && window.history.state?.recipeModalOpen) {
+      window.history.back();
+    } else {
+      onClose();
+    }
+  };
+
   // Load items & sub-recipes if not provided
   useEffect(() => {
     if (!isOpen) return;
@@ -464,7 +488,7 @@ export default function RecipeWorkspaceModal({
       if (onSaved) {
         onSaved(data.recipe);
       }
-      onClose();
+      handleClose();
     } catch (e: any) {
       setError(e.message || "Failed to save recipe");
     } finally {
@@ -509,7 +533,7 @@ export default function RecipeWorkspaceModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer"
             title="Close Workspace"
           >
@@ -1070,7 +1094,7 @@ export default function RecipeWorkspaceModal({
           <div className="flex items-center gap-2 justify-end">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="px-4 py-2 text-xs font-semibold rounded-xl text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition cursor-pointer"
             >
               Cancel

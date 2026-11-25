@@ -192,9 +192,29 @@ export default function RecipesDirectoryPage({
       const editId = new URLSearchParams(window.location.search).get("edit");
       if (editId) {
         handleEditRecipe({ id: editId } as any);
+      } else {
+        setActiveModal("NONE");
       }
     }
   }, []);
+
+  // Browser Back button integration: pressing Back closes open directory modal
+  useEffect(() => {
+    if (activeModal === "NONE") return;
+
+    window.history.pushState({ directoryModalOpen: activeModal }, "");
+
+    const handlePopState = () => {
+      setEditingRecipeId(null);
+      setActiveModal("NONE");
+      setError("");
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [activeModal]);
 
   const subRecipesList = recipes.filter((r) => r.type === "SUB_RECIPE" && !r.isDraft);
 
@@ -233,6 +253,9 @@ export default function RecipesDirectoryPage({
       if (url.searchParams.has("edit")) {
         url.searchParams.delete("edit");
         window.history.replaceState(null, "", url.pathname + (url.search ? url.search : ""));
+      }
+      if (window.history.state?.directoryModalOpen) {
+        window.history.back();
       }
     }
   };
@@ -765,7 +788,11 @@ export default function RecipesDirectoryPage({
             {filteredRecipes.map((r) => (
               <div
                 key={r.id}
-                onClick={() => router.push(`/restaurant/${subdomain}/inventory/recipes/${r.id}`)}
+                onClick={() => {
+                  setActiveModal("NONE");
+                  setEditingRecipeId(null);
+                  router.push(`/restaurant/${subdomain}/inventory/recipes/${r.id}`);
+                }}
                 className={`p-5 rounded-3xl border transition cursor-pointer flex flex-col justify-between gap-4 hover:border-[#0071E3] group ${
                   isDark
                     ? "bg-[#121622]/60 border-white/[0.06] hover:bg-[#121622]/90"
