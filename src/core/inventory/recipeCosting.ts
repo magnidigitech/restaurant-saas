@@ -7,6 +7,7 @@ import {
   formatUnitPricing,
   getUnitPricingMatrix,
   UnitEquivalentPricing,
+  UNIT_DEFINITIONS,
 } from "./units";
 
 export interface ComponentCostResult {
@@ -43,6 +44,7 @@ export interface RecipeCostBreakdown {
   isDraft: boolean;
   yieldQuantity: number;
   yieldUnit: UnitOfMeasure;
+  servingSize?: string | null;
   sellingPrice: number;
   totalCost: number;
   costPerUnit: number;
@@ -54,6 +56,13 @@ export interface RecipeCostBreakdown {
   costSource: "FORMULA_CALCULATED" | "STORED_SNAPSHOT" | "UNAVAILABLE";
   storedTotalCost?: number;
   storedCostPerUnit?: number;
+  batchWeightKg?: number;
+  batchVolumeL?: number;
+  portionWeightG?: number;
+  costPer100g?: number;
+  costPerKg?: number;
+  costPerLb?: number;
+  costPerOz?: number;
 }
 
 /**
@@ -251,6 +260,41 @@ export async function calculateRecipeCost(
     foodCostPercent = Math.min(100, (finalCostPerUnit / sellingPrice) * 100);
   }
 
+  // -------------------------------------------------------------------------
+  // Batch Output & Portion Derivation (Weight vs Volume vs Count)
+  // -------------------------------------------------------------------------
+  let totalBatchWeightKg = 0;
+  let totalBatchVolumeL = 0;
+
+  for (const item of itemsCostResult) {
+    const uom = item.unitOfMeasure;
+    const cat = UNIT_DEFINITIONS[uom]?.category;
+    if (cat === "WEIGHT") {
+      totalBatchWeightKg += convertQuantity(item.quantity, uom, "KG");
+    } else if (cat === "VOLUME") {
+      const volL = convertQuantity(item.quantity, uom, "L");
+      totalBatchVolumeL += volL;
+      // In professional culinary batch formulation, gravies/sauces/dairy/stocks have ~1.0 kg/L density
+      totalBatchWeightKg += volL;
+    }
+  }
+
+  let costPerKg: number | undefined;
+  let costPer100g: number | undefined;
+  let costPerLb: number | undefined;
+  let costPerOz: number | undefined;
+  let portionWeightG: number | undefined;
+
+  if (totalBatchWeightKg > 0 && finalTotalCost > 0) {
+    costPerKg = Number((finalTotalCost / totalBatchWeightKg).toFixed(2));
+    costPer100g = Number((costPerKg / 10).toFixed(2));
+    costPerLb = Number((costPerKg / 2.20462262).toFixed(2));
+    costPerOz = Number((costPerLb / 16).toFixed(2));
+    if (recipe.yieldUnit === "PORTION" && yieldQty > 0) {
+      portionWeightG = Math.round((totalBatchWeightKg * 1000) / yieldQty);
+    }
+  }
+
   return {
     recipeId: recipe.id,
     name: recipe.name,
@@ -258,6 +302,7 @@ export async function calculateRecipeCost(
     isDraft: recipe.isDraft,
     yieldQuantity: yieldQty,
     yieldUnit: recipe.yieldUnit,
+    servingSize: recipe.servingSize || null,
     sellingPrice,
     totalCost: finalTotalCost,
     costPerUnit: finalCostPerUnit,
@@ -269,6 +314,13 @@ export async function calculateRecipeCost(
     costSource,
     storedTotalCost: storedTotalCost > 0 ? storedTotalCost : undefined,
     storedCostPerUnit: storedCostPerUnit > 0 ? storedCostPerUnit : undefined,
+    batchWeightKg: totalBatchWeightKg > 0 ? Number(totalBatchWeightKg.toFixed(2)) : undefined,
+    batchVolumeL: totalBatchVolumeL > 0 ? Number(totalBatchVolumeL.toFixed(2)) : undefined,
+    portionWeightG,
+    costPer100g,
+    costPerKg,
+    costPerLb,
+    costPerOz,
   };
 }
 

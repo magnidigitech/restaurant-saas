@@ -92,6 +92,7 @@ interface RecipeCostBreakdownData {
   isDraft: boolean;
   yieldQuantity: number;
   yieldUnit: UnitOfMeasure;
+  servingSize?: string | null;
   sellingPrice: number;
   totalCost: number;
   costPerUnit: number;
@@ -103,6 +104,13 @@ interface RecipeCostBreakdownData {
   costSource: "FORMULA_CALCULATED" | "STORED_SNAPSHOT" | "UNAVAILABLE";
   storedTotalCost?: number;
   storedCostPerUnit?: number;
+  batchWeightKg?: number;
+  batchVolumeL?: number;
+  portionWeightG?: number;
+  costPer100g?: number;
+  costPerKg?: number;
+  costPerLb?: number;
+  costPerOz?: number;
 }
 
 /**
@@ -515,12 +523,31 @@ export default function RecipeDetailPage({
                   {ingredientsSummaryText}
                 </span>
 
-                {recipe.servingSize && (
+                {recipe.servingSize ? (
                   <>
                     <span>·</span>
-                    <span>Serving: {recipe.servingSize}</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-300">
+                      Serving: {recipe.servingSize}
+                    </span>
                   </>
-                )}
+                ) : breakdown?.portionWeightG ? (
+                  <>
+                    <span>·</span>
+                    <span>~{breakdown.portionWeightG}g / serving</span>
+                  </>
+                ) : null}
+
+                {breakdown?.batchWeightKg ? (
+                  <>
+                    <span>·</span>
+                    <span>{breakdown.batchWeightKg} kg batch output</span>
+                  </>
+                ) : breakdown?.batchVolumeL ? (
+                  <>
+                    <span>·</span>
+                    <span>{breakdown.batchVolumeL} L batch output</span>
+                  </>
+                ) : null}
 
                 {recipe.prepTimeMin && (
                   <>
@@ -1187,39 +1214,222 @@ export default function RecipeDetailPage({
                   Cost by unit
                 </h2>
                 <span className="text-xs text-slate-400">
-                  {unitInfo.short} basis
+                  {yieldUnitRaw === "PORTION"
+                    ? "Serving & weight basis"
+                    : yieldUnitRaw === "PIECES"
+                    ? "Piece count basis"
+                    : `${unitInfo.short} basis`}
                 </span>
               </div>
 
-              {costByUnitList.length === 0 ? (
+              {costState.unitCost === null || costState.unitCost <= 0 ? (
                 <p className="text-xs text-slate-400 italic py-2">
                   Cost by unit unavailable — add ingredients or cost data.
                 </p>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {costByUnitList.map((item) => (
+              ) : yieldUnitRaw === "PORTION" ? (
+                /* PORTION / SERVING BASED DISHES (Curries, Biryanis, Entrees) */
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Primary: Per Serving */}
                     <div
-                      key={item.unit}
-                      className={`p-2.5 rounded-xl border flex flex-col justify-between ${item.isPrimary
-                        ? isDark
-                          ? "bg-[#0071E3]/15 border-[#0071E3]/40"
-                          : "bg-blue-50/80 border-blue-200"
-                        : isDark
-                          ? "bg-white/[0.02] border-white/[0.06]"
-                          : "bg-slate-50 border-slate-200"
-                        }`}
+                      className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                        isDark ? "bg-[#0071E3]/15 border-[#0071E3]/40" : "bg-blue-50/80 border-blue-200"
+                      }`}
                     >
                       <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate">
-                        Per {item.label}
+                        Per Serving / Portion
                       </span>
-                      <span
-                        className={`text-sm font-bold font-mono tabular-nums mt-1 ${item.isPrimary ? "text-[#0071E3]" : "text-slate-900 dark:text-white"
-                          }`}
-                      >
-                        {item.formattedPricing}
+                      <span className="text-sm font-bold font-mono tabular-nums mt-1 text-[#0071E3]">
+                        ${costState.unitCost.toFixed(2)} / serving
                       </span>
                     </div>
-                  ))}
+
+                    {/* Batch Output Total */}
+                    <div
+                      className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                        isDark ? "bg-white/[0.02] border-white/[0.06]" : "bg-slate-50 border-slate-200"
+                      }`}
+                    >
+                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate">
+                        Full Batch ({yieldQty} serv)
+                      </span>
+                      <span className="text-sm font-bold font-mono tabular-nums mt-1 text-slate-900 dark:text-white">
+                        ${(costState.batchCost || 0).toFixed(2)}
+                      </span>
+                    </div>
+
+                    {/* Weight Equivalents: per 100g & per kg */}
+                    {breakdown?.costPer100g !== undefined && (
+                      <div
+                        className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                          isDark ? "bg-white/[0.02] border-white/[0.06]" : "bg-slate-50 border-slate-200"
+                        }`}
+                      >
+                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate">
+                          Per 100 grams
+                        </span>
+                        <span className="text-sm font-bold font-mono tabular-nums mt-1 text-slate-900 dark:text-white">
+                          ${breakdown.costPer100g.toFixed(2)} / 100g
+                        </span>
+                      </div>
+                    )}
+
+                    {breakdown?.costPerKg !== undefined && (
+                      <div
+                        className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                          isDark ? "bg-white/[0.02] border-white/[0.06]" : "bg-slate-50 border-slate-200"
+                        }`}
+                      >
+                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate">
+                          Per Kilogram
+                        </span>
+                        <span className="text-sm font-bold font-mono tabular-nums mt-1 text-slate-900 dark:text-white">
+                          ${breakdown.costPerKg.toFixed(2)} / kg
+                        </span>
+                      </div>
+                    )}
+
+                    {breakdown?.costPerLb !== undefined && (
+                      <div
+                        className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                          isDark ? "bg-white/[0.02] border-white/[0.06]" : "bg-slate-50 border-slate-200"
+                        }`}
+                      >
+                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate">
+                          Per Pound
+                        </span>
+                        <span className="text-sm font-bold font-mono tabular-nums mt-1 text-slate-900 dark:text-white">
+                          ${breakdown.costPerLb.toFixed(2)} / lb
+                        </span>
+                      </div>
+                    )}
+
+                    {breakdown?.costPerOz !== undefined && (
+                      <div
+                        className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                          isDark ? "bg-white/[0.02] border-white/[0.06]" : "bg-slate-50 border-slate-200"
+                        }`}
+                      >
+                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate">
+                          Per Ounce
+                        </span>
+                        <span className="text-sm font-bold font-mono tabular-nums mt-1 text-slate-900 dark:text-white">
+                          ${breakdown.costPerOz.toFixed(2)} / oz
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {breakdown?.batchWeightKg ? (
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed pt-1">
+                      Derived from {breakdown.batchWeightKg} kg batch output
+                      {breakdown.portionWeightG ? ` (~${breakdown.portionWeightG}g per portion)` : ""}.
+                      Costed by portion and kitchen weight, not by the dozen.
+                    </p>
+                  ) : null}
+                </div>
+              ) : yieldUnitRaw === "PIECES" ? (
+                /* PIECE BASED RECIPES (Buns, Patties, Samosas, Cookies) */
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div
+                      className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                        isDark ? "bg-[#0071E3]/15 border-[#0071E3]/40" : "bg-blue-50/80 border-blue-200"
+                      }`}
+                    >
+                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate">
+                        Per Piece
+                      </span>
+                      <span className="text-sm font-bold font-mono tabular-nums mt-1 text-[#0071E3]">
+                        ${costState.unitCost.toFixed(2)} / pcs
+                      </span>
+                    </div>
+
+                    <div
+                      className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                        isDark ? "bg-white/[0.02] border-white/[0.06]" : "bg-slate-50 border-slate-200"
+                      }`}
+                    >
+                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate">
+                        Per Dozen (12 pcs)
+                      </span>
+                      <span className="text-sm font-bold font-mono tabular-nums mt-1 text-slate-900 dark:text-white">
+                        ${(costState.unitCost * 12).toFixed(2)} / doz
+                      </span>
+                    </div>
+
+                    <div
+                      className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                        isDark ? "bg-white/[0.02] border-white/[0.06]" : "bg-slate-50 border-slate-200"
+                      }`}
+                    >
+                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate">
+                        Full Batch ({yieldQty} pcs)
+                      </span>
+                      <span className="text-sm font-bold font-mono tabular-nums mt-1 text-slate-900 dark:text-white">
+                        ${(costState.batchCost || 0).toFixed(2)}
+                      </span>
+                    </div>
+
+                    {recipe.servingSize && (
+                      <div
+                        className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                          isDark ? "bg-white/[0.02] border-white/[0.06]" : "bg-slate-50 border-slate-200"
+                        }`}
+                      >
+                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate">
+                          Serving ({recipe.servingSize})
+                        </span>
+                        <span className="text-sm font-bold font-mono tabular-nums mt-1 text-slate-900 dark:text-white">
+                          ${costState.unitCost.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* VOLUME OR WEIGHT BASED PREP RECIPES (Litres, kg, lbs, etc.) */
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    {costByUnitList.map((item) => (
+                      <div
+                        key={item.unit}
+                        className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                          item.isPrimary
+                            ? isDark
+                              ? "bg-[#0071E3]/15 border-[#0071E3]/40"
+                              : "bg-blue-50/80 border-blue-200"
+                            : isDark
+                            ? "bg-white/[0.02] border-white/[0.06]"
+                            : "bg-slate-50 border-slate-200"
+                        }`}
+                      >
+                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate">
+                          Per {item.label}
+                        </span>
+                        <span
+                          className={`text-sm font-bold font-mono tabular-nums mt-1 ${
+                            item.isPrimary ? "text-[#0071E3]" : "text-slate-900 dark:text-white"
+                          }`}
+                        >
+                          {item.formattedPricing}
+                        </span>
+                      </div>
+                    ))}
+
+                    <div
+                      className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                        isDark ? "bg-white/[0.02] border-white/[0.06]" : "bg-slate-50 border-slate-200"
+                      }`}
+                    >
+                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate">
+                        Full Batch Yield
+                      </span>
+                      <span className="text-sm font-bold font-mono tabular-nums mt-1 text-slate-900 dark:text-white">
+                        ${(costState.batchCost || 0).toFixed(2)} / {yieldQty} {unitInfo.short}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               )}
             </section>

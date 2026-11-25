@@ -1179,7 +1179,7 @@ export default function RecipesDirectoryPage({
 
                 {/* Name, Yield & Units */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                  <div className="sm:col-span-6">
+                  <div className="sm:col-span-5">
                     <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
                       Recipe Title *
                     </label>
@@ -1194,7 +1194,7 @@ export default function RecipesDirectoryPage({
                     />
                   </div>
 
-                  <div className="sm:col-span-3">
+                  <div className="sm:col-span-2">
                     <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
                       Batch Yield Qty *
                     </label>
@@ -1210,7 +1210,7 @@ export default function RecipesDirectoryPage({
                     />
                   </div>
 
-                  <div className="sm:col-span-3">
+                  <div className="sm:col-span-2">
                     <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
                       Yield Unit *
                     </label>
@@ -1231,6 +1231,21 @@ export default function RecipesDirectoryPage({
                         </optgroup>
                       ))}
                     </select>
+                  </div>
+
+                  <div className="sm:col-span-3">
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                      Serving Size (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 450g, 250ml, 2 pcs"
+                      value={formServingSize}
+                      onChange={(e) => setFormServingSize(e.target.value)}
+                      className={`w-full px-3 py-2 text-xs rounded-xl border focus:outline-none ${
+                        isDark ? "bg-white/[0.04] border-white/[0.08]" : "bg-white border-slate-200"
+                      }`}
+                    />
                   </div>
                 </div>
 

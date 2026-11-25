@@ -177,7 +177,11 @@ export function getUnitPricingMatrix(
   } else if (category === "VOLUME") {
     targetUnits = ["LADLE", "CUP", "FL_OZ", "TBSP", "TSP", "L", "ML", "GAL", "QT", "PT"];
   } else if (category === "COUNT") {
-    targetUnits = ["PIECES", "DOZEN", "PORTION"];
+    if (baseUnit === "PORTION") {
+      targetUnits = ["PORTION"];
+    } else {
+      targetUnits = ["PIECES", "DOZEN"];
+    }
   } else {
     targetUnits = [baseUnit];
   }
