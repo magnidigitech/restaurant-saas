@@ -1006,20 +1006,30 @@ export default function RecipeDetailPage({
                     .split("\n")
                     .map((l) => l.trim())
                     .filter(Boolean)
-                    .map((step, idx) => (
-                      <div
-                        key={idx}
-                        className={`p-3 rounded-xl border flex items-start gap-2.5 text-xs leading-relaxed ${isDark
-                          ? "bg-white/[0.02] border-white/[0.05] text-slate-200"
-                          : "bg-slate-50/70 border-slate-200 text-slate-800"
-                          }`}
-                      >
-                        <span className="w-5 h-5 rounded-full bg-[#0071E3]/10 text-[#0071E3] font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
-                          {idx + 1}
-                        </span>
-                        <span className="min-w-0 flex-1">{step}</span>
-                      </div>
-                    ))}
+                    .map((rawStep, idx) => {
+                      // Trim leading numbering/bullets like "1. ", "1) ", "1 - ", "Step 1: ", etc.
+                      const step =
+                        rawStep
+                          .replace(
+                            /^(?:step\s*\d+[\s.:-]*|(?:\d+\.)*\d+[.):-]+\s+|[-*•]\s+)/i,
+                            ""
+                          )
+                          .trim() || rawStep;
+                      return (
+                        <div
+                          key={idx}
+                          className={`p-3 rounded-xl border flex items-start gap-2.5 text-xs leading-relaxed ${isDark
+                            ? "bg-white/[0.02] border-white/[0.05] text-slate-200"
+                            : "bg-slate-50/70 border-slate-200 text-slate-800"
+                            }`}
+                        >
+                          <span className="w-5 h-5 rounded-full bg-[#0071E3]/10 text-[#0071E3] font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                            {idx + 1}
+                          </span>
+                          <span className="min-w-0 flex-1">{step}</span>
+                        </div>
+                      );
+                    })}
                 </div>
               </section>
             )}
