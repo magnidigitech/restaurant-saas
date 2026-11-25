@@ -424,9 +424,8 @@ export default function RecipeDetailPage({
   if (loading) {
     return (
       <div
-        className={`min-h-screen flex flex-col items-center justify-center font-sans antialiased ${
-          isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
-        }`}
+        className={`min-h-screen flex flex-col items-center justify-center font-sans antialiased ${isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+          }`}
       >
         <div className="w-8 h-8 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin mb-3" />
         <p className="text-xs text-slate-500 font-medium">Loading recipe details...</p>
@@ -437,9 +436,8 @@ export default function RecipeDetailPage({
   if (!recipe) {
     return (
       <div
-        className={`min-h-screen flex flex-col font-sans antialiased ${
-          isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
-        }`}
+        className={`min-h-screen flex flex-col font-sans antialiased ${isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+          }`}
       >
         <RestaurantNavbar activeSection="Recipes" />
         <main className="max-w-4xl mx-auto p-6 space-y-4">
@@ -459,20 +457,18 @@ export default function RecipeDetailPage({
 
   return (
     <div
-      className={`min-h-screen font-sans antialiased transition-colors duration-200 flex flex-col ${
-        isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
-      }`}
+      className={`min-h-screen font-sans antialiased transition-colors duration-200 flex flex-col ${isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
+        }`}
     >
       <RestaurantNavbar activeSection="Recipes" />
 
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-5">
         {/* Compact Breadcrumb & Header Bar */}
         <header
-          className={`p-5 sm:p-6 rounded-2xl border transition ${
-            isDark
-              ? "bg-[#121622] border-white/[0.08]"
-              : "bg-white border-slate-200 shadow-2xs"
-          }`}
+          className={`p-5 sm:p-6 rounded-2xl border transition ${isDark
+            ? "bg-[#121622] border-white/[0.08]"
+            : "bg-white border-slate-200 shadow-2xs"
+            }`}
         >
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div className="space-y-1.5 min-w-0 flex-1">
@@ -490,21 +486,19 @@ export default function RecipeDetailPage({
                 </span>
 
                 <span
-                  className={`ml-1 text-[11px] font-semibold px-2 py-0.5 rounded-md border ${
-                    isDish
-                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
-                      : "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20"
-                  }`}
+                  className={`ml-1 text-[11px] font-semibold px-2 py-0.5 rounded-md border ${isDish
+                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
+                    : "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20"
+                    }`}
                 >
                   {isDish ? "Menu dish" : "Prep recipe"}
                 </span>
 
                 <span
-                  className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border ${
-                    recipe.isDraft
-                      ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
-                      : "bg-blue-500/10 text-[#0071E3] dark:text-[#70B4FF] border-blue-500/20"
-                  }`}
+                  className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border ${recipe.isDraft
+                    ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+                    : "bg-blue-500/10 text-[#0071E3] dark:text-[#70B4FF] border-blue-500/20"
+                    }`}
                 >
                   {recipe.isDraft ? "Draft" : "Published"}
                 </span>
@@ -585,9 +579,8 @@ export default function RecipeDetailPage({
                       onClick={() => setShowOverflowMenu(false)}
                     />
                     <div
-                      className={`absolute right-0 top-full mt-1.5 w-48 rounded-2xl border shadow-xl p-1 z-30 ${
-                        isDark ? "bg-[#181D2D] border-white/[0.1]" : "bg-white border-slate-200"
-                      }`}
+                      className={`absolute right-0 top-full mt-1.5 w-48 rounded-2xl border shadow-xl p-1 z-30 ${isDark ? "bg-[#181D2D] border-white/[0.1]" : "bg-white border-slate-200"
+                        }`}
                     >
                       {recipe.isDraft && (
                         <button
@@ -633,11 +626,10 @@ export default function RecipeDetailPage({
           <div className="lg:col-span-7 xl:col-span-8 space-y-5">
             {/* Ingredients Section */}
             <section
-              className={`p-5 sm:p-6 rounded-2xl border transition ${
-                isDark
-                  ? "bg-[#121622] border-white/[0.08]"
-                  : "bg-white border-slate-200 shadow-2xs"
-              }`}
+              className={`p-5 sm:p-6 rounded-2xl border transition ${isDark
+                ? "bg-[#121622] border-white/[0.08]"
+                : "bg-white border-slate-200 shadow-2xs"
+                }`}
             >
               <div className="flex items-center justify-between pb-3 border-b border-black/[0.06] dark:border-white/[0.06] mb-4">
                 <div>
@@ -712,11 +704,10 @@ export default function RecipeDetailPage({
                                       {item.name}
                                     </span>
                                     <span
-                                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
-                                        item.componentType === "SUB_RECIPE"
-                                          ? "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20"
-                                          : "bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/[0.08]"
-                                      }`}
+                                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${item.componentType === "SUB_RECIPE"
+                                        ? "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20"
+                                        : "bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/[0.08]"
+                                        }`}
                                     >
                                       {item.componentType === "SUB_RECIPE" ? "Prep recipe" : "Item"}
                                     </span>
@@ -838,11 +829,10 @@ export default function RecipeDetailPage({
                       return (
                         <div
                           key={rowKey}
-                          className={`p-3 rounded-xl border transition ${
-                            isDark
-                              ? "bg-white/[0.02] border-white/[0.06]"
-                              : "bg-slate-50/70 border-slate-200"
-                          }`}
+                          className={`p-3 rounded-xl border transition ${isDark
+                            ? "bg-white/[0.02] border-white/[0.06]"
+                            : "bg-slate-50/70 border-slate-200"
+                            }`}
                         >
                           <div
                             onClick={() => toggleRowExpanded(rowKey)}
@@ -854,11 +844,10 @@ export default function RecipeDetailPage({
                                   {item.name}
                                 </span>
                                 <span
-                                  className={`text-[9px] font-semibold px-1 py-0.2 rounded border shrink-0 ${
-                                    item.componentType === "SUB_RECIPE"
-                                      ? "bg-purple-500/10 text-purple-700 border-purple-500/20"
-                                      : "bg-slate-100 text-slate-600 border-slate-200"
-                                  }`}
+                                  className={`text-[9px] font-semibold px-1 py-0.2 rounded border shrink-0 ${item.componentType === "SUB_RECIPE"
+                                    ? "bg-purple-500/10 text-purple-700 border-purple-500/20"
+                                    : "bg-slate-100 text-slate-600 border-slate-200"
+                                    }`}
                                 >
                                   {item.componentType === "SUB_RECIPE" ? "Prep" : "Item"}
                                 </span>
@@ -932,11 +921,10 @@ export default function RecipeDetailPage({
             {/* Preparation Instructions Section */}
             {recipe.instructions && (
               <section
-                className={`p-5 sm:p-6 rounded-2xl border transition ${
-                  isDark
-                    ? "bg-[#121622] border-white/[0.08]"
-                    : "bg-white border-slate-200 shadow-2xs"
-                }`}
+                className={`p-5 sm:p-6 rounded-2xl border transition ${isDark
+                  ? "bg-[#121622] border-white/[0.08]"
+                  : "bg-white border-slate-200 shadow-2xs"
+                  }`}
               >
                 <div className="flex items-center gap-2 pb-3 border-b border-black/[0.06] dark:border-white/[0.06] mb-3">
                   <Flame className="w-4 h-4 text-amber-500" />
@@ -952,11 +940,10 @@ export default function RecipeDetailPage({
                     .map((step, idx) => (
                       <div
                         key={idx}
-                        className={`p-3 rounded-xl border flex items-start gap-2.5 text-xs leading-relaxed ${
-                          isDark
-                            ? "bg-white/[0.02] border-white/[0.05] text-slate-200"
-                            : "bg-slate-50/70 border-slate-200 text-slate-800"
-                        }`}
+                        className={`p-3 rounded-xl border flex items-start gap-2.5 text-xs leading-relaxed ${isDark
+                          ? "bg-white/[0.02] border-white/[0.05] text-slate-200"
+                          : "bg-slate-50/70 border-slate-200 text-slate-800"
+                          }`}
                       >
                         <span className="w-5 h-5 rounded-full bg-[#0071E3]/10 text-[#0071E3] font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
                           {idx + 1}
@@ -971,11 +958,10 @@ export default function RecipeDetailPage({
             {/* Used In Section (Placed below relevant content for Prep Recipes) */}
             {isSubRecipe && (
               <section
-                className={`p-5 sm:p-6 rounded-2xl border transition ${
-                  isDark
-                    ? "bg-[#121622] border-white/[0.08]"
-                    : "bg-white border-slate-200 shadow-2xs"
-                }`}
+                className={`p-5 sm:p-6 rounded-2xl border transition ${isDark
+                  ? "bg-[#121622] border-white/[0.08]"
+                  : "bg-white border-slate-200 shadow-2xs"
+                  }`}
               >
                 <div className="flex items-center justify-between pb-3 border-b border-black/[0.06] dark:border-white/[0.06] mb-3">
                   <div className="flex items-center gap-2">
@@ -995,11 +981,10 @@ export default function RecipeDetailPage({
                       <Link
                         key={u.id}
                         href={`/restaurant/${subdomain}/inventory/recipes/${u.recipe.id}`}
-                        className={`p-3 rounded-xl border text-left flex items-center justify-between gap-2 transition hover:border-[#0071E3] ${
-                          isDark
-                            ? "bg-white/[0.02] border-white/[0.06]"
-                            : "bg-slate-50 border-slate-200"
-                        }`}
+                        className={`p-3 rounded-xl border text-left flex items-center justify-between gap-2 transition hover:border-[#0071E3] ${isDark
+                          ? "bg-white/[0.02] border-white/[0.06]"
+                          : "bg-slate-50 border-slate-200"
+                          }`}
                       >
                         <div className="min-w-0">
                           <span className="text-xs font-semibold text-slate-900 dark:text-white truncate block">
@@ -1026,11 +1011,10 @@ export default function RecipeDetailPage({
           <div className="lg:col-span-5 xl:col-span-4 space-y-5">
             {/* Cost and Pricing Summary Card */}
             <section
-              className={`p-5 sm:p-6 rounded-2xl border transition ${
-                isDark
-                  ? "bg-[#121622] border-white/[0.08]"
-                  : "bg-white border-slate-200 shadow-2xs"
-              }`}
+              className={`p-5 sm:p-6 rounded-2xl border transition ${isDark
+                ? "bg-[#121622] border-white/[0.08]"
+                : "bg-white border-slate-200 shadow-2xs"
+                }`}
             >
               <div className="flex items-center justify-between pb-3 border-b border-black/[0.06] dark:border-white/[0.06] mb-4">
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -1102,15 +1086,14 @@ export default function RecipeDetailPage({
                       Food cost %
                     </span>
                     <span
-                      className={`text-sm font-bold font-mono tabular-nums ${
-                        financialMetrics.foodCostPercent === null
-                          ? "text-slate-400"
-                          : financialMetrics.foodCostPercent <= 28.6
+                      className={`text-sm font-bold font-mono tabular-nums ${financialMetrics.foodCostPercent === null
+                        ? "text-slate-400"
+                        : financialMetrics.foodCostPercent <= 28.6
                           ? "text-emerald-600 dark:text-emerald-400"
                           : financialMetrics.foodCostPercent <= 35
-                          ? "text-amber-600"
-                          : "text-rose-600"
-                      }`}
+                            ? "text-amber-600"
+                            : "text-rose-600"
+                        }`}
                     >
                       {financialMetrics.foodCostPercent !== null
                         ? `${financialMetrics.foodCostPercent.toFixed(1)}%`
@@ -1124,13 +1107,12 @@ export default function RecipeDetailPage({
                       Gross margin %
                     </span>
                     <span
-                      className={`text-sm font-bold font-mono tabular-nums ${
-                        financialMetrics.grossMarginPercent === null
-                          ? "text-slate-400"
-                          : financialMetrics.grossMarginPercent >= 70
+                      className={`text-sm font-bold font-mono tabular-nums ${financialMetrics.grossMarginPercent === null
+                        ? "text-slate-400"
+                        : financialMetrics.grossMarginPercent >= 70
                           ? "text-emerald-600 dark:text-emerald-400"
                           : "text-slate-900 dark:text-white"
-                      }`}
+                        }`}
                     >
                       {financialMetrics.grossMarginPercent !== null
                         ? `${financialMetrics.grossMarginPercent.toFixed(1)}%`
@@ -1144,13 +1126,12 @@ export default function RecipeDetailPage({
                       {unitInfo.profitLabel}
                     </span>
                     <span
-                      className={`text-base font-bold font-mono tabular-nums ${
-                        financialMetrics.grossProfit === null
-                          ? "text-slate-400"
-                          : financialMetrics.isProfitable
+                      className={`text-base font-bold font-mono tabular-nums ${financialMetrics.grossProfit === null
+                        ? "text-slate-400"
+                        : financialMetrics.isProfitable
                           ? "text-emerald-600 dark:text-emerald-400"
                           : "text-rose-600"
-                      }`}
+                        }`}
                     >
                       {financialMetrics.grossProfit !== null
                         ? `$${financialMetrics.grossProfit.toFixed(2)}`
@@ -1196,11 +1177,10 @@ export default function RecipeDetailPage({
 
             {/* Cost by Unit Section */}
             <section
-              className={`p-5 sm:p-6 rounded-2xl border transition ${
-                isDark
-                  ? "bg-[#121622] border-white/[0.08]"
-                  : "bg-white border-slate-200 shadow-2xs"
-              }`}
+              className={`p-5 sm:p-6 rounded-2xl border transition ${isDark
+                ? "bg-[#121622] border-white/[0.08]"
+                : "bg-white border-slate-200 shadow-2xs"
+                }`}
             >
               <div className="flex items-center justify-between pb-3 border-b border-black/[0.06] dark:border-white/[0.06] mb-3">
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -1220,23 +1200,21 @@ export default function RecipeDetailPage({
                   {costByUnitList.map((item) => (
                     <div
                       key={item.unit}
-                      className={`p-2.5 rounded-xl border flex flex-col justify-between ${
-                        item.isPrimary
-                          ? isDark
-                            ? "bg-[#0071E3]/15 border-[#0071E3]/40"
-                            : "bg-blue-50/80 border-blue-200"
-                          : isDark
+                      className={`p-2.5 rounded-xl border flex flex-col justify-between ${item.isPrimary
+                        ? isDark
+                          ? "bg-[#0071E3]/15 border-[#0071E3]/40"
+                          : "bg-blue-50/80 border-blue-200"
+                        : isDark
                           ? "bg-white/[0.02] border-white/[0.06]"
                           : "bg-slate-50 border-slate-200"
-                      }`}
+                        }`}
                     >
                       <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate">
                         Per {item.label}
                       </span>
                       <span
-                        className={`text-sm font-bold font-mono tabular-nums mt-1 ${
-                          item.isPrimary ? "text-[#0071E3]" : "text-slate-900 dark:text-white"
-                        }`}
+                        className={`text-sm font-bold font-mono tabular-nums mt-1 ${item.isPrimary ? "text-[#0071E3]" : "text-slate-900 dark:text-white"
+                          }`}
                       >
                         {item.formattedPricing}
                       </span>
@@ -1253,9 +1231,8 @@ export default function RecipeDetailPage({
       {showArchiveModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-150 overscroll-contain">
           <div
-            className={`w-full max-w-md p-6 rounded-2xl border shadow-xl space-y-4 animate-in zoom-in-95 duration-150 ${
-              isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
-            }`}
+            className={`w-full max-w-md p-6 rounded-2xl border shadow-xl space-y-4 animate-in zoom-in-95 duration-150 ${isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
+              }`}
           >
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0">
