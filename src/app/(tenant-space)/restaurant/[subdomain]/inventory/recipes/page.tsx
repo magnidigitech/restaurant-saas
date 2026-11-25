@@ -26,6 +26,7 @@ import {
   Info,
   ExternalLink,
   BookOpen,
+  X,
 } from "lucide-react";
 
 interface Recipe {
@@ -1102,507 +1103,590 @@ export default function RecipesDirectoryPage({
         )}
 
         {/* ========================================================================= */}
-        {/* MODAL 3: UNIFIED RECIPE WORKSPACE (DRAWER / FULL EDIT MODAL)              */}
+        {/* MODAL 3: UNIFIED RECIPE WORKSPACE (EXPANSIVE STUDIO WITH FROZEN FOOTER)   */}
         {/* ========================================================================= */}
         {activeModal === "WORKSPACE" && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-3 md:p-5 bg-black/70 backdrop-blur-md animate-in fade-in">
             <div
-              className={`w-full max-w-5xl rounded-3xl border shadow-2xl p-5 sm:p-7 space-y-5 max-h-[95vh] overflow-y-auto ${
-                isDark ? "bg-[#090B10] border-white/[0.1] text-white" : "bg-white border-slate-200 text-slate-900"
+              className={`w-full h-full sm:h-[95vh] sm:max-w-6xl xl:max-w-7xl sm:rounded-3xl border border-black/10 dark:border-white/10 shadow-2xl flex flex-col overflow-hidden ${
+                isDark ? "bg-[#090B10] text-white" : "bg-white text-slate-900"
               }`}
             >
-              {/* Workspace Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-black/[0.06] dark:border-white/[0.06]">
-                <div className="flex items-center gap-2">
-                  <ChefHat className="w-5 h-5 text-[#0071E3]" />
-                  <h3 className="font-bold text-sm">
-                    {editingRecipeId ? "Edit Recipe Formulation" : "Unified Recipe Workspace"}
-                  </h3>
-                  {formIsDraft && (
-                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                      Draft Mode
-                    </span>
-                  )}
+              {/* Frozen Header */}
+              <div className="shrink-0 px-4 sm:px-7 py-3.5 border-b border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between bg-white/95 dark:bg-[#090B10]/95 backdrop-blur-md z-20">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-[#0071E3]/10 text-[#0071E3] flex items-center justify-center shrink-0">
+                    <ChefHat className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-sm sm:text-base">
+                        {editingRecipeId ? "Edit Recipe Formulation" : "Unified Recipe Workspace"}
+                      </h3>
+                      {formIsDraft ? (
+                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                          Draft Mode
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                          Active Recipe
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">
+                      Formula ingredients, kitchen shrinkage, and dynamic food costing.
+                    </p>
+                  </div>
                 </div>
                 <button
+                  type="button"
                   onClick={resetWorkspace}
-                  className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer"
+                  title="Close Workspace"
                 >
-                  ✕ Close
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Recipe Meta Details (Type, Name, Yield, Instructions) */}
-              <div className="space-y-4">
-                {/* Type Selector Toggle */}
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setFormType("DISH")}
-                    className={`p-3 rounded-2xl border text-left flex items-start gap-3 transition cursor-pointer ${
-                      formType === "DISH"
-                        ? "bg-[#0071E3]/15 border-[#0071E3] text-[#0071E3]"
-                        : isDark
-                        ? "bg-white/[0.02] border-white/[0.06] text-slate-400"
-                        : "bg-slate-50 border-slate-200 text-slate-600"
-                    }`}
-                  >
-                    <UtensilsCrossed className="w-4 h-4 mt-0.5 shrink-0" />
-                    <div>
-                      <div className="text-xs font-bold">Menu Dish</div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">
-                        Sold directly via POS & Catering with selling price & gross margin.
-                      </div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setFormType("SUB_RECIPE")}
-                    className={`p-3 rounded-2xl border text-left flex items-start gap-3 transition cursor-pointer ${
-                      formType === "SUB_RECIPE"
-                        ? "bg-purple-500/15 border-purple-500 text-purple-600 dark:text-purple-400"
-                        : isDark
-                        ? "bg-white/[0.02] border-white/[0.06] text-slate-400"
-                        : "bg-slate-50 border-slate-200 text-slate-600"
-                    }`}
-                  >
-                    <Layers className="w-4 h-4 mt-0.5 shrink-0" />
-                    <div>
-                      <div className="text-xs font-bold">Sub-Recipe (Prep Batch)</div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">
-                        Batch prep (sauces, marinades, doughs) reused inside dishes.
-                      </div>
-                    </div>
-                  </button>
-                </div>
-
-                {/* Name, Yield & Units */}
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                  <div className="sm:col-span-5">
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Recipe Title *
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Signature Truffle Burger, Tikka Base Gravy"
-                      value={formName}
-                      onChange={(e) => setFormName(e.target.value)}
-                      className={`w-full px-3 py-2 text-xs rounded-xl border focus:outline-none focus:ring-1 focus:ring-[#0071E3] ${
-                        isDark ? "bg-white/[0.04] border-white/[0.08]" : "bg-white border-slate-200"
-                      }`}
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Batch Yield Qty *
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      min="0.1"
-                      value={formYieldQty}
-                      onChange={(e) => setFormYieldQty(e.target.value)}
-                      className={`w-full px-3 py-2 text-xs rounded-xl border focus:outline-none ${
-                        isDark ? "bg-white/[0.04] border-white/[0.08]" : "bg-white border-slate-200"
-                      }`}
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Yield Unit *
-                    </label>
-                    <select
-                      value={formYieldUnit}
-                      onChange={(e) => setFormYieldUnit(e.target.value)}
-                      className={`w-full px-3 py-2 text-xs rounded-xl border focus:outline-none ${
-                        isDark ? "bg-[#0F131D] border-white/[0.08]" : "bg-white border-slate-200"
+              {/* Scrollable Body */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-7 space-y-6">
+                {/* Recipe Meta Details (Type, Name, Yield, Instructions) */}
+                <div className="space-y-4">
+                  {/* Type Selector Toggle */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setFormType("DISH")}
+                      className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition cursor-pointer ${
+                        formType === "DISH"
+                          ? "bg-[#0071E3]/10 border-[#0071E3] text-[#0071E3] shadow-xs"
+                          : isDark
+                          ? "bg-white/[0.02] border-white/[0.06] text-slate-400 hover:border-white/[0.12]"
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300"
                       }`}
                     >
-                      {CULINARY_UOM_GROUPS.map((g) => (
-                        <optgroup key={g.group} label={g.group}>
-                          {g.options.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                  </div>
+                      <UtensilsCrossed className="w-4 h-4 mt-0.5 shrink-0" />
+                      <div>
+                        <div className="text-xs font-bold">Menu Dish</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          Sold directly via POS & Catering with selling price & gross margin.
+                        </div>
+                      </div>
+                    </button>
 
-                  <div className="sm:col-span-3">
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Serving Size (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 450g, 250ml, 2 pcs"
-                      value={formServingSize}
-                      onChange={(e) => setFormServingSize(e.target.value)}
-                      className={`w-full px-3 py-2 text-xs rounded-xl border focus:outline-none ${
-                        isDark ? "bg-white/[0.04] border-white/[0.08]" : "bg-white border-slate-200"
+                    <button
+                      type="button"
+                      onClick={() => setFormType("SUB_RECIPE")}
+                      className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition cursor-pointer ${
+                        formType === "SUB_RECIPE"
+                          ? "bg-purple-500/10 border-purple-500 text-purple-600 dark:text-purple-400 shadow-xs"
+                          : isDark
+                          ? "bg-white/[0.02] border-white/[0.06] text-slate-400 hover:border-white/[0.12]"
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300"
                       }`}
-                    />
-                  </div>
-                </div>
-
-                {/* Instructions Collapsible Area */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    Preparation Instructions (Method & Steps)
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="1. Sear patties on high heat for 3 minutes.\n2. Simmer tomatoes with garlic and house gravy."
-                    value={formInstructions}
-                    onChange={(e) => setFormInstructions(e.target.value)}
-                    className={`w-full p-2.5 text-xs rounded-xl border focus:outline-none ${
-                      isDark ? "bg-white/[0.04] border-white/[0.08]" : "bg-white border-slate-200"
-                    }`}
-                  />
-                </div>
-              </div>
-
-              {/* Real-Time Costing & Food Cost Simulator */}
-              <div
-                className={`p-4 rounded-2xl border space-y-3 ${
-                  isDark ? "bg-white/[0.02] border-white/[0.06]" : "bg-slate-50 border-slate-200/90"
-                }`}
-              >
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-bold">Batch Total Cost</span>
-                    <span className="text-base font-bold font-mono text-slate-900 dark:text-white">
-                      ${calculatedTotalBatchCost.toFixed(2)}
-                    </span>
+                    >
+                      <Layers className="w-4 h-4 mt-0.5 shrink-0" />
+                      <div>
+                        <div className="text-xs font-bold">Sub-Recipe (Prep Batch)</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          Batch prep (sauces, marinades, doughs) reused inside dishes.
+                        </div>
+                      </div>
+                    </button>
                   </div>
 
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-bold">Cost per Portion</span>
-                    <span className="text-base font-bold font-mono text-[#0071E3]">
-                      ${calculatedCostPerPortion.toFixed(2)}
-                    </span>
-                  </div>
-
-                  {formType === "DISH" && (
-                    <div>
-                      <span className="text-[10px] text-slate-400 block uppercase font-bold">Selling Price ($)</span>
+                  {/* Name, Yield & Units */}
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                    <div className="sm:col-span-5">
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                        Recipe Title *
+                      </label>
                       <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={formSellingPrice}
-                        onChange={(e) => setFormSellingPrice(e.target.value)}
-                        className={`w-28 px-2 py-1 text-xs font-mono font-bold rounded-lg border mt-0.5 ${
+                        type="text"
+                        placeholder="e.g. Signature Truffle Burger, Tikka Base Gravy"
+                        value={formName}
+                        onChange={(e) => setFormName(e.target.value)}
+                        className={`w-full px-3 py-2 text-xs rounded-xl border focus:outline-none focus:ring-1 focus:ring-[#0071E3] ${
                           isDark ? "bg-white/[0.04] border-white/[0.08]" : "bg-white border-slate-200"
                         }`}
                       />
                     </div>
-                  )}
 
-                  {formType === "DISH" && (
-                    <div>
-                      <span className="text-[10px] text-slate-400 block uppercase font-bold">Gross Margin %</span>
-                      <span
-                        className={`text-base font-bold font-mono ${
-                          currentGrossMargin >= 65 ? "text-emerald-500" : "text-amber-500"
-                        }`}
-                      >
-                        {currentGrossMargin > 0 ? `${currentGrossMargin.toFixed(1)}%` : "0.0%"}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {formType === "DISH" && (
-                  <div className="pt-2 border-t border-black/[0.04] dark:border-white/[0.04] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-500 text-[11px]">Target Food Cost %:</span>
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                        Batch Yield Qty *
+                      </label>
                       <input
                         type="number"
-                        min="5"
-                        max="90"
-                        value={targetFoodCostPercent}
-                        onChange={(e) => setTargetFoodCostPercent(e.target.value)}
-                        className="w-14 px-2 py-0.5 text-xs font-mono rounded-lg border text-center"
+                        step="any"
+                        min="0.1"
+                        value={formYieldQty}
+                        onChange={(e) => setFormYieldQty(e.target.value)}
+                        className={`w-full px-3 py-2 text-xs rounded-xl border focus:outline-none focus:ring-1 focus:ring-[#0071E3] ${
+                          isDark ? "bg-white/[0.04] border-white/[0.08]" : "bg-white border-slate-200"
+                        }`}
                       />
-                      <span className="text-slate-400 text-[11px]">
-                        ➔ Suggested Price: <strong className="text-slate-900 dark:text-white font-mono">${suggestedSellingPrice.toFixed(2)}</strong>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                        Yield Unit *
+                      </label>
+                      <select
+                        value={formYieldUnit}
+                        onChange={(e) => setFormYieldUnit(e.target.value)}
+                        className={`w-full px-3 py-2 text-xs rounded-xl border focus:outline-none focus:ring-1 focus:ring-[#0071E3] ${
+                          isDark ? "bg-[#0F131D] border-white/[0.08]" : "bg-white border-slate-200"
+                        }`}
+                      >
+                        {CULINARY_UOM_GROUPS.map((g) => (
+                          <optgroup key={g.group} label={g.group}>
+                            {g.options.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                        Serving Size (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 450g, 250ml, 2 pcs"
+                        value={formServingSize}
+                        onChange={(e) => setFormServingSize(e.target.value)}
+                        className={`w-full px-3 py-2 text-xs rounded-xl border focus:outline-none focus:ring-1 focus:ring-[#0071E3] ${
+                          isDark ? "bg-white/[0.04] border-white/[0.08]" : "bg-white border-slate-200"
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Instructions Collapsible Area */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                      Preparation Instructions (Method & Steps)
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder={`1. Sear patties on high heat for 3 minutes.\n2. Simmer tomatoes with garlic and house gravy.`}
+                      value={formInstructions}
+                      onChange={(e) => setFormInstructions(e.target.value)}
+                      className={`w-full p-2.5 text-xs rounded-xl border focus:outline-none focus:ring-1 focus:ring-[#0071E3] ${
+                        isDark ? "bg-white/[0.04] border-white/[0.08]" : "bg-white border-slate-200"
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                {/* Real-Time Costing & Food Cost Simulator */}
+                <div
+                  className={`p-4 rounded-2xl border space-y-3 ${
+                    isDark ? "bg-white/[0.02] border-white/[0.06]" : "bg-slate-50 border-slate-200/90"
+                  }`}
+                >
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block uppercase font-bold">Batch Total Cost</span>
+                      <span className="text-base font-bold font-mono text-slate-900 dark:text-white">
+                        ${calculatedTotalBatchCost.toFixed(2)}
                       </span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={handleApplySuggestedPrice}
-                      className="px-3 py-1 bg-[#0071E3]/15 text-[#0071E3] font-semibold rounded-lg hover:bg-[#0071E3]/25 transition text-xs cursor-pointer"
-                    >
-                      Apply Suggested Price (${suggestedSellingPrice.toFixed(2)})
-                    </button>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block uppercase font-bold">Cost per Portion</span>
+                      <span className="text-base font-bold font-mono text-[#0071E3]">
+                        ${calculatedCostPerPortion.toFixed(2)}
+                      </span>
+                    </div>
+
+                    {formType === "DISH" && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block uppercase font-bold">Selling Price ($)</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formSellingPrice}
+                          onChange={(e) => setFormSellingPrice(e.target.value)}
+                          className={`w-28 px-2 py-1 text-xs font-mono font-bold rounded-lg border mt-0.5 ${
+                            isDark ? "bg-white/[0.04] border-white/[0.08]" : "bg-white border-slate-200"
+                          }`}
+                        />
+                      </div>
+                    )}
+
+                    {formType === "DISH" && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block uppercase font-bold">Gross Margin %</span>
+                        <span
+                          className={`text-base font-bold font-mono ${
+                            currentGrossMargin >= 65 ? "text-emerald-500" : "text-amber-500"
+                          }`}
+                        >
+                          {currentGrossMargin > 0 ? `${currentGrossMargin.toFixed(1)}%` : "0.0%"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {formType === "DISH" && (
+                    <div className="pt-2 border-t border-black/[0.04] dark:border-white/[0.04] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-500 text-[11px]">Target Food Cost %:</span>
+                        <input
+                          type="number"
+                          min="5"
+                          max="90"
+                          value={targetFoodCostPercent}
+                          onChange={(e) => setTargetFoodCostPercent(e.target.value)}
+                          className="w-14 px-2 py-0.5 text-xs font-mono rounded-lg border text-center"
+                        />
+                        <span className="text-slate-400 text-[11px]">
+                          ➔ Suggested Price: <strong className="text-slate-900 dark:text-white font-mono">${suggestedSellingPrice.toFixed(2)}</strong>
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleApplySuggestedPrice}
+                        className="px-3 py-1 bg-[#0071E3]/15 text-[#0071E3] font-semibold rounded-lg hover:bg-[#0071E3]/25 transition text-xs cursor-pointer"
+                      >
+                        Apply Suggested Price (${suggestedSellingPrice.toFixed(2)})
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Unresolved Issues Alert Banner */}
+                {unresolvedItems.length > 0 && (
+                  <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs space-y-1">
+                    <div className="flex items-center gap-2 font-bold">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>{unresolvedItems.length} Unresolved Line(s) in Recipe</span>
+                    </div>
+                    <p className="text-[11px] pl-6 text-amber-700/80 dark:text-amber-300/80">
+                      Lines marked "to taste", ranges (e.g. 2–3), or unlinked stock items must be resolved with exact quantities before this recipe can be published. You can safely save as Draft at any time.
+                    </p>
                   </div>
                 )}
-              </div>
 
-              {/* Unresolved Issues Alert Banner */}
-              {unresolvedItems.length > 0 && (
-                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs space-y-1">
-                  <div className="flex items-center gap-2 font-bold">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    <span>{unresolvedItems.length} Unresolved Line(s) in Recipe</span>
+                {/* Ingredient Formulation Grid */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        Formula Ingredients & Kitchen Loss
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        Define raw inventory components, linked prep sub-recipes, packaging, and yield loss.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddItemRow}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-[#0071E3] hover:bg-[#0077ED] text-white transition shadow-2xs cursor-pointer active:scale-95"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Ingredient</span>
+                    </button>
                   </div>
-                  <p className="text-[11px] pl-6 text-amber-700/80 dark:text-amber-300/80">
-                    Lines marked "to taste", ranges (e.g. 2–3), or unlinked stock items must be resolved with exact quantities before this recipe can be published. You can safely save as Draft at any time.
-                  </p>
-                </div>
-              )}
 
-              {/* Ingredient Formulation Grid */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                    Formula Ingredients & Kitchen Loss
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={handleAddItemRow}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-[#0071E3]/15 text-[#0071E3] hover:bg-[#0071E3]/25 transition cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Ingredient</span>
-                  </button>
-                </div>
+                  {/* Desktop Table Column Header Bar */}
+                  <div className="hidden md:grid grid-cols-12 gap-2.5 px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-white/[0.02] rounded-xl border border-black/[0.04] dark:border-white/[0.04] items-center">
+                    <div className="col-span-4">Stock Item / Sub-Recipe</div>
+                    <div className="col-span-2">Purchase Pack</div>
+                    <div className="col-span-1 text-center">Usable Qty</div>
+                    <div className="col-span-2">Recipe Unit</div>
+                    <div className="col-span-1 text-center">Loss %</div>
+                    <div className="col-span-2 text-right">Gross Qty & Line Cost</div>
+                  </div>
 
-                <div className="space-y-2.5">
-                  {formItems.map((row, idx) => {
-                    const rowCost = computeFormRowCost(row);
-                    const matchedItem = row.inventoryItemId
-                      ? inventoryItems.find((i) => i.id === row.inventoryItemId)
-                      : null;
-                    const availablePacks = matchedItem?.purchasePacks || [];
+                  <div className="space-y-2.5">
+                    {formItems.map((row, idx) => {
+                      const rowCost = computeFormRowCost(row);
+                      const matchedItem = row.inventoryItemId
+                        ? inventoryItems.find((i) => i.id === row.inventoryItemId)
+                        : null;
+                      const availablePacks = matchedItem?.purchasePacks || [];
 
-                    return (
-                      <div
-                        key={idx}
-                        className={`p-3 rounded-2xl border transition ${
-                          row.isUnresolved
-                            ? "bg-amber-500/[0.04] border-amber-500/30"
-                            : isDark
-                            ? "bg-white/[0.02] border-white/[0.06]"
-                            : "bg-white border-slate-200"
-                        }`}
-                      >
-                        {/* Original Text / Warning Banner */}
-                        {row.originalText && (
-                          <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pb-1.5 mb-1.5 border-b border-black/[0.04] dark:border-white/[0.04]">
-                            <span className="truncate">
-                              Original text: <code className="text-[#0071E3] font-mono">{row.originalText}</code>
-                            </span>
-                            {row.isUnresolved && (
-                              <span className="text-amber-500 font-semibold text-[10px]">
-                                {row.unresolvedReason || "Action required"}
+                      return (
+                        <div
+                          key={idx}
+                          className={`p-3 rounded-2xl border transition ${
+                            row.isUnresolved
+                              ? "bg-amber-500/[0.04] border-amber-500/30"
+                              : isDark
+                              ? "bg-white/[0.02] border-white/[0.06] hover:border-white/[0.12]"
+                              : "bg-white border-slate-200 hover:border-slate-300"
+                          }`}
+                        >
+                          {/* Original Text / Warning Banner */}
+                          {row.originalText && (
+                            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pb-2 mb-2 border-b border-black/[0.04] dark:border-white/[0.04]">
+                              <span className="truncate">
+                                Original text: <code className="text-[#0071E3] font-mono">{row.originalText}</code>
                               </span>
-                            )}
-                          </div>
-                        )}
-
-                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
-                          {/* Component Type & Link */}
-                          <div className="sm:col-span-4">
-                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                              Stock Item / Sub-Recipe *
-                            </label>
-                            <div className="flex gap-1.5">
-                              <select
-                                value={row.componentType}
-                                onChange={(e) =>
-                                  handleItemRowChange(idx, "componentType", e.target.value)
-                                }
-                                className="w-20 px-2 py-1.5 text-xs rounded-xl border bg-transparent"
-                              >
-                                <option value="INVENTORY_ITEM">Item</option>
-                                <option value="SUB_RECIPE">Sub-Rec</option>
-                              </select>
-
-                              {row.componentType === "INVENTORY_ITEM" ? (
-                                <select
-                                  value={row.inventoryItemId || ""}
-                                  onChange={(e) =>
-                                    handleItemRowChange(idx, "inventoryItemId", e.target.value)
-                                  }
-                                  className={`flex-1 px-2.5 py-1.5 text-xs rounded-xl border ${
-                                    isDark ? "bg-[#0F131D] border-white/[0.08]" : "bg-white border-slate-200"
-                                  }`}
-                                >
-                                  <option value="">Select inventory item...</option>
-                                  {inventoryItems.map((inv) => (
-                                    <option key={inv.id} value={inv.id}>
-                                      {inv.name} ({inv.unitOfMeasure}) - ${Number(inv.costPerUnit).toFixed(2)}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <select
-                                  value={row.subRecipeId || ""}
-                                  onChange={(e) =>
-                                    handleItemRowChange(idx, "subRecipeId", e.target.value)
-                                  }
-                                  className={`flex-1 px-2.5 py-1.5 text-xs rounded-xl border ${
-                                    isDark ? "bg-[#0F131D] border-white/[0.08]" : "bg-white border-slate-200"
-                                  }`}
-                                >
-                                  <option value="">Select sub-recipe...</option>
-                                  {subRecipesList.map((sub) => (
-                                    <option key={sub.id} value={sub.id}>
-                                      {sub.name} (Yield: {sub.yieldQuantity} {sub.yieldUnit}) - ${Number(sub.costPerUnit).toFixed(2)}
-                                    </option>
-                                  ))}
-                                </select>
+                              {row.isUnresolved && (
+                                <span className="text-amber-500 font-semibold text-[10px] shrink-0 ml-2">
+                                  {row.unresolvedReason || "Action required"}
+                                </span>
                               )}
-                            </div>
-                          </div>
-
-                          {/* Purchase Pack Selector if item has packs */}
-                          {availablePacks.length > 0 && (
-                            <div className="sm:col-span-2">
-                              <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                                Purchase Pack
-                              </label>
-                              <select
-                                value={row.packId || ""}
-                                onChange={(e) => handleItemRowChange(idx, "packId", e.target.value)}
-                                className="w-full px-2 py-1.5 text-xs rounded-xl border bg-transparent"
-                              >
-                                <option value="">None (Standard Unit)</option>
-                                {availablePacks.map((p) => (
-                                  <option key={p.id} value={p.id}>
-                                    {p.name} ({p.conversionFactor} {p.packUnit})
-                                  </option>
-                                ))}
-                              </select>
                             </div>
                           )}
 
-                          {/* Usable Quantity */}
-                          <div className={availablePacks.length > 0 ? "sm:col-span-1" : "sm:col-span-2"}>
-                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                              {row.packId ? "Packs" : "Usable Qty"}
-                            </label>
-                            <input
-                              type="number"
-                              step="any"
-                              min="0"
-                              value={row.packId ? row.packQuantity || "" : row.quantity}
-                              onChange={(e) =>
-                                handleItemRowChange(
-                                  idx,
-                                  row.packId ? "packQuantity" : "quantity",
-                                  e.target.value
-                                )
-                              }
-                              className="w-full px-2 py-1.5 text-xs font-mono rounded-xl border bg-transparent"
-                            />
-                          </div>
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center">
+                              {/* 1. Component Type & Link (4 cols) */}
+                              <div className="md:col-span-4">
+                                <label className="block md:hidden text-[10px] font-bold text-slate-500 mb-1">
+                                  Stock Item / Sub-Recipe *
+                                </label>
+                                <div className="flex gap-1.5 items-center">
+                                  <select
+                                    value={row.componentType}
+                                    onChange={(e) =>
+                                      handleItemRowChange(idx, "componentType", e.target.value)
+                                    }
+                                    className={`w-20 shrink-0 px-2 py-1.5 text-xs font-semibold rounded-xl border focus:outline-none focus:ring-1 focus:ring-[#0071E3] ${
+                                      isDark
+                                        ? "bg-[#121622] border-white/[0.1] text-slate-200"
+                                        : "bg-slate-50 border-slate-200 text-slate-700"
+                                    }`}
+                                  >
+                                    <option value="INVENTORY_ITEM">Item</option>
+                                    <option value="SUB_RECIPE">Sub-Rec</option>
+                                  </select>
 
-                          {/* Unit of Measure */}
-                          <div className="sm:col-span-2">
-                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                              Recipe Unit
-                            </label>
-                            <select
-                              value={row.unitOfMeasure}
-                              onChange={(e) =>
-                                handleItemRowChange(idx, "unitOfMeasure", e.target.value)
-                              }
-                              className={`w-full px-2 py-1.5 text-xs rounded-xl border ${
-                                isDark ? "bg-[#0F131D] border-white/[0.08]" : "bg-white border-slate-200"
-                              }`}
-                            >
-                              {CULINARY_UOM_GROUPS.map((g) => (
-                                <optgroup key={g.group} label={g.group}>
-                                  {g.options.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>
-                                      {opt.label}
-                                    </option>
+                                  {row.componentType === "INVENTORY_ITEM" ? (
+                                    <select
+                                      value={row.inventoryItemId || ""}
+                                      onChange={(e) =>
+                                        handleItemRowChange(idx, "inventoryItemId", e.target.value)
+                                      }
+                                      className={`flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-xl border focus:outline-none focus:ring-1 focus:ring-[#0071E3] truncate ${
+                                        isDark ? "bg-[#0F131D] border-white/[0.08]" : "bg-white border-slate-200"
+                                      }`}
+                                    >
+                                      <option value="">Select inventory item...</option>
+                                      {inventoryItems.map((inv) => (
+                                        <option key={inv.id} value={inv.id}>
+                                          {inv.name} ({inv.unitOfMeasure}) - ${Number(inv.costPerUnit).toFixed(2)}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <select
+                                      value={row.subRecipeId || ""}
+                                      onChange={(e) =>
+                                        handleItemRowChange(idx, "subRecipeId", e.target.value)
+                                      }
+                                      className={`flex-1 min-w-0 px-2.5 py-1.5 text-xs rounded-xl border focus:outline-none focus:ring-1 focus:ring-[#0071E3] truncate ${
+                                        isDark ? "bg-[#0F131D] border-white/[0.08]" : "bg-white border-slate-200"
+                                      }`}
+                                    >
+                                      <option value="">Select sub-recipe...</option>
+                                      {subRecipesList.map((sub) => (
+                                        <option key={sub.id} value={sub.id}>
+                                          {sub.name} (Yield: {sub.yieldQuantity} {sub.yieldUnit}) - ${Number(sub.costPerUnit).toFixed(2)}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* 2. Purchase Pack Selector (2 cols) */}
+                              <div className="md:col-span-2">
+                                <label className="block md:hidden text-[10px] font-bold text-slate-500 mb-1">
+                                  Purchase Pack
+                                </label>
+                                {row.componentType === "SUB_RECIPE" ? (
+                                  <div className="w-full px-2.5 py-1.5 text-xs text-slate-600 dark:text-slate-400 rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-slate-50/60 dark:bg-white/[0.02] truncate">
+                                    Batch Yield Base
+                                  </div>
+                                ) : availablePacks.length > 0 ? (
+                                  <select
+                                    value={row.packId || ""}
+                                    onChange={(e) => handleItemRowChange(idx, "packId", e.target.value)}
+                                    className={`w-full px-2 py-1.5 text-xs rounded-xl border focus:outline-none focus:ring-1 focus:ring-[#0071E3] truncate ${
+                                      isDark ? "bg-[#0F131D] border-white/[0.08]" : "bg-white border-slate-200"
+                                    }`}
+                                  >
+                                    <option value="">Base ({matchedItem?.unitOfMeasure})</option>
+                                    {availablePacks.map((p) => (
+                                      <option key={p.id} value={p.id}>
+                                        {p.name} ({p.conversionFactor} {p.packUnit})
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <div className="w-full px-2.5 py-1.5 text-xs text-slate-600 dark:text-slate-400 rounded-xl border border-slate-200/80 dark:border-white/[0.08] bg-slate-50/60 dark:bg-white/[0.02] truncate">
+                                    Base ({matchedItem?.unitOfMeasure || "Unit"})
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* 3. Usable Quantity (1 col) */}
+                              <div className="md:col-span-1">
+                                <label className="block md:hidden text-[10px] font-bold text-slate-500 mb-1">
+                                  {row.packId ? "Packs" : "Usable Qty"}
+                                </label>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  min="0"
+                                  value={row.packId ? row.packQuantity || "" : row.quantity}
+                                  onChange={(e) =>
+                                    handleItemRowChange(
+                                      idx,
+                                      row.packId ? "packQuantity" : "quantity",
+                                      e.target.value
+                                    )
+                                  }
+                                  className={`w-full px-2 py-1.5 text-xs font-mono font-semibold rounded-xl border text-center focus:outline-none focus:ring-1 focus:ring-[#0071E3] ${
+                                    isDark ? "bg-[#0F131D] border-white/[0.08]" : "bg-white border-slate-200"
+                                  }`}
+                                />
+                              </div>
+
+                              {/* 4. Unit of Measure (2 cols) */}
+                              <div className="md:col-span-2">
+                                <label className="block md:hidden text-[10px] font-bold text-slate-500 mb-1">
+                                  Recipe Unit
+                                </label>
+                                <select
+                                  value={row.unitOfMeasure}
+                                  onChange={(e) =>
+                                    handleItemRowChange(idx, "unitOfMeasure", e.target.value)
+                                  }
+                                  className={`w-full px-2 py-1.5 text-xs rounded-xl border focus:outline-none focus:ring-1 focus:ring-[#0071E3] truncate ${
+                                    isDark ? "bg-[#0F131D] border-white/[0.08]" : "bg-white border-slate-200"
+                                  }`}
+                                >
+                                  {CULINARY_UOM_GROUPS.map((g) => (
+                                    <optgroup key={g.group} label={g.group}>
+                                      {g.options.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>
+                                          {opt.label}
+                                        </option>
+                                      ))}
+                                    </optgroup>
                                   ))}
-                                </optgroup>
-                              ))}
-                            </select>
-                          </div>
+                                </select>
+                              </div>
 
-                          {/* Prep Loss % (Shrinkage) */}
-                          <div className="sm:col-span-1">
-                            <label className="block text-[10px] font-bold text-slate-500 mb-1 truncate">
-                              Loss %
-                            </label>
-                            <input
-                              type="number"
-                              min="0"
-                              max="99"
-                              value={row.wastagePercent}
-                              onChange={(e) =>
-                                handleItemRowChange(idx, "wastagePercent", e.target.value)
-                              }
-                              className="w-full px-2 py-1.5 text-xs font-mono rounded-xl border bg-transparent text-center"
-                            />
-                          </div>
+                              {/* 5. Prep Loss % (Shrinkage) (1 col) */}
+                              <div className="md:col-span-1">
+                                <label className="block md:hidden text-[10px] font-bold text-slate-500 mb-1 truncate">
+                                  Loss %
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="99"
+                                  value={row.wastagePercent}
+                                  onChange={(e) =>
+                                    handleItemRowChange(idx, "wastagePercent", e.target.value)
+                                  }
+                                  className={`w-full px-1.5 py-1.5 text-xs font-mono rounded-xl border text-center focus:outline-none focus:ring-1 focus:ring-[#0071E3] ${
+                                    isDark ? "bg-[#0F131D] border-white/[0.08]" : "bg-white border-slate-200"
+                                  }`}
+                                />
+                              </div>
 
-                          {/* Gross Stock Quantity & Line Cost */}
-                          <div className="sm:col-span-2 text-right">
-                            <span className="text-[10px] text-slate-400 block">
-                              Gross: {rowCost.grossQty.toFixed(2)} {formatUnit(row.unitOfMeasure as any)}
-                            </span>
-                            <span className="font-mono font-bold text-xs text-slate-900 dark:text-white">
-                              ${rowCost.lineTotal.toFixed(2)}
-                            </span>
-                          </div>
+                              {/* 6. Gross Stock Quantity & Line Cost (2 cols) */}
+                              <div className="md:col-span-2 text-right">
+                                <span className="text-[10px] text-slate-400 block truncate font-mono">
+                                  Gross: {rowCost.grossQty.toFixed(2)} {formatUnit(row.unitOfMeasure as any)}
+                                </span>
+                                <span className="font-mono font-bold text-xs text-slate-900 dark:text-white">
+                                  ${rowCost.lineTotal.toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
 
-                          {/* Delete Action */}
-                          <div className="sm:col-span-1 text-right">
+                            {/* Delete Action (Fixed right, never breaks row alignment) */}
                             <button
                               type="button"
                               onClick={() => handleRemoveItemRow(idx)}
                               disabled={formItems.length === 1}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 disabled:opacity-30 cursor-pointer"
+                              title="Remove ingredient line"
+                              className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 disabled:opacity-20 cursor-pointer transition"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
-                        </div>
 
-                        {/* Ladle or Container Note */}
-                        {row.ladleInfo && (
-                          <div className="text-[10px] text-[#0071E3] mt-1.5 flex items-center gap-1">
-                            <Info className="w-3 h-3" />
-                            <span>{row.ladleInfo}</span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                          {/* Ladle or Container Note */}
+                          {row.ladleInfo && (
+                            <div className="text-[10px] text-[#0071E3] mt-2 flex items-center gap-1">
+                              <Info className="w-3 h-3" />
+                              <span>{row.ladleInfo}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
-              {/* Actions Footer */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-black/[0.06] dark:border-white/[0.06]">
-                <div className="text-xs text-slate-400">
-                  {unresolvedItems.length > 0 ? (
-                    <span className="text-amber-500 font-semibold">
-                      ⚠️ {unresolvedItems.length} issue(s) remaining. Fix all issues before publishing.
-                    </span>
-                  ) : (
-                    <span className="text-emerald-500 font-semibold">
-                      ✓ All ingredient lines validated and ready to publish.
-                    </span>
-                  )}
+              {/* Frozen / Fixed Action Footer (Save from anywhere!) */}
+              <div className="shrink-0 px-4 sm:px-7 py-3.5 border-t border-black/[0.08] dark:border-white/[0.08] bg-white/95 dark:bg-[#090B10]/95 backdrop-blur-md z-20 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+                {/* Live Metrics & Status Banner */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.04] dark:border-white/[0.06] text-xs">
+                    <span className="text-slate-500 text-[11px]">Batch:</span>
+                    <strong className="font-mono text-slate-900 dark:text-white">
+                      ${calculatedTotalBatchCost.toFixed(2)}
+                    </strong>
+                    <span className="text-slate-300 dark:text-slate-700">|</span>
+                    <span className="text-slate-500 text-[11px]">Portion:</span>
+                    <strong className="font-mono text-[#0071E3]">
+                      ${calculatedCostPerPortion.toFixed(2)}
+                    </strong>
+                    {formType === "DISH" && currentGrossMargin > 0 && (
+                      <>
+                        <span className="text-slate-300 dark:text-slate-700">|</span>
+                        <span className="text-slate-500 text-[11px]">Margin:</span>
+                        <strong
+                          className={`font-mono ${
+                            currentGrossMargin >= 65 ? "text-emerald-500" : "text-amber-500"
+                          }`}
+                        >
+                          {currentGrossMargin.toFixed(1)}%
+                        </strong>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="text-xs">
+                    {unresolvedItems.length > 0 ? (
+                      <span className="text-amber-500 font-semibold flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{unresolvedItems.length} issue(s) remaining (Save as Draft available)</span>
+                      </span>
+                    ) : (
+                      <span className="text-emerald-500 font-semibold flex items-center gap-1.5">
+                        <Check className="w-3.5 h-3.5 shrink-0" />
+                        <span>Ready to publish</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
 
+                {/* Actions */}
                 <div className="flex items-center gap-2 justify-end">
                   <button
                     type="button"
                     onClick={resetWorkspace}
-                    className="px-4 py-2 text-xs font-semibold rounded-xl text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                    className="px-4 py-2 text-xs font-semibold rounded-xl text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -1611,7 +1695,7 @@ export default function RecipesDirectoryPage({
                     type="button"
                     disabled={submitting}
                     onClick={() => handleSaveRecipe(true)}
-                    className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl transition hover:opacity-90 cursor-pointer"
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl transition cursor-pointer"
                   >
                     {submitting ? "Saving..." : "Save as Draft"}
                   </button>
