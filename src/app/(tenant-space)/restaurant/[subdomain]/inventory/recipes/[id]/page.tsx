@@ -728,43 +728,18 @@ export default function RecipeDetailPage({
                               >
                                 <td className="py-3 px-2">
                                   <div className="flex items-center gap-2">
-                                    {item.componentType === "SUB_RECIPE" ? (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSubRecipeToOpen({ id: item.id, name: item.name });
-                                        }}
-                                        className="font-semibold text-slate-900 dark:text-white hover:text-[#0071E3] dark:hover:text-[#70B4FF] hover:underline cursor-pointer text-left flex items-center gap-1.5 group"
-                                        title={`Click to view ${item.name} formula`}
-                                      >
-                                        <span>{item.name}</span>
-                                        <ExternalLink className="w-3 h-3 text-purple-500 opacity-60 group-hover:opacity-100 transition" />
-                                      </button>
-                                    ) : (
-                                      <span className="font-semibold text-slate-900 dark:text-white">
-                                        {item.name}
-                                      </span>
-                                    )}
-
-                                    {item.componentType === "SUB_RECIPE" ? (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSubRecipeToOpen({ id: item.id, name: item.name });
-                                        }}
-                                        className="text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30 transition cursor-pointer flex items-center gap-1"
-                                        title="Open sub-recipe"
-                                      >
-                                        <span>Prep recipe</span>
-                                        <span className="text-[9px] opacity-70">↗</span>
-                                      </button>
-                                    ) : (
-                                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/[0.08]">
-                                        Item
-                                      </span>
-                                    )}
+                                    <span className="font-semibold text-slate-900 dark:text-white">
+                                      {item.name}
+                                    </span>
+                                    <span
+                                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
+                                        item.componentType === "SUB_RECIPE"
+                                          ? "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20"
+                                          : "bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/[0.08]"
+                                      }`}
+                                    >
+                                      {item.componentType === "SUB_RECIPE" ? "Prep recipe" : "Item"}
+                                    </span>
                                   </div>
                                   {item.packName && (
                                     <div className="text-[11px] text-purple-600 dark:text-purple-400 font-mono mt-0.5">
@@ -914,41 +889,18 @@ export default function RecipeDetailPage({
                           >
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5">
-                                {item.componentType === "SUB_RECIPE" ? (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSubRecipeToOpen({ id: item.id, name: item.name });
-                                    }}
-                                    className="font-semibold text-xs text-slate-900 dark:text-white hover:text-[#0071E3] hover:underline truncate cursor-pointer text-left flex items-center gap-1"
-                                    title={`Click to open ${item.name}`}
-                                  >
-                                    <span className="truncate">{item.name}</span>
-                                    <ExternalLink className="w-2.5 h-2.5 text-purple-500 shrink-0" />
-                                  </button>
-                                ) : (
-                                  <span className="font-semibold text-xs text-slate-900 dark:text-white truncate">
-                                    {item.name}
-                                  </span>
-                                )}
-
-                                {item.componentType === "SUB_RECIPE" ? (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSubRecipeToOpen({ id: item.id, name: item.name });
-                                    }}
-                                    className="text-[9px] font-semibold px-1.5 py-0.5 rounded border bg-purple-500/10 text-purple-700 border-purple-500/30 shrink-0 cursor-pointer"
-                                  >
-                                    Prep ↗
-                                  </button>
-                                ) : (
-                                  <span className="text-[9px] font-semibold px-1 py-0.2 rounded border shrink-0 bg-slate-100 text-slate-600 border-slate-200">
-                                    Item
-                                  </span>
-                                )}
+                                <span className="font-semibold text-xs text-slate-900 dark:text-white truncate">
+                                  {item.name}
+                                </span>
+                                <span
+                                  className={`text-[9px] font-semibold px-1 py-0.2 rounded border shrink-0 ${
+                                    item.componentType === "SUB_RECIPE"
+                                      ? "bg-purple-500/10 text-purple-700 border-purple-500/20"
+                                      : "bg-slate-100 text-slate-600 border-slate-200"
+                                  }`}
+                                >
+                                  {item.componentType === "SUB_RECIPE" ? "Prep" : "Item"}
+                                </span>
                               </div>
                               <div className="text-[11px] text-slate-500 font-mono tabular-nums mt-0.5">
                                 {item.quantity} {formatUnit(item.unitOfMeasure as any)}
