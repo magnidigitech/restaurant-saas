@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
+import RecipeWorkspaceModal from "@/components/recipes/RecipeWorkspaceModal";
 import {
   UnitEquivalentPricing,
   UnitOfMeasure,
@@ -236,6 +237,7 @@ export default function RecipeDetailPage({
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [subRecipeToOpen, setSubRecipeToOpen] = useState<{ id: string; name: string } | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const fetchRecipeDetail = async () => {
     try {
@@ -567,9 +569,7 @@ export default function RecipeDetailPage({
               {/* Primary Action: Edit Recipe */}
               <button
                 type="button"
-                onClick={() =>
-                  router.push(`/restaurant/${subdomain}/inventory/recipes?edit=${recipe.id}`)
-                }
+                onClick={() => setIsEditModalOpen(true)}
                 className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-[#0071E3] hover:bg-[#0077ED] text-white shadow-2xs transition active:scale-[0.98] cursor-pointer"
               >
                 <Edit3 className="w-3.5 h-3.5" />
@@ -692,9 +692,7 @@ export default function RecipeDetailPage({
                   </div>
                   <button
                     type="button"
-                    onClick={() =>
-                      router.push(`/restaurant/${subdomain}/inventory/recipes?edit=${recipe.id}`)
-                    }
+                    onClick={() => setIsEditModalOpen(true)}
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-[#0071E3] hover:bg-[#0077ED] text-white shadow-2xs transition active:scale-[0.98] cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -1581,6 +1579,18 @@ export default function RecipeDetailPage({
           </div>
         </div>
       )}
+
+      {/* Edit Recipe Formulation Workspace Modal */}
+      <RecipeWorkspaceModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        editingRecipeId={recipe?.id}
+        initialRecipeData={recipe}
+        onSaved={async () => {
+          setIsEditModalOpen(false);
+          await fetchRecipeDetail();
+        }}
+      />
     </div>
   );
 }

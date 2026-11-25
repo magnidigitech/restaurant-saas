@@ -226,6 +226,15 @@ export default function RecipesDirectoryPage({
     ]);
     setActiveModal("NONE");
     setError("");
+
+    // Clean up ?edit= from URL so it doesn't get stuck in the address bar
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("edit")) {
+        url.searchParams.delete("edit");
+        window.history.replaceState(null, "", url.pathname + (url.search ? url.search : ""));
+      }
+    }
   };
 
   // Start Manually Entry Point
