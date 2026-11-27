@@ -66,16 +66,19 @@ export async function computeMenuEngineering(
     },
   });
 
-  // Aggregate POS sales by recipeId
+  // Aggregate normalized non-voided POS sales by recipeId
   const orderItems = await prisma.posOrderItem.groupBy({
     by: ["recipeId"],
     where: {
       order: whereOrder,
       recipeId: { not: null },
+      isVoided: false,
     },
     _sum: {
       quantity: true,
+      refundedQuantity: true,
       totalPrice: true,
+      netSales: true,
     },
   });
 
@@ -86,8 +89,12 @@ export async function computeMenuEngineering(
 
   for (const item of orderItems) {
     if (item.recipeId) {
-      const qty = item._sum.quantity || 0;
-      const rev = Number(item._sum.totalPrice || 0);
+      const qty = Math.max(
+        0,
+        (item._sum.quantity || 0) - (item._sum.refundedQuantity || 0)
+      );
+      const net = Number(item._sum.netSales || 0);
+      const rev = net > 0 ? net : Number(item._sum.totalPrice || 0);
       salesMap.set(item.recipeId, { quantity: qty, revenue: rev });
       totalUnitsSold += qty;
       totalRevenue += rev;

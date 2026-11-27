@@ -106,14 +106,19 @@ async function runPosSyncTests() {
       assert("3. Total order count remains strictly unchanged", countAfterUpdateSync === savedOrdersCount);
     }
 
-    // Test 4: Simultaneous parallel sync execution -> 0 race conditions or duplicate rows
-    const [parallelResA, parallelResB] = await Promise.all([
+    // Test 4: Simultaneous parallel sync execution -> lock prevents overlap & 0 duplicate rows
+    const [parallelResA, parallelResB] = await Promise.allSettled([
       executeSync(testIntegrationId),
       executeSync(testIntegrationId),
     ]);
 
-    assert("4. Simultaneous parallel sync A completed", parallelResA.success === true);
-    assert("4. Simultaneous parallel sync B completed", parallelResB.success === true);
+    const fulfilledCount = [parallelResA, parallelResB].filter(
+      (r) => r.status === "fulfilled" && r.value.success === true
+    ).length;
+    const lockRejectedCount = [parallelResA, parallelResB].filter(
+      (r) => r.status === "rejected" && /already running/.test(String(r.reason))
+    ).length;
+    assert("4. Simultaneous parallel sync A/B handled safely (1+ succeeded, overlap locked)", fulfilledCount >= 1 && fulfilledCount + lockRejectedCount === 2);
 
     const duplicateGroups = await prisma.posOrder.groupBy({
       by: ["providerOrderId"],

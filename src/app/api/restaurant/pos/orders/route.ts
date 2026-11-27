@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/core/database/client";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
 import { depleteOrderInventory } from "@/core/inventory/depletionEngine";
 import { getUnifiedOrdersDashboard } from "@/modules/pos-integrations/service";
+import {
+  assertPosOutletInScope,
+  getPosActorContext,
+} from "@/modules/pos-integrations/authHelper";
 import { z } from "zod";
 
 const createOrderItemSchema = z.object({
@@ -26,54 +28,86 @@ const createPosOrderSchema = z.object({
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+function parseOutletDateBound(dateStr: string, timeZone: string, endOfDay: boolean): Date {
+  // If full ISO timestamp is already provided, use it directly
+  if (dateStr.includes("T")) {
+    return new Date(dateStr);
+  }
+  const [y, m, d] = dateStr.split("-").map(Number);
+  if (!y || !m || !d) return new Date(dateStr);
+  const utcGuess = new Date(Date.UTC(y, m - 1, d, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0));
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).formatToParts(utcGuess);
+    const map: Record<string, number> = {};
+    for (const p of parts) {
+      if (p.type !== "literal") map[p.type] = Number(p.value);
+    }
+    const tzHour = map.hour === 24 ? 0 : map.hour;
+    const tzAsUtc = Date.UTC(map.year, map.month - 1, map.day, tzHour, map.minute, map.second);
+    const offsetMs = tzAsUtc - utcGuess.getTime();
+    return new Date(utcGuess.getTime() - offsetMs);
+  } catch {
+    return utcGuess;
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
-    }
-
-    const accessCheck = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      {},
-      session.tokenVersion
-    );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
+    const auth = await getPosActorContext({ requireView: true });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const { searchParams } = new URL(req.url);
     const outletId = searchParams.get("outletId") || undefined;
     const provider = searchParams.get("provider") || undefined;
     const status = searchParams.get("status") || undefined;
+    const businessDate = searchParams.get("businessDate") || undefined;
     const search = searchParams.get("search") || undefined;
     const startDate = searchParams.get("startDate") || undefined;
     const endDate = searchParams.get("endDate") || undefined;
-    const limit = parseInt(searchParams.get("limit") || "30");
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const pageSize = parseInt(
+      searchParams.get("pageSize") || searchParams.get("limit") || "100",
+      10
+    );
 
-    // Auto-purge any legacy zero-item zero-total dummy/placeholder tickets from DB
-    await prisma.posOrder.deleteMany({
-      where: {
-        restaurantId: session.activeRestaurantId,
-        OR: [
-          { providerOrderId: { startsWith: "ord_" } },
-          { providerOrderId: "undefined" },
-          { AND: [{ totalAmount: 0 }, { tipAmount: 0 }, { items: { none: {} } }] },
-        ],
-      },
-    }).catch(() => {});
+    if (outletId && outletId !== "ALL") {
+      const scope = assertPosOutletInScope(auth.ctx, outletId);
+      if (!scope.ok) {
+        return NextResponse.json({ error: scope.error }, { status: scope.status });
+      }
+    }
 
-    const result = await getUnifiedOrdersDashboard(session.activeRestaurantId, {
+    let outletTimeZone = "UTC";
+    if (outletId && outletId !== "ALL") {
+      const outletRow = await prisma.restaurantOutlet.findFirst({
+        where: { id: outletId, restaurantId: auth.ctx.restaurantId },
+        select: { timezone: true },
+      });
+      if (outletRow?.timezone) outletTimeZone = outletRow.timezone;
+    }
+
+    const result = await getUnifiedOrdersDashboard(auth.ctx.restaurantId, {
       outletId,
+      accessibleOutletIds: auth.ctx.accessibleOutletIds,
       provider,
       status,
+      businessDate,
       search,
-      startDate,
-      endDate,
-      limit,
-      offset,
+      startDate: startDate ? parseOutletDateBound(startDate, outletTimeZone, false) : undefined,
+      endDate: endDate ? parseOutletDateBound(endDate, outletTimeZone, true) : undefined,
+      page,
+      pageSize,
     });
 
     return NextResponse.json(
@@ -81,7 +115,7 @@ export async function GET(req: NextRequest) {
         success: true,
         orders: result.orders,
         pagination: result.pagination,
-        metrics: result.metrics,
+        totalsByCurrency: result.totalsByCurrency,
       },
       {
         headers: {
@@ -98,21 +132,6 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
-    }
-
-    const accessCheck = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      {},
-      session.tokenVersion
-    );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
-    }
-
     const body = await req.json();
     const result = createPosOrderSchema.safeParse(body);
     if (!result.success) {
@@ -120,10 +139,17 @@ export async function POST(req: NextRequest) {
     }
 
     const data = result.data;
+    const auth = await getPosActorContext({
+      requireTakeOrders: true,
+      outletId: data.outletId,
+    });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     // Verify outlet belongs to restaurant
     const outlet = await prisma.restaurantOutlet.findFirst({
-      where: { id: data.outletId, restaurantId: session.activeRestaurantId },
+      where: { id: data.outletId, restaurantId: auth.ctx.restaurantId },
     });
 
     if (!outlet) {
@@ -133,7 +159,7 @@ export async function POST(req: NextRequest) {
     // Generate unique order number
     const countToday = await prisma.posOrder.count({
       where: {
-        restaurantId: session.activeRestaurantId,
+        restaurantId: auth.ctx.restaurantId,
         createdAt: {
           gte: new Date(new Date().setHours(0, 0, 0, 0)),
         },
@@ -151,12 +177,13 @@ export async function POST(req: NextRequest) {
     // Create POS Order and line items
     const order = await prisma.posOrder.create({
       data: {
-        restaurantId: session.activeRestaurantId,
+        restaurantId: auth.ctx.restaurantId,
         outletId: data.outletId,
         orderNumber,
         tableNumber: data.tableNumber,
         orderType: data.orderType,
         status: "COMPLETED",
+        currency: outlet.currency || "USD",
         totalAmount,
         taxAmount,
         discountAmount: 0,
@@ -171,6 +198,7 @@ export async function POST(req: NextRequest) {
             quantity: i.quantity,
             unitPrice: i.unitPrice,
             totalPrice: i.quantity * i.unitPrice,
+            netSales: i.quantity * i.unitPrice,
             notes: i.notes,
           })),
         },
@@ -182,7 +210,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Execute automatic stock deduction engine
-    const depletionResult = await depleteOrderInventory(order.id, session.userId);
+    const depletionResult = await depleteOrderInventory(order.id, auth.ctx.userId);
 
     return NextResponse.json(
       {

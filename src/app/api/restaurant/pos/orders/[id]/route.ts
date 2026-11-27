@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/core/database/client";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
 import { reverseOrderDepletion } from "@/core/inventory/depletionEngine";
+import {
+  assertPosOutletInScope,
+  getPosActorContext,
+} from "@/modules/pos-integrations/authHelper";
 import { z } from "zod";
 
 const updateOrderSchema = z.object({
@@ -11,22 +13,23 @@ const updateOrderSchema = z.object({
 });
 
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
+    const auth = await getPosActorContext({ requireView: true });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const { id } = await params;
     const order = await prisma.posOrder.findFirst({
-      where: { id, restaurantId: session.activeRestaurantId },
+      where: { id, restaurantId: auth.ctx.restaurantId },
       include: {
+        outlet: { select: { id: true, name: true } },
         items: {
           include: {
-            recipe: true,
+            recipe: { select: { id: true, name: true } },
           },
         },
       },
@@ -34,6 +37,11 @@ export async function GET(
 
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    const scope = assertPosOutletInScope(auth.ctx, order.outletId);
+    if (!scope.ok) {
+      return NextResponse.json({ error: scope.error }, { status: scope.status });
     }
 
     return NextResponse.json({ success: true, order });
@@ -47,19 +55,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
-    }
-
-    const accessCheck = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      { moduleKey: "pos" },
-      session.tokenVersion
-    );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
+    const auth = await getPosActorContext({ requireManage: true });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const { id } = await params;
@@ -70,18 +68,26 @@ export async function PATCH(
     }
 
     const existing = await prisma.posOrder.findFirst({
-      where: { id, restaurantId: session.activeRestaurantId },
+      where: { id, restaurantId: auth.ctx.restaurantId },
     });
     if (!existing) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    const scope = assertPosOutletInScope(auth.ctx, existing.outletId);
+    if (!scope.ok) {
+      return NextResponse.json({ error: scope.error }, { status: scope.status });
     }
 
     let reversalResult = null;
     const targetStatus = parsed.data.status;
 
     if (targetStatus === "CANCELLED" || targetStatus === "REFUNDED") {
-      // Execute stock depletion reversal using historical ledger records
-      reversalResult = await reverseOrderDepletion(id, session.userId, parsed.data.reason || `POS Order ${targetStatus}`);
+      reversalResult = await reverseOrderDepletion(
+        id,
+        auth.ctx.userId,
+        parsed.data.reason || `POS Order ${targetStatus}`
+      );
       await prisma.posOrder.update({
         where: { id },
         data: {

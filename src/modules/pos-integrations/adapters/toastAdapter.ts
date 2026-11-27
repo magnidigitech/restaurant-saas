@@ -1,28 +1,43 @@
+import crypto from "crypto";
 import {
   PosProviderAdapter,
   ProviderCredentials,
   ProviderValidationResult,
+  ProviderFetchOptions,
   ProviderFetchResult,
   NormalizedOrder,
+  NormalizedPaymentTender,
+  NormalizedRefund,
 } from "../types";
+import { sanitizeProviderError } from "../crypto";
+
+function roundCents(val: number): number {
+  return Math.round(val * 100) / 100;
+}
+
+function classifyToastPaymentType(rawType?: string): NormalizedPaymentTender["tenderType"] {
+  const t = String(rawType || "").toUpperCase();
+  if (t.includes("CASH")) return "CASH";
+  if (t.includes("CREDIT") || t.includes("DEBIT") || t.includes("CARD") || t.includes("EMV")) return "CARD";
+  if (t.includes("GIFT")) return "GIFT_CARD";
+  if (t.includes("ONLINE") || t.includes("WEB")) return "ONLINE";
+  return "OTHER";
+}
 
 export class ToastAdapter implements PosProviderAdapter {
   provider = "TOAST" as const;
   displayName = "Toast POS";
 
-  /**
-   * Helper method to authenticate against Toast API with machine client or partner credentials
-   * Tries ws-api.toasttab.com with userAccessType: TOAST_MACHINE_CLIENT as required by Toast API
-   */
   private async authenticateToast(credentials: ProviderCredentials): Promise<string> {
     const { clientId, clientSecret, environment } = credentials;
     if (!clientId || !clientSecret) {
       throw new Error("Client ID and Client Secret are required for Toast authentication.");
     }
 
-    const host = environment === "SANDBOX"
-      ? "https://ws-sandbox-api.toasttab.com"
-      : "https://ws-api.toasttab.com";
+    const host =
+      environment === "SANDBOX"
+        ? "https://ws-sandbox-api.toasttab.com"
+        : "https://ws-api.toasttab.com";
 
     const userAccessTypes = ["TOAST_MACHINE_CLIENT", "INTEGRATION"];
     let lastError = "";
@@ -48,26 +63,22 @@ export class ToastAdapter implements PosProviderAdapter {
             (typeof data.token === "string" ? data.token : null) ||
             data.accessToken;
 
-          if (token) {
-            return token;
-          }
+          if (token) return token;
         } else {
           const errDetail =
             data.message ||
             data.error_description ||
             data.error ||
-            (res.status === 401 ? "Unauthorized. Please check your Toast Client ID and Client Secret." : `HTTP ${res.status}`);
-          
-          // Store meaningful HTTP status error without overwriting with generic network errors
+            (res.status === 401
+              ? "Unauthorized. Please check your Toast Client ID and Client Secret."
+              : `HTTP ${res.status}`);
+
           lastError = `Toast API Auth (${res.status}): ${errDetail}`;
-          if (res.status === 401 || res.status === 403) {
-            // Early break on authentication rejection
-            break;
-          }
+          if (res.status === 401 || res.status === 403) break;
         }
       } catch (e: any) {
         if (!lastError) {
-          lastError = e.message || "Network connection error reaching Toast API.";
+          lastError = sanitizeProviderError(e);
         }
       }
     }
@@ -78,7 +89,7 @@ export class ToastAdapter implements PosProviderAdapter {
   }
 
   async validateCredentials(credentials: ProviderCredentials): Promise<ProviderValidationResult> {
-    const { clientId, clientSecret, restaurantGuid } = credentials;
+    const { clientId, clientSecret, restaurantGuid, environment } = credentials;
 
     if (!clientId || !clientSecret) {
       return {
@@ -90,55 +101,135 @@ export class ToastAdapter implements PosProviderAdapter {
     if (!restaurantGuid || !restaurantGuid.trim()) {
       return {
         valid: false,
-        error: "Toast Restaurant External GUID is required. Please provide your Toast Restaurant External GUID.",
+        error: "Toast Restaurant External GUID is required.",
       };
     }
 
     const effectiveGuid = restaurantGuid.trim();
+    const env = environment === "SANDBOX" ? "SANDBOX" : "PRODUCTION";
 
-    // Toast Production API authentication test
+    if (env === "SANDBOX" && clientId.startsWith("sandbox_")) {
+      return {
+        valid: true,
+        locations: [{ id: effectiveGuid, name: "Toast Sandbox Restaurant" }],
+        providerMetadata: {
+          tokenType: "Bearer",
+          environment: "SANDBOX",
+          authenticatedAt: new Date().toISOString(),
+        },
+      };
+    }
+
     try {
-      const accessToken = await this.authenticateToast(credentials);
-
+      await this.authenticateToast(credentials);
       return {
         valid: true,
         locations: [
           {
             id: effectiveGuid,
-            name: "Toast Production Restaurant",
+            name: env === "SANDBOX" ? "Toast Sandbox Restaurant" : "Toast Production Restaurant",
           },
         ],
         providerMetadata: {
           tokenType: "Bearer",
-          environment: "PRODUCTION",
+          environment: env,
           authenticatedAt: new Date().toISOString(),
         },
       };
     } catch (err: any) {
       return {
         valid: false,
-        error: err.message || "Could not reach or authenticate with Toast API. Please check your Client ID and Client Secret.",
+        error: sanitizeProviderError(err),
       };
     }
   }
 
   async fetchOrders(
     credentials: ProviderCredentials,
-    options: { locationId?: string; since?: Date; limit?: number }
+    options: ProviderFetchOptions
   ): Promise<ProviderFetchResult> {
-    const { restaurantGuid } = credentials;
+    const { restaurantGuid, environment, clientId } = credentials;
     const cleanGuid = restaurantGuid?.trim().replace(/^["']|["']$/g, "");
+    const env = environment === "SANDBOX" ? "SANDBOX" : "PRODUCTION";
 
     if (!cleanGuid) {
-      throw new Error(
-        "Toast Restaurant External GUID is required to fetch orders. Please edit your Toast connection and enter your Restaurant External GUID."
-      );
+      throw new Error("Toast Restaurant External GUID is required to fetch orders.");
     }
 
-    // Toast Production API Fetch using OAuth 2.0 Access Token
+    // Deterministic sandbox fixture when using sandbox_* test credentials
+    if (env === "SANDBOX" && clientId?.startsWith("sandbox_")) {
+      const mockOrders: NormalizedOrder[] = [
+        {
+          provider: "TOAST",
+          providerOrderId: "tst_ord_sbx_1001",
+          providerLocationId: options.locationId || cleanGuid,
+          orderNumber: "TST-1001",
+          orderType: "DINE_IN",
+          status: "COMPLETED",
+          currency: "USD",
+          environment: "SANDBOX",
+          totalAmount: 112.4,
+          taxAmount: 8.4,
+          tipAmount: 18.0,
+          discountAmount: 0,
+          serviceChargeAmount: 4.0,
+          voidedAmount: 0,
+          refundAmount: 0,
+          paymentStatus: "PAID",
+          paymentMethod: "SPLIT",
+          payments: [
+            { tenderType: "CARD", label: "VISA Credit", amount: 72.4, tipAmount: 12.0, cardBrand: "VISA", last4: "4242" },
+            { tenderType: "CASH", label: "Cash", amount: 40.0, tipAmount: 6.0 },
+          ],
+          refunds: [],
+          customerName: "Maya Lin",
+          notes: "Table 12",
+          createdAt: new Date("2026-11-20T18:30:00.000Z"),
+          providerUpdatedAt: new Date("2026-11-20T19:05:00.000Z"),
+          providerVersion: "v1",
+          isPartialSnapshot: false,
+          items: [
+            {
+              posMenuItemId: "tst_item_ribeye",
+              providerItemId: "tst_li_1001_1",
+              name: "Prime Ribeye Steak",
+              quantity: 2,
+              unitPrice: 41.0,
+              totalPrice: 82.0,
+              taxAmount: 6.56,
+              discountAmount: 0,
+              netSales: 82.0,
+              isVoided: false,
+              modifiers: [{ name: "Medium Rare", price: 0 }],
+            },
+            {
+              posMenuItemId: "tst_item_salad",
+              providerItemId: "tst_li_1001_2",
+              name: "Truffle Caesar Salad",
+              quantity: 1,
+              unitPrice: 18.0,
+              totalPrice: 18.0,
+              taxAmount: 1.84,
+              discountAmount: 0,
+              netSales: 18.0,
+              isVoided: false,
+            },
+          ],
+        },
+      ];
+      return {
+        orders: mockOrders.slice(0, options.limit || 100),
+        hasMore: false,
+        isPartialSnapshot: false,
+      };
+    }
+
     try {
       const accessToken = await this.authenticateToast(credentials);
-      const host = "https://ws-api.toasttab.com";
+      const host =
+        env === "SANDBOX"
+          ? "https://ws-sandbox-api.toasttab.com"
+          : "https://ws-api.toasttab.com";
 
       const reqHeaders: Record<string, string> = {
         Authorization: `Bearer ${accessToken}`,
@@ -146,184 +237,253 @@ export class ToastAdapter implements PosProviderAdapter {
         "Toast-Restaurant-External-ID": cleanGuid,
       };
 
-      // Determine date range in businessDate format (YYYYMMDD)
-      const datesToFetch: string[] = [];
-      const now = new Date();
-      const sinceDate = options.since || new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // default last 30 days
-      
-      let curr = new Date(now);
-      while (curr >= sinceDate || datesToFetch.length < 14) {
-        const yyyy = curr.getFullYear();
-        const mm = String(curr.getMonth() + 1).padStart(2, "0");
-        const dd = String(curr.getDate()).padStart(2, "0");
-        const dateStr = `${yyyy}${mm}${dd}`;
-        if (!datesToFetch.includes(dateStr)) {
-          datesToFetch.push(dateStr);
-        }
-        curr.setDate(curr.getDate() - 1);
-        if (datesToFetch.length >= 60) break; // cap at 60 days max
+      const pageSize = Math.min(options.limit || 100, 100);
+      const currentPage = options.cursor && options.cursor.startsWith("page:")
+        ? Math.max(1, parseInt(options.cursor.slice(5), 10) || 1)
+        : 1;
+
+      const url = new URL(`${host}/orders/v2/ordersBulk`);
+      if (options.businessDate) {
+        url.searchParams.set("businessDate", options.businessDate.replace(/-/g, ""));
+      } else {
+        const endDate = options.until || new Date();
+        const startDate =
+          options.since || new Date(endDate.getTime() - 24 * 60 * 60 * 1000);
+        url.searchParams.set("startDate", startDate.toISOString());
+        url.searchParams.set("endDate", endDate.toISOString());
+      }
+      url.searchParams.set("pageSize", String(pageSize));
+      url.searchParams.set("page", String(currentPage));
+
+      const response = await fetch(url.toString(), { headers: reqHeaders });
+      if (!response.ok) {
+        throw new Error(`Toast Orders API returned HTTP ${response.status}`);
       }
 
-      // Explicitly ensure recent known dates are checked
-      ["20260916", "20260915", "20260816"].forEach((d) => {
-        if (!datesToFetch.includes(d)) datesToFetch.push(d);
-      });
+      const data = await response.json();
+      const list = Array.isArray(data) ? data : data.orders || data.data || [];
+      const hasMore = list.length >= pageSize;
+      const nextCursor = hasMore ? `page:${currentPage + 1}` : undefined;
 
-      // Fetch orders across business dates in parallel chunks
-      const rawOrdersMap = new Map<string, any>();
-      let lastErrMessage = "";
-      const batchSize = 15;
-
-      for (let i = 0; i < datesToFetch.length; i += batchSize) {
-        const chunk = datesToFetch.slice(i, i + batchSize);
-        await Promise.all(
-          chunk.map(async (bDate) => {
-            try {
-              const endpoint = `${host}/orders/v2/ordersBulk?businessDate=${bDate}&pageSize=100`;
-              const response = await fetch(endpoint, { headers: reqHeaders });
-
-              if (response.ok) {
-                const data = await response.json();
-                const list = Array.isArray(data) ? data : data.orders || data.data || [];
-                for (const o of list) {
-                  const idKey = o.guid || o.id;
-                  if (idKey && !rawOrdersMap.has(idKey)) {
-                    rawOrdersMap.set(idKey, o);
-                  }
-                }
-              } else {
-                const errTxt = await response.text().catch(() => "");
-                lastErrMessage = `Toast Orders API (${response.status}): ${errTxt || response.statusText}`;
-              }
-            } catch (e: any) {
-              lastErrMessage = `Connection error reaching Toast Orders API: ${e.message || "fetch failed"}`;
-            }
-          })
-        );
-      }
-
-      const ordersList = Array.from(rawOrdersMap.values());
-
-      if (ordersList.length === 0 && lastErrMessage) {
-        // If no orders were retrieved and we had an API error message, throw error
-        throw new Error(lastErrMessage);
-      }
-
-      const targetList = options.limit ? ordersList.slice(0, options.limit) : ordersList;
-
-      const orders: NormalizedOrder[] = targetList.map((o: any) => {
-        const firstCheck = o.checks?.[0] || {};
-        const totalAmount = Number(firstCheck.amount || o.total || o.amount || 0);
-        const taxAmount = Number(firstCheck.taxAmount || o.tax || 0);
-        const tipAmount = Number(firstCheck.payments?.[0]?.tipAmount || o.tip || 0);
-
-        // Extract items across all checks if available
-        let allItems: any[] = [];
-        if (Array.isArray(o.checks)) {
-          o.checks.forEach((chk: any) => {
-            if (Array.isArray(chk.items) && chk.items.length > 0) {
-              allItems.push(...chk.items);
-            }
-            if (Array.isArray(chk.selections) && chk.selections.length > 0) {
-              allItems.push(...chk.selections);
-            }
-          });
-        }
-        if (allItems.length === 0 && Array.isArray(o.items)) {
-          allItems.push(...o.items);
-        }
-        if (allItems.length === 0 && Array.isArray(o.selections)) {
-          allItems.push(...o.selections);
-        }
-
-        const items = allItems.map((i: any, index: number) => {
-          const qty = Number(i.quantity || 1);
-          const uPrice = Number(i.price || 0);
-          const disc = Number(i.discountAmount || 0);
-          const net = i.netAmount !== undefined ? Number(i.netAmount) : (qty * uPrice - disc);
-          return {
-            posMenuItemId: i.item?.guid || i.entityId || i.menuItem?.guid || i.itemGroup?.guid || (i.guid ? String(i.guid) : undefined),
-            providerItemId: i.guid ? String(i.guid) : `item_${index + 1}`,
-            name: i.displayName || i.name || "Menu Item",
-            quantity: qty,
-            unitPrice: uPrice,
-            totalPrice: qty * uPrice,
-            netSales: net > 0 ? net : (qty * uPrice),
-            isVoided: Boolean(i.voided || i.isVoided || false),
-            modifiers: (i.selections || i.modifiers || []).map((s: any) => ({
-              name: s.displayName || s.name || "Modifier",
-              price: Number(s.price || 0),
-            })),
-          };
-        });
-
-        // Extract Customer info across Toast order, check, and delivery objects
-        const custObj = o.customer || firstCheck.customer || o.deliveryInfo?.recipient || {};
-        const custFirstName = custObj.firstName || custObj.first_name || "";
-        const custLastName = custObj.lastName || custObj.last_name || "";
-        let derivedCustName = `${custFirstName} ${custLastName}`.trim();
-        if (!derivedCustName && custObj.name) {
-          derivedCustName = custObj.name;
-        }
-        if (!derivedCustName && o.deliveryInfo?.recipient?.name) {
-          derivedCustName = o.deliveryInfo.recipient.name;
-        }
-
-        const derivedCustPhone = custObj.phone || custObj.phoneNumber || o.deliveryInfo?.phone || undefined;
-        const derivedNotes = o.notes || firstCheck.notes || o.deliveryInfo?.deliveryNotes || (o.table?.name ? `Table: ${o.table.name}` : undefined);
-
-        // Determine Order Type (DINE_IN, TAKEAWAY, DELIVERY)
-        const diningOptStr = String(o.diningOption?.displayName || o.diningOption?.name || o.diningOption || "").toUpperCase();
-        let derivedOrderType: "DINE_IN" | "TAKEAWAY" | "DELIVERY" = "TAKEAWAY";
-        if (diningOptStr.includes("DINE") || diningOptStr.includes("TABLE")) {
-          derivedOrderType = "DINE_IN";
-        } else if (diningOptStr.includes("DELIVER")) {
-          derivedOrderType = "DELIVERY";
-        }
-
-        const orderGuid = (o.guid && o.guid !== "undefined") ? o.guid : ((o.id && o.id !== "undefined") ? String(o.id) : (firstCheck.guid || `ord_${Date.now()}_${Math.floor(Math.random() * 1000)}`));
-        const sanitizedGuid = String(orderGuid).replace(/[^a-zA-Z0-9]/g, "");
-        const shortCode = sanitizedGuid.length >= 4
-          ? sanitizedGuid.slice(-4).toUpperCase()
-          : Math.floor(1000 + Math.random() * 9000).toString();
-
-        const rawNum = o.displayNumber || o.shortOrderNumber || o.checkNumber;
-        const orderNumberStr = rawNum ? `TST-${rawNum}` : `TST-${shortCode}`;
-
-        return {
-          provider: "TOAST",
-          providerOrderId: orderGuid,
-          providerLocationId: options.locationId || cleanGuid,
-          orderNumber: orderNumberStr,
-          orderType: derivedOrderType,
-          status: o.voided || o.deleted ? "CANCELLED" : "COMPLETED",
-          totalAmount,
-          taxAmount,
-          tipAmount,
-          discountAmount: Number(o.discount || 0),
-          refundAmount: Number(o.refundAmount || 0),
-          paymentMethod: firstCheck.payments?.[0]?.type || o.payments?.[0]?.type || "CREDIT_CARD",
-          customerName: derivedCustName || undefined,
-          customerPhone: derivedCustPhone || undefined,
-          notes: derivedNotes,
-          createdAt: new Date(o.createdDate || o.openedDate || o.modifiedDate || Date.now()),
-          rawPayload: o,
-          items,
-        };
-      });
-
-      // Filter out empty zero-value staff/void/placeholder checks
-      const validOrders = orders.filter(
-        (o) => o.items.length > 0 || o.totalAmount > 0 || o.tipAmount > 0
+      const orders: NormalizedOrder[] = list.map((o: any) =>
+        this.normalizeToastOrder(o, options.locationId || cleanGuid, env)
       );
 
-      // Sort fetched Toast orders descending (latest orders first)
-      validOrders.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-
-      return { orders: validOrders };
+      return {
+        orders,
+        nextCursor,
+        hasMore,
+        isPartialSnapshot: false,
+      };
     } catch (err: any) {
-      throw new Error(`Failed to fetch orders from Toast: ${err.message}`);
+      throw new Error(sanitizeProviderError(err));
     }
   }
-}
 
+  private normalizeToastOrder(
+    o: any,
+    locationId: string,
+    environment: "SANDBOX" | "PRODUCTION"
+  ): NormalizedOrder {
+    const checks = Array.isArray(o.checks) ? o.checks : [];
+    const firstCheck = checks[0] || {};
+
+    let taxCents = 0;
+    let tipCents = 0;
+    let discountCents = 0;
+    let serviceChargeCents = 0;
+    let refundCents = 0;
+    let voidedCents = 0;
+    let grossCents = 0;
+
+    const payments: NormalizedPaymentTender[] = [];
+    const refunds: NormalizedRefund[] = [];
+    const allSelections: any[] = [];
+
+    for (const chk of checks) {
+      taxCents += Math.round(Number(chk.taxAmount || 0) * 100);
+
+      for (const sc of chk.appliedServiceCharges || []) {
+        serviceChargeCents += Math.round(Number(sc.chargeAmount || 0) * 100);
+      }
+      for (const disc of chk.appliedDiscounts || []) {
+        discountCents += Math.round(Number(disc.discountAmount || 0) * 100);
+      }
+
+      const chkSelections = chk.selections || chk.items || [];
+      for (const sel of chkSelections) {
+        allSelections.push(sel);
+        const qty = Number(sel.quantity || 1);
+        const linePriceCents = Math.round(Number(sel.preDiscountPrice ?? (qty * Number(sel.price || 0))) * 100);
+        if (sel.voided || sel.isVoided) {
+          voidedCents += linePriceCents;
+        } else {
+          grossCents += linePriceCents;
+          discountCents += Math.round(Number(sel.discountAmount || 0) * 100);
+        }
+      }
+
+      for (const p of chk.payments || []) {
+        const pAmt = Number(p.amount || 0);
+        const pTip = Number(p.tipAmount || 0);
+        tipCents += Math.round(pTip * 100);
+        payments.push({
+          tenderType: classifyToastPaymentType(p.type || p.cardType),
+          label: p.type || p.cardType || "PAYMENT",
+          amount: roundCents(pAmt),
+          tipAmount: roundCents(pTip),
+          cardBrand: p.cardType || undefined,
+          last4: p.last4Digits || undefined,
+          externalPaymentId: p.guid || undefined,
+        });
+
+        if (p.refund && Number(p.refund.refundAmount || 0) > 0) {
+          const rAmt = Number(p.refund.refundAmount || 0);
+          refundCents += Math.round(rAmt * 100);
+          refunds.push({
+            externalRefundId: p.refund.guid || `${p.guid || "ref"}_r`,
+            amount: roundCents(rAmt),
+            tipRefundAmount: roundCents(Number(p.refund.tipRefundAmount || 0)),
+            refundedAt: p.refund.refundDate || undefined,
+          });
+        }
+      }
+    }
+
+    if (allSelections.length === 0 && Array.isArray(o.items)) {
+      allSelections.push(...o.items);
+    }
+
+    const items = allSelections.map((i: any, index: number) => {
+      const qty = Number(i.quantity || 1);
+      const uPrice = Number(i.price || 0);
+      const disc = Number(i.discountAmount || 0);
+      const tax = Number(i.tax || 0);
+      const isVoided = Boolean(i.voided || i.isVoided || false);
+      const net = isVoided
+        ? 0
+        : i.netAmount !== undefined
+          ? Number(i.netAmount)
+          : roundCents(qty * uPrice - disc);
+
+      return {
+        posMenuItemId:
+          i.item?.guid ||
+          i.entityId ||
+          i.menuItem?.guid ||
+          i.itemGroup?.guid ||
+          (i.guid ? String(i.guid) : undefined),
+        providerItemId: i.guid ? String(i.guid) : `item_${index + 1}`,
+        externalVariantId: i.itemGroup?.guid || undefined,
+        name: i.displayName || i.name || "Menu Item",
+        quantity: qty,
+        unitPrice: uPrice,
+        totalPrice: roundCents(qty * uPrice),
+        taxAmount: roundCents(tax),
+        discountAmount: roundCents(disc),
+        netSales: net,
+        isVoided,
+        modifiers: (i.selections || i.modifiers || []).map((s: any) => ({
+          name: s.displayName || s.name || "Modifier",
+          price: Number(s.price || 0),
+        })),
+      };
+    });
+
+    const netCents = Math.max(0, grossCents - discountCents);
+    const totalCollectedCents = Math.max(
+      0,
+      netCents + taxCents + serviceChargeCents + tipCents - refundCents
+    );
+
+    const custObj = o.customer || firstCheck.customer || o.deliveryInfo?.recipient || {};
+    const custName =
+      `${custObj.firstName || ""} ${custObj.lastName || ""}`.trim() ||
+      custObj.name ||
+      undefined;
+
+    const diningOptStr = String(
+      o.diningOption?.displayName || o.diningOption?.name || o.diningOption || ""
+    ).toUpperCase();
+    let derivedOrderType: "DINE_IN" | "TAKEAWAY" | "DELIVERY" = "TAKEAWAY";
+    if (diningOptStr.includes("DINE") || diningOptStr.includes("TABLE")) {
+      derivedOrderType = "DINE_IN";
+    } else if (diningOptStr.includes("DELIVER")) {
+      derivedOrderType = "DELIVERY";
+    }
+
+    const orderGuid =
+      o.guid && o.guid !== "undefined"
+        ? String(o.guid)
+        : o.id
+          ? String(o.id)
+          : String(firstCheck.guid || `tst_${Date.now()}`);
+    const rawNum = o.displayNumber || o.shortOrderNumber || o.checkNumber;
+    const shortCode = orderGuid.replace(/[^a-zA-Z0-9]/g, "").slice(-4).toUpperCase() || "0000";
+
+    const uniqueTenderTypes = Array.from(new Set(payments.map((p) => p.tenderType)));
+    const paymentMethod =
+      uniqueTenderTypes.length > 1
+        ? "SPLIT"
+        : uniqueTenderTypes[0] || o.paymentMethod || "TOAST_PAYMENT";
+
+    const paymentStatus: NormalizedOrder["paymentStatus"] =
+      refundCents >= totalCollectedCents && refundCents > 0
+        ? "REFUNDED"
+        : refundCents > 0
+          ? "PARTIAL"
+          : "PAID";
+
+    return {
+      provider: "TOAST",
+      providerOrderId: orderGuid,
+      providerLocationId: locationId,
+      orderNumber: rawNum ? `TST-${rawNum}` : `TST-${shortCode}`,
+      orderType: derivedOrderType,
+      status: o.voided || o.deleted ? "CANCELLED" : "COMPLETED",
+      currency: o.currency || "",
+      environment,
+      totalAmount: roundCents(
+        totalCollectedCents > 0 ? totalCollectedCents / 100 : Number(firstCheck.totalAmount || o.total || 0)
+      ),
+      taxAmount: roundCents(taxCents / 100),
+      tipAmount: roundCents(tipCents / 100),
+      discountAmount: roundCents(discountCents / 100),
+      serviceChargeAmount: roundCents(serviceChargeCents / 100),
+      voidedAmount: roundCents(voidedCents / 100),
+      refundAmount: roundCents(refundCents / 100),
+      paymentStatus,
+      paymentMethod,
+      payments,
+      refunds,
+      customerName: custName,
+      customerPhone: custObj.phone || custObj.phoneNumber || undefined,
+      notes: o.notes || firstCheck.notes || (o.table?.name ? `Table: ${o.table.name}` : undefined),
+      createdAt: new Date(o.openedDate || o.createdDate || Date.now()),
+      providerUpdatedAt: o.modifiedDate ? new Date(o.modifiedDate) : undefined,
+      providerVersion: o.modifiedDate ? String(o.modifiedDate) : undefined,
+      businessDate: o.businessDate ? String(o.businessDate) : undefined,
+      isPartialSnapshot: false,
+      rawPayload: o,
+      items,
+    };
+  }
+
+  verifyWebhookSignature(params: {
+    rawBody: string;
+    headers: Record<string, string | undefined>;
+    secret: string;
+  }): boolean {
+    const sig = params.headers["toast-signature"];
+    if (!sig || !params.secret) return false;
+    const timestamp = params.headers["toast-timestamp"] || "";
+    const payload = timestamp ? `${params.rawBody}${timestamp}` : params.rawBody;
+    const computed = crypto
+      .createHmac("sha256", params.secret)
+      .update(payload, "utf8")
+      .digest("base64");
+    const a = Buffer.from(sig);
+    const b = Buffer.from(computed);
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  }
+}

@@ -165,6 +165,7 @@ export async function GET(
           posMenuItemId: true,
           name: true,
           quantity: true,
+          refundedQuantity: true,
           unitPrice: true,
           totalPrice: true,
           netSales: true,
@@ -193,7 +194,8 @@ export async function GET(
 
     posItems.forEach((item) => {
       const key = item.posMenuItemId || item.name.toLowerCase().trim();
-      const q = Number(item.quantity || 1);
+      const q = Math.max(0, Number(item.quantity || 1) - Number(item.refundedQuantity || 0));
+      if (q <= 0) return;
       const netSalesNum = Number(item.netSales || 0);
       const totalNum = Number(item.totalPrice || 0);
       const unitNum = Number(item.unitPrice || 0);

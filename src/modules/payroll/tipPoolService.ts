@@ -160,7 +160,9 @@ export const TipPoolService = {
       select: {
         tipAmount: true,
         refundAmount: true,
+        serviceChargeAmount: true,
         paymentMethod: true,
+        paymentsJson: true,
         status: true,
         rawPayload: true,
       },
@@ -168,6 +170,7 @@ export const TipPoolService = {
 
     let cashTipsCents = 0;
     let cardTipsCents = 0;
+    let unattributedTipsCents = 0;
     let serviceChargesCents = 0;
     let refundsCents = 0;
 
@@ -175,13 +178,40 @@ export const TipPoolService = {
       const tipCents = Math.round(Number(o.tipAmount || 0) * 100);
       const refundCents = Math.round(Number(o.refundAmount || 0) * 100);
       const raw = (o.rawPayload as Record<string, any> | null) || {};
-      const svcCents = Math.round(Number(raw.serviceCharge || raw.serviceChargeAmount || 0) * 100);
+      const svcCents = Math.round(
+        Number(o.serviceChargeAmount || raw.serviceCharge || raw.serviceChargeAmount || 0) * 100
+      );
 
-      if ((o.paymentMethod || "").toUpperCase() === "CASH") {
+      const payments = Array.isArray(o.paymentsJson)
+        ? (o.paymentsJson as Array<{ tenderType?: string; tipAmount?: number }>)
+        : [];
+
+      if (payments.length > 0) {
+        let tenderTipSumCents = 0;
+        for (const p of payments) {
+          const pTipCents = Math.round(Number(p.tipAmount || 0) * 100);
+          tenderTipSumCents += pTipCents;
+          if (String(p.tenderType || "").toUpperCase() === "CASH") {
+            cashTipsCents += pTipCents;
+          } else {
+            cardTipsCents += pTipCents;
+          }
+        }
+        // If order tip exceeds itemized tender tips, record remainder as unattributed rather than guessing
+        if (tipCents > tenderTipSumCents) {
+          unattributedTipsCents += tipCents - tenderTipSumCents;
+        }
+      } else if ((o.paymentMethod || "").toUpperCase() === "CASH") {
         cashTipsCents += tipCents;
-      } else {
+      } else if (
+        o.paymentMethod &&
+        (o.paymentMethod || "").toUpperCase() !== "SPLIT"
+      ) {
         cardTipsCents += tipCents;
+      } else if (tipCents > 0) {
+        unattributedTipsCents += tipCents;
       }
+
       serviceChargesCents += svcCents;
       refundsCents += refundCents;
     }
@@ -190,6 +220,7 @@ export const TipPoolService = {
     let eligibleCents = 0;
     if (includeCashTips) eligibleCents += cashTipsCents;
     if (includeCardTips) eligibleCents += cardTipsCents;
+    if (includeCashTips && includeCardTips) eligibleCents += unattributedTipsCents;
     if (includeServiceCharges) eligibleCents += serviceChargesCents;
     if (deductRefunds) eligibleCents -= refundsCents;
     eligibleCents += adjustmentsCents;

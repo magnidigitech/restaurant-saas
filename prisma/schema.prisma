@@ -164,6 +164,8 @@ model Restaurant {
   recipes              Recipe[]
   posOrders            PosOrder[]
   posIntegrations      PosIntegration[]
+  posSyncRuns          PosSyncRun[]
+  posMenuItemMappings  PosMenuItemMapping[]
   vaultFolders         VaultFolder[]
   vaultItems           VaultItem[]
   vaultAuditLogs       VaultAuditLog[]
@@ -264,6 +266,8 @@ model RestaurantOutlet {
   payrollRuns          PayrollRun[]
   posOrders            PosOrder[]
   posIntegrations      PosIntegration[]
+  posSyncRuns          PosSyncRun[]
+  posMenuItemMappings  PosMenuItemMapping[]
   attendanceRecords    AttendanceRecord[]
   timePunches          TimePunch[]
   financialTransactions FinancialTransaction[]
@@ -1961,6 +1965,7 @@ model Recipe {
   items                RecipeItem[]          @relation("ParentRecipe")
   usedInRecipeItems    RecipeItem[]          @relation("ComponentSubRecipe")
   posOrderItems        PosOrderItem[]
+  posMenuItemMappings  PosMenuItemMapping[]
   cateringOrderItems   CateringOrderItem[]
   cateringPackageItems CateringPackageItem[]
 
@@ -2038,30 +2043,41 @@ enum PosIntegrationStatus {
 }
 
 model PosIntegration {
-  id                   String                 @id @default(uuid())
-  restaurantId         String                 @map("restaurant_id")
-  outletId             String                 @map("outlet_id")
-  provider             PosIntegrationProvider
-  providerLocationId   String?                @map("provider_location_id")
-  providerLocationName String?                @map("provider_location_name")
-  providerMerchantId   String?                @map("provider_merchant_id")
-  status               PosIntegrationStatus   @default(ACTIVE)
-  environment          String                 @default("SANDBOX")
-  isTestMode           Boolean                @default(true) @map("is_test_mode")
-  credentials          Json?                  @map("credentials")
-  credentialsEncrypted String?                @map("credentials_encrypted")
-  syncFrequency        String                 @default("15_MIN") @map("sync_frequency")
-  lastSyncAt           DateTime?              @map("last_sync_at")
-  lastSyncStatus       String?                @map("last_sync_status")
-  syncError            String?                @map("sync_error")
-  errorMessage         String?                @map("error_message")
-  importedOrdersCount  Int                    @default(0) @map("imported_orders_count")
-  createdAt            DateTime               @default(now()) @map("created_at")
-  updatedAt            DateTime               @updatedAt @map("updated_at")
+  id                        String                 @id @default(uuid())
+  restaurantId              String                 @map("restaurant_id")
+  outletId                  String                 @map("outlet_id")
+  provider                  PosIntegrationProvider
+  providerLocationId        String?                @map("provider_location_id")
+  providerLocationName      String?                @map("provider_location_name")
+  providerMerchantId        String?                @map("provider_merchant_id")
+  status                    PosIntegrationStatus   @default(ACTIVE)
+  environment               String                 @default("SANDBOX")
+  isTestMode                Boolean                @default(true) @map("is_test_mode")
+  credentials               Json?                  @map("credentials")
+  credentialsEncrypted      String?                @map("credentials_encrypted")
+  webhookSecretEncrypted    String?                @map("webhook_secret_encrypted")
+  syncFrequency             String                 @default("15_MIN") @map("sync_frequency")
+  syncCursor                String?                @map("sync_cursor")
+  backfillCursor            String?                @map("backfill_cursor")
+  backfillCompletedAt       DateTime?              @map("backfill_completed_at")
+  lastSyncAt                DateTime?              @map("last_sync_at")
+  lastSuccessfulSyncAt      DateTime?              @map("last_successful_sync_at")
+  lastSyncStatus            String?                @map("last_sync_status")
+  syncError                 String?                @map("sync_error")
+  errorMessage              String?                @map("error_message")
+  activeSyncLockId          String?                @map("active_sync_lock_id")
+  activeSyncStartedAt       DateTime?              @map("active_sync_started_at")
+  stockPostingEnabled       Boolean                @default(false) @map("stock_posting_enabled")
+  stockPostingEffectiveFrom DateTime?              @map("stock_posting_effective_from")
+  importedOrdersCount       Int                    @default(0) @map("imported_orders_count")
+  createdAt                 DateTime               @default(now()) @map("created_at")
+  updatedAt                 DateTime               @updatedAt @map("updated_at")
 
   // Relations
-  restaurant           Restaurant             @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  outlet               RestaurantOutlet       @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  restaurant                Restaurant             @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet                    RestaurantOutlet       @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  syncRuns                  PosSyncRun[]
+  orders                    PosOrder[]
 
   @@index([restaurantId])
   @@index([outletId])
@@ -2070,71 +2086,149 @@ model PosIntegration {
 }
 
 model PosOrder {
-  id                 String           @id @default(uuid())
-  restaurantId       String           @map("restaurant_id")
-  outletId           String           @map("outlet_id")
-  orderNumber        String           @map("order_number")
-  tableNumber        String?          @map("table_number")
-  orderType          PosOrderType     @default(DINE_IN) @map("order_type")
-  status             PosOrderStatus   @default(COMPLETED)
-  totalAmount        Decimal          @map("total_amount")
-  taxAmount          Decimal          @default(0) @map("tax_amount")
-  discountAmount     Decimal          @default(0) @map("discount_amount")
-  tipAmount          Decimal          @default(0) @map("tip_amount")
-  refundAmount       Decimal          @default(0) @map("refund_amount")
-  finalAmount        Decimal          @map("final_amount")
-  paymentStatus      PosPaymentStatus @default(PAID) @map("payment_status")
-  paymentMethod      String?          @map("payment_method")
-  provider           String           @default("MANUAL") // TOAST, SQUARE, CLOVER, MANUAL
-  providerOrderId    String?          @map("provider_order_id")
-  providerLocationId String?          @map("provider_location_id")
-  customerName       String?          @map("customer_name")
-  customerPhone      String?          @map("customer_phone")
-  rawPayload         Json?            @map("raw_payload")
-  depletedAt         DateTime?        @map("depleted_at")
-  notes              String?
-  createdAt          DateTime         @default(now()) @map("created_at")
-  updatedAt          DateTime         @updatedAt @map("updated_at")
+  id                  String           @id @default(uuid())
+  restaurantId        String           @map("restaurant_id")
+  outletId            String           @map("outlet_id")
+  integrationId       String?          @map("integration_id")
+  orderNumber         String           @map("order_number")
+  tableNumber         String?          @map("table_number")
+  orderType           PosOrderType     @default(DINE_IN) @map("order_type")
+  status              PosOrderStatus   @default(COMPLETED)
+  currency            String           @default("USD")
+  environment         String           @default("PRODUCTION")
+  totalAmount         Decimal          @map("total_amount")
+  taxAmount           Decimal          @default(0) @map("tax_amount")
+  discountAmount      Decimal          @default(0) @map("discount_amount")
+  tipAmount           Decimal          @default(0) @map("tip_amount")
+  serviceChargeAmount Decimal          @default(0) @map("service_charge_amount")
+  voidedAmount        Decimal          @default(0) @map("voided_amount")
+  refundAmount        Decimal          @default(0) @map("refund_amount")
+  finalAmount         Decimal          @map("final_amount")
+  paymentStatus       PosPaymentStatus @default(PAID) @map("payment_status")
+  paymentMethod       String?          @map("payment_method")
+  paymentsJson        Json?            @map("payments_json")
+  refundsJson         Json?            @map("refunds_json")
+  provider            String           @default("MANUAL") // TOAST, SQUARE, CLOVER, MANUAL
+  providerOrderId     String?          @map("provider_order_id")
+  providerLocationId  String?          @map("provider_location_id")
+  providerUpdatedAt   DateTime?        @map("provider_updated_at")
+  providerVersion     String?          @map("provider_version")
+  businessDate        String?          @map("business_date")
+  syncHash            String?          @map("sync_hash")
+  isPartialSnapshot   Boolean          @default(false) @map("is_partial_snapshot")
+  lastSyncedAt        DateTime?        @map("last_synced_at")
+  customerName        String?          @map("customer_name")
+  customerPhone       String?          @map("customer_phone")
+  rawPayload          Json?            @map("raw_payload")
+  depletedAt          DateTime?        @map("depleted_at")
+  notes               String?
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
 
   // Relations
-  restaurant         Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  outlet             RestaurantOutlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
-  items              PosOrderItem[]
+  restaurant          Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet              RestaurantOutlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  integration         PosIntegration?  @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  items               PosOrderItem[]
 
   @@unique([restaurantId, provider, providerOrderId])
   @@index([restaurantId, provider, providerOrderId])
   @@index([restaurantId])
   @@index([outletId])
+  @@index([integrationId])
   @@index([orderNumber])
   @@index([provider])
+  @@index([restaurantId, outletId, businessDate])
   @@map("pos_orders")
 }
 
 model PosOrderItem {
-  id             String   @id @default(uuid())
-  orderId        String   @map("order_id")
-  recipeId       String?  @map("recipe_id")
-  posMenuItemId  String?  @map("pos_menu_item_id")
-  providerItemId String?  @map("provider_item_id")
-  name           String
-  quantity       Int      @default(1)
-  unitPrice      Decimal  @map("unit_price")
-  totalPrice     Decimal  @map("total_price")
-  netSales       Decimal  @default(0) @map("net_sales")
-  isVoided       Boolean  @default(false) @map("is_voided")
-  modifiers      Json?
-  notes          String?
-  createdAt      DateTime @default(now()) @map("created_at")
+  id                String   @id @default(uuid())
+  orderId           String   @map("order_id")
+  recipeId          String?  @map("recipe_id")
+  posMenuItemId     String?  @map("pos_menu_item_id")
+  providerItemId    String?  @map("provider_item_id")
+  externalVariantId String?  @map("external_variant_id")
+  name              String
+  quantity          Int      @default(1)
+  unitPrice         Decimal  @map("unit_price")
+  totalPrice        Decimal  @map("total_price")
+  taxAmount         Decimal  @default(0) @map("tax_amount")
+  discountAmount    Decimal  @default(0) @map("discount_amount")
+  netSales          Decimal  @default(0) @map("net_sales")
+  refundedQuantity  Int      @default(0) @map("refunded_quantity")
+  depletedQuantity  Int      @default(0) @map("depleted_quantity")
+  isVoided          Boolean  @default(false) @map("is_voided")
+  modifiers         Json?
+  notes             String?
+  createdAt         DateTime @default(now()) @map("created_at")
 
   // Relations
-  order          PosOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  recipe         Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  order             PosOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  recipe            Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
 
   @@unique([orderId, providerItemId])
   @@index([orderId])
   @@index([recipeId])
   @@index([posMenuItemId])
   @@map("pos_order_items")
+}
+
+model PosSyncRun {
+  id            String         @id @default(uuid())
+  restaurantId  String         @map("restaurant_id")
+  outletId      String         @map("outlet_id")
+  integrationId String         @map("integration_id")
+  runType       String         @default("INCREMENTAL") @map("run_type") // BACKFILL, INCREMENTAL, WEBHOOK, MANUAL
+  status        String         @default("RUNNING") // RUNNING, SUCCEEDED, PARTIAL, FAILED
+  rangeStart    DateTime?      @map("range_start")
+  rangeEnd      DateTime?      @map("range_end")
+  cursorIn      String?        @map("cursor_in")
+  cursorOut     String?        @map("cursor_out")
+  importedCount Int            @default(0) @map("imported_count")
+  updatedCount  Int            @default(0) @map("updated_count")
+  skippedCount  Int            @default(0) @map("skipped_count")
+  failedCount   Int            @default(0) @map("failed_count")
+  errorSummary  String?        @map("error_summary")
+  startedAt     DateTime       @default(now()) @map("started_at")
+  finishedAt    DateTime?      @map("finished_at")
+
+  // Relations
+  restaurant    Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet        RestaurantOutlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  integration   PosIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, integrationId, startedAt])
+  @@index([outletId])
+  @@map("pos_sync_runs")
+}
+
+model PosMenuItemMapping {
+  id                      String           @id @default(uuid())
+  restaurantId            String           @map("restaurant_id")
+  outletId                String           @map("outlet_id")
+  provider                String
+  externalItemId          String           @map("external_item_id")
+  externalItemName        String           @map("external_item_name")
+  externalVariantId       String           @default("") @map("external_variant_id")
+  externalVariantName     String?          @map("external_variant_name")
+  recipeId                String?          @map("recipe_id")
+  modifierAdjustmentsJson Json?            @map("modifier_adjustments_json")
+  isIgnored               Boolean          @default(false) @map("is_ignored")
+  mappedByUserId          String?          @map("mapped_by_user_id")
+  mappedAt                DateTime?        @map("mapped_at")
+  createdAt               DateTime         @default(now()) @map("created_at")
+  updatedAt               DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant              Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet                  RestaurantOutlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  recipe                  Recipe?          @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+
+  @@unique([restaurantId, outletId, provider, externalItemId, externalVariantId])
+  @@index([restaurantId, outletId, provider])
+  @@index([recipeId])
+  @@map("pos_menu_item_mappings")
 }
 
 // ----------------------------------------------------

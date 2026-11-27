@@ -1,153 +1,94 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/core/database/client";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
+import { z } from "zod";
 import {
   getIntegrationsList,
   connectPosIntegration,
   validateProviderCredentials,
 } from "@/modules/pos-integrations/service";
-import { PosProviderType, PosEnvironmentType } from "@/modules/pos-integrations/types";
-import { z } from "zod";
+import {
+  assertPosOutletInScope,
+  getPosActorContext,
+} from "@/modules/pos-integrations/authHelper";
+import { sanitizeProviderError } from "@/modules/pos-integrations/crypto";
 
 const connectSchema = z.object({
+  outletId: z.string().min(1),
   provider: z.enum(["TOAST", "SQUARE", "CLOVER"]),
-  outletId: z.string().optional(),
-  environment: z.enum(["PRODUCTION", "SANDBOX"]).default("PRODUCTION"),
   credentials: z.record(z.string(), z.any()),
   providerLocationId: z.string().optional(),
   providerLocationName: z.string().optional(),
-  importPeriodDays: z.number().int().min(1).max(365).optional(),
+  syncFrequency: z.enum(["5_MIN", "15_MIN", "30_MIN", "HOURLY", "MANUAL"]).optional(),
+  isTestMode: z.boolean().optional(),
+  action: z.enum(["VALIDATE", "CONNECT"]).optional(),
 });
 
-const validateSchema = z.object({
-  provider: z.enum(["TOAST", "SQUARE", "CLOVER"]),
-  environment: z.enum(["PRODUCTION", "SANDBOX"]).default("PRODUCTION"),
-  credentials: z.record(z.string(), z.any()),
-});
-
-export const dynamic = "force-dynamic";
-
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
+    const auth = await getPosActorContext({ requireView: true });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const accessCheck = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      {},
-      session.tokenVersion
+    const integrations = await getIntegrationsList(
+      auth.ctx.restaurantId,
+      auth.ctx.accessibleOutletIds
     );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
-    }
-
-    const integrations = await getIntegrationsList(session.activeRestaurantId);
     return NextResponse.json({ success: true, integrations });
   } catch (error: any) {
-    console.error("List POS Integrations Error:", error);
-    return NextResponse.json({ error: error.message || "Failed to load integrations" }, { status: 500 });
+    return NextResponse.json(
+      { error: sanitizeProviderError(error) },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
-    }
-
-    const accessCheck = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      { moduleKey: "pos" },
-      session.tokenVersion
-    );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
-    }
-
     const body = await req.json();
-    const url = new URL(req.url);
-
-    // If query ?validateOnly=true, validate credentials only
-    if (url.searchParams.get("validateOnly") === "true") {
-      const parsed = validateSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json(
-          { error: "Invalid credentials format", details: parsed.error.flatten() },
-          { status: 400 }
-        );
-      }
-      const valResult = await validateProviderCredentials(
-        parsed.data.provider as PosProviderType,
-        { ...parsed.data.credentials, environment: parsed.data.environment as PosEnvironmentType }
-      );
-      return NextResponse.json({ success: valResult.valid, result: valResult });
-    }
-
-    // Auto-resolve or create default outletId if missing or blank
-    if (!body.outletId || typeof body.outletId !== "string" || !body.outletId.trim()) {
-      let defaultOutlet = await prisma.restaurantOutlet.findFirst({
-        where: { restaurantId: session.activeRestaurantId },
-        select: { id: true },
-      });
-
-      if (!defaultOutlet) {
-        const restaurant = await prisma.restaurant.findUnique({
-          where: { id: session.activeRestaurantId },
-          select: { name: true },
-        });
-        const createdOutlet = await prisma.restaurantOutlet.create({
-          data: {
-            restaurantId: session.activeRestaurantId,
-            name: restaurant?.name ? `${restaurant.name} Main Outlet` : "Main Outlet",
-            currency: "USD",
-          },
-        });
-        defaultOutlet = { id: createdOutlet.id };
-      }
-
-      body.outletId = defaultOutlet.id;
-    }
-
     const parsed = connectSchema.safeParse(body);
     if (!parsed.success) {
-      const fieldErrors = parsed.error.flatten().fieldErrors;
-      const firstErrorField = Object.keys(fieldErrors)[0];
-      const errorMsg = firstErrorField 
-        ? `Invalid payload: '${firstErrorField}' ${(fieldErrors as any)[firstErrorField]?.[0] || 'is invalid'}`
-        : "Invalid connection payload";
-
       return NextResponse.json(
-        { error: errorMsg, details: fieldErrors },
+        { error: "Invalid POS integration payload", details: parsed.error.flatten() },
         { status: 400 }
       );
     }
 
-    const resolvedOutletId = body.outletId || parsed.data.outletId;
+    const auth = await getPosActorContext({
+      requireManage: true,
+      outletId: parsed.data.outletId,
+    });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
-    const result = await connectPosIntegration(session.activeRestaurantId, {
-      provider: parsed.data.provider as PosProviderType,
-      outletId: resolvedOutletId,
-      environment: parsed.data.environment as PosEnvironmentType,
-      credentials: {
-        ...parsed.data.credentials,
-        environment: parsed.data.environment as PosEnvironmentType,
-      },
+    const scope = assertPosOutletInScope(auth.ctx, parsed.data.outletId);
+    if (!scope.ok) {
+      return NextResponse.json({ error: scope.error }, { status: scope.status });
+    }
+
+    if (parsed.data.action === "VALIDATE") {
+      const validation = await validateProviderCredentials(
+        parsed.data.provider,
+        parsed.data.credentials
+      );
+      return NextResponse.json({ success: validation.valid, ...validation });
+    }
+
+    const integration = await connectPosIntegration({
+      restaurantId: auth.ctx.restaurantId,
+      outletId: parsed.data.outletId,
+      provider: parsed.data.provider,
+      credentials: parsed.data.credentials,
       providerLocationId: parsed.data.providerLocationId,
       providerLocationName: parsed.data.providerLocationName,
-      importPeriodDays: parsed.data.importPeriodDays,
+      syncFrequency: parsed.data.syncFrequency,
+      isTestMode: parsed.data.isTestMode,
     });
 
-    return NextResponse.json({ success: true, ...result });
+    return NextResponse.json({ success: true, integration });
   } catch (error: any) {
-    console.error("Connect POS Integration Error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to establish POS integration" },
+      { error: sanitizeProviderError(error) },
       { status: 400 }
     );
   }
