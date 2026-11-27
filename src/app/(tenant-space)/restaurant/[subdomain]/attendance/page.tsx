@@ -25,6 +25,12 @@ interface AttendanceRecordItem {
   overtimeMinutes: number;
   lateMinutes: number;
   isApproved: boolean;
+  needsReview?: boolean;
+  exceptionFlags?: string[];
+  scheduledSnapshot?: { startTime: string; endTime: string; breakMinutes?: number } | null;
+  correctedBy?: string | null;
+  correctedAt?: string | null;
+  correctionReason?: string | null;
   managerNotes?: string;
   employee: {
     id: string;
@@ -37,7 +43,13 @@ interface AttendanceRecordItem {
   };
   outlet: { id: string; name: string };
   shiftAssignment?: { startTime: string; endTime: string };
-  timePunches?: { id: string; punchType: string; punchTime: string }[];
+  timePunches?: {
+    id: string;
+    punchType: string;
+    punchTime: string;
+    isManualAdjustment?: boolean;
+    adjustmentReason?: string | null;
+  }[];
 }
 
 interface LeaveRequestItem {
@@ -81,6 +93,15 @@ export default function AttendanceHubPage({
   const [timesheets, setTimesheets] = useState<AttendanceRecordItem[]>([]);
   const [loadingTimesheets, setLoadingTimesheets] = useState(false);
   const [filterApproved, setFilterApproved] = useState<string>("ALL");
+  const [filterDate, setFilterDate] = useState<string>("");
+
+  // Review / Correction Modal State
+  const [reviewRecord, setReviewRecord] = useState<AttendanceRecordItem | null>(null);
+  const [missedPunchTime, setMissedPunchTime] = useState<string>("");
+  const [editWorkMins, setEditWorkMins] = useState<string>("");
+  const [correctionReason, setCorrectionReason] = useState<string>("");
+  const [savingCorrection, setSavingCorrection] = useState(false);
+  const [correctionError, setCorrectionError] = useState<string>("");
 
   // Leaves State
   const [leaves, setLeaves] = useState<LeaveRequestItem[]>([]);
@@ -166,11 +187,17 @@ export default function AttendanceHubPage({
   const fetchTimesheets = async (silent = false) => {
     try {
       if (!silent) setLoadingTimesheets(true);
-      let url = "/api/restaurant/attendance/records?";
-      if (selectedOutletId) url += `outletId=${selectedOutletId}&`;
-      if (filterApproved !== "ALL") url += `isApproved=${filterApproved === "APPROVED"}&`;
+      const q = new URLSearchParams();
+      if (selectedOutletId) q.set("outletId", selectedOutletId);
+      if (filterApproved === "EXCEPTIONS") q.set("needsReview", "true");
+      else if (filterApproved === "PENDING") q.set("isApproved", "false");
+      else if (filterApproved === "APPROVED") q.set("isApproved", "true");
+      if (filterDate) {
+        q.set("startDate", `${filterDate}T00:00:00.000Z`);
+        q.set("endDate", `${filterDate}T23:59:59.999Z`);
+      }
 
-      const res = await fetch(url);
+      const res = await fetch(`/api/restaurant/attendance/records?${q.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setTimesheets(data.records || []);
@@ -179,6 +206,57 @@ export default function AttendanceHubPage({
       // ignore
     } finally {
       if (!silent) setLoadingTimesheets(false);
+    }
+  };
+
+  const openReviewModal = (rec: AttendanceRecordItem) => {
+    setReviewRecord(rec);
+    const dKey = new Date(rec.workDate).toISOString().slice(0, 10);
+    setMissedPunchTime(!rec.clockOutTime ? `${dKey}T17:00` : "");
+    setEditWorkMins(String(rec.totalWorkMinutes));
+    setCorrectionReason("");
+    setCorrectionError("");
+  };
+
+  const handleSaveReviewCorrection = async (approveAfter: boolean) => {
+    if (!reviewRecord) return;
+    setSavingCorrection(true);
+    setCorrectionError("");
+    try {
+      const payload: Record<string, unknown> = {
+        id: reviewRecord.id,
+        isApproved: approveAfter,
+      };
+      if (missedPunchTime && !reviewRecord.clockOutTime) {
+        payload.addMissedPunch = {
+          punchType: "CLOCK_OUT",
+          punchTime: new Date(missedPunchTime).toISOString(),
+        };
+      } else if (
+        editWorkMins.trim() !== "" &&
+        Number(editWorkMins) !== reviewRecord.totalWorkMinutes
+      ) {
+        payload.totalWorkMinutes = Number(editWorkMins);
+      }
+      if (correctionReason.trim()) {
+        payload.correctionReason = correctionReason.trim();
+      }
+
+      const res = await fetch("/api/restaurant/attendance/records", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update attendance");
+
+      setReviewRecord(null);
+      await fetchTimesheets();
+      await fetchLiveBoard(true);
+    } catch (e: any) {
+      setCorrectionError(e.message || "Update failed");
+    } finally {
+      setSavingCorrection(false);
     }
   };
 
@@ -271,7 +349,7 @@ export default function AttendanceHubPage({
     if (activeTab === "LIVE_FLOOR") fetchLiveBoard();
     if (activeTab === "TIMESHEETS") fetchTimesheets();
     if (activeTab === "LEAVES") fetchLeaves();
-  }, [activeTab, selectedOutletId, filterApproved]);
+  }, [activeTab, selectedOutletId, filterApproved, filterDate]);
 
   // Handle Approve Timesheet Record
   const handleApproveRecord = async (recordId: string, isApproved: boolean) => {
@@ -608,13 +686,20 @@ export default function AttendanceHubPage({
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="date"
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                  className={`px-3 py-1.5 text-xs rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-slate-50"}`}
+                />
                 <select
                   value={filterApproved}
                   onChange={(e) => setFilterApproved(e.target.value)}
                   className={`px-3 py-1.5 text-xs rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-slate-50"}`}
                 >
                   <option value="ALL">All Statuses</option>
+                  <option value="EXCEPTIONS">Exceptions / Needs Review</option>
                   <option value="PENDING">Pending Approval</option>
                   <option value="APPROVED">Approved</option>
                 </select>
@@ -631,93 +716,158 @@ export default function AttendanceHubPage({
                 No timesheet records found for the selected filter.
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className={`border-b ${isDark ? "border-white/[0.06] bg-white/[0.01]" : "border-slate-200 bg-slate-50"}`}>
-                      <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Date</th>
-                      <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Employee</th>
-                      <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Clock In / Out</th>
-                      <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Net Hours</th>
-                      <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Overtime</th>
-                      <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Punctuality</th>
-                      <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Approval</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
-                    {timesheets.map((ts) => {
-                      const liveWorked = getLiveWorkedMinutes(ts);
-                      const isShiftActive = !ts.clockOutTime;
-
+              <>
+                {/* Mobile Exception-First Cards */}
+                <div className="divide-y divide-black/[0.06] dark:divide-white/[0.06] md:hidden">
+                  {[...timesheets]
+                    .sort((a, b) => Number(Boolean(b.needsReview)) - Number(Boolean(a.needsReview)))
+                    .map((ts) => {
+                      const flags = ts.exceptionFlags || [];
                       return (
-                        <tr key={ts.id} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.02] transition">
-                          <td className="p-3.5 font-mono">
-                            {new Date(ts.workDate).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
-                          </td>
-                          <td className="p-3.5">
-                            <strong className="block font-bold">{ts.employee.firstName} {ts.employee.lastName}</strong>
-                            <span className={`text-[10px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>{ts.employee.employeeCode}</span>
-                          </td>
-                          <td className="p-3.5 font-mono">
+                        <div key={ts.id} className="p-4 space-y-2.5">
+                          <div className="flex items-start justify-between gap-2">
                             <div>
+                              <p className="text-sm font-bold">
+                                {ts.employee.firstName} {ts.employee.lastName}
+                              </p>
+                              <p className="text-[11px] opacity-65">
+                                {ts.outlet?.name} •{" "}
+                                {new Date(ts.workDate).toLocaleDateString([], { month: "short", day: "numeric" })}
+                              </p>
+                            </div>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                ts.isApproved
+                                  ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/25"
+                                  : ts.needsReview
+                                  ? "bg-rose-500/15 text-rose-500 border-rose-500/25"
+                                  : "bg-amber-500/15 text-amber-500 border-amber-500/25"
+                              }`}
+                            >
+                              {ts.isApproved ? "Approved" : ts.needsReview ? "Needs Review" : "Pending"}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-xs opacity-85">
+                            <div>
+                              <span className="opacity-60">Worked: </span>
+                              <strong>{formatMins(getLiveWorkedMinutes(ts))}</strong>
+                            </div>
+                            <div>
+                              <span className="opacity-60">Break: </span>
+                              <strong>{ts.totalBreakMinutes}m</strong>
+                            </div>
+                          </div>
+
+                          {flags.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {flags.map((f) => (
+                                <span
+                                  key={f}
+                                  className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-500 border border-rose-500/20"
+                                >
+                                  {f.replace(/_/g, " ")}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => openReviewModal(ts)}
+                            className="w-full py-2 rounded-xl text-xs font-semibold bg-[#0071E3] text-white cursor-pointer"
+                          >
+                            Review &amp; Resolve →
+                          </button>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                {/* Desktop Table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className={`border-b ${isDark ? "border-white/[0.06] bg-white/[0.01]" : "border-slate-200 bg-slate-50"}`}>
+                        <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Date</th>
+                        <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Employee</th>
+                        <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Outlet</th>
+                        <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Scheduled</th>
+                        <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Actual Punches</th>
+                        <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Worked / Break</th>
+                        <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Exceptions</th>
+                        <th className="p-3.5 font-bold uppercase tracking-wider text-[10px] text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
+                      {timesheets.map((ts) => {
+                        const liveWorked = getLiveWorkedMinutes(ts);
+                        const sched = ts.scheduledSnapshot || ts.shiftAssignment;
+                        const flags = ts.exceptionFlags || [];
+
+                        return (
+                          <tr key={ts.id} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.02] transition">
+                            <td className="p-3.5 font-mono">
+                              {new Date(ts.workDate).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
+                            </td>
+                            <td className="p-3.5">
+                              <strong className="block font-bold">{ts.employee.firstName} {ts.employee.lastName}</strong>
+                              <span className={`text-[10px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>{ts.employee.employeeCode}</span>
+                            </td>
+                            <td className="p-3.5 font-medium">{ts.outlet?.name || "—"}</td>
+                            <td className="p-3.5 font-mono text-[11px]">
+                              {sched ? `${sched.startTime}–${sched.endTime}` : "Unscheduled"}
+                            </td>
+                            <td className="p-3.5 font-mono">
                               {ts.clockInTime ? new Date(ts.clockInTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}
                               {" → "}
                               {ts.clockOutTime ? (
                                 new Date(ts.clockOutTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                               ) : (
-                                <span className="text-amber-500 font-semibold">Active</span>
+                                <span className="text-rose-500 font-semibold">Missing Out</span>
                               )}
-                            </div>
-                            {ts.totalBreakMinutes > 0 && (
-                              <span className="text-[10px] text-amber-500">Break: {ts.totalBreakMinutes}m</span>
-                            )}
-                          </td>
-                          <td className="p-3.5 font-bold font-mono text-[#0071E3]">
-                            {formatMins(liveWorked)}
-                          </td>
-                          <td className="p-3.5 font-mono">
-                            {ts.overtimeMinutes > 0 ? (
-                              <span className="text-purple-400 font-bold">+{formatMins(ts.overtimeMinutes)}</span>
-                            ) : (
-                              <span className="opacity-40">—</span>
-                            )}
-                          </td>
-                          <td className="p-3.5">
-                            {ts.lateMinutes > 0 ? (
-                              <span className="text-rose-400 font-medium">Late ({ts.lateMinutes}m)</span>
-                            ) : (
-                              <span className="text-emerald-400 font-medium">On-Time</span>
-                            )}
-                          </td>
-                          <td className="p-3.5">
-                            {ts.isApproved ? (
-                              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                                Approved
-                              </span>
-                            ) : isShiftActive ? (
-                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium border ${
-                                isDark
-                                  ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
-                                  : "bg-amber-50 text-amber-700 border-amber-200"
-                              }`}>
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                Active Session
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => handleApproveRecord(ts.id, true)}
-                                className="px-3 py-1 bg-[#0071E3] hover:bg-[#0077ED] active:scale-95 text-white font-bold rounded-lg text-[11px] cursor-pointer shadow-xs transition"
-                              >
-                                Approve
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                            </td>
+                            <td className="p-3.5 font-mono">
+                              <strong className="text-[#0071E3]">{formatMins(liveWorked)}</strong>
+                              <span className="block text-[10px] opacity-65">Break: {ts.totalBreakMinutes}m</span>
+                            </td>
+                            <td className="p-3.5">
+                              {flags.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {flags.map((f) => (
+                                    <span key={f} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-500 border border-rose-500/25">
+                                      {f.replace(/_/g, " ")}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-[11px] opacity-50">None</span>
+                              )}
+                            </td>
+                            <td className="p-3.5 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                {ts.isApproved ? (
+                                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                                    Approved
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => openReviewModal(ts)}
+                                    className="px-3 py-1 bg-[#0071E3] hover:bg-[#0077ED] text-white font-bold rounded-lg text-[11px] cursor-pointer"
+                                  >
+                                    Review
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -962,6 +1112,134 @@ export default function AttendanceHubPage({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Review, Missed Punch Resolution & Approval */}
+      {reviewRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs">
+          <div
+            className={`w-full h-full sm:h-auto sm:max-w-lg sm:rounded-3xl border p-6 space-y-4 shadow-2xl overflow-y-auto ${
+              isDark ? "bg-[#121622] border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold">
+                  Review Attendance: {reviewRecord.employee.firstName} {reviewRecord.employee.lastName}
+                </h3>
+                <p className="text-xs opacity-65">
+                  {reviewRecord.outlet?.name} • {new Date(reviewRecord.workDate).toLocaleDateString()}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReviewRecord(null)}
+                className="text-xs text-slate-400 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {correctionError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs">
+                {correctionError}
+              </div>
+            )}
+
+            {/* Punch Timeline (Preserves original punches) */}
+            <div className="space-y-1.5">
+              <p className="text-xs font-bold uppercase tracking-wider opacity-60">
+                Recorded Punch History
+              </p>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                {(reviewRecord.timePunches || []).map((p) => (
+                  <div
+                    key={p.id}
+                    className={`px-3 py-2 rounded-xl border text-xs flex items-center justify-between ${
+                      isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"
+                    }`}
+                  >
+                    <span className="font-semibold">
+                      {p.punchType.replace(/_/g, " ")}
+                      {p.isManualAdjustment && (
+                        <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500">
+                          Manual Adjustment
+                        </span>
+                      )}
+                    </span>
+                    <span className="font-mono">
+                      {new Date(p.punchTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {!reviewRecord.clockOutTime && (
+              <div>
+                <label className="block text-xs font-medium mb-1 opacity-75">
+                  Resolve Missed Clock-Out Time
+                </label>
+                <input
+                  type="datetime-local"
+                  value={missedPunchTime}
+                  onChange={(e) => setMissedPunchTime(e.target.value)}
+                  className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                    isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"
+                  }`}
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-medium mb-1 opacity-75">
+                Worked Minutes Override (Current: {reviewRecord.totalWorkMinutes}m)
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={editWorkMins}
+                onChange={(e) => setEditWorkMins(e.target.value)}
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium mb-1 opacity-75">
+                Correction Reason (Required when changing punches or minutes)
+              </label>
+              <input
+                type="text"
+                value={correctionReason}
+                onChange={(e) => setCorrectionReason(e.target.value)}
+                placeholder="e.g. Forgot to clock out at close, verified with supervisor"
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"
+                }`}
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-black/5 dark:border-white/5">
+              <button
+                type="button"
+                onClick={() => setReviewRecord(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-white/10 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={savingCorrection}
+                onClick={() => handleSaveReviewCorrection(true)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer"
+              >
+                {savingCorrection ? "Saving..." : "Resolve & Approve"}
+              </button>
+            </div>
           </div>
         </div>
       )}

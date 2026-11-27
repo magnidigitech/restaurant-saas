@@ -1,91 +1,184 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/core/database/client";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
-import { HROnboardingService } from "@/modules/hr-onboarding/service";
+import { EmploymentStatus, WorkerType } from "@prisma/client";
+import { getWorkforceActorContext } from "@/modules/workforce/authHelper";
+import {
+  HROnboardingService,
+  OnboardingError,
+} from "@/modules/hr-onboarding/service";
 import { sendEmployeeOnboardingEmail } from "@/core/mail";
 import { z } from "zod";
 
 const startSchema = z.object({
-  employeeId: z.string().min(1),
+  employeeId: z.string().optional(),
+  candidate: z
+    .object({
+      firstName: z.string().min(1),
+      lastName: z.string().min(1),
+      personalEmail: z.string().email().optional().or(z.literal("")),
+      phone: z.string().optional(),
+    })
+    .optional(),
   templateId: z.string().min(1),
+  intendedOutletId: z.string().optional().nullable(),
+  intendedDepartmentId: z.string().optional().nullable(),
+  intendedDesignationId: z.string().optional().nullable(),
+  intendedStartDate: z.string().optional().nullable(),
+  intendedEmploymentStatus: z.nativeEnum(EmploymentStatus).optional(),
+  intendedWorkerType: z.nativeEnum(WorkerType).optional(),
+  provisionAppAccess: z.boolean().optional(),
+  appRoleId: z.string().optional().nullable(),
+  expiresInDays: z.number().int().min(1).max(60).optional(),
 });
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const access = await verifyAccess(session.userId, session.activeRestaurantId, { moduleKey: "hr_onboarding", permissionKey: "hr:view_employees" }, session.tokenVersion);
-    if (!access.authorized) return NextResponse.json({ error: access.error }, { status: access.status });
-
     const { searchParams } = new URL(req.url);
+    const outletId = searchParams.get("outletId") || undefined;
+
+    const auth = await getWorkforceActorContext({ outletId });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const status = searchParams.get("status") || undefined;
     const employeeId = searchParams.get("employeeId") || undefined;
+    const search = searchParams.get("search") || undefined;
 
-    const sessions = await HROnboardingService.getSessions(session.activeRestaurantId, { status, employeeId });
+    const sessions = await HROnboardingService.getSessions(
+      auth.ctx.restaurantId,
+      { status, employeeId, outletId, search },
+      auth.ctx.accessibleOutletIds
+    );
     return NextResponse.json({ sessions });
   } catch (error: any) {
+    if (error instanceof OnboardingError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status }
+      );
+    }
     console.error("GET Sessions Error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const access = await verifyAccess(session.userId, session.activeRestaurantId, { moduleKey: "hr_onboarding", permissionKey: "hr:manage_onboarding" }, session.tokenVersion);
-    if (!access.authorized) return NextResponse.json({ error: access.error }, { status: access.status });
+    const auth = await getWorkforceActorContext({ requireManage: true });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     const body = await req.json();
     const result = startSchema.safeParse(body);
-    if (!result.success) return NextResponse.json({ error: "Invalid payload", details: result.error.flatten() }, { status: 400 });
+    if (!result.success) {
+      return NextResponse.json(
+        { error: "Invalid payload", details: result.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const data = result.data;
+    if (
+      data.intendedOutletId &&
+      auth.ctx.accessibleOutletIds !== null &&
+      !auth.ctx.accessibleOutletIds.includes(data.intendedOutletId)
+    ) {
+      return NextResponse.json(
+        { error: "Intended outlet is outside your authorized scope" },
+        { status: 403 }
+      );
+    }
 
     const onboarding = await HROnboardingService.startOnboarding(
-      session.activeRestaurantId,
-      result.data.employeeId,
-      result.data.templateId
+      auth.ctx.restaurantId,
+      {
+        employeeId: data.employeeId,
+        candidate: data.candidate,
+        templateId: data.templateId,
+        intendedOutletId: data.intendedOutletId,
+        intendedDepartmentId: data.intendedDepartmentId,
+        intendedDesignationId: data.intendedDesignationId,
+        intendedStartDate: data.intendedStartDate
+          ? new Date(data.intendedStartDate)
+          : null,
+        intendedEmploymentStatus: data.intendedEmploymentStatus,
+        intendedWorkerType: data.intendedWorkerType,
+        provisionAppAccess: data.provisionAppAccess,
+        appRoleId: data.appRoleId,
+        expiresInDays: data.expiresInDays,
+        actor: {
+          userId: auth.ctx.userId,
+          userEmail: auth.ctx.userEmail,
+        },
+      }
     );
 
-    // Trigger branded employee onboarding email
     const employee = await prisma.employee.findUnique({
-      where: { id: result.data.employeeId },
-      include: {
-        employmentRecords: {
-          where: { status: "ACTIVE" },
-          include: { department: true, designation: true },
-          take: 1,
-        },
+      where: { id: onboarding.employeeId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        employeeCode: true,
+        personalEmail: true,
       },
     });
 
-    const restaurant = await prisma.restaurant.findUnique({
-      where: { id: session.activeRestaurantId },
-      include: { branding: true },
-    });
+    const [restaurant, dept, desig] = await Promise.all([
+      prisma.restaurant.findUnique({
+        where: { id: auth.ctx.restaurantId },
+        include: { branding: true },
+      }),
+      onboarding.intendedDepartmentId
+        ? prisma.department.findUnique({
+            where: { id: onboarding.intendedDepartmentId },
+            select: { name: true },
+          })
+        : null,
+      onboarding.intendedDesignationId
+        ? prisma.designation.findUnique({
+            where: { id: onboarding.intendedDesignationId },
+            select: { name: true },
+          })
+        : null,
+    ]);
 
     let emailSent = false;
     if (employee?.personalEmail) {
-      const activeRecord = employee.employmentRecords[0];
       const emailResult = await sendEmployeeOnboardingEmail({
         employeeName: `${employee.firstName} ${employee.lastName}`.trim(),
         employeeCode: employee.employeeCode,
         personalEmail: employee.personalEmail,
         restaurantName: restaurant?.name || "Our Restaurant",
-        department: activeRecord?.department?.name,
-        designation: activeRecord?.designation?.name,
+        department: dept?.name,
+        designation: desig?.name,
         accessToken: onboarding.accessToken,
         branding: restaurant?.branding,
-      }).catch((err) => {
-        console.warn("Failed to dispatch onboarding email:", err);
-        return { success: false };
-      });
+      }).catch(() => ({ success: false }));
       emailSent = emailResult?.success ?? false;
     }
 
-    return NextResponse.json({ success: true, onboarding, emailSent });
+    return NextResponse.json({
+      success: true,
+      onboarding,
+      emailSent,
+    });
   } catch (error: any) {
+    if (error instanceof OnboardingError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code, details: error.details },
+        { status: error.status }
+      );
+    }
     console.error("POST Session Error:", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 400 });
+    return NextResponse.json(
+      { error: error.message || "Internal server error" },
+      { status: 400 }
+    );
   }
 }

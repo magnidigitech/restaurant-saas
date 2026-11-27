@@ -1,149 +1,132 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/core/database/client";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
-import { calculateTipDistribution, StaffTipParticipant, TipPoolRuleConfig } from "@/core/payroll/tipPoolEngine";
+import { getPayrollActorContext } from "@/modules/payroll/authHelper";
+import { TipPoolService, TipPoolError } from "@/modules/payroll/tipPoolService";
 import { z } from "zod";
 
-const calculateTipSchema = z.object({
-  startDate: z.string().min(1),
-  endDate: z.string().min(1),
-  customTipAmount: z.number().min(0).optional(),
-  outletId: z.string().optional(),
-  fohPercentage: z.number().min(0).max(100).default(70),
-  bohPercentage: z.number().min(0).max(100).default(30),
-  distributionMethod: z.enum(["HOURS_WORKED", "EQUAL_SPLIT", "ROLE_POINT_SYSTEM"]).default("HOURS_WORKED"),
-  rolePoints: z.record(z.string(), z.number()).optional(),
-});
+const tipPoolActionSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.enum(["PREVIEW", "SAVE", "FINALIZE"]),
+    outletId: z.string().uuid(),
+    startDate: z.string().min(1),
+    endDate: z.string().min(1),
+    ruleId: z.string().uuid().optional(),
+    adjustmentsAmount: z.number().optional(),
+    fohPercentage: z.number().min(0).max(100).optional(),
+    bohPercentage: z.number().min(0).max(100).optional(),
+    distributionMethod: z
+      .enum(["HOURS_WORKED", "EQUAL_SPLIT", "ROLE_POINT_SYSTEM"])
+      .optional(),
+    rolePoints: z.record(z.string(), z.number()).optional(),
+    includeCashTips: z.boolean().optional(),
+    includeCardTips: z.boolean().optional(),
+    includeServiceCharges: z.boolean().optional(),
+    deductRefunds: z.boolean().optional(),
+  }),
+  z.object({
+    action: z.literal("FINALIZE_RUN"),
+    tipPoolRunId: z.string().uuid(),
+  }),
+]);
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const outletId = searchParams.get("outletId") || undefined;
+
+    const auth = await getPayrollActorContext({ requireView: true, outletId });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    const [runs, rules] = await Promise.all([
+      TipPoolService.getRuns(auth.ctx.restaurantId, {
+        outletId,
+        accessibleOutletIds: auth.ctx.accessibleOutletIds,
+      }),
+      TipPoolService.getRules(auth.ctx.restaurantId, outletId),
+    ]);
+
+    return NextResponse.json({ success: true, runs, rules });
+  } catch (error: any) {
+    const status = error instanceof TipPoolError ? error.status : 500;
+    return NextResponse.json(
+      { error: error.message || "Failed to load tip pool runs" },
+      { status }
+    );
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
-    }
-
-    const accessCheck = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      {},
-      session.tokenVersion
-    );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
-    }
-
     const body = await req.json();
-    const result = calculateTipSchema.safeParse(body);
-    if (!result.success) {
+    // Backward-compatible default action if omitted
+    const normalizedBody = body.action ? body : { ...body, action: "PREVIEW" };
+    const parsed = tipPoolActionSchema.safeParse(normalizedBody);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid calculation payload", details: result.error.flatten() },
+        { error: "Invalid tip pool payload", details: parsed.error.flatten() },
         { status: 400 }
       );
     }
 
-    const data = result.data;
-    const start = new Date(data.startDate);
-    const end = new Date(data.endDate);
+    const payload = parsed.data;
 
-    // 1. Fetch POS tips in period if not passed
-    let totalTips = data.customTipAmount;
-    if (totalTips === undefined) {
-      try {
-        const posSum = await prisma.posOrder.aggregate({
-          where: {
-            restaurantId: session.activeRestaurantId,
-            createdAt: { gte: start, lte: end },
-            status: "COMPLETED",
-          },
-          _sum: { finalAmount: true },
-        });
-        const sales = Number(posSum._sum?.finalAmount || 0);
-        totalTips = Number((sales * 0.15).toFixed(2));
-      } catch {
-        totalTips = 0;
+    if (payload.action === "FINALIZE_RUN") {
+      const auth = await getPayrollActorContext({ requireRun: true });
+      if (!auth.ok) {
+        return NextResponse.json({ error: auth.error }, { status: auth.status });
       }
-    }
-
-    // 2. Fetch approved attendance records in period
-    const attWhere: any = {
-      restaurantId: session.activeRestaurantId,
-      workDate: { gte: start, lte: end },
-      isApproved: true,
-    };
-    if (data.outletId) attWhere.outletId = data.outletId;
-
-    const records = await prisma.attendanceRecord.findMany({
-      where: attWhere,
-      include: {
-        employee: {
-          include: {
-            employmentRecords: {
-              where: { effectiveTo: null },
-              include: { department: true, designation: true },
-              take: 1,
-            },
-          },
-        },
-      },
-    });
-
-    // Group hours by employee
-    const staffHoursMap = new Map<string, { employee: any; totalMinutes: number }>();
-    for (const r of records) {
-      if (!staffHoursMap.has(r.employeeId)) {
-        staffHoursMap.set(r.employeeId, { employee: r.employee, totalMinutes: 0 });
+      const existing = (await TipPoolService.getRuns(auth.ctx.restaurantId)).find(
+        (r) => r.id === payload.tipPoolRunId
+      );
+      if (!existing) {
+        return NextResponse.json({ error: "Tip pool run not found" }, { status: 404 });
       }
-      staffHoursMap.get(r.employeeId)!.totalMinutes += r.totalWorkMinutes;
+      if (
+        auth.ctx.accessibleOutletIds !== null &&
+        (!existing.outletId || !auth.ctx.accessibleOutletIds.includes(existing.outletId))
+      ) {
+        return NextResponse.json(
+          { error: "Outlet is outside your authorized scope" },
+          { status: 403 }
+        );
+      }
+
+      const result = await TipPoolService.finalizeExistingRun(
+        auth.ctx.restaurantId,
+        payload.tipPoolRunId,
+        auth.ctx.userId,
+        auth.ctx.userEmail
+      );
+      return NextResponse.json({ success: true, ...result });
     }
 
-    // Build participants
-    const participants: StaffTipParticipant[] = [];
-    for (const [empId, entry] of staffHoursMap.entries()) {
-      const emp = entry.employee;
-      const activeRecord = emp.employmentRecords?.[0];
-      const deptName = activeRecord?.department?.name || "";
-      const desigName = activeRecord?.designation?.name || "";
-
-      const isFoh =
-        deptName.toLowerCase().includes("front") ||
-        deptName.toLowerCase().includes("service") ||
-        deptName.toLowerCase().includes("bar") ||
-        desigName.toLowerCase().includes("server") ||
-        desigName.toLowerCase().includes("waiter") ||
-        desigName.toLowerCase().includes("bartender") ||
-        desigName.toLowerCase().includes("host");
-
-      const hoursWorked = Number((entry.totalMinutes / 60).toFixed(2));
-
-      participants.push({
-        employeeId: empId,
-        name: `${emp.firstName} ${emp.lastName}`,
-        departmentName: deptName,
-        designationName: desigName,
-        isFoh,
-        hoursWorked,
-      });
-    }
-
-    const ruleConfig: TipPoolRuleConfig = {
-      fohPercentage: data.fohPercentage,
-      bohPercentage: data.bohPercentage,
-      distributionMethod: data.distributionMethod,
-      rolePoints: data.rolePoints,
-    };
-
-    const calculation = calculateTipDistribution(totalTips || 0, participants, ruleConfig);
-
-    return NextResponse.json({
-      success: true,
-      calculation,
-      totalParticipants: participants.length,
-      fohCount: participants.filter((p) => p.isFoh).length,
-      bohCount: participants.filter((p) => !p.isFoh).length,
+    const auth = await getPayrollActorContext({
+      requireRun: payload.action !== "PREVIEW",
+      requireView: true,
+      outletId: payload.outletId,
     });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    if (payload.action === "PREVIEW") {
+      const preview = await TipPoolService.previewTipPool(auth.ctx.restaurantId, payload);
+      return NextResponse.json({ success: true, preview });
+    }
+
+    const saved = await TipPoolService.saveOrFinalizeRun(auth.ctx.restaurantId, {
+      ...payload,
+      finalize: payload.action === "FINALIZE",
+      actorUserId: auth.ctx.userId,
+      actorEmail: auth.ctx.userEmail,
+    });
+    return NextResponse.json({ success: true, ...saved });
   } catch (error: any) {
-    console.error("Calculate Tip Pool Error:", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
+    const status = error instanceof TipPoolError ? error.status : 500;
+    return NextResponse.json(
+      { error: error.message || "Tip pool calculation failed", code: error.code },
+      { status }
+    );
   }
 }

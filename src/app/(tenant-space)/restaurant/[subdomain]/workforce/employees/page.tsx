@@ -303,10 +303,16 @@ export default function AppleEmployeeDirectoryPage() {
   const [selectedDept, setSelectedDept] = useState("");
   const [selectedOutlet, setSelectedOutlet] = useState("");
   const [selectedWorkerType, setSelectedWorkerType] = useState("");
+  const [selectedEmploymentStatus, setSelectedEmploymentStatus] = useState("");
+  const [canManageWorkforce, setCanManageWorkforce] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
 
   const activeFilterCount =
-    (selectedDept ? 1 : 0) + (selectedOutlet ? 1 : 0) + (selectedWorkerType ? 1 : 0) + (statusFilter !== "active" ? 1 : 0);
+    (selectedDept ? 1 : 0) +
+    (selectedOutlet ? 1 : 0) +
+    (selectedWorkerType ? 1 : 0) +
+    (selectedEmploymentStatus ? 1 : 0) +
+    (statusFilter !== "active" ? 1 : 0);
 
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -503,14 +509,20 @@ export default function AppleEmployeeDirectoryPage() {
       if (search) qParams.append("search", search);
       if (selectedDept) qParams.append("departmentId", selectedDept);
       if (selectedOutlet) qParams.append("outletId", selectedOutlet);
+      if (selectedWorkerType && selectedWorkerType !== "CUSTOM") qParams.append("workerType", selectedWorkerType);
+      if (selectedEmploymentStatus) qParams.append("employmentStatus", selectedEmploymentStatus);
       qParams.append("status", statusFilter);
 
       const res = await fetch(`/api/restaurant/employees?${qParams.toString()}`);
       const data = await res.json();
       if (res.ok) {
-        setEmployees(data.employees || []);
-        if (data.activeCount !== undefined) setActiveStaffCount(data.activeCount);
+        const list = data.employees || [];
+        setEmployees(list);
+        setActiveStaffCount(data.activeCount !== undefined ? data.activeCount : list.length);
         if (data.archivedCount !== undefined) setArchivedStaffCount(data.archivedCount);
+        if (data.permissions?.canManageWorkforce !== undefined) {
+          setCanManageWorkforce(Boolean(data.permissions.canManageWorkforce));
+        }
       } else {
         setError(data.error || "Failed to load employees");
       }
@@ -567,7 +579,7 @@ export default function AppleEmployeeDirectoryPage() {
 
   useEffect(() => {
     fetchEmployees();
-  }, [search, selectedDept, selectedOutlet, statusFilter]);
+  }, [search, selectedDept, selectedOutlet, selectedWorkerType, selectedEmploymentStatus, statusFilter]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1151,6 +1163,7 @@ export default function AppleEmployeeDirectoryPage() {
                       setSelectedDept("");
                       setSelectedOutlet("");
                       setSelectedWorkerType("");
+                      setSelectedEmploymentStatus("");
                       setStatusFilter("active");
                     }}
                     className="text-xs text-[#0071E3] dark:text-blue-400 hover:underline font-semibold cursor-pointer flex items-center gap-1"
@@ -1161,7 +1174,28 @@ export default function AppleEmployeeDirectoryPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                <div>
+                  <label className={`block text-[11px] font-semibold mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                    Employment Status
+                  </label>
+                  <select
+                    value={selectedEmploymentStatus}
+                    onChange={(e) => setSelectedEmploymentStatus(e.target.value)}
+                    className={`w-full px-3 py-2 text-xs font-medium rounded-xl border transition focus:outline-none focus:border-[#0071E3] cursor-pointer ${
+                      isDark ? "bg-[#0A0C12] border-white/[0.08] text-white" : "bg-[#F5F5F7] border-slate-200 text-slate-900"
+                    }`}
+                  >
+                    <option value="">All Employment Statuses</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="PROBATION">On probation</option>
+                    <option value="ON_LEAVE">On leave</option>
+                    <option value="NOTICE">Serving notice</option>
+                    <option value="SUSPENDED">Suspended</option>
+                    <option value="RESIGNED">Resigned</option>
+                    <option value="TERMINATED">Terminated</option>
+                  </select>
+                </div>
                 <div>
                   <label className={`block text-[11px] font-semibold mb-1 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
                     Profile Status
@@ -1272,10 +1306,19 @@ export default function AppleEmployeeDirectoryPage() {
           <>
             {/* Mobile Cards View */}
             <div className="grid grid-cols-1 gap-3 md:hidden">
-              {filteredEmployees.map((emp) => {
-                const currentRec = emp.employmentRecords[0];
-                const hasLogin = emp.memberships.length > 0;
+              {filteredEmployees.map((emp: any) => {
+                const empStatus = emp.employmentStatus || "ACTIVE";
+                const empStatusLabel = emp.employmentStatusLabel || "Active";
+                const hasLogin = emp.appAccessStatus === "ACTIVE";
                 const wtBadge = getWorkerTypeBadge(emp.workerType, emp.weeklyHoursLimit);
+                const statusBadgeCls =
+                  empStatus === "ACTIVE"
+                    ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/25"
+                    : empStatus === "PROBATION"
+                    ? "bg-blue-500/15 text-blue-500 border-blue-500/25"
+                    : empStatus === "NOTICE" || empStatus === "ON_LEAVE"
+                    ? "bg-amber-500/15 text-amber-500 border-amber-500/25"
+                    : "bg-rose-500/15 text-rose-500 border-rose-500/25";
 
                 return (
                   <div
@@ -1286,8 +1329,8 @@ export default function AppleEmployeeDirectoryPage() {
                         : "bg-white border-slate-200/80 shadow-xs"
                     }`}
                   >
-                    {/* Header Row: Avatar, Name, Worker Type */}
-                    <div className="flex items-start justify-between gap-3">
+                    {/* Header Row: Avatar, Name, Status */}
+                    <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-10 h-10 rounded-full bg-[#0071E3]/15 text-[#0071E3] flex items-center justify-center font-bold text-xs shrink-0">
                           {emp.firstName.charAt(0)}
@@ -1297,85 +1340,47 @@ export default function AppleEmployeeDirectoryPage() {
                           <p className={`font-semibold text-sm truncate ${isDark ? "text-white" : "text-slate-900"}`}>
                             {emp.firstName} {emp.lastName}
                           </p>
-                          <div className="flex items-center gap-2 mt-0.5">
+                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                             <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
                               {emp.employeeCode}
                             </span>
-                            {emp.archivedAt ? (
-                              <span className="text-[10px] font-bold text-amber-500">
-                                Archived
-                              </span>
-                            ) : hasLogin ? (
-                              <span className="text-[10px] font-semibold text-emerald-500">
-                                Active User
-                              </span>
-                            ) : (
-                              <span className={`text-[10px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-                                Profile Only
-                              </span>
-                            )}
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusBadgeCls}`}>
+                              {empStatusLabel}
+                            </span>
                           </div>
                         </div>
                       </div>
 
-                      {emp.archivedAt ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md border bg-amber-500/15 text-amber-500 border-amber-500/30 shrink-0">
-                          Archived
-                        </span>
-                      ) : (
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border shrink-0 ${wtBadge.cls}`}>
-                          {wtBadge.label}
-                        </span>
-                      )}
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border shrink-0 ${wtBadge.cls}`}>
+                        {wtBadge.label}
+                      </span>
                     </div>
 
                     {/* Details Info Grid */}
                     <div className={`p-2.5 rounded-xl text-xs space-y-1.5 ${isDark ? "bg-white/[0.02] border border-white/[0.04]" : "bg-slate-50/70 border border-slate-100"}`}>
-                      <div className="flex items-center justify-between">
-                        <span className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>Department</span>
-                        <span className={`font-medium ${isDark ? "text-white" : "text-slate-800"}`}>
-                          {currentRec?.department?.name || "Unassigned"}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>Role & Dept</span>
+                        <span className={`font-medium text-right truncate ${isDark ? "text-white" : "text-slate-800"}`}>
+                          {emp.designation?.name || "Staff Member"} • {emp.department?.name || "Unassigned"}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>Designation</span>
-                        <span className={`font-medium ${isDark ? "text-white" : "text-slate-800"}`}>
-                          {currentRec?.designation?.name || "Staff Member"}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <span className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>Primary Outlet</span>
-                        <span className={`font-medium ${isDark ? "text-[#58A6FF]" : "text-blue-600"}`}>
-                          📍 {currentRec?.primaryOutlet?.name || "All Outlets"}
+                        <span className={`font-medium text-right truncate ${isDark ? "text-[#58A6FF]" : "text-blue-600"}`}>
+                          {emp.primaryOutlet?.name || "Unassigned"}
+                          {emp.eligibleOutletsCount > 1 ? ` (+${emp.eligibleOutletsCount - 1})` : ""}
                         </span>
                       </div>
-                      {emp.personalEmail && (
-                        <div className="flex items-center justify-between pt-1 border-t border-black/[0.04] dark:border-white/[0.04]">
-                          <span className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>Email</span>
-                          <span className={`text-[11px] truncate max-w-[200px] ${isDark ? "text-[#BAC0CD]" : "text-slate-600"}`}>
-                            {emp.personalEmail}
-                          </span>
-                        </div>
-                      )}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>App Access</span>
+                        <span className={`text-[11px] font-medium ${hasLogin ? "text-emerald-500" : isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                          {hasLogin ? "Active Login" : emp.appAccessStatus === "SUSPENDED" ? "Suspended" : "Profile Only"}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Actions */}
                     <div className="flex items-center gap-2">
-                      {emp.archivedAt ? (
-                        <button
-                          onClick={() => handleToggleArchive(emp.id, `${emp.firstName} ${emp.lastName}`, true)}
-                          className="flex-1 py-2 rounded-xl text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 transition cursor-pointer text-center"
-                        >
-                          Restore Staff
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleToggleArchive(emp.id, `${emp.firstName} ${emp.lastName}`, false)}
-                          className="px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
-                        >
-                          Archive
-                        </button>
-                      )}
                       <button
                         onClick={() => router.push(`/restaurant/${subdomain}/workforce/employees/${emp.id}`)}
                         className={`flex-1 py-2 rounded-xl text-xs font-medium border transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
@@ -1400,25 +1405,34 @@ export default function AppleEmployeeDirectoryPage() {
               }`}
             >
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[700px]">
+                <table className="w-full text-left border-collapse min-w-[760px]">
                   <thead>
                     <tr className={`border-b text-[11px] font-medium uppercase tracking-wider ${
                       isDark ? "bg-[#0A0C12]/50 border-white/[0.06] text-[#8F95A3]" : "bg-slate-50/70 border-slate-100 text-slate-500"
                     }`}>
                       <th className="p-4">Staff Member</th>
-                      <th className="p-4">Worker Type</th>
+                      <th className="p-4">Employment Status</th>
                       <th className="p-4">Department & Role</th>
                       <th className="p-4">Primary Outlet</th>
-                      <th className="p-4">App Access</th>
+                      <th className="p-4">Worker Type</th>
                       <th className="p-4 text-right">Action</th>
                     </tr>
                   </thead>
 
                   <tbody className={`divide-y text-xs ${isDark ? "divide-white/[0.04]" : "divide-slate-100"}`}>
-                    {filteredEmployees.map((emp) => {
-                      const currentRec = emp.employmentRecords[0];
-                      const hasLogin = emp.memberships.length > 0;
+                    {filteredEmployees.map((emp: any) => {
+                      const empStatus = emp.employmentStatus || "ACTIVE";
+                      const empStatusLabel = emp.employmentStatusLabel || "Active";
+                      const hasLogin = emp.appAccessStatus === "ACTIVE";
                       const wtBadge = getWorkerTypeBadge(emp.workerType, emp.weeklyHoursLimit);
+                      const statusBadgeCls =
+                        empStatus === "ACTIVE"
+                          ? isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                          : empStatus === "PROBATION"
+                          ? isDark ? "bg-blue-500/15 text-blue-300 border-blue-500/25" : "bg-blue-50 text-blue-800 border-blue-200"
+                          : empStatus === "NOTICE" || empStatus === "ON_LEAVE"
+                          ? isDark ? "bg-amber-500/15 text-amber-300 border-amber-500/25" : "bg-amber-50 text-amber-800 border-amber-200"
+                          : isDark ? "bg-rose-500/15 text-rose-300 border-rose-500/25" : "bg-rose-50 text-rose-800 border-rose-200";
 
                       return (
                         <tr key={emp.id} className={`transition ${isDark ? "hover:bg-white/[0.01]" : "hover:bg-slate-50/50"}`}>
@@ -1436,17 +1450,38 @@ export default function AppleEmployeeDirectoryPage() {
                                   <span className={`text-[10px] font-mono ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
                                     {emp.employeeCode}
                                   </span>
-                                  {emp.personalEmail && (
-                                    <>
-                                      <span className={`text-[10px] ${isDark ? "text-[#484E5E]" : "text-slate-300"}`}>•</span>
-                                      <span className={`text-[10px] truncate ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-                                        {emp.personalEmail}
-                                      </span>
-                                    </>
-                                  )}
+                                  <span className={`text-[10px] ${hasLogin ? "text-emerald-500" : isDark ? "text-[#6C7280]" : "text-slate-400"}`}>
+                                    • {hasLogin ? "App Access" : "Profile Only"}
+                                  </span>
                                 </div>
                               </div>
                             </div>
+                          </td>
+
+                          <td className="p-4">
+                            <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full border ${statusBadgeCls}`}>
+                              {empStatusLabel}
+                            </span>
+                          </td>
+
+                          <td className="p-4">
+                            <p className={`font-medium ${isDark ? "text-white" : "text-slate-900"}`}>
+                              {emp.designation?.name || "Staff Member"}
+                            </p>
+                            <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                              {emp.department?.name || "Unassigned Dept"}
+                            </p>
+                          </td>
+
+                          <td className="p-4">
+                            <span className={`font-medium ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+                              {emp.primaryOutlet?.name || "Unassigned"}
+                            </span>
+                            {emp.eligibleOutletsCount > 1 && (
+                              <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-md bg-blue-500/10 text-[#0071E3] font-semibold">
+                                +{emp.eligibleOutletsCount - 1} outlet
+                              </span>
+                            )}
                           </td>
 
                           <td className="p-4">
@@ -1455,53 +1490,11 @@ export default function AppleEmployeeDirectoryPage() {
                             </span>
                           </td>
 
-                          <td className="p-4">
-                            <p className={`font-medium ${isDark ? "text-white" : "text-slate-900"}`}>
-                              {currentRec?.department?.name || "Unassigned Dept"}
-                            </p>
-                            <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                              {currentRec?.designation?.name || "Staff Member"}
-                            </p>
-                          </td>
-
-                          <td className="p-4">
-                            <span className={`font-medium ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
-                              {currentRec?.primaryOutlet?.name || "All Outlets"}
-                            </span>
-                          </td>
-
-                          <td className="p-4">
-                            {emp.archivedAt ? (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">
-                                Archived Staff
-                              </span>
-                            ) : hasLogin ? (
-                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                                isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-100 text-emerald-800 border-emerald-200"
-                              }`}>
-                                Active User
-                              </span>
-                            ) : (
-                              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
-                                isDark ? "bg-white/[0.04] text-[#8F95A3] border-white/[0.08]" : "bg-slate-100 text-slate-500 border-slate-200"
-                              }`}>
-                                Employee Profile
-                              </span>
-                            )}
-                          </td>
-
                           <td className="p-4 text-right">
                             <div className="flex items-center justify-end gap-2">
-                              {emp.archivedAt ? (
+                              {canManageWorkforce && (
                                 <button
-                                  onClick={() => handleToggleArchive(emp.id, `${emp.firstName} ${emp.lastName}`, true)}
-                                  className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 transition cursor-pointer"
-                                >
-                                  Restore Staff
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => handleToggleArchive(emp.id, `${emp.firstName} ${emp.lastName}`, false)}
+                                  onClick={() => handleToggleArchive(emp.id, `${emp.firstName} ${emp.lastName}`, Boolean(emp.archivedAt))}
                                   className="px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
                                   title="Archive staff member"
                                 >

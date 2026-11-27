@@ -1,191 +1,168 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/core/database/client";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
 import { z } from "zod";
-import { sendEmployeeOnboardingEmail } from "@/core/mail";
-import { HROnboardingService } from "@/modules/hr-onboarding/service";
-
+import { prisma } from "@/core/database/client";
+import { EmploymentStatus, WorkerType } from "@prisma/client";
 import { MasterDataService } from "@/modules/master-data/service";
+import { getWorkforceActorContext } from "@/modules/workforce/authHelper";
+import {
+  listDirectoryEmployees,
+  sanitizeAuditPayload,
+  WorkforceError,
+} from "@/modules/workforce/service";
 
 const createEmployeeSchema = z.object({
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
   personalEmail: z.string().email().optional().or(z.literal("")),
   phone: z.string().optional(),
   alternatePhone: z.string().optional(),
   gender: z.string().optional(),
   dateOfBirth: z.string().optional(),
   joiningDate: z.string().optional(),
-  workerType: z.enum(["FULL_TIME", "PART_TIME", "CONTRACT", "INTERN", "CONSULTANT", "TEMPORARY"]).default("FULL_TIME"),
-  weeklyHoursLimit: z.number().positive().nullable().optional(),
-  // Optional initial employment record details
+  workerType: z.nativeEnum(WorkerType).default("FULL_TIME"),
+  weeklyHoursLimit: z.number().min(1).max(168).optional(),
   departmentId: z.string().optional(),
   departmentName: z.string().optional(),
   designationId: z.string().optional(),
   designationName: z.string().optional(),
   primaryOutletId: z.string().optional(),
+  status: z.nativeEnum(EmploymentStatus).optional(),
 });
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
+    const sp = req.nextUrl.searchParams;
+    const outletId = sp.get("outletId") || undefined;
+
+    const auth = await getWorkforceActorContext({ outletId });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const accessCheck = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      {},
-      session.tokenVersion
-    );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
+    const departmentId = sp.get("departmentId") || undefined;
+    const search = sp.get("search") || undefined;
+    const workerTypeRaw = sp.get("workerType") || undefined;
+    const statusRaw = sp.get("employmentStatus") || undefined;
+
+    const workerType =
+      workerTypeRaw && workerTypeRaw in WorkerType
+        ? (workerTypeRaw as WorkerType)
+        : undefined;
+    const employmentStatus =
+      statusRaw && statusRaw in EmploymentStatus
+        ? (statusRaw as EmploymentStatus)
+        : undefined;
+
+    const employees = await listDirectoryEmployees(auth.ctx, {
+      search,
+      outletId,
+      departmentId,
+      workerType,
+      employmentStatus,
+    });
+
+    return NextResponse.json({
+      employees,
+      permissions: {
+        canManageWorkforce: auth.ctx.canManageWorkforce,
+        canViewSensitive: auth.ctx.canViewSensitive,
+      },
+    });
+  } catch (error) {
+    if (error instanceof WorkforceError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status }
+      );
     }
-
-    const { searchParams } = new URL(req.url);
-    const search = searchParams.get("search") || "";
-    const departmentId = searchParams.get("departmentId");
-    const outletId = searchParams.get("outletId");
-    const statusParam = searchParams.get("status"); // "active" | "archived" | "all"
-    const includeArchived = searchParams.get("includeArchived") === "true";
-
-    let archiveCondition: any = { archivedAt: null };
-    if (statusParam === "archived") {
-      archiveCondition = { archivedAt: { not: null } };
-    } else if (statusParam === "all" || includeArchived) {
-      archiveCondition = {};
-    }
-
-    const [employees, activeCount, archivedCount] = await Promise.all([
-      prisma.employee.findMany({
-        where: {
-          restaurantId: session.activeRestaurantId,
-          ...archiveCondition,
-          ...(search && {
-            OR: [
-              { firstName: { contains: search, mode: "insensitive" } },
-              { lastName: { contains: search, mode: "insensitive" } },
-              { employeeCode: { contains: search, mode: "insensitive" } },
-              { personalEmail: { contains: search, mode: "insensitive" } },
-            ],
-          }),
-          ...(departmentId && {
-            employmentRecords: {
-              some: { departmentId, status: "ACTIVE" },
-            },
-          }),
-          ...(outletId && {
-            outletAssignments: {
-              some: { outletId },
-            },
-          }),
-        },
-        include: {
-          employmentRecords: {
-            where: { status: "ACTIVE" },
-            include: {
-              department: true,
-              designation: true,
-              primaryOutlet: true,
-            },
-            orderBy: { effectiveFrom: "desc" },
-            take: 1,
-          },
-          outletAssignments: {
-            include: { outlet: true },
-          },
-          memberships: {
-            include: { user: true },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.employee.count({
-        where: { restaurantId: session.activeRestaurantId, archivedAt: null },
-      }),
-      prisma.employee.count({
-        where: { restaurantId: session.activeRestaurantId, archivedAt: { not: null } },
-      }),
-    ]);
-
-    return NextResponse.json({ employees, activeCount, archivedCount });
-  } catch (error: any) {
     console.error("List Employees Error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
+    const auth = await getWorkforceActorContext({ requireManage: true });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const restaurantId = session.activeRestaurantId!;
-
-    const accessCheck = await verifyAccess(
-      session.userId,
-      restaurantId,
-      {},
-      session.tokenVersion
-    );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
-    }
-
+    const { ctx } = auth;
     const body = await req.json();
     const result = createEmployeeSchema.safeParse(body);
     if (!result.success) {
-      return NextResponse.json({ error: "Invalid request payload", details: result.error.flatten() }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid request payload", details: result.error.flatten() },
+        { status: 400 }
+      );
     }
 
     const data = result.data;
 
+    if (
+      data.primaryOutletId &&
+      ctx.accessibleOutletIds !== null &&
+      !ctx.accessibleOutletIds.includes(data.primaryOutletId)
+    ) {
+      return NextResponse.json(
+        { error: "Primary outlet is outside your authorized scope" },
+        { status: 403 }
+      );
+    }
+
     const newEmployee = await prisma.$transaction(async (tx) => {
-      // 1. Enforce maxEmployees subscription limit
       const sub = await tx.restaurantSubscription.findFirst({
-        where: { restaurantId, status: "ACTIVE" },
+        where: { restaurantId: ctx.restaurantId, status: "ACTIVE" },
         include: { plan: true },
         orderBy: { startDate: "desc" },
       });
 
       const maxEmployees = sub?.plan.maxEmployees ?? 30;
-
       const currentEmployeeCount = await tx.employee.count({
-        where: { restaurantId, archivedAt: null },
+        where: { restaurantId: ctx.restaurantId, archivedAt: null },
       });
 
       if (currentEmployeeCount >= maxEmployees) {
-        throw new Error(`Employee limit reached (${maxEmployees}). Upgrade subscription plan to onboard more employees.`);
+        throw new WorkforceError(
+          `Employee limit reached (${maxEmployees}). Upgrade subscription plan to onboard more employees.`,
+          400
+        );
       }
 
-      // 2. Auto-generate employee code (EMP-00001 format per restaurant)
       const countTotal = await tx.employee.count({
-        where: { restaurantId },
+        where: { restaurantId: ctx.restaurantId },
       });
 
       let nextNumber = countTotal + 1;
       let employeeCode = `EMP-${String(nextNumber).padStart(5, "0")}`;
 
-      // Handle rare race conditions/collisions
       let existingCode = await tx.employee.findUnique({
-        where: { restaurantId_employeeCode: { restaurantId, employeeCode } },
+        where: {
+          restaurantId_employeeCode: {
+            restaurantId: ctx.restaurantId,
+            employeeCode,
+          },
+        },
       });
       while (existingCode) {
         nextNumber++;
         employeeCode = `EMP-${String(nextNumber).padStart(5, "0")}`;
         existingCode = await tx.employee.findUnique({
-          where: { restaurantId_employeeCode: { restaurantId, employeeCode } },
+          where: {
+            restaurantId_employeeCode: {
+              restaurantId: ctx.restaurantId,
+              employeeCode,
+            },
+          },
         });
       }
 
-      // 3. Create Employee (NO USER OR LOGIN CREATED HERE)
       const employee = await tx.employee.create({
         data: {
-          restaurantId,
+          restaurantId: ctx.restaurantId,
           employeeCode,
           firstName: data.firstName,
           lastName: data.lastName,
@@ -194,47 +171,71 @@ export async function POST(req: NextRequest) {
           alternatePhone: data.alternatePhone || null,
           gender: data.gender || null,
           dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
-          joiningDate: data.joiningDate ? new Date(data.joiningDate) : new Date(),
+          joiningDate: data.joiningDate
+            ? new Date(data.joiningDate)
+            : new Date(),
           workerType: data.workerType,
           weeklyHoursLimit: data.weeklyHoursLimit || null,
         },
+        select: {
+          id: true,
+          restaurantId: true,
+          employeeCode: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          joiningDate: true,
+          workerType: true,
+          weeklyHoursLimit: true,
+          createdAt: true,
+        },
       });
 
-      // 4. Resolve / Auto-create Department and Designation in Master Data if needed
       let departmentId = data.departmentId || null;
       if (data.departmentName) {
-        departmentId = await MasterDataService.findOrCreateDepartmentByName(restaurantId, data.departmentName);
+        departmentId = await MasterDataService.findOrCreateDepartmentByName(
+          ctx.restaurantId,
+          data.departmentName
+        );
       } else if (departmentId && !departmentId.includes("-")) {
-        departmentId = await MasterDataService.findOrCreateDepartmentByName(restaurantId, departmentId);
+        departmentId = await MasterDataService.findOrCreateDepartmentByName(
+          ctx.restaurantId,
+          departmentId
+        );
       }
 
       let designationId = data.designationId || null;
       if (data.designationName) {
-        designationId = await MasterDataService.findOrCreateDesignationByName(restaurantId, data.designationName);
+        designationId = await MasterDataService.findOrCreateDesignationByName(
+          ctx.restaurantId,
+          data.designationName
+        );
       } else if (designationId && !designationId.includes("-")) {
-        designationId = await MasterDataService.findOrCreateDesignationByName(restaurantId, designationId);
+        designationId = await MasterDataService.findOrCreateDesignationByName(
+          ctx.restaurantId,
+          designationId
+        );
       }
 
       if (departmentId || designationId || data.primaryOutletId) {
         await tx.employmentRecord.create({
           data: {
-            restaurantId,
+            restaurantId: ctx.restaurantId,
             employeeId: employee.id,
             departmentId,
             designationId,
             primaryOutletId: data.primaryOutletId || null,
             employmentType: data.workerType,
             effectiveFrom: employee.joiningDate,
-            status: "ACTIVE",
+            status: data.status || "ACTIVE",
           },
         });
       }
 
-      // 5. Create initial primary EmployeeOutletAssignment if outlet specified
       if (data.primaryOutletId) {
         await tx.employeeOutletAssignment.create({
           data: {
-            restaurantId,
+            restaurantId: ctx.restaurantId,
             employeeId: employee.id,
             outletId: data.primaryOutletId,
             isPrimary: true,
@@ -244,19 +245,20 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // 6. Audit Log
       await tx.auditLog.create({
         data: {
-          restaurantId,
-          userId: session.userId,
-          userEmail: session.email,
+          restaurantId: ctx.restaurantId,
+          userId: ctx.userId,
+          userEmail: ctx.userEmail,
           action: "EMPLOYEE_CREATED",
           entityType: "Employee",
           entityId: employee.id,
-          newValues: JSON.stringify({
-            employeeCode,
-            name: `${employee.firstName} ${employee.lastName}`,
-            email: employee.personalEmail,
+          newValues: sanitizeAuditPayload({
+            employeeCode: employee.employeeCode,
+            firstName: employee.firstName,
+            lastName: employee.lastName,
+            workerType: employee.workerType,
+            primaryOutletId: data.primaryOutletId || null,
           }),
         },
       });
@@ -264,63 +266,21 @@ export async function POST(req: NextRequest) {
       return employee;
     });
 
-    // 7. If personalEmail is provided, initiate onboarding session and trigger branded email
-    let emailSent = false;
-    let onboardingToken: string | undefined = undefined;
-
-    if (newEmployee.personalEmail) {
-      try {
-        const template = await HROnboardingService.getOrCreateDefaultTemplate(restaurantId);
-        if (template) {
-          const session = await HROnboardingService.startOnboarding(
-            restaurantId,
-            newEmployee.id,
-            template.id
-          );
-          onboardingToken = session.accessToken;
-
-          const restaurant = await prisma.restaurant.findUnique({
-            where: { id: restaurantId },
-            include: { branding: true },
-          });
-
-          let departmentName: string | null = null;
-          let designationName: string | null = null;
-          if (data.departmentId) {
-            const dept = await prisma.department.findUnique({ where: { id: data.departmentId } });
-            departmentName = dept?.name || null;
-          }
-          if (data.designationId) {
-            const desig = await prisma.designation.findUnique({ where: { id: data.designationId } });
-            designationName = desig?.name || null;
-          }
-
-          const emailResult = await sendEmployeeOnboardingEmail({
-            employeeName: `${newEmployee.firstName} ${newEmployee.lastName}`.trim(),
-            employeeCode: newEmployee.employeeCode,
-            personalEmail: newEmployee.personalEmail,
-            restaurantName: restaurant?.name || "Our Restaurant",
-            department: departmentName,
-            designation: designationName,
-            accessToken: session.accessToken,
-            branding: restaurant?.branding,
-          });
-
-          emailSent = emailResult.success;
-        }
-      } catch (err: any) {
-        console.warn("Failed to initiate onboarding or dispatch onboarding email:", err);
-      }
+    return NextResponse.json(
+      { success: true, employee: newEmployee },
+      { status: 201 }
+    );
+  } catch (error) {
+    if (error instanceof WorkforceError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status }
+      );
     }
-
-    return NextResponse.json({
-      success: true,
-      employee: newEmployee,
-      emailSent,
-      onboardingToken,
-    });
-  } catch (error: any) {
     console.error("Create Employee Error:", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

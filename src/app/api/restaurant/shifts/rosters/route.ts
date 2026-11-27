@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
+import { getShiftActorContext } from "@/modules/shifts/authHelper";
 import { ShiftService } from "@/modules/shifts/service";
 import { z } from "zod";
-
-import { prisma } from "@/core/database/client";
 
 const createRosterSchema = z.object({
   outletId: z.string().uuid(),
@@ -18,45 +15,39 @@ const createRosterSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const access = await verifyAccess(session.userId, session.activeRestaurantId, { moduleKey: "shifts", permissionKey: "shifts:view_roster" }, session.tokenVersion);
-    if (!access.authorized) return NextResponse.json({ error: access.error }, { status: access.status });
+    const auth = await getShiftActorContext("shifts:view_roster");
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const { searchParams } = new URL(req.url);
     const outletId = searchParams.get("outletId") || undefined;
 
-    // Check if requester is an admin/manager
-    const membership = await prisma.restaurantMembership.findUnique({
-      where: {
-        restaurantId_userId: {
-          restaurantId: session.activeRestaurantId,
-          userId: session.userId,
-        },
-      },
-      include: {
-        accessGrants: {
-          where: { status: "ACTIVE" },
-          include: { role: true },
-        },
-      },
-    });
+    if (
+      outletId &&
+      auth.ctx.accessibleOutletIds &&
+      !auth.ctx.accessibleOutletIds.includes(outletId)
+    ) {
+      return NextResponse.json({ error: "Forbidden for this outlet" }, { status: 403 });
+    }
 
-    const isUserAdmin =
-      session.role === "PLATFORM_ADMIN" ||
-      (membership?.accessGrants?.some((g: any) =>
-        ["Restaurant Owner", "Admin", "Owner", "Super Admin", "General Manager"].includes(g.role?.name || "")
-      ) ?? false) ||
-      (!membership?.employeeId && (membership?.accessGrants?.length || 0) === 0);
+    let rosters = await ShiftService.getRosters(auth.ctx.restaurantId, outletId);
 
-    let rosters = await ShiftService.getRosters(session.activeRestaurantId, outletId);
+    if (auth.ctx.accessibleOutletIds) {
+      rosters = rosters.filter((r: any) => auth.ctx.accessibleOutletIds!.includes(r.outletId));
+    }
 
-    // Regular employees should only see rosters that are OPEN for availability or PUBLISHED/COMPLETED
-    if (!isUserAdmin) {
+    if (!auth.ctx.canManageRoster) {
       rosters = rosters.filter((r: any) => r.status !== "DRAFT" && r.status !== "ARCHIVED");
     }
 
-    return NextResponse.json({ rosters });
+    return NextResponse.json({
+      rosters,
+      permissions: {
+        canManageRoster: auth.ctx.canManageRoster,
+        canApproveSwap: auth.ctx.canApproveSwap,
+        employeeId: auth.ctx.employeeId,
+        accessibleOutletIds: auth.ctx.accessibleOutletIds,
+      },
+    });
   } catch (error: any) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
@@ -64,16 +55,20 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const access = await verifyAccess(session.userId, session.activeRestaurantId, { moduleKey: "shifts", permissionKey: "shifts:manage_roster" }, session.tokenVersion);
-    if (!access.authorized) return NextResponse.json({ error: access.error }, { status: access.status });
-
     const body = await req.json();
     const result = createRosterSchema.safeParse(body);
-    if (!result.success) return NextResponse.json({ error: "Invalid payload", details: result.error.flatten() }, { status: 400 });
+    if (!result.success) {
+      return NextResponse.json({ error: "Invalid payload", details: result.error.flatten() }, { status: 400 });
+    }
 
-    const roster = await ShiftService.createRoster(session.activeRestaurantId, result.data);
+    const auth = await getShiftActorContext("shifts:manage_roster", result.data.outletId);
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+    const roster = await ShiftService.createRoster(
+      auth.ctx.restaurantId,
+      result.data,
+      { userId: auth.ctx.userId, userEmail: auth.ctx.userEmail }
+    );
     return NextResponse.json({ success: true, roster });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || "Internal server error" }, { status: 400 });

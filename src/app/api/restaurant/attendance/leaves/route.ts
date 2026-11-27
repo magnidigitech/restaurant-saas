@@ -1,82 +1,93 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/core/database/client";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
+import { getLeaveActorContext } from "@/modules/leaves/authHelper";
+import {
+  createLeaveRequest,
+  getLeaveBalances,
+  LeaveError,
+  listLeaveRequests,
+} from "@/modules/leaves/service";
 import { z } from "zod";
 
 const createLeaveSchema = z.object({
-  employeeId: z.string().min(1),
-  leaveType: z.enum(["CASUAL", "SICK", "ANNUAL", "UNPAID", "MATERNITY_PATERNITY"]),
+  employeeId: z.string().optional(),
+  leaveType: z.enum([
+    "CASUAL",
+    "SICK",
+    "ANNUAL",
+    "UNPAID",
+    "MATERNITY_PATERNITY",
+  ]),
   startDate: z.string().min(1),
   endDate: z.string().min(1),
-  totalDays: z.number().min(0.5).default(1),
-  reason: z.string().min(1),
+  totalDays: z.number().min(0.25).default(1),
+  isPartialDay: z.boolean().optional(),
+  startTime: z.string().optional().nullable(),
+  endTime: z.string().optional().nullable(),
+  hoursRequested: z.number().optional().nullable(),
+  attachmentUrl: z.string().optional().nullable(),
+  attachmentName: z.string().optional().nullable(),
+  reason: z.string().min(1, "Reason is required"),
 });
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
-    }
-
-    const accessCheck = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      {},
-      session.tokenVersion
-    );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
-    }
-
     const { searchParams } = new URL(req.url);
-    const status = searchParams.get("status");
-    const employeeId = searchParams.get("employeeId");
+    const outletId = searchParams.get("outletId") || undefined;
 
-    const whereClause: any = {
-      restaurantId: session.activeRestaurantId,
-    };
-    if (status) whereClause.status = status;
-    if (employeeId) whereClause.employeeId = employeeId;
+    const auth = await getLeaveActorContext({ outletId });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
-    const leaves = await prisma.leaveRequest.findMany({
-      where: whereClause,
-      include: {
-        employee: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            employeeCode: true,
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
+    const status = searchParams.get("status") || undefined;
+    const leaveType = searchParams.get("leaveType") || undefined;
+    const employeeId = searchParams.get("employeeId") || undefined;
+    const startDate = searchParams.get("startDate") || undefined;
+    const endDate = searchParams.get("endDate") || undefined;
+
+    const leaves = await listLeaveRequests(auth.ctx, {
+      status,
+      leaveType,
+      employeeId,
+      outletId,
+      startDate,
+      endDate,
     });
 
-    return NextResponse.json({ success: true, leaves });
+    const balances = auth.ctx.employeeId
+      ? await getLeaveBalances(auth.ctx.restaurantId, auth.ctx.employeeId)
+      : null;
+
+    return NextResponse.json({
+      success: true,
+      leaves,
+      balances,
+      permissions: {
+        canApproveLeaves: auth.ctx.canApproveLeaves,
+        canRequestLeave: auth.ctx.canRequestLeave,
+        employeeId: auth.ctx.employeeId,
+      },
+    });
   } catch (error: any) {
+    if (error instanceof LeaveError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status }
+      );
+    }
     console.error("List Leaves Error:", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
-    }
-
-    const accessCheck = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      {},
-      session.tokenVersion
-    );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
+    const auth = await getLeaveActorContext();
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const body = await req.json();
@@ -88,27 +99,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const data = result.data;
-
-    const leave = await prisma.leaveRequest.create({
-      data: {
-        restaurantId: session.activeRestaurantId,
-        employeeId: data.employeeId,
-        leaveType: data.leaveType,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
-        totalDays: data.totalDays,
-        reason: data.reason,
-        status: "PENDING",
-      },
-      include: {
-        employee: true,
-      },
-    });
-
+    const leave = await createLeaveRequest(auth.ctx, result.data);
     return NextResponse.json({ success: true, leave }, { status: 201 });
   } catch (error: any) {
+    if (error instanceof LeaveError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status }
+      );
+    }
     console.error("Create Leave Error:", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Internal server error" },
+      { status: 500 }
+    );
   }
 }

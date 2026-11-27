@@ -1,19 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
-import { PayrollService } from "@/modules/payroll/service";
+import { getPayrollActorContext } from "@/modules/payroll/authHelper";
+import { PayrollService, PayrollError } from "@/modules/payroll/service";
 
-export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const params = await props.params;
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const access = await verifyAccess(session.userId, session.activeRestaurantId, { moduleKey: "payroll", permissionKey: "payroll:approve_payroll" }, session.tokenVersion);
-    if (!access.authorized) return NextResponse.json({ error: access.error }, { status: access.status });
+    const { id } = await params;
+    const body = await req.json().catch(() => ({}));
 
-    const run = await PayrollService.approvePayrollRun(session.activeRestaurantId, params.id, session.userId);
-    return NextResponse.json({ success: true, run });
+    const auth = await getPayrollActorContext({ requireApprove: true });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    const existing = await PayrollService.getPayrollRunById(auth.ctx.restaurantId, id);
+    if (
+      auth.ctx.accessibleOutletIds !== null &&
+      (!existing.outletId || !auth.ctx.accessibleOutletIds.includes(existing.outletId))
+    ) {
+      return NextResponse.json(
+        { error: "Payroll run is outside your authorized outlet scope" },
+        { status: 403 }
+      );
+    }
+
+    if (body?.action === "CORRECT") {
+      const correction = await PayrollService.createCorrectionRun(
+        auth.ctx.restaurantId,
+        id,
+        auth.ctx.userId,
+        auth.ctx.userEmail,
+        body.notes
+      );
+      return NextResponse.json({ success: true, correction });
+    }
+
+    const result = await PayrollService.finalizePayrollRun(
+      auth.ctx.restaurantId,
+      id,
+      auth.ctx.userId,
+      auth.ctx.userEmail,
+      body?.expectedPreviewHash
+    );
+    return NextResponse.json({ success: true, ...result });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 400 });
+    const status = error instanceof PayrollError ? error.status : 400;
+    return NextResponse.json(
+      { error: error.message || "Finalization failed", code: error.code, details: error.details },
+      { status }
+    );
   }
 }

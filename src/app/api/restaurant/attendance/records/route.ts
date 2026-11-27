@@ -1,145 +1,175 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/core/database/client";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
+import { getAttendanceActorContext } from "@/core/attendance/authHelper";
+import {
+  AttendanceError,
+  correctAndApproveAttendance,
+} from "@/core/attendance/punchService";
 import { z } from "zod";
 
 const patchAttendanceSchema = z.object({
   id: z.string().min(1),
   isApproved: z.boolean().optional(),
-  totalWorkMinutes: z.number().optional(),
-  totalBreakMinutes: z.number().optional(),
-  overtimeMinutes: z.number().optional(),
+  totalWorkMinutes: z.number().int().min(0).optional(),
+  totalBreakMinutes: z.number().int().min(0).optional(),
+  overtimeMinutes: z.number().int().min(0).optional(),
   managerNotes: z.string().optional(),
-  status: z.enum(["PRESENT", "LATE", "ON_BREAK", "EARLY_DEPARTURE", "HALF_DAY", "ABSENT", "ON_LEAVE"]).optional(),
+  correctionReason: z.string().optional(),
+  status: z
+    .enum([
+      "PRESENT",
+      "LATE",
+      "ON_BREAK",
+      "EARLY_DEPARTURE",
+      "HALF_DAY",
+      "ABSENT",
+      "ON_LEAVE",
+    ])
+    .optional(),
+  addMissedPunch: z
+    .object({
+      punchType: z.enum(["CLOCK_IN", "CLOCK_OUT", "BREAK_START", "BREAK_END"]),
+      punchTime: z.string().min(1),
+    })
+    .optional(),
 });
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
-    }
-
-    const accessCheck = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      {},
-      session.tokenVersion
-    );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
-    }
-
     const { searchParams } = new URL(req.url);
+    const outletId = searchParams.get("outletId") || undefined;
+
+    const auth = await getAttendanceActorContext({ outletId });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const employeeId = searchParams.get("employeeId");
-    const outletId = searchParams.get("outletId");
     const isApproved = searchParams.get("isApproved");
+    const needsReview = searchParams.get("needsReview");
 
-    let records: any[] = [];
+    const whereClause: any = {
+      restaurantId: auth.ctx.restaurantId,
+    };
 
-    if ((prisma as any).attendanceRecord) {
-      try {
-        const whereClause: any = {
-          restaurantId: session.activeRestaurantId,
-        };
+    if (outletId) {
+      whereClause.outletId = outletId;
+    } else if (auth.ctx.accessibleOutletIds !== null) {
+      whereClause.outletId = {
+        in:
+          auth.ctx.accessibleOutletIds.length > 0
+            ? auth.ctx.accessibleOutletIds
+            : ["__none__"],
+      };
+    }
 
-        if (employeeId) whereClause.employeeId = employeeId;
-        if (outletId) whereClause.outletId = outletId;
-        if (isApproved !== null && isApproved !== undefined) {
-          whereClause.isApproved = isApproved === "true";
-        }
+    // Self-service fallback if user only has view_my_attendance
+    if (!auth.ctx.canManageAttendance && !auth.ctx.isAdmin && auth.ctx.employeeId && !auth.ctx.canViewAttendance) {
+      whereClause.employeeId = auth.ctx.employeeId;
+    } else if (employeeId) {
+      whereClause.employeeId = employeeId;
+    }
 
-        if (startDate && endDate) {
-          whereClause.workDate = {
-            gte: new Date(startDate),
-            lte: new Date(endDate),
-          };
-        } else if (startDate) {
-          whereClause.workDate = { gte: new Date(startDate) };
-        }
+    if (isApproved !== null && isApproved !== undefined && isApproved !== "") {
+      whereClause.isApproved = isApproved === "true";
+    }
+    if (needsReview === "true") {
+      whereClause.OR = [{ needsReview: true }, { clockOutTime: null }];
+    }
 
-        records = await (prisma as any).attendanceRecord.findMany({
-          where: whereClause,
-          include: {
-            employee: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                employeeCode: true,
-                workerType: true,
-                employmentRecords: {
-                  where: { effectiveTo: null },
-                  include: {
-                    department: { select: { name: true } },
-                    designation: { select: { name: true } },
-                  },
-                  take: 1,
-                },
+    if (startDate && endDate) {
+      whereClause.workDate = {
+        gte: new Date(startDate),
+        lte: new Date(endDate),
+      };
+    } else if (startDate) {
+      whereClause.workDate = { gte: new Date(startDate) };
+    }
+
+    const records = await prisma.attendanceRecord.findMany({
+      where: whereClause,
+      include: {
+        employee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            employeeCode: true,
+            workerType: true,
+            employmentRecords: {
+              where: { effectiveTo: null },
+              include: {
+                department: { select: { name: true } },
+                designation: { select: { name: true } },
               },
-            },
-            outlet: { select: { id: true, name: true } },
-            shiftAssignment: {
-              select: {
-                id: true,
-                startTime: true,
-                endTime: true,
-              },
-            },
-            timePunches: {
-              orderBy: { punchTime: "asc" },
+              take: 1,
             },
           },
-          orderBy: [{ workDate: "desc" }, { createdAt: "desc" }],
-          take: 200,
-        });
-      } catch {
-        records = [];
+        },
+        outlet: { select: { id: true, name: true, timezone: true } },
+        shiftAssignment: {
+          select: {
+            id: true,
+            startTime: true,
+            endTime: true,
+            breakMinutes: true,
+          },
+        },
+        timePunches: {
+          orderBy: { punchTime: "asc" },
+          select: {
+            id: true,
+            punchType: true,
+            punchTime: true,
+            isManualAdjustment: true,
+            adjustedBy: true,
+            adjustmentReason: true,
+            deviceInfo: true,
+          },
+        },
+      },
+      orderBy: [{ workDate: "desc" }, { createdAt: "desc" }],
+      take: 200,
+    });
+
+    const mapped = records.map((r) => {
+      const flags = Array.isArray(r.exceptionFlags)
+        ? ([...(r.exceptionFlags as string[])] as string[])
+        : [];
+      const hasMissedClockOut = Boolean(r.clockInTime && !r.clockOutTime);
+      if (hasMissedClockOut && !flags.includes("MISSED_CLOCK_OUT")) {
+        flags.push("MISSED_CLOCK_OUT");
       }
-    }
+      return {
+        ...r,
+        exceptionFlags: flags,
+        needsReview: r.needsReview || (hasMissedClockOut && !r.isApproved),
+      };
+    });
 
-    if (records.length === 0) {
-      const rows: any[] = await prisma.$queryRawUnsafe(
-        `SELECT ar.id, ar.work_date as "workDate", ar.status, ar.clock_in_time as "clockInTime", ar.clock_out_time as "clockOutTime",
-                ar.total_work_minutes as "totalWorkMinutes", ar.total_break_minutes as "totalBreakMinutes",
-                ar.overtime_minutes as "overtimeMinutes", ar.late_minutes as "lateMinutes", ar.is_approved as "isApproved",
-                json_build_object('id', e.id, 'firstName', e.first_name, 'lastName', e.last_name, 'employeeCode', e.employee_code) as employee,
-                json_build_object('id', o.id, 'name', o.name) as outlet
-         FROM attendance_records ar
-         JOIN employees e ON ar.employee_id = e.id
-         JOIN restaurant_outlets o ON ar.outlet_id = o.id
-         WHERE ar.restaurant_id = $1
-         ORDER BY ar.work_date DESC LIMIT 200`,
-        session.activeRestaurantId
-      );
-      records = rows;
-    }
-
-    return NextResponse.json({ success: true, records });
+    return NextResponse.json({
+      success: true,
+      records: mapped,
+      permissions: {
+        canManageAttendance: auth.ctx.canManageAttendance,
+      },
+    });
   } catch (error: any) {
     console.error("List Attendance Records Error:", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 
 export async function PATCH(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
-    }
-
-    const accessCheck = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      {},
-      session.tokenVersion
-    );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
+    const auth = await getAttendanceActorContext({ requireManage: true });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const body = await req.json();
@@ -152,26 +182,38 @@ export async function PATCH(req: NextRequest) {
     }
 
     const data = result.data;
-    const isApprovedVal = data.isApproved !== undefined ? data.isApproved : false;
+    const updated = await correctAndApproveAttendance({
+      restaurantId: auth.ctx.restaurantId,
+      recordId: data.id,
+      actor: { userId: auth.ctx.userId, userEmail: auth.ctx.userEmail },
+      accessibleOutletIds: auth.ctx.accessibleOutletIds,
+      addMissedPunch: data.addMissedPunch
+        ? {
+            punchType: data.addMissedPunch.punchType,
+            punchTime: new Date(data.addMissedPunch.punchTime),
+          }
+        : undefined,
+      totalWorkMinutes: data.totalWorkMinutes,
+      totalBreakMinutes: data.totalBreakMinutes,
+      overtimeMinutes: data.overtimeMinutes,
+      status: data.status,
+      managerNotes: data.managerNotes,
+      correctionReason: data.correctionReason,
+      isApproved: data.isApproved,
+    });
 
-    await prisma.$executeRawUnsafe(
-      `UPDATE attendance_records SET
-         is_approved = COALESCE($1, is_approved),
-         approved_by = CASE WHEN $1 = true THEN $2 ELSE approved_by END,
-         approved_at = CASE WHEN $1 = true THEN NOW() ELSE approved_at END,
-         manager_notes = COALESCE($3, manager_notes),
-         updated_at = NOW()
-       WHERE id = $4 AND restaurant_id = $5`,
-      data.isApproved,
-      session.userId,
-      data.managerNotes || null,
-      data.id,
-      session.activeRestaurantId
-    );
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, record: updated });
   } catch (error: any) {
+    if (error instanceof AttendanceError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status }
+      );
+    }
     console.error("Patch Attendance Record Error:", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Internal server error" },
+      { status: 400 }
+    );
   }
 }

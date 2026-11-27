@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
+import { getShiftActorContext } from "@/modules/shifts/authHelper";
 import { ShiftService } from "@/modules/shifts/service";
 
 export async function GET(
@@ -9,38 +8,28 @@ export async function GET(
 ) {
   try {
     const { id: rosterId } = await params;
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const access = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      { moduleKey: "shifts", permissionKey: "shifts:manage_roster" },
-      session.tokenVersion
-    );
-    if (!access.authorized) {
-      return NextResponse.json({ error: access.error }, { status: access.status });
-    }
+    const auth = await getShiftActorContext("shifts:manage_roster");
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const { searchParams } = new URL(req.url);
     const shiftDate = searchParams.get("shiftDate");
     const startTime = searchParams.get("startTime") || "09:00";
     const endTime = searchParams.get("endTime") || "17:00";
     const departmentId = searchParams.get("departmentId") || undefined;
+    const breakMinutes = parseInt(searchParams.get("breakMinutes") || "0", 10) || 0;
 
     if (!shiftDate) {
       return NextResponse.json({ error: "shiftDate query param required" }, { status: 400 });
     }
 
     const suggestions = await ShiftService.getSmartEmployeeSuggestions(
-      session.activeRestaurantId,
+      auth.ctx.restaurantId,
       rosterId,
       shiftDate,
       startTime,
       endTime,
-      departmentId
+      departmentId,
+      breakMinutes
     );
 
     return NextResponse.json(suggestions);

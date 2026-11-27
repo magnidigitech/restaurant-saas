@@ -1,19 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
-import { PayrollService } from "@/modules/payroll/service";
+import { getPayrollActorContext } from "@/modules/payroll/authHelper";
+import { PayrollService, PayrollError } from "@/modules/payroll/service";
 
-export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const params = await props.params;
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const access = await verifyAccess(session.userId, session.activeRestaurantId, { moduleKey: "payroll", permissionKey: "payroll:view_payroll" }, session.tokenVersion);
-    if (!access.authorized) return NextResponse.json({ error: access.error }, { status: access.status });
+    const { id } = await params;
+    const auth = await getPayrollActorContext();
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+    const { ctx } = auth;
 
-    const payslip = await PayrollService.getPayslipById(session.activeRestaurantId, params.id);
+    const payslip = await PayrollService.getPayslipById(ctx.restaurantId, id);
+
+    const isOwnIssued = Boolean(
+      ctx.employeeId &&
+        payslip.employeeId === ctx.employeeId &&
+        payslip.status !== "DRAFT"
+    );
+
+    const isScopedManager =
+      ctx.canViewPayroll &&
+      (ctx.accessibleOutletIds === null ||
+        (payslip.payrollRun?.outletId &&
+          ctx.accessibleOutletIds.includes(payslip.payrollRun.outletId)));
+
+    if (!isOwnIssued && !isScopedManager) {
+      return NextResponse.json(
+        { error: "You are not authorized to view this payslip" },
+        { status: 403 }
+      );
+    }
+
     return NextResponse.json({ payslip });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 404 });
+    const status = error instanceof PayrollError ? error.status : 404;
+    return NextResponse.json({ error: error.message || "Payslip not found" }, { status });
   }
 }

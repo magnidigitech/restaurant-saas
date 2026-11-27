@@ -1,28 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
-import { PayrollService } from "@/modules/payroll/service";
-import { z } from "zod";
+import { getPayrollActorContext } from "@/modules/payroll/authHelper";
+import { PayrollService, PayrollError } from "@/modules/payroll/service";
 
-const paySchema = z.object({
-  paymentMethod: z.enum(["BANK_TRANSFER", "CHECK", "CASH", "DIRECT_DEPOSIT", "OTHER"]).optional(),
-});
-
-export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const params = await props.params;
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const access = await verifyAccess(session.userId, session.activeRestaurantId, { moduleKey: "payroll", permissionKey: "payroll:run_payroll" }, session.tokenVersion);
-    if (!access.authorized) return NextResponse.json({ error: access.error }, { status: access.status });
+    const { id } = await params;
+    const auth = await getPayrollActorContext({ requireApprove: true });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    const existing = await PayrollService.getPayrollRunById(auth.ctx.restaurantId, id);
+    if (
+      auth.ctx.accessibleOutletIds !== null &&
+      (!existing.outletId || !auth.ctx.accessibleOutletIds.includes(existing.outletId))
+    ) {
+      return NextResponse.json(
+        { error: "Payroll run is outside your authorized outlet scope" },
+        { status: 403 }
+      );
+    }
 
     const body = await req.json().catch(() => ({}));
-    const result = paySchema.safeParse(body);
-    const paymentMethod = result.success ? result.data.paymentMethod : undefined;
-
-    const run = await PayrollService.markPayrollPaid(session.activeRestaurantId, params.id, paymentMethod as any);
+    const run = await PayrollService.markPayrollPaid(
+      auth.ctx.restaurantId,
+      id,
+      body?.paymentMethod
+    );
     return NextResponse.json({ success: true, run });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 400 });
+    const status = error instanceof PayrollError ? error.status : 400;
+    return NextResponse.json({ error: error.message || "Payment update failed" }, { status });
   }
 }

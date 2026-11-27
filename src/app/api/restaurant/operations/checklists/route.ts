@@ -1,231 +1,414 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
-import { ChecklistService } from "@/modules/operations/checklistService";
+import { ChecklistService, ChecklistError } from "@/modules/operations/checklistService";
+import { getOperationsActorContext } from "@/modules/operations/authHelper";
 import { prisma } from "@/core/database/client";
+import { ChecklistStatus } from "@prisma/client";
 import { z } from "zod";
 
-const startExecutionSchema = z.object({
+const startChecklistSchema = z.object({
   templateId: z.string().uuid(),
   outletId: z.string().uuid(),
-  executionDate: z.string().optional(),
-  assignedEmployeeId: z.string().uuid().optional().nullable(),
-  shiftAssignmentId: z.string().uuid().optional().nullable(),
-  notes: z.string().optional(),
+  assignedEmployeeId: z.string().uuid().optional(),
+  shiftAssignmentId: z.string().uuid().optional(),
+  stationName: z.string().optional(),
+  dueAt: z.string().optional(),
+  allowCarryForwardExceptions: z.boolean().optional(),
 });
 
-const patchActionSchema = z.object({
-  action: z.enum(["UPDATE_ITEM", "VERIFY_CHECKLIST", "ASSIGN_STAFF"]),
-  // For UPDATE_ITEM
-  itemId: z.string().uuid().optional(),
-  isCompleted: z.boolean().optional(),
-  completedByEmployeeId: z.string().uuid().optional().nullable(),
-  inputValue: z.string().optional(),
-  photoUrl: z.string().optional(),
-  notes: z.string().optional(),
-  // For VERIFY_CHECKLIST
-  executionId: z.string().uuid().optional(),
-  supervisorEmployeeId: z.string().uuid().optional(),
-  verificationNotes: z.string().optional(),
-  // For ASSIGN_STAFF
-  assignedEmployeeId: z.string().uuid().optional().nullable(),
-});
+const patchSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("UPDATE_ITEM"),
+    itemExecutionId: z.string().uuid(),
+    status: z.string().optional(),
+    isCompleted: z.boolean().optional(),
+    recordedValue: z.string().nullable().optional(),
+    notes: z.string().nullable().optional(),
+    photoUrl: z.string().nullable().optional(),
+    expectedVersion: z.number().int().optional(),
+  }),
+  z.object({
+    action: z.literal("SUBMIT_CHECKLIST"),
+    executionId: z.string().uuid(),
+    handoverNotes: z.string().optional(),
+    expectedVersion: z.number().int().optional(),
+  }),
+  z.object({
+    action: z.literal("RETURN_ITEM"),
+    executionId: z.string().uuid(),
+    itemExecutionId: z.string().uuid(),
+    returnReason: z.string().min(1),
+    expectedVersion: z.number().int().optional(),
+  }),
+  z.object({
+    action: z.literal("VERIFY_CHECKLIST"),
+    executionId: z.string().uuid(),
+    handoverNotes: z.string().optional(),
+    allowCarryForwardExceptions: z.boolean().optional(),
+    carryForwardOwner: z.string().optional(),
+    carryForwardNote: z.string().optional(),
+    expectedVersion: z.number().int().optional(),
+  }),
+  z.object({
+    action: z.literal("ASSIGN_STAFF"),
+    executionId: z.string().uuid(),
+    assignedEmployeeId: z.string().uuid(),
+    expectedVersion: z.number().int().optional(),
+  }),
+]);
+
+function canAccessOutlet(accessibleOutletIds: string[] | null, outletId: string) {
+  return accessibleOutletIds === null || accessibleOutletIds.includes(outletId);
+}
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
+    const auth = await getOperationsActorContext();
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-
-    const accessCheck = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      {},
-      session.tokenVersion
-    );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
-    }
+    const { ctx } = auth;
 
     const { searchParams } = new URL(req.url);
-    const dateStr = searchParams.get("date") || new Date().toISOString().split("T")[0];
     const outletId = searchParams.get("outletId") || undefined;
+    const employeeId = searchParams.get("employeeId") || undefined;
+    const statusParam = searchParams.get("status") as ChecklistStatus | null;
+    const date = searchParams.get("date") || undefined;
+    const shiftAssignmentId = searchParams.get("shiftAssignmentId") || undefined;
 
-    // Fetch executions
-    const executions = await ChecklistService.getExecutions(
-      session.activeRestaurantId,
-      dateStr,
-      outletId
-    );
+    if (!ctx.canViewOperations && !ctx.canManageOperations) {
+      if (!ctx.employeeId) {
+        return NextResponse.json({
+          success: true,
+          executions: [],
+          actor: {
+            canViewOperations: ctx.canViewOperations,
+            canManageOperations: ctx.canManageOperations,
+            employeeId: ctx.employeeId,
+            accessibleOutletIds: ctx.accessibleOutletIds,
+          },
+        });
+      }
+      const executions = await ChecklistService.getExecutions(ctx.restaurantId, {
+        outletId,
+        onlyOwnEmployeeId: ctx.employeeId,
+        status: statusParam || undefined,
+        date,
+        shiftAssignmentId,
+      });
+      return NextResponse.json({
+        success: true,
+        executions,
+        actor: {
+          canViewOperations: ctx.canViewOperations,
+          canManageOperations: ctx.canManageOperations,
+          employeeId: ctx.employeeId,
+          accessibleOutletIds: ctx.accessibleOutletIds,
+        },
+      });
+    }
 
-    // Also fetch today's active shift assignments so supervisor can easily assign staff
-    const startOfDay = new Date(dateStr);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(dateStr);
-    endOfDay.setHours(23, 59, 59, 999);
+    const executions = await ChecklistService.getExecutions(ctx.restaurantId, {
+      outletId,
+      accessibleOutletIds: ctx.accessibleOutletIds,
+      assignedEmployeeId: employeeId,
+      status: statusParam || undefined,
+      date,
+      shiftAssignmentId,
+    });
 
-    const shiftAssignments = await prisma.shiftAssignment.findMany({
-      where: {
-        restaurantId: session.activeRestaurantId,
-        shiftDate: { gte: startOfDay, lte: endOfDay },
-        ...(outletId && { outletId }),
-      },
-      include: {
-        employee: {
+    const outletFilter = outletId
+      ? { outletId }
+      : ctx.accessibleOutletIds
+        ? { outletId: { in: ctx.accessibleOutletIds } }
+        : {};
+
+    const shiftDateFilter = date
+      ? {
+        shiftDate: {
+          gte: new Date(`${date}T00:00:00.000Z`),
+          lte: new Date(`${date}T23:59:59.999Z`),
+        },
+      }
+      : {};
+
+    const [shiftAssignments, employees] = ctx.canManageOperations
+      ? await Promise.all([
+        prisma.shiftAssignment.findMany({
+          where: {
+            restaurantId: ctx.restaurantId,
+            ...outletFilter,
+            ...shiftDateFilter,
+          },
+          include: {
+            employee: {
+              select: { id: true, firstName: true, lastName: true, employeeCode: true },
+            },
+            outlet: { select: { id: true, name: true, timezone: true } },
+          },
+          orderBy: { startTime: "asc" },
+          take: 100,
+        }),
+        prisma.employee.findMany({
+          where: {
+            restaurantId: ctx.restaurantId,
+            archivedAt: null,
+            ...(outletId || ctx.accessibleOutletIds
+              ? {
+                outletAssignments: {
+                  some: {
+                    ...(outletId
+                      ? { outletId }
+                      : { outletId: { in: ctx.accessibleOutletIds! } }),
+                  },
+                },
+              }
+              : {}),
+          },
           select: {
             id: true,
             firstName: true,
             lastName: true,
             employeeCode: true,
-            workerType: true,
-            employmentRecords: {
-              where: { status: "ACTIVE" },
-              include: {
-                department: true,
-                designation: true,
-              },
-              take: 1,
-            },
           },
-        },
-        template: true,
-      },
-    });
+          orderBy: { firstName: "asc" },
+        }),
+      ])
+      : [[], []];
 
     return NextResponse.json({
       success: true,
-      date: dateStr,
       executions,
       shiftAssignments,
+      employees,
+      actor: {
+        canViewOperations: ctx.canViewOperations,
+        canManageOperations: ctx.canManageOperations,
+        employeeId: ctx.employeeId,
+        accessibleOutletIds: ctx.accessibleOutletIds,
+      },
     });
   } catch (error: any) {
-    console.error("Get Shift Checklists Error:", error);
-    return NextResponse.json({ error: error.message || "Failed to load checklists" }, { status: 500 });
+    const status = error instanceof ChecklistError ? error.status : 500;
+    return NextResponse.json(
+      { error: error.message || "Failed to load checklists", code: error.code },
+      { status }
+    );
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
-    }
-
-    const accessCheck = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      {},
-      session.tokenVersion
-    );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
-    }
-
     const body = await req.json();
-    const result = startExecutionSchema.safeParse(body);
+    const result = startChecklistSchema.safeParse(body);
     if (!result.success) {
-      return NextResponse.json({ error: "Invalid payload", details: result.error.flatten() }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid payload", details: result.error.flatten() },
+        { status: 400 }
+      );
     }
 
-    const data = result.data;
-    const execution = await ChecklistService.startExecution(session.activeRestaurantId, {
-      templateId: data.templateId,
-      outletId: data.outletId,
-      executionDate: data.executionDate || new Date().toISOString().split("T")[0],
-      assignedEmployeeId: data.assignedEmployeeId || undefined,
-      shiftAssignmentId: data.shiftAssignmentId || undefined,
-      notes: data.notes,
+    const auth = await getOperationsActorContext({
+      requireManage: true,
+      outletId: result.data.outletId,
+    });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    const execution = await ChecklistService.startExecution(auth.ctx.restaurantId, {
+      ...result.data,
+      actorUserId: auth.ctx.userId,
+      actorEmail: auth.ctx.userEmail,
     });
 
     return NextResponse.json({ success: true, execution });
   } catch (error: any) {
-    console.error("Start Checklist Error:", error);
-    return NextResponse.json({ error: error.message || "Failed to start checklist" }, { status: 500 });
+    const status = error instanceof ChecklistError ? error.status : 500;
+    return NextResponse.json(
+      { error: error.message || "Failed to assign checklist", code: error.code },
+      { status }
+    );
   }
 }
 
 export async function PATCH(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
+    const auth = await getOperationsActorContext();
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-
-    const accessCheck = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      {},
-      session.tokenVersion
-    );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
-    }
+    const { ctx } = auth;
 
     const body = await req.json();
-    const result = patchActionSchema.safeParse(body);
-    if (!result.success) {
-      return NextResponse.json({ error: "Invalid payload", details: result.error.flatten() }, { status: 400 });
+    const parsed = patchSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid checklist update payload", details: parsed.error.flatten() },
+        { status: 400 }
+      );
     }
 
-    const data = result.data;
+    const payload = parsed.data;
 
-    if (data.action === "UPDATE_ITEM") {
-      if (!data.itemId) return NextResponse.json({ error: "itemId is required" }, { status: 400 });
-      const updated = await ChecklistService.updateItemExecution(data.itemId, {
-        isCompleted: data.isCompleted,
-        completedByEmployeeId: data.completedByEmployeeId || undefined,
-        inputValue: data.inputValue,
-        photoUrl: data.photoUrl,
-        notes: data.notes,
+    if (payload.action === "UPDATE_ITEM") {
+      const item = await prisma.shiftChecklistItemExecution.findFirst({
+        where: {
+          id: payload.itemExecutionId,
+          execution: { restaurantId: ctx.restaurantId },
+        },
+        include: { execution: { select: { outletId: true, assignedEmployeeId: true } } },
       });
-      return NextResponse.json({ success: true, item: updated });
-    }
+      if (!item) {
+        return NextResponse.json({ error: "Checklist item not found" }, { status: 404 });
+      }
+      const isAssignee = Boolean(
+        ctx.employeeId && item.execution.assignedEmployeeId === ctx.employeeId
+      );
+      const isScopedManager =
+        ctx.canManageOperations &&
+        canAccessOutlet(ctx.accessibleOutletIds, item.execution.outletId);
 
-    if (data.action === "VERIFY_CHECKLIST") {
-      if (!data.executionId) return NextResponse.json({ error: "executionId is required" }, { status: 400 });
-      // Find employee ID for current user if not provided
-      let supervisorId = data.supervisorEmployeeId;
-      if (!supervisorId) {
-        const emp = await prisma.employee.findFirst({
-          where: {
-            restaurantId: session.activeRestaurantId,
-            memberships: { some: { userId: session.userId } },
-          },
-        });
-        if (emp) supervisorId = emp.id;
+      if (!isAssignee && !isScopedManager) {
+        return NextResponse.json(
+          { error: "You are not permitted to update this checklist task" },
+          { status: 403 }
+        );
       }
 
-      if (!supervisorId) {
-        // Fallback to first active supervisor/manager
-        const fallbackEmp = await prisma.employee.findFirst({
-          where: { restaurantId: session.activeRestaurantId },
-        });
-        if (fallbackEmp) supervisorId = fallbackEmp.id;
+      const updatedItem = await ChecklistService.updateItemExecution(
+        payload.itemExecutionId,
+        ctx.restaurantId,
+        {
+          status: payload.status,
+          isCompleted: payload.isCompleted,
+          recordedValue: payload.recordedValue,
+          notes: payload.notes,
+          photoUrl: payload.photoUrl,
+          completedById: ctx.employeeId || undefined,
+          actorId: ctx.userId,
+          actorName: ctx.userName,
+          expectedVersion: payload.expectedVersion,
+        }
+      );
+
+      return NextResponse.json({ success: true, item: updatedItem });
+    }
+
+    if (payload.action === "SUBMIT_CHECKLIST") {
+      const execution = await ChecklistService.getExecutionById(
+        payload.executionId,
+        ctx.restaurantId
+      );
+      const isAssignee = Boolean(
+        ctx.employeeId && execution.assignedEmployeeId === ctx.employeeId
+      );
+      const isScopedManager =
+        ctx.canManageOperations &&
+        canAccessOutlet(ctx.accessibleOutletIds, execution.outletId);
+
+      if (!isAssignee && !isScopedManager) {
+        return NextResponse.json(
+          { error: "You are not permitted to submit this checklist" },
+          { status: 403 }
+        );
       }
 
-      if (!supervisorId) return NextResponse.json({ error: "Supervisor employee profile not found" }, { status: 400 });
-
-      const verified = await ChecklistService.verifyExecution(
-        data.executionId,
-        supervisorId,
-        data.verificationNotes
+      const submitted = await ChecklistService.submitExecution(
+        payload.executionId,
+        ctx.restaurantId,
+        {
+          employeeId: ctx.employeeId,
+          handoverNotes: payload.handoverNotes,
+          expectedVersion: payload.expectedVersion,
+          actorUserId: ctx.userId,
+          actorEmail: ctx.userEmail,
+        }
       );
-      return NextResponse.json({ success: true, execution: verified });
+      return NextResponse.json({ success: true, execution: submitted });
     }
 
-    if (data.action === "ASSIGN_STAFF") {
-      if (!data.executionId) return NextResponse.json({ error: "executionId is required" }, { status: 400 });
-      const assigned = await ChecklistService.assignStaff(
-        data.executionId,
-        data.assignedEmployeeId || null
+    // Supervisor-only actions below
+    if (!ctx.canManageOperations) {
+      return NextResponse.json(
+        { error: "Supervisor operations permission required" },
+        { status: 403 }
       );
-      return NextResponse.json({ success: true, execution: assigned });
     }
 
-    return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+    const execution = await ChecklistService.getExecutionById(
+      payload.executionId,
+      ctx.restaurantId
+    );
+    if (!canAccessOutlet(ctx.accessibleOutletIds, execution.outletId)) {
+      return NextResponse.json(
+        { error: "Outlet is outside your authorized scope" },
+        { status: 403 }
+      );
+    }
+
+    if (payload.action === "RETURN_ITEM") {
+      const returned = await ChecklistService.returnItemForCorrection(
+        payload.executionId,
+        payload.itemExecutionId,
+        ctx.restaurantId,
+        {
+          returnReason: payload.returnReason,
+          actorUserId: ctx.userId,
+          actorEmail: ctx.userEmail,
+          actorName: ctx.userName,
+          expectedVersion: payload.expectedVersion,
+        }
+      );
+      return NextResponse.json({ success: true, item: returned });
+    }
+
+    if (payload.action === "VERIFY_CHECKLIST") {
+      const result = await ChecklistService.verifyExecution(
+        payload.executionId,
+        ctx.restaurantId,
+        {
+          verifiedById: ctx.employeeId,
+          actorUserId: ctx.userId,
+          actorEmail: ctx.userEmail,
+          actorName: ctx.userName,
+          handoverNotes: payload.handoverNotes,
+          allowCarryForwardExceptions: payload.allowCarryForwardExceptions,
+          carryForwardOwner: payload.carryForwardOwner,
+          carryForwardNote: payload.carryForwardNote,
+          expectedVersion: payload.expectedVersion,
+        }
+      );
+      return NextResponse.json({
+        success: true,
+        execution: result.execution,
+        alreadyVerified: result.alreadyVerified,
+      });
+    }
+
+    if (payload.action === "ASSIGN_STAFF") {
+      const updated = await ChecklistService.assignStaff(
+        payload.executionId,
+        ctx.restaurantId,
+        payload.assignedEmployeeId,
+        {
+          expectedVersion: payload.expectedVersion,
+          actorUserId: ctx.userId,
+          actorEmail: ctx.userEmail,
+        }
+      );
+      return NextResponse.json({ success: true, execution: updated });
+    }
+
+    return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
   } catch (error: any) {
-    console.error("Checklist Action Error:", error);
-    return NextResponse.json({ error: error.message || "Action failed" }, { status: 500 });
+    const status = error instanceof ChecklistError ? error.status : 500;
+    return NextResponse.json(
+      {
+        error: error.message || "Failed to update checklist",
+        code: error.code,
+        details: error.details,
+      },
+      { status }
+    );
   }
 }

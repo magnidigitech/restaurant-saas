@@ -1,106 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/core/database/client";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
 import { z } from "zod";
+import { prisma } from "@/core/database/client";
+import { WorkerType } from "@prisma/client";
+import { getWorkforceActorContext } from "@/modules/workforce/authHelper";
+import {
+  assertEmployeeInScope,
+  getEmployeeProfile,
+  sanitizeAuditPayload,
+  WorkforceError,
+} from "@/modules/workforce/service";
 
 const updateEmployeeSchema = z.object({
   firstName: z.string().min(1).optional(),
   lastName: z.string().min(1).optional(),
-  personalEmail: z.string().email().nullable().optional(),
-  phone: z.string().nullable().optional(),
-  alternatePhone: z.string().nullable().optional(),
-  gender: z.string().nullable().optional(),
-  dateOfBirth: z.string().nullable().optional(),
+  personalEmail: z.string().email().optional().nullable().or(z.literal("")),
+  phone: z.string().optional().nullable(),
+  alternatePhone: z.string().optional().nullable(),
+  gender: z.string().optional().nullable(),
+  dateOfBirth: z.string().optional().nullable(),
   joiningDate: z.string().optional(),
-  workerType: z.enum(["FULL_TIME", "PART_TIME", "CONTRACT", "INTERN", "CONSULTANT", "TEMPORARY"]).optional(),
-  weeklyHoursLimit: z.number().positive().nullable().optional(),
+  workerType: z.nativeEnum(WorkerType).optional(),
+  weeklyHoursLimit: z.number().min(1).max(168).optional().nullable(),
   archived: z.boolean().optional(),
 });
 
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
-    }
-
-    const accessCheck = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      {},
-      session.tokenVersion
-    );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
+    const auth = await getWorkforceActorContext();
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const { id } = await params;
-
-    const employee = await prisma.employee.findFirst({
-      where: { id, restaurantId: session.activeRestaurantId },
-      include: {
-        employmentRecords: {
-          include: {
-            department: true,
-            designation: true,
-            primaryOutlet: true,
-            reportingManager: true,
-          },
-          orderBy: { effectiveFrom: "desc" },
-        },
-        outletAssignments: {
-          include: { outlet: true },
-        },
-        emergencyContacts: true,
-        documents: true,
-        onboardings: {
-          include: {
-            template: { select: { id: true, name: true } },
-            progresses: {
-              include: { task: true, fileUpload: true },
-            },
-          },
-          orderBy: { createdAt: "desc" },
-        },
-        memberships: {
-          include: { user: true },
-        },
-        salaryStructures: {
-          orderBy: { effectiveFrom: "desc" },
-        },
-        payslips: {
-          include: {
-            payrollRun: {
-              select: {
-                id: true,
-                title: true,
-                periodStart: true,
-                periodEnd: true,
-                paymentDate: true,
-                status: true,
-              },
-            },
-            earnings: true,
-            deductions: true,
-            payments: true,
-          },
-          orderBy: { periodStart: "desc" },
-        },
-      },
-    });
-
-    if (!employee) {
-      return NextResponse.json({ error: "Employee not found or access denied" }, { status: 404 });
-    }
-
+    const employee = await getEmployeeProfile(auth.ctx, id);
     return NextResponse.json({ employee });
-  } catch (error: any) {
-    console.error("Get Employee Error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  } catch (error) {
+    if (error instanceof WorkforceError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status }
+      );
+    }
+    console.error("Get Employee Detail Error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 
@@ -109,36 +57,42 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
-    }
-
-    const accessCheck = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      {},
-      session.tokenVersion
-    );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
+    const auth = await getWorkforceActorContext({ requireManage: true });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const { id } = await params;
+    await assertEmployeeInScope(auth.ctx, id);
+
     const body = await req.json();
     const result = updateEmployeeSchema.safeParse(body);
     if (!result.success) {
-      return NextResponse.json({ error: "Invalid request payload", details: result.error.flatten() }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid request payload", details: result.error.flatten() },
+        { status: 400 }
+      );
     }
 
     const data = result.data;
-
     const existing = await prisma.employee.findFirst({
-      where: { id, restaurantId: session.activeRestaurantId },
+      where: { id, restaurantId: auth.ctx.restaurantId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        workerType: true,
+        weeklyHoursLimit: true,
+        archivedAt: true,
+      },
     });
 
     if (!existing) {
-      return NextResponse.json({ error: "Employee not found or access denied" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Employee not found or access denied" },
+        { status: 404 }
+      );
     }
 
     const updated = await prisma.employee.update({
@@ -146,34 +100,67 @@ export async function PATCH(
       data: {
         ...(data.firstName && { firstName: data.firstName }),
         ...(data.lastName && { lastName: data.lastName }),
-        ...(data.personalEmail !== undefined && { personalEmail: data.personalEmail }),
+        ...(data.personalEmail !== undefined && {
+          personalEmail: data.personalEmail || null,
+        }),
         ...(data.phone !== undefined && { phone: data.phone }),
-        ...(data.alternatePhone !== undefined && { alternatePhone: data.alternatePhone }),
+        ...(data.alternatePhone !== undefined && {
+          alternatePhone: data.alternatePhone,
+        }),
         ...(data.gender !== undefined && { gender: data.gender }),
-        ...(data.dateOfBirth !== undefined && { dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null }),
+        ...(data.dateOfBirth !== undefined && {
+          dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
+        }),
         ...(data.joiningDate && { joiningDate: new Date(data.joiningDate) }),
         ...(data.workerType && { workerType: data.workerType }),
-        ...(data.weeklyHoursLimit !== undefined && { weeklyHoursLimit: data.weeklyHoursLimit }),
-        ...(data.archived !== undefined && { archivedAt: data.archived ? new Date() : null }),
+        ...(data.weeklyHoursLimit !== undefined && {
+          weeklyHoursLimit: data.weeklyHoursLimit,
+        }),
+        ...(data.archived !== undefined && {
+          archivedAt: data.archived ? new Date() : null,
+        }),
+      },
+      select: {
+        id: true,
+        employeeCode: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        workerType: true,
+        weeklyHoursLimit: true,
+        archivedAt: true,
       },
     });
 
     await prisma.auditLog.create({
       data: {
-        restaurantId: session.activeRestaurantId,
-        userId: session.userId,
-        userEmail: session.email,
+        restaurantId: auth.ctx.restaurantId,
+        userId: auth.ctx.userId,
+        userEmail: auth.ctx.userEmail,
         action: data.archived ? "EMPLOYEE_ARCHIVED" : "EMPLOYEE_UPDATED",
         entityType: "Employee",
         entityId: id,
-        previousValues: JSON.stringify(existing),
-        newValues: JSON.stringify(updated),
+        previousValues: sanitizeAuditPayload(
+          existing as unknown as Record<string, unknown>
+        ),
+        newValues: sanitizeAuditPayload(
+          updated as unknown as Record<string, unknown>
+        ),
       },
     });
 
     return NextResponse.json({ success: true, employee: updated });
-  } catch (error: any) {
+  } catch (error) {
+    if (error instanceof WorkforceError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status }
+      );
+    }
     console.error("Update Employee Error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

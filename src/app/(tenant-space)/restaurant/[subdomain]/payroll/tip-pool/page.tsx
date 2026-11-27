@@ -5,6 +5,12 @@ import Link from "next/link";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 
+interface Outlet {
+  id: string;
+  name: string;
+  currency?: string;
+}
+
 interface StaffAllocationPreview {
   employeeId: string;
   name: string;
@@ -15,6 +21,47 @@ interface StaffAllocationPreview {
   weight: number;
   percentageOfPool: number;
   tipAmount: number;
+  eligible: boolean;
+  basisLabel: string;
+  ineligibleReason?: string;
+}
+
+interface TipPreview {
+  outletId: string;
+  outletName: string;
+  currency: string;
+  periodStart: string;
+  periodEnd: string;
+  cashTipsAmount: number;
+  cardTipsAmount: number;
+  serviceChargesAmount: number;
+  refundsAmount: number;
+  adjustmentsAmount: number;
+  eligiblePoolAmount: number;
+  distribution: {
+    totalCollectedTips: number;
+    fohPoolAmount: number;
+    bohPoolAmount: number;
+    totalDistributedTips: number;
+    undistributedAmount: number;
+    undistributedReason: string | null;
+    flags: string[];
+    allocations: StaffAllocationPreview[];
+  };
+  missingConfig: string[];
+}
+
+interface TipPoolRunItem {
+  id: string;
+  outletId: string | null;
+  status: string;
+  currency: string;
+  periodStart: string;
+  periodEnd: string;
+  eligiblePoolAmount: number;
+  totalDistributedTips: number;
+  undistributedAmount: number;
+  payrollRun?: { id: string; title: string; status: string } | null;
 }
 
 export default function TipPoolStudioPage({
@@ -23,457 +70,364 @@ export default function TipPoolStudioPage({
   params: Promise<{ subdomain: string }>;
 }) {
   const { subdomain } = use(params);
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
+  const { isDark } = useTheme();
 
-  // Rule State
-  const [ruleName, setRuleName] = useState("Standard Restaurant Pool");
-  const [fohPercent, setFohPercent] = useState(70);
-  const [distMethod, setDistMethod] = useState<"HOURS_WORKED" | "EQUAL_SPLIT" | "ROLE_POINT_SYSTEM">("HOURS_WORKED");
-  const [rolePoints, setRolePoints] = useState<Record<string, number>>({
-    "Lead Bartender": 1.5,
-    "Server": 1.0,
-    "Busser": 0.75,
-    "Line Cook": 1.0,
-    "Dishwasher": 0.8,
-  });
+  const [outlets, setOutlets] = useState<Outlet[]>([]);
+  const [selectedOutletId, setSelectedOutletId] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [adjustmentsAmount, setAdjustmentsAmount] = useState<number>(0);
 
-  // Simulator Inputs
-  const [totalTipsInput, setTotalTipsInput] = useState<number>(1200);
-  const [simStartDate, setSimStartDate] = useState<string>("");
-  const [simEndDate, setSimEndDate] = useState<string>("");
+  const [fohPercent, setFohPercent] = useState<number>(70);
+  const [distMethod, setDistMethod] = useState<
+    "HOURS_WORKED" | "EQUAL_SPLIT" | "ROLE_POINT_SYSTEM"
+  >("HOURS_WORKED");
+  const [includeCashTips, setIncludeCashTips] = useState(true);
+  const [includeCardTips, setIncludeCardTips] = useState(true);
+  const [includeServiceCharges, setIncludeServiceCharges] = useState(false);
+  const [deductRefunds, setDeductRefunds] = useState(true);
 
-  // Preview Result State
-  const [simulating, setSimulating] = useState(false);
-  const [savingRule, setSavingRule] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [previewAllocations, setPreviewAllocations] = useState<StaffAllocationPreview[]>([]);
-  const [summaryStats, setSummaryStats] = useState<{
-    fohPool: number;
-    bohPool: number;
-    totalDistributed: number;
-    fohCount: number;
-    bohCount: number;
-  } | null>(null);
+  const [preview, setPreview] = useState<TipPreview | null>(null);
+  const [runs, setRuns] = useState<TipPoolRunItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<{ text: string; type: "ok" | "err" } | null>(null);
 
-  // Set default date range to past 7 days
   useEffect(() => {
     const end = new Date();
     const start = new Date();
     start.setDate(end.getDate() - 7);
+    setStartDate(start.toISOString().split("T")[0]);
+    setEndDate(end.toISOString().split("T")[0]);
 
-    setSimStartDate(start.toISOString().split("T")[0]);
-    setSimEndDate(end.toISOString().split("T")[0]);
-  }, []);
-
-  // Fetch Existing Active Rule
-  useEffect(() => {
-    const fetchRule = async () => {
-      try {
-        const res = await fetch("/api/restaurant/payroll/tip-pool/rules");
-        if (res.ok) {
-          const data = await res.json();
-          const rules = data.rules || [];
-          if (rules.length > 0) {
-            const active = rules[0];
-            setRuleName(active.name);
-            setFohPercent(active.fohPercentage);
-            setDistMethod(active.distributionMethod);
-            if (active.rolePointsJson) setRolePoints(active.rolePointsJson);
-          }
+    fetch("/api/restaurant/outlets")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.outlets?.length) {
+          setOutlets(d.outlets);
+          setSelectedOutletId(d.outlets[0].id);
         }
-      } catch {
-        // ignore
-      }
-    };
-    fetchRule();
+      })
+      .catch(() => { });
   }, []);
 
-  // Run Tip Simulation Preview
-  const runSimulation = async () => {
-    if (!simStartDate || !simEndDate) return;
-    setSimulating(true);
-    setStatusMessage(null);
+  const fetchRunsAndRules = async (outletId: string) => {
+    if (!outletId) return;
+    try {
+      const res = await fetch(`/api/restaurant/payroll/tip-pool/calculate?outletId=${outletId}`);
+      const data = await res.json();
+      if (res.ok) {
+        setRuns(data.runs || []);
+        if (data.rules?.length) {
+          const r = data.rules[0];
+          setFohPercent(r.fohPercentage ?? 70);
+          setDistMethod(r.distributionMethod ?? "HOURS_WORKED");
+          setIncludeCashTips(r.includeCashTips ?? true);
+          setIncludeCardTips(r.includeCardTips ?? true);
+          setIncludeServiceCharges(r.includeServiceCharges ?? false);
+          setDeductRefunds(r.deductRefunds ?? true);
+        }
+      }
+    } catch { }
+  };
 
+  useEffect(() => {
+    if (selectedOutletId) fetchRunsAndRules(selectedOutletId);
+  }, [selectedOutletId]);
+
+  const runAction = async (action: "PREVIEW" | "SAVE" | "FINALIZE") => {
+    if (!selectedOutletId || !startDate || !endDate) return;
+    setLoading(true);
+    setMessage(null);
     try {
       const res = await fetch("/api/restaurant/payroll/tip-pool/calculate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          startDate: simStartDate,
-          endDate: simEndDate,
-          customTipAmount: Number(totalTipsInput),
+          action,
+          outletId: selectedOutletId,
+          startDate: `${startDate}T00:00:00.000Z`,
+          endDate: `${endDate}T23:59:59.999Z`,
+          adjustmentsAmount,
           fohPercentage: fohPercent,
           bohPercentage: 100 - fohPercent,
           distributionMethod: distMethod,
-          rolePoints,
+          includeCashTips,
+          includeCardTips,
+          includeServiceCharges,
+          deductRefunds,
         }),
       });
-
       const data = await res.json();
-      if (res.ok) {
-        setPreviewAllocations(data.calculation.allocations || []);
-        setSummaryStats({
-          fohPool: data.calculation.fohPoolAmount,
-          bohPool: data.calculation.bohPoolAmount,
-          totalDistributed: data.calculation.totalDistributedTips,
-          fohCount: data.fohCount,
-          bohCount: data.bohCount,
-        });
-      } else {
-        setStatusMessage(`Error: ${data.error}`);
+      if (!res.ok) {
+        setMessage({ text: data.error || "Tip pool calculation failed", type: "err" });
+        return;
+      }
+      if (data.preview) setPreview(data.preview);
+      if (action === "FINALIZE") {
+        setMessage({ text: "Tip pool finalized and locked for payroll.", type: "ok" });
+        fetchRunsAndRules(selectedOutletId);
+      } else if (action === "SAVE") {
+        setMessage({ text: "Draft tip pool saved.", type: "ok" });
+        fetchRunsAndRules(selectedOutletId);
       }
     } catch {
-      setStatusMessage("Failed to simulate tip distribution");
+      setMessage({ text: "Network error calculating tip pool", type: "err" });
     } finally {
-      setSimulating(false);
+      setLoading(false);
     }
   };
 
-  // Run on mount or parameter changes
-  useEffect(() => {
-    if (simStartDate && simEndDate) {
-      runSimulation();
-    }
-  }, [fohPercent, distMethod, totalTipsInput, simStartDate, simEndDate]);
-
-  // Save Rule Configuration
-  const handleSaveRule = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingRule(true);
-    setStatusMessage(null);
-
-    try {
-      const res = await fetch("/api/restaurant/payroll/tip-pool/rules", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: ruleName,
-          fohPercentage: fohPercent,
-          bohPercentage: 100 - fohPercent,
-          distributionMethod: distMethod,
-          rolePointsJson: rolePoints,
-          isActive: true,
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setStatusMessage("✅ Tip Pool policy saved and activated for all future payroll runs!");
-      } else {
-        setStatusMessage(`Error: ${data.error}`);
-      }
-    } catch {
-      setStatusMessage("Failed to save rule");
-    } finally {
-      setSavingRule(false);
-    }
-  };
+  const card = isDark ? "bg-zinc-900 border-zinc-800 text-zinc-100" : "bg-white border-zinc-200 text-zinc-900";
+  const muted = isDark ? "text-zinc-400" : "text-zinc-500";
+  const input = isDark ? "bg-zinc-800 border-zinc-700 text-zinc-100" : "bg-white border-zinc-300 text-zinc-900";
 
   return (
-    <div className={`min-h-screen transition-colors duration-200 ${isDark ? "bg-[#0A0C12] text-white" : "bg-[#F5F5F7] text-slate-900"}`}>
+    <div className="min-h-screen">
       <RestaurantNavbar />
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Header Title & Actions */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <main className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${
-                isDark ? "bg-[#0071E3]/20 text-[#64B5FF] border-[#0071E3]/30" : "bg-blue-100 text-[#0071E3] border-blue-200"
-              }`}>
-                Tip Distribution Engine
-              </span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-1">
-              Tip Pooling & Allocation Studio
-            </h1>
-            <p className={`text-xs mt-1 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-              Configure house tip splits between Front of House & Kitchen and preview live proportional payouts.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Link
-              href={`/restaurant/${subdomain}/payroll/runs`}
-              className={`px-4 py-2 text-xs font-semibold rounded-xl border transition ${
-                isDark ? "bg-white/[0.04] text-white border-white/[0.08] hover:bg-white/[0.08]" : "bg-white text-slate-700 border-slate-200 shadow-xs"
-              }`}
-            >
-              ← Back to Payroll Runs
+            <Link href={`/restaurant/${subdomain}/payroll`} className="text-xs text-indigo-500 hover:underline">
+              ← Back to Payroll
             </Link>
+            <h1 className="text-2xl font-bold mt-1">Tip Pooling & Reconciliation</h1>
+            <p className={`text-sm ${muted}`}>
+              Reconcile POS cash/card tips, service charges, refunds, and approved staff hours before finalizing into payroll.
+            </p>
           </div>
         </div>
 
-        {/* Status Message */}
-        {statusMessage && (
-          <div className={`p-3.5 rounded-2xl border text-xs font-medium ${
-            statusMessage.startsWith("✅")
-              ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
-              : "bg-rose-500/15 border-rose-500/30 text-rose-300"
-          }`}>
-            {statusMessage}
+        {message && (
+          <div
+            role="status"
+            className={`p-3 rounded-xl text-sm font-medium ${message.type === "err" ? "bg-red-500/15 text-red-600" : "bg-emerald-500/15 text-emerald-600"
+              }`}
+          >
+            {message.text}
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* LEFT: Rule Configuration Card */}
-          <div className="lg:col-span-5 space-y-4">
-            <div className={`p-6 rounded-3xl border shadow-sm space-y-5 ${isDark ? "bg-[#121622] border-white/[0.06]" : "bg-white border-slate-200"}`}>
-              <div>
-                <h2 className="text-base font-bold">House Tip Pool Policy</h2>
-                <p className={`text-xs mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                  Define how customer tips are divided across teams.
-                </p>
-              </div>
-
-              <form onSubmit={handleSaveRule} className="space-y-4 text-xs">
-                <div>
-                  <label className="block font-medium mb-1">Policy Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={ruleName}
-                    onChange={(e) => setRuleName(e.target.value)}
-                    className={`w-full px-3.5 py-2 text-xs rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-slate-50 border-slate-200"}`}
-                  />
-                </div>
-
-                {/* FOH vs BOH Ratio Slider */}
-                <div className="space-y-2 pt-2 border-t border-black/[0.04] dark:border-white/[0.04]">
-                  <div className="flex justify-between items-center text-xs font-bold">
-                    <span className="text-[#0071E3]">Front of House: {fohPercent}%</span>
-                    <span className="text-amber-500">Kitchen (BOH): {100 - fohPercent}%</span>
-                  </div>
-
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="5"
-                    value={fohPercent}
-                    onChange={(e) => setFohPercent(parseInt(e.target.value))}
-                    className="w-full accent-[#0071E3] cursor-pointer"
-                  />
-
-                  <div className="flex justify-between text-[10px] text-slate-400">
-                    <span>100% Servers/Bar</span>
-                    <span>50/50 Equal</span>
-                    <span>100% Kitchen</span>
-                  </div>
-                </div>
-
-                {/* Distribution Method Selector */}
-                <div className="space-y-1.5 pt-2 border-t border-black/[0.04] dark:border-white/[0.04]">
-                  <label className="block font-medium">Distribution Formula</label>
-                  <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.03] p-1 border border-black/[0.04] dark:border-white/[0.04]">
-                    {[
-                      { key: "HOURS_WORKED", label: "Hours Worked" },
-                      { key: "ROLE_POINT_SYSTEM", label: "Role Points" },
-                      { key: "EQUAL_SPLIT", label: "Equal Split" },
-                    ].map((m) => (
-                      <button
-                        key={m.key}
-                        type="button"
-                        onClick={() => setDistMethod(m.key as any)}
-                        className={`py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${
-                          distMethod === m.key
-                            ? "bg-[#0071E3] text-white shadow-xs"
-                            : isDark ? "text-[#8F95A3] hover:text-white" : "text-slate-600 hover:text-slate-900"
-                        }`}
-                      >
-                        {m.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Role Multiplier Weights (If ROLE_POINT_SYSTEM) */}
-                {distMethod === "ROLE_POINT_SYSTEM" && (
-                  <div className="space-y-2 p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04]">
-                    <span className={`block text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                      Role Multipliers (Points Weight)
-                    </span>
-                    <div className="space-y-2">
-                      {Object.entries(rolePoints).map(([role, pt]) => (
-                        <div key={role} className="flex justify-between items-center">
-                          <span className="font-medium">{role}</span>
-                          <input
-                            type="number"
-                            step="0.1"
-                            min="0.1"
-                            max="5.0"
-                            value={pt}
-                            onChange={(e) =>
-                              setRolePoints({ ...rolePoints, [role]: parseFloat(e.target.value) || 1.0 })
-                            }
-                            className={`w-20 px-2 py-1 text-right font-mono rounded-lg border ${
-                              isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-white border-slate-200"
-                            }`}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={savingRule}
-                  className="w-full py-2.5 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white font-bold rounded-xl text-xs shadow-xs transition cursor-pointer disabled:opacity-50"
-                >
-                  {savingRule ? "Saving..." : "Save & Activate Tip Policy"}
-                </button>
-              </form>
+        {/* Controls */}
+        <div className={`p-5 rounded-2xl border space-y-4 ${card}`}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div>
+              <label className={`block text-xs font-medium mb-1 ${muted}`}>Outlet</label>
+              <select
+                aria-label="Tip pool outlet"
+                value={selectedOutletId}
+                onChange={(e) => setSelectedOutletId(e.target.value)}
+                className={`w-full rounded-xl border px-3 py-2 text-sm ${input}`}
+              >
+                {outlets.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={`block text-xs font-medium mb-1 ${muted}`}>Start Date</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className={`w-full rounded-xl border px-3 py-2 text-sm ${input}`}
+              />
+            </div>
+            <div>
+              <label className={`block text-xs font-medium mb-1 ${muted}`}>End Date</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className={`w-full rounded-xl border px-3 py-2 text-sm ${input}`}
+              />
+            </div>
+            <div>
+              <label className={`block text-xs font-medium mb-1 ${muted}`}>Adjustments (+/-)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={adjustmentsAmount}
+                onChange={(e) => setAdjustmentsAmount(Number(e.target.value))}
+                className={`w-full rounded-xl border px-3 py-2 text-sm ${input}`}
+              />
             </div>
           </div>
 
-          {/* RIGHT: Live Simulation Preview Table */}
-          <div className="lg:col-span-7 space-y-4">
-            {/* Simulation Filter Bar */}
-            <div className={`p-4 rounded-3xl border flex flex-col sm:flex-row justify-between items-center gap-3 ${
-              isDark ? "bg-[#121622] border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"
-            }`}>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <div>
-                  <label className="block text-[10px] uppercase font-bold text-slate-400 mb-0.5">Total Tips ($)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="10"
-                    value={totalTipsInput}
-                    onChange={(e) => setTotalTipsInput(parseFloat(e.target.value) || 0)}
-                    className={`px-3 py-1.5 text-xs font-mono font-bold w-28 rounded-xl border ${
-                      isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-slate-50 border-slate-200"
-                    }`}
-                  />
-                </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+            <div>
+              <label className={`block text-xs font-medium mb-1 ${muted}`}>Allocation Method</label>
+              <select
+                value={distMethod}
+                onChange={(e) => setDistMethod(e.target.value as any)}
+                className={`w-full rounded-xl border px-3 py-2 text-sm ${input}`}
+              >
+                <option value="HOURS_WORKED">Approved Hours Worked</option>
+                <option value="ROLE_POINT_SYSTEM">Role Points × Hours</option>
+                <option value="EQUAL_SPLIT">Equal Split</option>
+              </select>
+            </div>
+            <div>
+              <label className={`block text-xs font-medium mb-1 ${muted}`}>
+                FOH / BOH Split ({fohPercent}% / {100 - fohPercent}%)
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={fohPercent}
+                onChange={(e) => setFohPercent(Number(e.target.value))}
+                className="w-full mt-2"
+              />
+            </div>
+            <div className="flex flex-wrap gap-3 items-center text-xs pt-3">
+              <label className="flex items-center gap-1.5">
+                <input type="checkbox" checked={includeCashTips} onChange={(e) => setIncludeCashTips(e.target.checked)} />
+                Cash Tips
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input type="checkbox" checked={includeCardTips} onChange={(e) => setIncludeCardTips(e.target.checked)} />
+                Card Tips
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input type="checkbox" checked={includeServiceCharges} onChange={(e) => setIncludeServiceCharges(e.target.checked)} />
+                Service Charges
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input type="checkbox" checked={deductRefunds} onChange={(e) => setDeductRefunds(e.target.checked)} />
+                Deduct Refunds
+              </label>
+            </div>
+          </div>
 
-                <div>
-                  <label className="block text-[10px] uppercase font-bold text-slate-400 mb-0.5">Period Window</label>
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="date"
-                      value={simStartDate}
-                      onChange={(e) => setSimStartDate(e.target.value)}
-                      className={`px-2.5 py-1.5 text-xs rounded-xl border ${
-                        isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-slate-50 border-slate-200"
-                      }`}
-                    />
-                    <span className="text-xs text-slate-400">to</span>
-                    <input
-                      type="date"
-                      value={simEndDate}
-                      onChange={(e) => setSimEndDate(e.target.value)}
-                      className={`px-2.5 py-1.5 text-xs rounded-xl border ${
-                        isDark ? "bg-[#0A0C12] border-white/[0.08]" : "bg-slate-50 border-slate-200"
-                      }`}
-                    />
+          <div className="flex flex-wrap gap-2 pt-2">
+            <button
+              disabled={loading}
+              onClick={() => runAction("PREVIEW")}
+              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold"
+            >
+              Preview Reconciliation
+            </button>
+            <button
+              disabled={loading}
+              onClick={() => runAction("FINALIZE")}
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold"
+            >
+              Finalize Tip Pool
+            </button>
+          </div>
+        </div>
+
+        {/* Reconciliation Summary & Breakdown */}
+        {preview && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+              {[
+                { label: "Cash Tips", val: preview.cashTipsAmount },
+                { label: "Card Tips", val: preview.cardTipsAmount },
+                { label: "Service Chg", val: preview.serviceChargesAmount },
+                { label: "Refunds", val: preview.refundsAmount },
+                { label: "Adjustments", val: preview.adjustmentsAmount },
+                { label: "Eligible Pool", val: preview.eligiblePoolAmount },
+                { label: "Distributed", val: preview.distribution.totalDistributedTips },
+              ].map((m) => (
+                <div key={m.label} className={`p-3.5 rounded-2xl border ${card}`}>
+                  <div className={`text-xs ${muted}`}>{m.label}</div>
+                  <div className="text-lg font-bold mt-1">
+                    {preview.currency} {m.val.toFixed(2)}
                   </div>
                 </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={runSimulation}
-                className="px-3.5 py-2 text-xs font-bold rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] cursor-pointer"
-              >
-                🔄 Refresh
-              </button>
+              ))}
             </div>
 
-            {/* Summary Stat Pills */}
-            {summaryStats && (
-              <div className="grid grid-cols-3 gap-3">
-                <div className={`p-3.5 rounded-2xl border ${isDark ? "bg-[#121622] border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
-                  <span className="text-[10px] font-bold uppercase text-[#0071E3] block">FOH Pool ({fohPercent}%)</span>
-                  <span className="text-xl font-extrabold font-mono text-[#0071E3] mt-0.5 block">
-                    ${summaryStats.fohPool.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </span>
-                  <span className="text-[10px] text-slate-400">{summaryStats.fohCount} Front staff</span>
-                </div>
-
-                <div className={`p-3.5 rounded-2xl border ${isDark ? "bg-[#121622] border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
-                  <span className="text-[10px] font-bold uppercase text-amber-500 block">Kitchen Pool ({100 - fohPercent}%)</span>
-                  <span className="text-xl font-extrabold font-mono text-amber-500 mt-0.5 block">
-                    ${summaryStats.bohPool.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </span>
-                  <span className="text-[10px] text-slate-400">{summaryStats.bohCount} Kitchen staff</span>
-                </div>
-
-                <div className={`p-3.5 rounded-2xl border ${isDark ? "bg-[#121622] border-white/[0.06]" : "bg-white border-slate-200 shadow-xs"}`}>
-                  <span className="text-[10px] font-bold uppercase text-emerald-400 block">Total Distributed</span>
-                  <span className="text-xl font-extrabold font-mono text-emerald-400 mt-0.5 block">
-                    ${summaryStats.totalDistributed.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </span>
-                  <span className="text-[10px] text-slate-400">100.00% Exact</span>
-                </div>
+            {preview.distribution.undistributedAmount > 0 && (
+              <div className="p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-800 dark:text-amber-300 text-sm">
+                <strong>Undistributed Amount:</strong> {preview.currency}{" "}
+                {preview.distribution.undistributedAmount.toFixed(2)} —{" "}
+                {preview.distribution.undistributedReason}
               </div>
             )}
 
-            {/* Payout Preview Table */}
-            <div className={`rounded-3xl border overflow-hidden ${isDark ? "bg-[#121622] border-white/[0.06]" : "bg-white border-slate-200 shadow-sm"}`}>
-              <div className="p-4 border-b border-black/[0.04] dark:border-white/[0.04]">
-                <h3 className="text-sm font-bold">Calculated Employee Payouts ({previewAllocations.length})</h3>
-                <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                  Weighted by verified attendance hours logged during this pay window.
-                </p>
+            {preview.distribution.flags.length > 0 && (
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-1">
+                {preview.distribution.flags.map((f, i) => (
+                  <div key={i}>• {f}</div>
+                ))}
               </div>
+            )}
 
-              {simulating ? (
-                <div className="py-16 text-center text-xs space-y-2">
-                  <div className="w-5 h-5 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin mx-auto" />
-                  <p>Calculating tip allocations from attendance records...</p>
-                </div>
-              ) : previewAllocations.length === 0 ? (
-                <div className="py-16 text-center text-xs text-slate-400">
-                  No staff with logged attendance hours found in this period.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className={`border-b ${isDark ? "border-white/[0.06] bg-white/[0.01]" : "border-slate-200 bg-slate-50"}`}>
-                        <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Employee</th>
-                        <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Group</th>
-                        <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Hours</th>
-                        <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Weight</th>
-                        <th className="p-3.5 font-bold uppercase tracking-wider text-[10px]">Pool Share</th>
-                        <th className="p-3.5 font-bold uppercase tracking-wider text-[10px] text-right">Tip Payout</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
-                      {previewAllocations.map((alloc) => (
-                        <tr key={alloc.employeeId} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.02] transition">
-                          <td className="p-3.5 font-bold">
-                            <div>{alloc.name}</div>
-                            <div className={`text-[10px] font-normal ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-                              {alloc.designationName || alloc.departmentName || "Staff"}
-                            </div>
-                          </td>
-                          <td className="p-3.5">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
-                              alloc.isFoh
-                                ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
-                                : "bg-amber-500/20 text-amber-300 border-amber-500/30"
-                            }`}>
-                              {alloc.isFoh ? "FOH" : "Kitchen"}
-                            </span>
-                          </td>
-                          <td className="p-3.5 font-mono">{alloc.hoursWorked}h</td>
-                          <td className="p-3.5 font-mono">{alloc.weight}x</td>
-                          <td className="p-3.5 font-mono">{alloc.percentageOfPool}%</td>
-                          <td className="p-3.5 font-mono font-extrabold text-emerald-400 text-right text-sm">
-                            ${alloc.tipAmount.toFixed(2)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+            <div className={`overflow-x-auto rounded-2xl border ${card}`}>
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950">
+                  <tr>
+                    <th className="py-3 px-4">Employee</th>
+                    <th className="py-3 px-4">Group</th>
+                    <th className="py-3 px-4">Eligibility</th>
+                    <th className="py-3 px-4">Basis</th>
+                    <th className="py-3 px-4">Share %</th>
+                    <th className="py-3 px-4 text-right">Tip Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                  {preview.distribution.allocations.map((a) => (
+                    <tr key={a.employeeId}>
+                      <td className="py-3 px-4 font-medium">{a.name}</td>
+                      <td className="py-3 px-4">{a.isFoh ? "FOH" : "BOH"}</td>
+                      <td className="py-3 px-4">
+                        {a.eligible ? (
+                          <span className="px-2 py-0.5 rounded-full text-xs bg-emerald-500/15 text-emerald-600">
+                            Eligible
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-xs bg-red-500/15 text-red-600">
+                            {a.ineligibleReason || "Ineligible"}
+                          </span>
+                        )}
+                      </td>
+                      <td className={`py-3 px-4 text-xs ${muted}`}>{a.basisLabel}</td>
+                      <td className="py-3 px-4">{a.percentageOfPool.toFixed(2)}%</td>
+                      <td className="py-3 px-4 text-right font-semibold">
+                        {preview.currency} {a.tipAmount.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
+        )}
+
+        {/* History */}
+        <div className={`p-5 rounded-2xl border space-y-3 ${card}`}>
+          <h2 className="font-semibold text-base">Tip Pool Runs ({runs.length})</h2>
+          {runs.length === 0 ? (
+            <p className={`text-sm ${muted}`}>No tip pool runs recorded for this outlet.</p>
+          ) : (
+            <div className="space-y-2">
+              {runs.map((r) => (
+                <div key={r.id} className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <div>
+                    <span className="font-medium">
+                      {new Date(r.periodStart).toLocaleDateString()} – {new Date(r.periodEnd).toLocaleDateString()}
+                    </span>
+                    <span className={`ml-2 text-xs ${muted}`}>
+                      Pool: {r.currency} {r.eligiblePoolAmount.toFixed(2)} • Distributed: {r.currency} {r.totalDistributedTips.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${r.status === "FINALIZED" ? "bg-emerald-500/15 text-emerald-600" : "bg-amber-500/15 text-amber-600"
+                      }`}>
+                      {r.status}
+                    </span>
+                    {r.payrollRun && (
+                      <span className="text-xs text-indigo-500">Linked: {r.payrollRun.title}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </main>
     </div>

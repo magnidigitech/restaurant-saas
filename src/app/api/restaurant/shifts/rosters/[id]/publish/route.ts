@@ -1,19 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
+import { getShiftActorContext } from "@/modules/shifts/authHelper";
 import { ShiftService } from "@/modules/shifts/service";
 
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   try {
     const params = await props.params;
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const access = await verifyAccess(session.userId, session.activeRestaurantId, { moduleKey: "shifts", permissionKey: "shifts:manage_roster" }, session.tokenVersion);
-    if (!access.authorized) return NextResponse.json({ error: access.error }, { status: access.status });
+    const auth = await getShiftActorContext("shifts:manage_roster");
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-    const roster = await ShiftService.publishRoster(session.activeRestaurantId, params.id, session.userId);
+    let expectedVersion: number | undefined;
+    try {
+      const body = await req.json();
+      if (typeof body?.expectedVersion === "number") {
+        expectedVersion = body.expectedVersion;
+      }
+    } catch {
+      // empty body allowed when version not passed
+    }
+
+    const roster = await ShiftService.publishRoster(
+      auth.ctx.restaurantId,
+      params.id,
+      { userId: auth.ctx.userId, userEmail: auth.ctx.userEmail },
+      expectedVersion
+    );
     return NextResponse.json({ success: true, roster });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 400 });
+    const status = error.statusCode || 400;
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status });
   }
 }

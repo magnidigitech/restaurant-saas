@@ -2,6 +2,8 @@ export interface ShiftSchedule {
   startTime: string; // "09:00"
   endTime: string;   // "17:00"
   breakMinutes?: number;
+  shiftDate?: Date | string; // "YYYY-MM-DD" or midnight UTC Date
+  timezone?: string; // e.g. "America/Toronto"
 }
 
 export interface RawPunch {
@@ -18,15 +20,23 @@ export interface AttendanceCalculationResult {
   earlyExitMinutes: number;
   grossHours: number;
   netHours: number;
-  status: "PRESENT" | "LATE" | "ON_BREAK" | "EARLY_DEPARTURE" | "HALF_DAY" | "ABSENT" | "ON_LEAVE";
+  status:
+    | "PRESENT"
+    | "LATE"
+    | "ON_BREAK"
+    | "EARLY_DEPARTURE"
+    | "HALF_DAY"
+    | "ABSENT"
+    | "ON_LEAVE";
   clockInTime: Date | null;
   clockOutTime: Date | null;
-  activePunchState: "NOT_CLOCKED_IN" | "CLOCKED_IN" | "ON_BREAK" | "CLOCKED_OUT";
+  activePunchState:
+    | "NOT_CLOCKED_IN"
+    | "CLOCKED_IN"
+    | "ON_BREAK"
+    | "CLOCKED_OUT";
 }
 
-/**
- * Parses "HH:mm" time string into minutes since midnight.
- */
 export function timeStringToMinutes(timeStr: string): number {
   const parts = timeStr.split(":");
   if (parts.length < 2) return 0;
@@ -35,15 +45,80 @@ export function timeStringToMinutes(timeStr: string): number {
   return hours * 60 + mins;
 }
 
+export function getTimezoneOffsetMinutes(date: Date, timeZone: string): number {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(date);
+
+    const map: Record<string, number> = {};
+    for (const p of parts) {
+      if (p.type !== "literal") map[p.type] = parseInt(p.value, 10);
+    }
+    const asUtc = Date.UTC(
+      map.year,
+      map.month - 1,
+      map.day,
+      map.hour,
+      map.minute,
+      map.second
+    );
+    return Math.round((asUtc - date.getTime()) / 60000);
+  } catch {
+    return 0;
+  }
+}
+
+export function localDateTimeToUtc(
+  dateStr: string,
+  timeStr: string,
+  timeZone: string
+): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const [hh, mm] = timeStr.split(":").map(Number);
+  const utcGuess = new Date(Date.UTC(y, m - 1, d, hh, mm, 0));
+  const offset1 = getTimezoneOffsetMinutes(utcGuess, timeZone);
+  const candidate1 = new Date(utcGuess.getTime() - offset1 * 60000);
+  const offset2 = getTimezoneOffsetMinutes(candidate1, timeZone);
+  return offset2 !== offset1
+    ? new Date(utcGuess.getTime() - offset2 * 60000)
+    : candidate1;
+}
+
+export function formatUtcToLocalDateKey(date: Date, timeZone: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date);
+    const map: Record<string, string> = {};
+    for (const p of parts) {
+      if (p.type !== "literal") map[p.type] = p.value;
+    }
+    return `${map.year}-${map.month}-${map.day}`;
+  } catch {
+    return date.toISOString().slice(0, 10);
+  }
+}
+
 /**
  * Calculates work, break, overtime, and punctuality metrics from a list of time punches.
+ * Supports overnight shifts and DST transitions when timezone + shiftDate are provided.
  */
 export function calculateAttendanceMetrics(
   punches: RawPunch[],
   scheduledShift?: ShiftSchedule | null,
   workDateMidnight?: Date
 ): AttendanceCalculationResult {
-  // Sort punches ascending by time
   const sorted = [...punches].sort(
     (a, b) => new Date(a.punchTime).getTime() - new Date(b.punchTime).getTime()
   );
@@ -55,7 +130,8 @@ export function calculateAttendanceMetrics(
   let currentBreakStart: number | null = null;
   let firstClockIn: Date | null = null;
   let lastClockOut: Date | null = null;
-  let activePunchState: AttendanceCalculationResult["activePunchState"] = "NOT_CLOCKED_IN";
+  let activePunchState: AttendanceCalculationResult["activePunchState"] =
+    "NOT_CLOCKED_IN";
 
   for (const punch of sorted) {
     const punchMs = new Date(punch.punchTime).getTime();
@@ -102,8 +178,6 @@ export function calculateAttendanceMetrics(
     }
   }
 
-  // If currently still on break or clocked in right now, we calculate accrued time up to now
-  // but only if it's the current active day
   const totalWorkMinutes = Math.round(totalWorkMs / (1000 * 60));
   const totalBreakMinutes = Math.round(totalBreakMs / (1000 * 60));
 
@@ -112,38 +186,67 @@ export function calculateAttendanceMetrics(
   let overtimeMinutes = 0;
 
   if (scheduledShift && firstClockIn) {
-    const shiftStartMins = timeStringToMinutes(scheduledShift.startTime);
-    const shiftEndMins = timeStringToMinutes(scheduledShift.endTime);
-    const scheduledShiftDuration = shiftEndMins > shiftStartMins
-      ? shiftEndMins - shiftStartMins
-      : (shiftEndMins + 24 * 60) - shiftStartMins;
+    const tz = scheduledShift.timezone || "UTC";
+    const baseDateObj =
+      scheduledShift.shiftDate
+        ? new Date(scheduledShift.shiftDate)
+        : workDateMidnight || new Date(firstClockIn);
+    const dateKey = baseDateObj.toISOString().slice(0, 10);
 
-    const actualInMins = firstClockIn.getUTCHours() * 60 + firstClockIn.getUTCMinutes();
-    if (actualInMins > shiftStartMins + 5) {
-      // 5 min grace period
-      lateMinutes = actualInMins - shiftStartMins;
+    const startMins = timeStringToMinutes(scheduledShift.startTime);
+    const endMins = timeStringToMinutes(scheduledShift.endTime);
+    const isOvernight = endMins <= startMins;
+
+    const scheduledStartUtc = localDateTimeToUtc(
+      dateKey,
+      scheduledShift.startTime,
+      tz
+    );
+    const nextDayObj = new Date(`${dateKey}T00:00:00Z`);
+    nextDayObj.setUTCDate(nextDayObj.getUTCDate() + 1);
+    const endDateKey = isOvernight
+      ? nextDayObj.toISOString().slice(0, 10)
+      : dateKey;
+    const scheduledEndUtc = localDateTimeToUtc(
+      endDateKey,
+      scheduledShift.endTime,
+      tz
+    );
+
+    const scheduledShiftDuration = Math.max(
+      0,
+      Math.round((scheduledEndUtc.getTime() - scheduledStartUtc.getTime()) / 60000)
+    );
+
+    const lateDiff = Math.round(
+      (firstClockIn.getTime() - scheduledStartUtc.getTime()) / 60000
+    );
+    if (lateDiff > 5) {
+      lateMinutes = lateDiff;
     }
 
     if (lastClockOut) {
-      const actualOutMins = lastClockOut.getUTCHours() * 60 + lastClockOut.getUTCMinutes();
-      if (actualOutMins < shiftEndMins - 5) {
-        earlyExitMinutes = shiftEndMins - actualOutMins;
+      const earlyDiff = Math.round(
+        (scheduledEndUtc.getTime() - lastClockOut.getTime()) / 60000
+      );
+      if (earlyDiff > 5) {
+        earlyExitMinutes = earlyDiff;
       }
     }
 
-    // Overtime is any time worked beyond the scheduled shift duration (minus scheduled break)
-    const netScheduledMins = Math.max(0, scheduledShiftDuration - (scheduledShift.breakMinutes || 0));
+    const netScheduledMins = Math.max(
+      0,
+      scheduledShiftDuration - (scheduledShift.breakMinutes || 0)
+    );
     if (totalWorkMinutes > netScheduledMins) {
       overtimeMinutes = totalWorkMinutes - netScheduledMins;
     }
   } else {
-    // If no scheduled shift, overtime kicks in after 8 hours (480 mins)
     if (totalWorkMinutes > 480) {
       overtimeMinutes = totalWorkMinutes - 480;
     }
   }
 
-  // Determine overall status
   let status: AttendanceCalculationResult["status"] = "PRESENT";
   if (activePunchState === "ON_BREAK") {
     status = "ON_BREAK";
@@ -151,11 +254,17 @@ export function calculateAttendanceMetrics(
     status = "LATE";
   } else if (earlyExitMinutes > 30 && activePunchState === "CLOCKED_OUT") {
     status = "EARLY_DEPARTURE";
-  } else if (totalWorkMinutes > 0 && totalWorkMinutes < 240 && activePunchState === "CLOCKED_OUT") {
+  } else if (
+    totalWorkMinutes > 0 &&
+    totalWorkMinutes < 240 &&
+    activePunchState === "CLOCKED_OUT"
+  ) {
     status = "HALF_DAY";
   }
 
-  const grossHours = Number(((totalWorkMinutes + totalBreakMinutes) / 60).toFixed(2));
+  const grossHours = Number(
+    ((totalWorkMinutes + totalBreakMinutes) / 60).toFixed(2)
+  );
   const netHours = Number((totalWorkMinutes / 60).toFixed(2));
 
   return {

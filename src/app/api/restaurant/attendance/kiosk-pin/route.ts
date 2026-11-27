@@ -1,30 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/core/database/client";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
+import { getAttendanceActorContext } from "@/core/attendance/authHelper";
 import { hashPin } from "@/core/attendance/punchService";
 import { z } from "zod";
 
 const setPinSchema = z.object({
   employeeId: z.string().min(1),
-  kioskPin: z.string().length(4).regex(/^\d{4}$/, "PIN must be a 4-digit number"),
+  kioskPin: z
+    .string()
+    .length(4)
+    .regex(/^\d{4}$/, "PIN must be a 4-digit number"),
 });
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized tenant session" }, { status: 401 });
-    }
-
-    const accessCheck = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      {},
-      session.tokenVersion
-    );
-    if (!accessCheck.authorized) {
-      return NextResponse.json({ error: accessCheck.error }, { status: accessCheck.status });
+    const auth = await getAttendanceActorContext({ requireManage: true });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const body = await req.json();
@@ -37,37 +29,58 @@ export async function POST(req: NextRequest) {
     }
 
     const { employeeId, kioskPin } = result.data;
-    const hashed = hashPin(kioskPin);
-
-    // Direct SQL update ensures bulletproof execution regardless of dev server memory caching
-    await prisma.$executeRawUnsafe(
-      `UPDATE employees SET kiosk_pin = $1, updated_at = NOW() WHERE id = $2 AND restaurant_id = $3`,
-      hashed,
-      employeeId,
-      session.activeRestaurantId
-    );
-
-    const employee = await prisma.employee.findUnique({
-      where: { id: employeeId },
+    const emp = await prisma.employee.findFirst({
+      where: {
+        id: employeeId,
+        restaurantId: auth.ctx.restaurantId,
+        archivedAt: null,
+      },
       select: {
         id: true,
         firstName: true,
         lastName: true,
         employeeCode: true,
+        outletAssignments: { select: { outletId: true } },
       },
     });
 
-    if (!employee) {
+    if (!emp) {
       return NextResponse.json({ error: "Employee not found" }, { status: 404 });
     }
 
+    if (auth.ctx.accessibleOutletIds !== null) {
+      const ok = emp.outletAssignments.some((a) =>
+        auth.ctx.accessibleOutletIds!.includes(a.outletId)
+      );
+      if (!ok) {
+        return NextResponse.json(
+          { error: "Employee is outside your authorized outlet scope" },
+          { status: 403 }
+        );
+      }
+    }
+
+    const hashed = hashPin(kioskPin);
+    await prisma.employee.update({
+      where: { id: emp.id },
+      data: { kioskPin: hashed },
+    });
+
     return NextResponse.json({
       success: true,
-      message: `Kiosk PIN configured for ${employee.firstName}`,
-      employee,
+      message: `Kiosk PIN configured for ${emp.firstName}`,
+      employee: {
+        id: emp.id,
+        firstName: emp.firstName,
+        lastName: emp.lastName,
+        employeeCode: emp.employeeCode,
+      },
     });
   } catch (error: any) {
     console.error("Set Kiosk PIN Error:", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Internal server error" },
+      { status: 500 }
+    );
   }
 }

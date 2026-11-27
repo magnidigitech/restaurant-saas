@@ -1,22 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
-import { PayrollService } from "@/modules/payroll/service";
+import { getPayrollActorContext } from "@/modules/payroll/authHelper";
+import { PayrollService, PayrollError } from "@/modules/payroll/service";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const access = await verifyAccess(session.userId, session.activeRestaurantId, { moduleKey: "payroll", permissionKey: "payroll:view_payroll" }, session.tokenVersion);
-    if (!access.authorized) return NextResponse.json({ error: access.error }, { status: access.status });
+    const auth = await getPayrollActorContext();
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+    const { ctx } = auth;
 
-    const { searchParams } = new URL(req.url);
-    const payrollRunId = searchParams.get("payrollRunId") || undefined;
-    const employeeId = searchParams.get("employeeId") || undefined;
+    const payrollRunId = req.nextUrl.searchParams.get("payrollRunId") || undefined;
+    const requestedEmpId = req.nextUrl.searchParams.get("employeeId") || undefined;
 
-    const payslips = await PayrollService.getPayslips(session.activeRestaurantId, { payrollRunId, employeeId });
+    if (!ctx.canViewPayroll) {
+      if (!ctx.employeeId) {
+        return NextResponse.json({ payslips: [] });
+      }
+      const payslips = await PayrollService.getPayslips(ctx.restaurantId, {
+        payrollRunId,
+        employeeId: ctx.employeeId,
+        onlyIssued: true,
+      });
+      return NextResponse.json({ payslips });
+    }
+
+    const payslips = await PayrollService.getPayslips(ctx.restaurantId, {
+      payrollRunId,
+      employeeId: requestedEmpId,
+      accessibleOutletIds: ctx.accessibleOutletIds,
+    });
     return NextResponse.json({ payslips });
   } catch (error: any) {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    const status = error instanceof PayrollError ? error.status : 500;
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status });
   }
 }

@@ -10,19 +10,21 @@ interface TaskProgress {
   id: string;
   taskId: string;
   status: TaskStatus;
-  notes?: string;
-  responseValue?: string;
+  notes?: string | null;
+  reviewNote?: string | null;
+  responseValue?: string | null;
   fileUploadId?: string | null;
-  completedAt?: string;
+  completedAt?: string | null;
+  submissionHistory?: Array<{ at: string; status: string }> | null;
   fileUpload?: { id: string; fileUrl: string; fileName: string } | null;
   task: {
     id: string;
     title: string;
-    description?: string;
+    description?: string | null;
     isRequired: boolean;
     requiresDoc: boolean;
     taskType: TaskType;
-    fieldConfig?: string;
+    fieldConfig?: string | null;
     sortOrder: number;
   };
 }
@@ -31,12 +33,21 @@ interface OnboardingPortalData {
   id: string;
   accessToken: string;
   status: string;
-  startedAt?: string;
-  submittedAt?: string;
-  reviewNotes?: string;
-  employee: { firstName: string; lastName: string; employeeCode: string; personalEmail?: string };
-  restaurant: { name: string; branding?: { logoUrl?: string; primaryColor?: string } | null };
-  template: { name: string; description?: string };
+  statusLabel?: string;
+  startedAt?: string | null;
+  submittedAt?: string | null;
+  reviewNotes?: string | null;
+  employee: {
+    firstName: string;
+    lastName: string;
+    employeeCode: string;
+    personalEmail?: string | null;
+  };
+  restaurant: {
+    name: string;
+    branding?: { logoUrl?: string | null; primaryColor?: string | null } | null;
+  };
+  template: { name: string; description?: string | null; roleName?: string | null };
   progresses: TaskProgress[];
 }
 
@@ -46,17 +57,22 @@ export default function EmployeeOnboardingPortal() {
 
   const [session, setSession] = useState<OnboardingPortalData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fatalError, setFatalError] = useState("");
   const [error, setError] = useState("");
+  const [saveNotice, setSaveNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
 
-  // Form Field Local State
   const [formResponses, setFormResponses] = useState<{ [taskId: string]: string }>({});
   const [checkboxResponses, setCheckboxResponses] = useState<{ [taskId: string]: string[] }>({});
-  const [fileUploads, setFileUploads] = useState<{ [taskId: string]: { id: string; fileName: string; fileUrl: string } }>({});
+  const [ackChecked, setAckChecked] = useState<{ [taskId: string]: boolean }>({});
+  const [fileUploads, setFileUploads] = useState<{
+    [taskId: string]: { id: string; fileName: string; fileUrl: string };
+  }>({});
   const [uploadingTaskId, setUploadingTaskId] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ [taskId: string]: string }>({});
 
-  // Signature canvas refs
   const canvasRefs = useRef<{ [taskId: string]: HTMLCanvasElement | null }>({});
   const fileInputRefs = useRef<{ [taskId: string]: HTMLInputElement | null }>({});
   const drawingTaskIds = useRef<{ [taskId: string]: boolean }>({});
@@ -67,9 +83,9 @@ export default function EmployeeOnboardingPortal() {
       const data = await res.json();
       if (res.ok) {
         setSession(data.session);
-        // Initialize existing responses into local state
         const initialForm: { [taskId: string]: string } = {};
         const initialCheckboxes: { [taskId: string]: string[] } = {};
+        const initialAck: { [taskId: string]: boolean } = {};
         const initialFiles: { [taskId: string]: { id: string; fileName: string; fileUrl: string } } = {};
 
         data.session?.progresses?.forEach((p: TaskProgress) => {
@@ -85,23 +101,29 @@ export default function EmployeeOnboardingPortal() {
               initialForm[p.taskId] = p.responseValue;
             }
           }
+          if (p.task.taskType === "CHECKBOX" && p.status === "COMPLETED") {
+            initialAck[p.taskId] = true;
+          }
           if (p.fileUpload) {
-            initialFiles[p.taskId] = { id: p.fileUpload.id, fileName: p.fileUpload.fileName, fileUrl: p.fileUpload.fileUrl };
+            initialFiles[p.taskId] = {
+              id: p.fileUpload.id,
+              fileName: p.fileUpload.fileName,
+              fileUrl: p.fileUpload.fileUrl,
+            };
           }
         });
 
         setFormResponses(initialForm);
         setCheckboxResponses(initialCheckboxes);
+        setAckChecked(initialAck);
         setFileUploads(initialFiles);
 
-        if (["PENDING_APPROVAL", "APPROVED"].includes(data.session?.status)) {
-          setSubmittedSuccess(true);
-        }
+        setSubmittedSuccess(["PENDING_APPROVAL", "APPROVED"].includes(data.session?.status));
       } else {
-        setError(data.error || "Link invalid or expired");
+        setFatalError(data.error || "Invalid or expired onboarding link");
       }
     } catch {
-      setError("Network error loading onboarding portal");
+      setFatalError("Network error loading onboarding portal");
     } finally {
       setLoading(false);
     }
@@ -111,8 +133,10 @@ export default function EmployeeOnboardingPortal() {
     if (token) fetchPortalData();
   }, [token]);
 
-  // Canvas Signature Drawing
-  const startDrawing = (taskId: string, e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+  const startDrawing = (
+    taskId: string,
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+  ) => {
     drawingTaskIds.current[taskId] = true;
     const canvas = canvasRefs.current[taskId];
     if (!canvas) return;
@@ -125,7 +149,10 @@ export default function EmployeeOnboardingPortal() {
     ctx.moveTo(clientX - rect.left, clientY - rect.top);
   };
 
-  const draw = (taskId: string, e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+  const draw = (
+    taskId: string,
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+  ) => {
     if (!drawingTaskIds.current[taskId]) return;
     const canvas = canvasRefs.current[taskId];
     if (!canvas) return;
@@ -142,11 +169,13 @@ export default function EmployeeOnboardingPortal() {
   };
 
   const stopDrawing = (taskId: string) => {
+    if (!drawingTaskIds.current[taskId]) return;
     drawingTaskIds.current[taskId] = false;
     const canvas = canvasRefs.current[taskId];
     if (canvas) {
       const dataUrl = canvas.toDataURL("image/png");
       setFormResponses((prev) => ({ ...prev, [taskId]: dataUrl }));
+      setFieldErrors((prev) => ({ ...prev, [taskId]: "" }));
     }
   };
 
@@ -163,10 +192,90 @@ export default function EmployeeOnboardingPortal() {
     }
   };
 
-  // File Upload handler
-  const handleFileUpload = async (taskId: string, file: File) => {
-    setUploadingTaskId(taskId);
+  const getTaskValuePayload = (p: TaskProgress) => {
+    const tType = p.task.taskType;
+    if (tType === "DOCUMENT" || p.task.requiresDoc) {
+      const f = fileUploads[p.taskId];
+      return { hasValue: Boolean(f), fileUploadId: f?.id, responseValue: undefined };
+    }
+    if (tType === "CHECKBOX") {
+      let options: string[] = [];
+      try {
+        if (p.task.fieldConfig) {
+          const parsed = JSON.parse(p.task.fieldConfig);
+          if (Array.isArray(parsed.options)) options = parsed.options;
+        }
+      } catch {
+        // ignore
+      }
+      if (options.length > 0) {
+        const selected = checkboxResponses[p.taskId] || [];
+        return {
+          hasValue: selected.length > 0,
+          responseValue: selected.length > 0 ? JSON.stringify(selected) : undefined,
+          fileUploadId: undefined,
+        };
+      }
+      const checked = Boolean(ackChecked[p.taskId]);
+      return {
+        hasValue: checked,
+        responseValue: checked ? "Acknowledged" : undefined,
+        fileUploadId: undefined,
+      };
+    }
+    const text = (formResponses[p.taskId] || "").trim();
+    return {
+      hasValue: text.length > 0,
+      responseValue: text || undefined,
+      fileUploadId: undefined,
+    };
+  };
+
+  const saveTask = async (p: TaskProgress, markCompleted: boolean) => {
+    const payload = getTaskValuePayload(p);
+    if (markCompleted && !payload.hasValue) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        [p.taskId]: `Please complete "${p.task.title}" before saving`,
+      }));
+      return false;
+    }
+
+    setSavingTaskId(p.taskId);
     setError("");
+    try {
+      const res = await fetch(`/api/restaurant/onboarding/portal/${token}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: p.taskId,
+          status: markCompleted ? "COMPLETED" : "PENDING",
+          responseValue: payload.responseValue,
+          fileUploadId: payload.fileUploadId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFieldErrors((prev) => ({ ...prev, [p.taskId]: data.error || "Save failed" }));
+        return false;
+      }
+      setFieldErrors((prev) => ({ ...prev, [p.taskId]: "" }));
+      setSaveNotice(`Saved "${p.task.title}"`);
+      setTimeout(() => setSaveNotice(""), 2500);
+      await fetchPortalData();
+      return true;
+    } catch {
+      setFieldErrors((prev) => ({ ...prev, [p.taskId]: "Network error saving task" }));
+      return false;
+    } finally {
+      setSavingTaskId(null);
+    }
+  };
+
+  const handleFileUpload = async (p: TaskProgress, file: File) => {
+    setUploadingTaskId(p.taskId);
+    setError("");
+    setFieldErrors((prev) => ({ ...prev, [p.taskId]: "" }));
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -174,80 +283,101 @@ export default function EmployeeOnboardingPortal() {
       if (session?.id) fd.append("onboardingId", session.id);
       const res = await fetch("/api/restaurant/uploads", { method: "POST", body: fd });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setFileUploads((prev) => ({
-        ...prev,
-        [taskId]: { id: data.upload.id, fileName: data.upload.fileName, fileUrl: data.upload.fileUrl },
-      }));
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+
+      const uploaded = {
+        id: data.upload.id,
+        fileName: data.upload.fileName,
+        fileUrl: data.upload.fileUrl,
+      };
+      setFileUploads((prev) => ({ ...prev, [p.taskId]: uploaded }));
+
+      // Persist immediately so candidate can resume anytime
+      await fetch(`/api/restaurant/onboarding/portal/${token}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: p.taskId,
+          status: "COMPLETED",
+          fileUploadId: uploaded.id,
+        }),
+      });
+      await fetchPortalData();
     } catch (e: any) {
-      setError(e.message || "File upload failed");
+      setFieldErrors((prev) => ({ ...prev, [p.taskId]: e.message || "File upload failed" }));
     } finally {
       setUploadingTaskId(null);
     }
   };
 
-  // Checkbox group toggle handler
   const handleToggleCheckboxOption = (taskId: string, option: string) => {
     setCheckboxResponses((prev) => {
       const current = prev[taskId] || [];
-      const updated = current.includes(option) ? current.filter((o) => o !== option) : [...current, option];
+      const updated = current.includes(option)
+        ? current.filter((o) => o !== option)
+        : [...current, option];
       return { ...prev, [taskId]: updated };
     });
+    setFieldErrors((prev) => ({ ...prev, [taskId]: "" }));
   };
 
-  // Submit entire Google Form
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session) return;
     setError("");
-
-    // Validate required fields
-    for (const p of session.progresses) {
-      if (p.task.isRequired) {
-        const responseText = formResponses[p.taskId];
-        const cbList = checkboxResponses[p.taskId];
-        const fileObj = fileUploads[p.taskId];
-
-        const hasText = responseText && responseText.trim().length > 0;
-        const hasCb = cbList && cbList.length > 0;
-        const hasFile = !!fileObj;
-
-        if (!hasText && !hasCb && !hasFile) {
-          setError(`Please complete required field: "${p.task.title}"`);
-          return;
-        }
-      }
-    }
+    const nextFieldErrors: { [taskId: string]: string } = {};
 
     setSubmitting(true);
     try {
-      // Batch save progress for all questions
+      // Save any filled tasks first
       for (const p of session.progresses) {
-        let val: string | undefined = formResponses[p.taskId];
-        if (checkboxResponses[p.taskId] && checkboxResponses[p.taskId].length > 0) {
-          val = JSON.stringify(checkboxResponses[p.taskId]);
-        }
-
-        const fileObj = fileUploads[p.taskId];
-
-        if (val || fileObj) {
-          await fetch(`/api/restaurant/onboarding/portal/${token}`, {
+        if (p.status === "WAIVED") continue;
+        const payload = getTaskValuePayload(p);
+        if (payload.hasValue) {
+          const patchRes = await fetch(`/api/restaurant/onboarding/portal/${token}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               taskId: p.taskId,
               status: "COMPLETED",
-              responseValue: val || undefined,
-              fileUploadId: fileObj?.id || undefined,
+              responseValue: payload.responseValue,
+              fileUploadId: payload.fileUploadId,
             }),
           });
+          if (!patchRes.ok) {
+            const pd = await patchRes.json();
+            nextFieldErrors[p.taskId] = pd.error || "Invalid response";
+          }
+        } else if (p.task.isRequired) {
+          nextFieldErrors[p.taskId] = "Required before submission";
         }
       }
 
+      if (Object.keys(nextFieldErrors).length > 0) {
+        setFieldErrors(nextFieldErrors);
+        setError("Please complete all required fields highlighted below before submitting.");
+        setSubmitting(false);
+        return;
+      }
+
+      const submitRes = await fetch(`/api/restaurant/onboarding/portal/${token}`, {
+        method: "POST",
+      });
+      const submitData = await submitRes.json();
+      if (!submitRes.ok) {
+        if (submitData.details?.missingTasks) {
+          for (const mt of submitData.details.missingTasks) {
+            nextFieldErrors[mt.taskId] = "Required before submission";
+          }
+          setFieldErrors(nextFieldErrors);
+        }
+        throw new Error(submitData.error || "Failed to submit onboarding");
+      }
+
       setSubmittedSuccess(true);
-      fetchPortalData();
+      await fetchPortalData();
     } catch (e: any) {
-      setError(e.message || "Failed to submit onboarding form");
+      setError(e.message || "Failed to submit onboarding");
     } finally {
       setSubmitting(false);
     }
@@ -255,18 +385,21 @@ export default function EmployeeOnboardingPortal() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-gray-50 text-gray-500 font-semibold">
-        Loading form...
+      <main className="flex min-h-screen items-center justify-center bg-[#F5F5F7] text-slate-600 text-sm font-medium">
+        Loading onboarding checklist...
       </main>
     );
   }
 
-  if (error && !session) {
+  if (fatalError && !session) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4 text-center text-gray-900">
-        <div className="max-w-md bg-white border border-gray-200 p-8 rounded-2xl space-y-4 shadow-lg">
-          <h2 className="text-xl font-bold text-red-600">Portal Access Error</h2>
-          <p className="text-gray-600 text-sm">{error || "Invalid onboarding link"}</p>
+      <main className="flex min-h-screen items-center justify-center bg-[#F5F5F7] px-4 text-center text-slate-900">
+        <div className="max-w-md w-full bg-white border border-slate-200 p-7 rounded-3xl space-y-3 shadow-sm">
+          <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto text-xl font-bold">
+            !
+          </div>
+          <h2 className="text-lg font-bold text-slate-900">Onboarding Link Unavailable</h2>
+          <p className="text-slate-600 text-sm">{fatalError}</p>
         </div>
       </main>
     );
@@ -274,276 +407,350 @@ export default function EmployeeOnboardingPortal() {
 
   if (!session) return null;
 
+  const brandColor = session.restaurant?.branding?.primaryColor || "#0071E3";
+  const requiredTasks = session.progresses.filter((p) => p.task.isRequired);
+  const completedRequired = requiredTasks.filter(
+    (p) => ["COMPLETED", "WAIVED"].includes(p.status) || getTaskValuePayload(p).hasValue
+  );
+  const attentionTasks = session.progresses.filter(
+    (p) => p.status === "REJECTED" || (p.task.isRequired && !["COMPLETED", "WAIVED"].includes(p.status) && !getTaskValuePayload(p).hasValue)
+  );
+  const pct =
+    requiredTasks.length > 0
+      ? Math.round((completedRequired.length / requiredTasks.length) * 100)
+      : 100;
+
+  if (submittedSuccess) {
+    return (
+      <main className="min-h-screen bg-[#F5F5F7] text-slate-900 py-10 px-4 flex items-center justify-center">
+        <div className="max-w-lg w-full bg-white rounded-3xl border border-slate-200 p-7 shadow-sm space-y-4 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto text-2xl font-bold">
+            ✓
+          </div>
+          <h1 className="text-xl font-bold tracking-tight">
+            {session.status === "APPROVED"
+              ? "Onboarding Approved!"
+              : "Onboarding Submitted for Review"}
+          </h1>
+          <p className="text-sm text-slate-600">
+            {session.status === "APPROVED"
+              ? `Welcome to ${session.restaurant.name}, ${session.employee.firstName}. Your employment profile is now active.`
+              : `Thank you, ${session.employee.firstName}. Your manager at ${session.restaurant.name} will review your submission shortly.`}
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-16">
-      {/* Top Header */}
-      <header className="border-b border-gray-200 bg-white sticky top-0 z-40 px-6 py-4 flex justify-between items-center shadow-sm">
-        <div className="flex items-center gap-3">
-          {session.restaurant.branding?.logoUrl ? (
-            <img src={session.restaurant.branding.logoUrl} alt="Logo" className="h-8 w-auto" />
-          ) : (
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold shadow">
-              {session.restaurant.name.charAt(0)}
+    <main className="min-h-screen bg-[#F5F5F7] text-slate-900 py-5 px-3 sm:px-6 overflow-x-hidden">
+      <div className="max-w-2xl mx-auto space-y-4">
+        {/* Header Card */}
+        <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                {session.restaurant.name}
+              </p>
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate">
+                {session.template.name}
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Welcome, {session.employee.firstName} {session.employee.lastName} ({session.employee.employeeCode})
+              </p>
+            </div>
+            <span
+              className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border shrink-0 ${
+                session.status === "REJECTED"
+                  ? "bg-rose-50 text-rose-700 border-rose-200"
+                  : "bg-blue-50 text-blue-700 border-blue-200"
+              }`}
+            >
+              {session.status === "REJECTED" ? "Changes Requested" : "In Progress"}
+            </span>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs font-medium text-slate-600">
+              <span>
+                {completedRequired.length} of {requiredTasks.length} required items ready
+              </span>
+              <span className="font-bold">{pct}%</span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{ width: `${pct}%`, backgroundColor: brandColor }}
+              />
+            </div>
+          </div>
+
+          {session.status === "REJECTED" && session.reviewNotes && (
+            <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 space-y-1">
+              <p className="font-bold">Manager requested corrections:</p>
+              <p>{session.reviewNotes}</p>
             </div>
           )}
-          <div>
-            <h1 className="text-base font-bold text-gray-900">{session.restaurant.name}</h1>
-            <p className="text-xs text-gray-500">Employee Onboarding Portal</p>
-          </div>
-        </div>
-        <span className="text-xs px-3 py-1 rounded-full font-mono font-bold bg-gray-100 border border-gray-200 text-gray-700">
-          {session.employee.employeeCode}
-        </span>
-      </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-        {/* Form Main Title Card */}
-        <div className="bg-white border-t-8 border-t-indigo-600 border-x border-b border-gray-200 rounded-2xl p-8 shadow-sm space-y-3">
-          <h2 className="text-3xl font-extrabold text-gray-900">{session.template.name}</h2>
-          <p className="text-sm text-gray-600">{session.template.description || "Please review and complete all requested form fields below."}</p>
-          <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500 font-medium">
-            <span>Employee: <strong className="text-gray-900">{session.employee.firstName} {session.employee.lastName}</strong></span>
-            <span className="text-red-500 font-semibold">* Indicates required question</span>
-          </div>
+          {attentionTasks.length > 0 && (
+            <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+              <span className="font-semibold">Still needs attention ({attentionTasks.length}): </span>
+              {attentionTasks.map((t) => t.task.title).join(", ")}
+            </div>
+          )}
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl font-semibold">
+          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
             {error}
           </div>
         )}
-
-        {/* Completion Card */}
-        {submittedSuccess ? (
-          <div className="bg-white border border-emerald-200 rounded-2xl p-10 text-center space-y-4 shadow-sm">
-            <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center text-2xl font-bold mx-auto border border-emerald-200">
-              ✓
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900">Onboarding Form Submitted!</h3>
-            <p className="text-sm text-gray-600 max-w-md mx-auto">
-              Thank you, <span className="font-bold text-gray-900">{session.employee.firstName}</span>. Your onboarding information has been recorded and submitted for manager review.
-            </p>
-            <span className="inline-block text-xs px-3 py-1 rounded-full font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 uppercase tracking-widest mt-2">
-              Status: Pending Manager Approval
-            </span>
+        {saveNotice && (
+          <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
+            {saveNotice}
           </div>
-        ) : (
-          /* Single Google Form Form */
-          <form onSubmit={handleSubmitForm} className="space-y-6">
-            {[...session.progresses]
-              .sort((a, b) => a.task.sortOrder - b.task.sortOrder)
-              .map((progress, idx) => {
-                let parsedConfig = { subtype: "short_answer", options: ["Option 1", "Option 2"] };
-                try {
-                  if (progress.task.fieldConfig) parsedConfig = JSON.parse(progress.task.fieldConfig);
-                } catch {}
+        )}
 
-                const taskId = progress.taskId;
+        {/* Checklist Form */}
+        <form onSubmit={handleSubmitForm} className="space-y-3.5">
+          {session.progresses.map((p, idx) => {
+            const t = p.task;
+            const isCompleted = p.status === "COMPLETED";
+            const isNeedsCorrection = p.status === "REJECTED";
+            const uploaded = fileUploads[p.taskId];
+            let options: string[] = [];
+            try {
+              if (t.fieldConfig) {
+                const parsed = JSON.parse(t.fieldConfig);
+                if (Array.isArray(parsed.options)) options = parsed.options;
+              }
+            } catch {
+              // ignore
+            }
 
-                return (
-                  <div key={progress.id} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-4">
-                    {/* Question Label & Required Badge */}
-                    <div className="space-y-1">
-                      <label className="block text-base font-bold text-gray-900">
-                        {idx + 1}. {progress.task.title} {progress.task.isRequired && <span className="text-red-500">*</span>}
-                      </label>
-                      {progress.task.description && <p className="text-xs text-gray-500">{progress.task.description}</p>}
+            return (
+              <div
+                key={p.id}
+                className={`bg-white rounded-3xl border p-4 sm:p-5 space-y-3 shadow-xs ${
+                  fieldErrors[p.taskId]
+                    ? "border-rose-300 ring-1 ring-rose-200"
+                    : isNeedsCorrection
+                    ? "border-amber-300"
+                    : isCompleted
+                    ? "border-emerald-200"
+                    : "border-slate-200"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[11px] font-bold text-slate-400">
+                        {idx + 1}.
+                      </span>
+                      <h3 className="text-sm font-bold text-slate-900">
+                        {t.title}
+                      </h3>
+                      {t.isRequired && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                          Required
+                        </span>
+                      )}
                     </div>
+                    {t.description && (
+                      <p className="text-xs text-slate-500">{t.description}</p>
+                    )}
+                  </div>
 
-                    {/* Form Field Inputs */}
-                    <div className="pt-2">
-                      {/* Short Answer */}
-                      {parsedConfig.subtype === "short_answer" && (
-                        <input
-                          type="text"
-                          required={progress.task.isRequired}
-                          placeholder="Your answer..."
-                          value={formResponses[taskId] || ""}
-                          onChange={(e) => setFormResponses((prev) => ({ ...prev, [taskId]: e.target.value }))}
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:bg-white focus:outline-none focus:border-indigo-600 transition-all"
-                        />
-                      )}
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
+                      isCompleted
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : isNeedsCorrection
+                        ? "bg-rose-50 text-rose-700 border-rose-200"
+                        : "bg-slate-100 text-slate-600 border-slate-200"
+                    }`}
+                  >
+                    {isCompleted ? "Saved" : isNeedsCorrection ? "Needs Fix" : "Pending"}
+                  </span>
+                </div>
 
-                      {/* Paragraph */}
-                      {parsedConfig.subtype === "paragraph" && (
-                        <textarea
-                          required={progress.task.isRequired}
-                          placeholder="Your answer..."
-                          rows={3}
-                          value={formResponses[taskId] || ""}
-                          onChange={(e) => setFormResponses((prev) => ({ ...prev, [taskId]: e.target.value }))}
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:bg-white focus:outline-none focus:border-indigo-600 transition-all resize-none"
-                        />
-                      )}
+                {isNeedsCorrection && p.reviewNote && (
+                  <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800">
+                    <strong>Correction note:</strong> {p.reviewNote}
+                  </div>
+                )}
 
-                      {/* Multiple Choice (Radio) */}
-                      {parsedConfig.subtype === "multiple_choice" && (
-                        <div className="space-y-2.5">
-                          {(parsedConfig.options || []).map((opt: string, oIdx: number) => (
-                            <label key={oIdx} className="flex items-center gap-3 p-3 bg-gray-50 hover:bg-indigo-50/50 border border-gray-200 rounded-xl cursor-pointer transition-all">
-                              <input
-                                type="radio"
-                                name={`q_${taskId}`}
-                                value={opt}
-                                checked={formResponses[taskId] === opt}
-                                onChange={(e) => setFormResponses((prev) => ({ ...prev, [taskId]: e.target.value }))}
-                                className="accent-indigo-600 w-4 h-4"
-                              />
-                              <span className="text-sm font-semibold text-gray-800">{opt}</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
+                {/* Input by taskType */}
+                {t.taskType === "FORM_INPUT" && (
+                  <input
+                    type="text"
+                    value={formResponses[p.taskId] || ""}
+                    onChange={(e) => {
+                      setFormResponses((prev) => ({ ...prev, [p.taskId]: e.target.value }));
+                      setFieldErrors((prev) => ({ ...prev, [p.taskId]: "" }));
+                    }}
+                    placeholder="Enter your response..."
+                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-[#0071E3]"
+                  />
+                )}
 
-                      {/* Checkboxes (Multi-Select) */}
-                      {parsedConfig.subtype === "checkboxes" && (
-                        <div className="space-y-2.5">
-                          {(parsedConfig.options || []).map((opt: string, oIdx: number) => {
-                            const isChecked = (checkboxResponses[taskId] || []).includes(opt);
-                            return (
-                              <label key={oIdx} className="flex items-center gap-3 p-3 bg-gray-50 hover:bg-indigo-50/50 border border-gray-200 rounded-xl cursor-pointer transition-all">
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={() => handleToggleCheckboxOption(taskId, opt)}
-                                  className="accent-indigo-600 w-4 h-4"
-                                />
-                                <span className="text-sm font-semibold text-gray-800">{opt}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      )}
+                {t.taskType === "DATE" && (
+                  <input
+                    type="date"
+                    value={formResponses[p.taskId] || ""}
+                    onChange={(e) => {
+                      setFormResponses((prev) => ({ ...prev, [p.taskId]: e.target.value }));
+                      setFieldErrors((prev) => ({ ...prev, [p.taskId]: "" }));
+                    }}
+                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-[#0071E3]"
+                  />
+                )}
 
-                      {/* Dropdown */}
-                      {parsedConfig.subtype === "dropdown" && (
-                        <select
-                          required={progress.task.isRequired}
-                          value={formResponses[taskId] || ""}
-                          onChange={(e) => setFormResponses((prev) => ({ ...prev, [taskId]: e.target.value }))}
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-semibold text-gray-900 focus:bg-white focus:outline-none focus:border-indigo-600 cursor-pointer"
+                {t.taskType === "CHECKBOX" && (
+                  <div className="space-y-2">
+                    {options.length > 0 ? (
+                      options.map((opt) => (
+                        <label
+                          key={opt}
+                          className="flex items-center gap-2.5 text-sm text-slate-700 cursor-pointer"
                         >
-                          <option value="">Select an option...</option>
-                          {(parsedConfig.options || []).map((opt: string, oIdx: number) => (
-                            <option key={oIdx} value={opt}>{opt}</option>
-                          ))}
-                        </select>
-                      )}
-
-                      {/* Date */}
-                      {progress.task.taskType === "DATE" && (
-                        <input
-                          type="date"
-                          required={progress.task.isRequired}
-                          value={formResponses[taskId] || ""}
-                          onChange={(e) => setFormResponses((prev) => ({ ...prev, [taskId]: e.target.value }))}
-                          className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:bg-white focus:outline-none focus:border-indigo-600 cursor-pointer"
-                        />
-                      )}
-
-                      {/* Time */}
-                      {parsedConfig.subtype === "time" && (
-                        <input
-                          type="time"
-                          required={progress.task.isRequired}
-                          value={formResponses[taskId] || ""}
-                          onChange={(e) => setFormResponses((prev) => ({ ...prev, [taskId]: e.target.value }))}
-                          className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:bg-white focus:outline-none focus:border-indigo-600 cursor-pointer"
-                        />
-                      )}
-
-                      {/* Digital Signature Pad */}
-                      {progress.task.taskType === "SIGNATURE" && (
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Sign with Mouse / Touch Screen</span>
-                            <button
-                              type="button"
-                              onClick={() => clearCanvas(taskId)}
-                              className="text-xs font-bold text-red-600 hover:text-red-700 cursor-pointer"
-                            >
-                              Clear Signature
-                            </button>
-                          </div>
-                          <div className="border border-gray-300 bg-white rounded-xl p-1 shadow-inner">
-                            <canvas
-                              ref={(el) => { canvasRefs.current[taskId] = el; }}
-                              width={500}
-                              height={160}
-                              onMouseDown={(e) => startDrawing(taskId, e)}
-                              onMouseMove={(e) => draw(taskId, e)}
-                              onMouseUp={() => stopDrawing(taskId)}
-                              onMouseLeave={() => stopDrawing(taskId)}
-                              onTouchStart={(e) => startDrawing(taskId, e)}
-                              onTouchMove={(e) => draw(taskId, e)}
-                              onTouchEnd={() => stopDrawing(taskId)}
-                              className="w-full h-36 cursor-crosshair rounded-lg"
-                            />
-                          </div>
-                          {formResponses[taskId] && <p className="text-xs text-emerald-600 font-bold">Signature captured</p>}
-                        </div>
-                      )}
-
-                      {/* File Upload Attachment */}
-                      {progress.task.taskType === "DOCUMENT" && (
-                        <div className="space-y-2">
-                          <input
-                            ref={(el) => { fileInputRefs.current[taskId] = el; }}
-                            type="file"
-                            className="hidden"
-                            onChange={(e) => e.target.files?.[0] && handleFileUpload(taskId, e.target.files[0])}
-                          />
-                          <div
-                            onClick={() => fileInputRefs.current[taskId]?.click()}
-                            className="p-6 border border-dashed border-gray-300 bg-gray-50 hover:bg-indigo-50/50 hover:border-indigo-400 rounded-xl text-center cursor-pointer transition-all"
-                          >
-                            {uploadingTaskId === taskId ? (
-                              <span className="text-xs font-bold text-indigo-600">Uploading attachment...</span>
-                            ) : fileUploads[taskId] ? (
-                              <div className="space-y-1">
-                                <span className="text-xs font-bold text-emerald-600 block">✓ File Uploaded: {fileUploads[taskId].fileName}</span>
-                                <span className="text-[10px] text-gray-500 underline">Click to replace file</span>
-                              </div>
-                            ) : (
-                              <div className="space-y-1">
-                                <span className="text-xs font-bold text-gray-700 block">Click to upload file attachment</span>
-                                <span className="text-[10px] text-gray-400">PDF, Photo, ID, or Image (Max 10MB)</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Checklist Agreement */}
-                      {parsedConfig.subtype === "agreement" && (
-                        <label className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer">
                           <input
                             type="checkbox"
-                            checked={formResponses[taskId] === "AGREED"}
-                            onChange={(e) => setFormResponses((prev) => ({ ...prev, [taskId]: e.target.checked ? "AGREED" : "" }))}
-                            className="accent-indigo-600 w-4 h-4"
+                            checked={(checkboxResponses[p.taskId] || []).includes(opt)}
+                            onChange={() => handleToggleCheckboxOption(p.taskId, opt)}
+                            className="w-4 h-4 rounded"
                           />
-                          <span className="text-sm font-semibold text-gray-800">I confirm and agree to all above details</span>
+                          <span>{opt}</span>
                         </label>
+                      ))
+                    ) : (
+                      <label className="flex items-center gap-2.5 text-sm text-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(ackChecked[p.taskId])}
+                          onChange={(e) => {
+                            setAckChecked((prev) => ({
+                              ...prev,
+                              [p.taskId]: e.target.checked,
+                            }));
+                            setFieldErrors((prev) => ({ ...prev, [p.taskId]: "" }));
+                          }}
+                          className="w-4 h-4 rounded"
+                        />
+                        <span>I acknowledge and confirm this requirement</span>
+                      </label>
+                    )}
+                  </div>
+                )}
+
+                {(t.taskType === "DOCUMENT" || t.requiresDoc) && (
+                  <div className="space-y-2">
+                    <input
+                      ref={(el) => {
+                        fileInputRefs.current[p.taskId] = el;
+                      }}
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFileUpload(p, file);
+                      }}
+                      className="hidden"
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={uploadingTaskId === p.taskId}
+                        onClick={() => fileInputRefs.current[p.taskId]?.click()}
+                        className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 cursor-pointer"
+                      >
+                        {uploadingTaskId === p.taskId
+                          ? "Uploading..."
+                          : uploaded
+                          ? "Replace File"
+                          : "Upload Document"}
+                      </button>
+                      {uploaded && (
+                        <a
+                          href={`${uploaded.fileUrl}?portalToken=${encodeURIComponent(token)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-medium text-[#0071E3] hover:underline truncate max-w-[220px]"
+                        >
+                          {uploaded.fileName}
+                        </a>
                       )}
                     </div>
                   </div>
-                );
-              })}
+                )}
 
-            {/* Submit Form Button */}
-            <div className="pt-4">
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-base rounded-2xl transition-all shadow-md cursor-pointer disabled:opacity-50"
-              >
-                {submitting ? "Submitting Form..." : "Submit Onboarding Form"}
-              </button>
-            </div>
-          </form>
-        )}
-      </main>
-    </div>
+                {t.taskType === "SIGNATURE" && (
+                  <div className="space-y-2">
+                    <canvas
+                      ref={(el) => {
+                        canvasRefs.current[p.taskId] = el;
+                      }}
+                      width={320}
+                      height={110}
+                      onMouseDown={(e) => startDrawing(p.taskId, e)}
+                      onMouseMove={(e) => draw(p.taskId, e)}
+                      onMouseUp={() => stopDrawing(p.taskId)}
+                      onMouseLeave={() => stopDrawing(p.taskId)}
+                      onTouchStart={(e) => startDrawing(p.taskId, e)}
+                      onTouchMove={(e) => draw(p.taskId, e)}
+                      onTouchEnd={() => stopDrawing(p.taskId)}
+                      className="w-full max-w-[320px] h-[110px] border border-slate-300 rounded-xl bg-slate-50 touch-none"
+                    />
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => clearCanvas(p.taskId)}
+                        className="text-xs text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                      >
+                        Clear signature
+                      </button>
+                      {formResponses[p.taskId] && (
+                        <span className="text-[11px] text-emerald-600 font-medium">
+                          Signature captured
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {fieldErrors[p.taskId] && (
+                  <p className="text-xs font-medium text-rose-600">
+                    {fieldErrors[p.taskId]}
+                  </p>
+                )}
+
+                <div className="flex items-center justify-end pt-1">
+                  <button
+                    type="button"
+                    disabled={savingTaskId === p.taskId}
+                    onClick={() => saveTask(p, true)}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 cursor-pointer"
+                  >
+                    {savingTaskId === p.taskId ? "Saving..." : "Save Progress"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="pt-2 pb-8">
+            <button
+              type="submit"
+              disabled={submitting}
+              style={{ backgroundColor: brandColor }}
+              className="w-full py-3.5 rounded-2xl text-sm font-bold text-white shadow-sm hover:opacity-95 transition cursor-pointer"
+            >
+              {submitting ? "Submitting..." : "Submit Onboarding for Review"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </main>
   );
 }

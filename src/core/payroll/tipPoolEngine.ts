@@ -3,16 +3,18 @@ export interface StaffTipParticipant {
   name: string;
   departmentName?: string;
   designationName?: string;
-  isFoh: boolean; // True for Front of House (Servers, Bartenders), False for Back of House (Kitchen)
+  isFoh: boolean;
   hoursWorked: number;
-  rolePointWeight?: number; // e.g. 1.0, 1.5, 0.75
+  rolePointWeight?: number;
+  isEligible?: boolean;
 }
 
 export interface TipPoolRuleConfig {
-  fohPercentage: number; // e.g. 70
-  bohPercentage: number; // e.g. 30
+  fohPercentage: number;
+  bohPercentage: number;
   distributionMethod: "HOURS_WORKED" | "EQUAL_SPLIT" | "ROLE_POINT_SYSTEM";
   rolePoints?: Record<string, number>;
+  preserveEmptyGroupShare?: boolean;
 }
 
 export interface StaffTipAllocation {
@@ -25,7 +27,10 @@ export interface StaffTipAllocation {
   weight: number;
   effectiveHoursOrPoints: number;
   percentageOfPool: number;
-  tipAmount: number; // In dollars/currency (2 decimal places)
+  tipAmount: number;
+  eligible: boolean;
+  basisLabel: string;
+  ineligibleReason?: string;
 }
 
 export interface TipPoolResult {
@@ -35,22 +40,27 @@ export interface TipPoolResult {
   allocations: StaffTipAllocation[];
   totalDistributedTips: number;
   unallocatedCents: number;
+  undistributedAmount: number;
+  undistributedReason: string | null;
+  flags: string[];
 }
 
 /**
- * Calculates proportional tip distribution across FOH and BOH staff.
+ * Deterministic minor-unit (cents) tip distribution using largest-remainder allocation.
+ * Reconciles totalDistributedTips + undistributedAmount === totalCollectedTips to the cent.
  */
 export function calculateTipDistribution(
   totalTips: number,
   participants: StaffTipParticipant[],
   rule: TipPoolRuleConfig
 ): TipPoolResult {
-  const safeTotalTips = Math.max(0, Number(totalTips.toFixed(2)));
+  const totalCents = Math.max(0, Math.round(totalTips * 100));
+  const safeTotalTips = Number((totalCents / 100).toFixed(2));
+  const flags: string[] = [];
 
-  // If no participants or 0 tips, return zeroed allocations
-  if (participants.length === 0 || safeTotalTips === 0) {
+  if (totalCents === 0) {
     return {
-      totalCollectedTips: safeTotalTips,
+      totalCollectedTips: 0,
       fohPoolAmount: 0,
       bohPoolAmount: 0,
       allocations: participants.map((p) => ({
@@ -64,121 +74,201 @@ export function calculateTipDistribution(
         effectiveHoursOrPoints: 0,
         percentageOfPool: 0,
         tipAmount: 0,
+        eligible: false,
+        basisLabel: "No eligible pool amount",
       })),
       totalDistributedTips: 0,
       unallocatedCents: 0,
+      undistributedAmount: 0,
+      undistributedReason: null,
+      flags: totalTips <= 0 ? ["Eligible tip pool amount is zero."] : [],
     };
   }
 
-  // Calculate pool totals based on configured percentage
-  const normalizedFohPct = rule.fohPercentage / (rule.fohPercentage + rule.bohPercentage);
-  const normalizedBohPct = 1 - normalizedFohPct;
+  const pctSum = rule.fohPercentage + rule.bohPercentage;
+  const normalizedFohPct = pctSum > 0 ? rule.fohPercentage / pctSum : 0.7;
+  let fohPoolCents = Math.round(totalCents * normalizedFohPct);
+  let bohPoolCents = totalCents - fohPoolCents;
 
-  const fohStaff = participants.filter((p) => p.isFoh && p.hoursWorked > 0);
-  const bohStaff = participants.filter((p) => !p.isFoh && p.hoursWorked > 0);
+  const isParticipantEligible = (p: StaffTipParticipant) => {
+    if (p.isEligible === false) return false;
+    if (rule.distributionMethod === "EQUAL_SPLIT") return p.hoursWorked >= 0;
+    return p.hoursWorked > 0;
+  };
 
-  // If only FOH or only BOH exists, 100% goes to active group
-  let effectiveFohPool = safeTotalTips * normalizedFohPct;
-  let effectiveBohPool = safeTotalTips * normalizedBohPct;
+  const fohEligible = participants.filter((p) => p.isFoh && isParticipantEligible(p));
+  const bohEligible = participants.filter((p) => !p.isFoh && isParticipantEligible(p));
+  const ineligible = participants.filter((p) => !isParticipantEligible(p));
 
-  if (fohStaff.length === 0 && bohStaff.length > 0) {
-    effectiveBohPool = safeTotalTips;
-    effectiveFohPool = 0;
-  } else if (bohStaff.length === 0 && fohStaff.length > 0) {
-    effectiveFohPool = safeTotalTips;
-    effectiveBohPool = 0;
+  for (const p of participants) {
+    if (p.hoursWorked <= 0 && rule.distributionMethod !== "EQUAL_SPLIT") {
+      flags.push(`${p.name}: missing approved hours for ${rule.distributionMethod.toLowerCase()} split.`);
+    }
   }
 
-  const distributeGroup = (
+  const undistributedReasons: string[] = [];
+  let undistributedCents = 0;
+
+  if (fohPoolCents > 0 && fohEligible.length === 0) {
+    if (rule.preserveEmptyGroupShare || bohEligible.length === 0) {
+      undistributedCents += fohPoolCents;
+      const msg = `Empty eligible FOH group: ${(fohPoolCents / 100).toFixed(2)} FOH share undistributed.`;
+      undistributedReasons.push(msg);
+      flags.push(msg);
+    } else {
+      flags.push(`Empty eligible FOH group: ${(fohPoolCents / 100).toFixed(2)} FOH share redistributed to active BOH group.`);
+      bohPoolCents = totalCents;
+      fohPoolCents = 0;
+    }
+  }
+  if (bohPoolCents > 0 && bohEligible.length === 0) {
+    if (rule.preserveEmptyGroupShare || fohEligible.length === 0) {
+      undistributedCents += bohPoolCents;
+      const msg = `Empty eligible BOH group: ${(bohPoolCents / 100).toFixed(2)} BOH share undistributed.`;
+      undistributedReasons.push(msg);
+      flags.push(msg);
+    } else {
+      flags.push(`Empty eligible BOH group: ${(bohPoolCents / 100).toFixed(2)} BOH share redistributed to active FOH group.`);
+      fohPoolCents = totalCents;
+      bohPoolCents = 0;
+    }
+  }
+
+  const distributeGroupCents = (
     staffGroup: StaffTipParticipant[],
-    poolAmount: number
+    poolCents: number
   ): StaffTipAllocation[] => {
-    if (staffGroup.length === 0 || poolAmount === 0) return [];
+    if (staffGroup.length === 0 || poolCents === 0) return [];
 
     let totalWeightSum = 0;
-    const computedStaff = staffGroup.map((s) => {
+    const computed = staffGroup.map((s) => {
       let weight = s.rolePointWeight || 1.0;
-      if (rule.rolePoints && s.designationName && rule.rolePoints[s.designationName] !== undefined) {
+      if (
+        rule.rolePoints &&
+        s.designationName &&
+        rule.rolePoints[s.designationName] !== undefined
+      ) {
         weight = rule.rolePoints[s.designationName];
       }
 
       let effectiveUnits = 0;
+      let basisLabel = "";
       if (rule.distributionMethod === "EQUAL_SPLIT") {
         effectiveUnits = 1.0;
+        basisLabel = `Equal split (1/${staffGroup.length})`;
       } else if (rule.distributionMethod === "ROLE_POINT_SYSTEM") {
         effectiveUnits = s.hoursWorked * weight;
+        basisLabel = `${s.hoursWorked.toFixed(2)}h × ${weight} pts`;
       } else {
-        // HOURS_WORKED
         effectiveUnits = s.hoursWorked;
+        basisLabel = `${s.hoursWorked.toFixed(2)} approved hrs`;
       }
 
       totalWeightSum += effectiveUnits;
-      return { staff: s, weight, effectiveUnits };
+      return { staff: s, weight, effectiveUnits, basisLabel };
     });
 
-    if (totalWeightSum === 0) {
-      return staffGroup.map((s) => ({
-        employeeId: s.employeeId,
-        name: s.name,
-        departmentName: s.departmentName,
-        designationName: s.designationName,
-        isFoh: s.isFoh,
-        hoursWorked: s.hoursWorked,
-        weight: s.rolePointWeight || 1.0,
-        effectiveHoursOrPoints: 0,
-        percentageOfPool: 0,
-        tipAmount: 0,
-      }));
+    if (totalWeightSum <= 0) {
+      undistributedCents += poolCents;
+      undistributedReasons.push("Total allocation weight is zero.");
+      return [];
     }
 
-    return computedStaff.map(({ staff, weight, effectiveUnits }) => {
-      const shareRatio = effectiveUnits / totalWeightSum;
-      const rawTip = poolAmount * shareRatio;
-      const tipAmount = Math.floor(rawTip * 100) / 100; // Round down to cents first
-
+    // Largest-remainder method in integer cents
+    const shares = computed.map((c) => {
+      const exactCents = (poolCents * c.effectiveUnits) / totalWeightSum;
+      const flooredCents = Math.floor(exactCents);
       return {
-        employeeId: staff.employeeId,
-        name: staff.name,
-        departmentName: staff.departmentName,
-        designationName: staff.designationName,
-        isFoh: staff.isFoh,
-        hoursWorked: staff.hoursWorked,
-        weight,
-        effectiveHoursOrPoints: Number(effectiveUnits.toFixed(2)),
-        percentageOfPool: Number((shareRatio * 100).toFixed(2)),
-        tipAmount,
+        ...c,
+        flooredCents,
+        remainder: exactCents - flooredCents,
+        shareRatio: c.effectiveUnits / totalWeightSum,
+      };
+    });
+
+    let remainderCents =
+      poolCents - shares.reduce((acc, s) => acc + s.flooredCents, 0);
+
+    const orderedForRemainder = [...shares].sort((a, b) => {
+      if (Math.abs(b.remainder - a.remainder) > 1e-9) {
+        return b.remainder - a.remainder;
+      }
+      if (b.staff.hoursWorked !== a.staff.hoursWorked) {
+        return b.staff.hoursWorked - a.staff.hoursWorked;
+      }
+      return a.staff.employeeId.localeCompare(b.staff.employeeId);
+    });
+
+    const bonusMap = new Map<string, number>();
+    for (let i = 0; i < remainderCents; i++) {
+      const target = orderedForRemainder[i % orderedForRemainder.length];
+      bonusMap.set(
+        target.staff.employeeId,
+        (bonusMap.get(target.staff.employeeId) || 0) + 1
+      );
+    }
+
+    return shares.map((s) => {
+      const finalCents = s.flooredCents + (bonusMap.get(s.staff.employeeId) || 0);
+      return {
+        employeeId: s.staff.employeeId,
+        name: s.staff.name,
+        departmentName: s.staff.departmentName,
+        designationName: s.staff.designationName,
+        isFoh: s.staff.isFoh,
+        hoursWorked: s.staff.hoursWorked,
+        weight: s.weight,
+        effectiveHoursOrPoints: Number(s.effectiveUnits.toFixed(2)),
+        percentageOfPool: Number((s.shareRatio * 100).toFixed(2)),
+        tipAmount: Number((finalCents / 100).toFixed(2)),
+        eligible: true,
+        basisLabel: s.basisLabel,
       };
     });
   };
 
-  const fohAllocations = distributeGroup(fohStaff, effectiveFohPool);
-  const bohAllocations = distributeGroup(bohStaff, effectiveBohPool);
+  const fohAllocations = distributeGroupCents(fohEligible, fohPoolCents);
+  const bohAllocations = distributeGroupCents(bohEligible, bohPoolCents);
+  const ineligibleAllocations: StaffTipAllocation[] = ineligible.map((p) => ({
+    employeeId: p.employeeId,
+    name: p.name,
+    departmentName: p.departmentName,
+    designationName: p.designationName,
+    isFoh: p.isFoh,
+    hoursWorked: p.hoursWorked,
+    weight: p.rolePointWeight || 1.0,
+    effectiveHoursOrPoints: 0,
+    percentageOfPool: 0,
+    tipAmount: 0,
+    eligible: false,
+    basisLabel: "0.00 hrs",
+    ineligibleReason:
+      p.isEligible === false
+        ? "Excluded by eligibility policy"
+        : "Missing approved hours",
+  }));
 
-  const allAllocations = [...fohAllocations, ...bohAllocations];
+  const allAllocations = [
+    ...fohAllocations,
+    ...bohAllocations,
+    ...ineligibleAllocations,
+  ];
 
-  // Distribute any leftover sub-cent rounding pennies to highest hour earners
-  const distributedSum = Number(allAllocations.reduce((acc, a) => acc + a.tipAmount, 0).toFixed(2));
-  let remainderCents = Math.round((safeTotalTips - distributedSum) * 100);
-
-  if (remainderCents > 0 && allAllocations.length > 0) {
-    const sortedByHours = [...allAllocations].sort((a, b) => b.hoursWorked - a.hoursWorked);
-    for (let i = 0; i < remainderCents; i++) {
-      const target = sortedByHours[i % sortedByHours.length];
-      const match = allAllocations.find((a) => a.employeeId === target.employeeId);
-      if (match) {
-        match.tipAmount = Number((match.tipAmount + 0.01).toFixed(2));
-      }
-    }
-  }
-
-  const finalDistributedTotal = Number(allAllocations.reduce((acc, a) => acc + a.tipAmount, 0).toFixed(2));
+  const totalDistributedCents = allAllocations.reduce(
+    (acc, a) => acc + Math.round(a.tipAmount * 100),
+    0
+  );
 
   return {
     totalCollectedTips: safeTotalTips,
-    fohPoolAmount: Number(effectiveFohPool.toFixed(2)),
-    bohPoolAmount: Number(effectiveBohPool.toFixed(2)),
+    fohPoolAmount: Number((fohPoolCents / 100).toFixed(2)),
+    bohPoolAmount: Number((bohPoolCents / 100).toFixed(2)),
     allocations: allAllocations,
-    totalDistributedTips: finalDistributedTotal,
-    unallocatedCents: Math.round((safeTotalTips - finalDistributedTotal) * 100),
+    totalDistributedTips: Number((totalDistributedCents / 100).toFixed(2)),
+    unallocatedCents: undistributedCents,
+    undistributedAmount: Number((undistributedCents / 100).toFixed(2)),
+    undistributedReason:
+      undistributedReasons.length > 0 ? undistributedReasons.join(" ") : null,
+    flags,
   };
 }

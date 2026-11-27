@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { processPunch } from "@/core/attendance/punchService";
+import {
+  AttendanceError,
+  processPunch,
+} from "@/core/attendance/punchService";
 import { getTenantSession } from "@/core/auth/session";
 import { prisma } from "@/core/database/client";
 import { z } from "zod";
@@ -10,6 +13,8 @@ const punchSchema = z.object({
   employeeId: z.string().optional(),
   kioskPin: z.string().min(4).max(6).optional(),
   punchType: z.enum(["CLOCK_IN", "CLOCK_OUT", "BREAK_START", "BREAK_END"]),
+  punchTime: z.string().optional(),
+  idempotencyKey: z.string().optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
   deviceInfo: z.string().optional(),
@@ -31,7 +36,6 @@ export async function POST(req: NextRequest) {
     const data = result.data;
     let restaurantId = data.restaurantId;
 
-    // If authenticated session exists, fallback restaurantId from session
     if (!restaurantId) {
       const session = await getTenantSession();
       if (session?.activeRestaurantId) {
@@ -39,7 +43,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // If still no restaurantId, lookup restaurant from outletId
     if (!restaurantId) {
       const outlet = await prisma.restaurantOutlet.findUnique({
         where: { id: data.outletId },
@@ -49,7 +52,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (!restaurantId) {
-      return NextResponse.json({ error: "Restaurant context required for attendance punch" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Restaurant context required for attendance punch" },
+        { status: 400 }
+      );
     }
 
     const punchResult = await processPunch({
@@ -58,6 +64,8 @@ export async function POST(req: NextRequest) {
       employeeId: data.employeeId,
       kioskPin: data.kioskPin,
       punchType: data.punchType,
+      punchTime: data.punchTime ? new Date(data.punchTime) : undefined,
+      idempotencyKey: data.idempotencyKey,
       latitude: data.latitude,
       longitude: data.longitude,
       deviceInfo: data.deviceInfo,
@@ -66,9 +74,20 @@ export async function POST(req: NextRequest) {
       notes: data.notes,
     });
 
-    return NextResponse.json(punchResult, { status: 201 });
+    return NextResponse.json(punchResult, {
+      status: punchResult.duplicate ? 200 : 201,
+    });
   } catch (error: any) {
+    if (error instanceof AttendanceError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code, details: error.details },
+        { status: error.status }
+      );
+    }
     console.error("Attendance Punch Error:", error);
-    return NextResponse.json({ error: error.message || "Failed to record time punch" }, { status: 400 });
+    return NextResponse.json(
+      { error: error.message || "Failed to record time punch" },
+      { status: 400 }
+    );
   }
 }

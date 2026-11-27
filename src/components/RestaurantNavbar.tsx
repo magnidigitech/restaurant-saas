@@ -964,15 +964,20 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
         </div>
       </aside>
 
-      {/* Floating mobile navigation toggle (visible only on mobile/tablet < 1024px) */}
-      <button
-        type="button"
-        onClick={() => setMobileDrawerOpen(true)}
-        aria-label="Open navigation menu"
-        className="lg:hidden fixed top-3 left-3 z-40 w-9 h-9 rounded-xl flex items-center justify-center bg-white/95 dark:bg-[#0A0D14]/95 backdrop-blur-md border border-slate-200/80 dark:border-white/[0.08] text-slate-700 dark:text-slate-200 shadow-md hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer"
-      >
-        <Menu className="w-4 h-4" />
-      </button>
+      {/* Sticky mobile navigation bar (visible only on mobile/tablet < 1024px) */}
+      <header className="lg:hidden sticky top-0 z-30 h-14 px-4 flex items-center gap-3 bg-white/95 dark:bg-[#0A0D14]/95 backdrop-blur-md border-b border-slate-200/80 dark:border-white/[0.08]">
+        <button
+          type="button"
+          onClick={() => setMobileDrawerOpen(true)}
+          aria-label="Open navigation menu"
+          className="w-9 h-9 rounded-xl flex items-center justify-center border border-slate-200/80 dark:border-white/[0.08] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer"
+        >
+          <Menu className="w-4 h-4" />
+        </button>
+        <span className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100 truncate">
+          {branding?.applicationName || branding?.name || "RestoBird"}
+        </span>
+      </header>
     </>
   );
 }

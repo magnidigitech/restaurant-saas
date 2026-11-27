@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
+import { getShiftActorContext } from "@/modules/shifts/authHelper";
 import { ShiftService } from "@/modules/shifts/service";
-import { RosterStatus } from "@prisma/client";
 import { z } from "zod";
 
 const updateStatusSchema = z.object({
@@ -15,6 +13,7 @@ const updateStatusSchema = z.object({
     "COMPLETED",
     "ARCHIVED",
   ]),
+  expectedVersion: z.number().int().optional(),
 });
 
 export async function PUT(
@@ -37,20 +36,8 @@ async function handleUpdateStatus(
 ) {
   try {
     const { id: rosterId } = await params;
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const access = await verifyAccess(
-      session.userId,
-      session.activeRestaurantId,
-      { moduleKey: "shifts", permissionKey: "shifts:manage_roster" },
-      session.tokenVersion
-    );
-    if (!access.authorized) {
-      return NextResponse.json({ error: access.error }, { status: access.status });
-    }
+    const auth = await getShiftActorContext("shifts:manage_roster");
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const body = await req.json();
     const parsed = updateStatusSchema.safeParse(body);
@@ -58,13 +45,19 @@ async function handleUpdateStatus(
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const roster = await ShiftService.updateRoster(session.activeRestaurantId, rosterId, {
-      status: parsed.data.status,
-    });
+    const roster = await ShiftService.updateRoster(
+      auth.ctx.restaurantId,
+      rosterId,
+      {
+        status: parsed.data.status,
+        expectedVersion: parsed.data.expectedVersion,
+      },
+      { userId: auth.ctx.userId, userEmail: auth.ctx.userEmail }
+    );
 
     return NextResponse.json({ success: true, roster });
   } catch (error: any) {
-    console.error("Update Roster Status Error:", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 400 });
+    const status = error.statusCode || 400;
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status });
   }
 }

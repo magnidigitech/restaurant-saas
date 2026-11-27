@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { HROnboardingService } from "@/modules/hr-onboarding/service";
+import {
+  HROnboardingService,
+  OnboardingError,
+} from "@/modules/hr-onboarding/service";
 import { z } from "zod";
 
 const updateTaskSchema = z.object({
@@ -10,22 +13,42 @@ const updateTaskSchema = z.object({
   responseValue: z.string().nullish(),
 });
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ token: string }> }
+) {
   try {
     const { token } = await params;
     const session = await HROnboardingService.getSessionByToken(token);
     return NextResponse.json({ session });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Invalid or expired link" }, { status: 404 });
+    if (error instanceof OnboardingError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status }
+      );
+    }
+    return NextResponse.json(
+      { error: error.message || "Invalid or expired link" },
+      { status: 404 }
+    );
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ token: string }> }
+) {
   try {
     const { token } = await params;
     const body = await req.json();
     const result = updateTaskSchema.safeParse(body);
-    if (!result.success) return NextResponse.json({ error: "Invalid payload", details: result.error.flatten() }, { status: 400 });
+    if (!result.success) {
+      return NextResponse.json(
+        { error: "Invalid payload", details: result.error.flatten() },
+        { status: 400 }
+      );
+    }
 
     const progress = await HROnboardingService.updateTaskProgressByToken(
       token,
@@ -39,6 +62,37 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ to
     );
     return NextResponse.json({ success: true, progress });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 400 });
+    if (error instanceof OnboardingError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code, details: error.details },
+        { status: error.status }
+      );
+    }
+    return NextResponse.json(
+      { error: error.message || "Internal server error" },
+      { status: 400 }
+    );
+  }
+}
+
+export async function POST(
+  _req: NextRequest,
+  { params }: { params: Promise<{ token: string }> }
+) {
+  try {
+    const { token } = await params;
+    const onboarding = await HROnboardingService.submitByToken(token);
+    return NextResponse.json({ success: true, onboarding });
+  } catch (error: any) {
+    if (error instanceof OnboardingError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code, details: error.details },
+        { status: error.status }
+      );
+    }
+    return NextResponse.json(
+      { error: error.message || "Submission failed" },
+      { status: 400 }
+    );
   }
 }

@@ -238,14 +238,17 @@ enum DomainStatus {
 }
 
 model RestaurantOutlet {
-  id           String   @id @default(uuid())
-  restaurantId String   @map("restaurant_id")
-  name         String
-  address      String?
-  timezone     String   @default("UTC")
-  currency     String   @default("USD")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id                    String   @id @default(uuid())
+  restaurantId          String   @map("restaurant_id")
+  name                  String
+  address               String?
+  timezone              String   @default("UTC")
+  currency              String   @default("USD")
+  workweekStartDay      Int      @default(1) @map("workweek_start_day") // 0 = Sun, 1 = Mon, ... 6 = Sat
+  hardWeeklyHoursCap    Float?   @map("hard_weekly_hours_cap") // Optional hard cap (null = no hard cap unless configured)
+  allowOvertimeOverride Boolean  @default(true) @map("allow_overtime_override")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   // Relations
   restaurant        Restaurant                 @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
@@ -957,6 +960,7 @@ model OnboardingTemplate {
   restaurantId String   @map("restaurant_id")
   name         String
   description  String?
+  roleName     String?  @map("role_name")
   isDefault    Boolean  @default(false) @map("is_default")
   archivedAt   DateTime? @map("archived_at")
   createdAt    DateTime @default(now()) @map("created_at")
@@ -993,19 +997,30 @@ model OnboardingTask {
 }
 
 model EmployeeOnboarding {
-  id           String           @id @default(uuid())
-  restaurantId String           @map("restaurant_id")
-  employeeId   String           @map("employee_id")
-  templateId   String           @map("template_id")
-  accessToken  String           @default(dbgenerated("gen_random_uuid()")) @map("access_token")
-  status       OnboardingStatus @default(PENDING)
-  startedAt    DateTime?        @map("started_at")
-  submittedAt  DateTime?        @map("submitted_at")
-  reviewedAt   DateTime?        @map("reviewed_at")
-  reviewedBy   String?          @map("reviewed_by") // User ID
-  reviewNotes  String?          @map("review_notes")
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
+  id                       String            @id @default(uuid())
+  restaurantId             String            @map("restaurant_id")
+  employeeId               String            @map("employee_id")
+  templateId               String            @map("template_id")
+  accessToken              String            @default(dbgenerated("gen_random_uuid()")) @map("access_token")
+  tokenExpiresAt           DateTime?         @map("token_expires_at")
+  revokedAt                DateTime?         @map("revoked_at")
+  status                   OnboardingStatus  @default(PENDING)
+  intendedOutletId         String?           @map("intended_outlet_id")
+  intendedDepartmentId     String?           @map("intended_department_id")
+  intendedDesignationId    String?           @map("intended_designation_id")
+  intendedStartDate        DateTime?         @map("intended_start_date")
+  intendedEmploymentStatus EmploymentStatus? @default(PROBATION) @map("intended_employment_status")
+  intendedWorkerType       WorkerType?       @default(FULL_TIME) @map("intended_worker_type")
+  provisionAppAccess       Boolean           @default(false) @map("provision_app_access")
+  appRoleId                String?           @map("app_role_id")
+  approvedEmployeeId       String?           @map("approved_employee_id")
+  startedAt                DateTime?         @map("started_at")
+  submittedAt              DateTime?         @map("submitted_at")
+  reviewedAt               DateTime?         @map("reviewed_at")
+  reviewedBy               String?           @map("reviewed_by") // User ID
+  reviewNotes              String?           @map("review_notes")
+  createdAt                DateTime          @default(now()) @map("created_at")
+  updatedAt                DateTime          @updatedAt @map("updated_at")
 
   // Relations
   restaurant Restaurant              @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
@@ -1021,16 +1036,25 @@ model EmployeeOnboarding {
 }
 
 model OnboardingTaskProgress {
-  id           String     @id @default(uuid())
-  onboardingId String     @map("onboarding_id")
-  taskId       String     @map("task_id")
-  status       TaskStatus @default(PENDING)
-  responseValue String?   @map("response_value") // Signature data URL, text response, or date value
-  completedAt  DateTime?  @map("completed_at")
-  notes        String?
-  fileUploadId String?    @map("file_upload_id")
-  createdAt    DateTime   @default(now()) @map("created_at")
-  updatedAt    DateTime   @updatedAt @map("updated_at")
+  id                String     @id @default(uuid())
+  onboardingId      String     @map("onboarding_id")
+  taskId            String     @map("task_id")
+  status            TaskStatus @default(PENDING)
+  taskTitle         String?    @map("task_title")
+  taskDescription   String?    @map("task_description")
+  taskType          TaskType?  @map("task_type")
+  isRequired        Boolean?   @map("is_required")
+  requiresDoc       Boolean?   @map("requires_doc")
+  sortOrder         Int?       @map("sort_order")
+  fieldConfig       String?    @map("field_config")
+  reviewNote        String?    @map("review_note")
+  submissionHistory Json?      @map("submission_history")
+  responseValue     String?    @map("response_value") // Signature data URL, text response, or date value
+  completedAt       DateTime?  @map("completed_at")
+  notes             String?
+  fileUploadId      String?    @map("file_upload_id")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
 
   // Relations
   onboarding EmployeeOnboarding @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
@@ -1492,6 +1516,9 @@ model ShiftRoster {
   availabilityDeadline DateTime?    @map("availability_deadline")
   departments          Json?        @map("departments")
   status               RosterStatus @default(DRAFT)
+  version              Int          @default(1)
+  draftRevisionJson    Json?        @map("draft_revision_json")
+  lastNotifiedVersion  Int          @default(0) @map("last_notified_version")
   publishedAt          DateTime?    @map("published_at")
   publishedBy          String?      @map("published_by")
   notes                String?
@@ -1531,6 +1558,7 @@ model ShiftAssignment {
   startTime    String                @map("start_time")
   endTime      String                @map("end_time")
   breakMinutes Int                   @default(0) @map("break_minutes")
+  roleName     String?               @map("role_name")
   status       ShiftAssignmentStatus @default(SCHEDULED)
   notes        String?
   createdAt    DateTime              @default(now()) @map("created_at")
@@ -1652,8 +1680,12 @@ model ShiftSwapRequest {
   requesterEmployeeId String            @map("requester_employee_id")
   targetEmployeeId    String?           @map("target_employee_id")
   targetAssignmentId  String?           @map("target_assignment_id")
-  status              SwapRequestStatus @default(PENDING)
-  reason              String?
+  status                     SwapRequestStatus @default(PENDING)
+  peerStatus                 String            @default("PENDING_PEER") @map("peer_status") // PENDING_PEER | ACCEPTED | DECLINED | NOT_REQUIRED
+  targetAcceptedAt           DateTime?         @map("target_accepted_at")
+  requesterSnapshotUpdatedAt DateTime?         @map("requester_snapshot_updated_at")
+  targetSnapshotUpdatedAt    DateTime?         @map("target_snapshot_updated_at")
+  reason                     String?
   reviewNotes         String?           @map("review_notes")
   reviewedBy          String?           @map("reviewed_by")
   reviewedAt          DateTime?         @map("reviewed_at")
@@ -1718,22 +1750,31 @@ enum PayFrequency {
 }
 
 model PayrollRun {
-  id              String           @id @default(uuid())
-  restaurantId    String           @map("restaurant_id")
-  outletId        String?          @map("outlet_id")
-  title           String
-  periodStart     DateTime         @map("period_start")
-  periodEnd       DateTime         @map("period_end")
-  paymentDate     DateTime         @map("payment_date")
-  status          PayrollRunStatus @default(DRAFT)
-  totalGross      Decimal          @default(0) @map("total_gross")
-  totalAllowances Decimal          @default(0) @map("total_allowances")
-  totalDeductions Decimal          @default(0) @map("total_deductions")
-  totalNet        Decimal          @default(0) @map("total_net")
-  processedBy     String?          @map("processed_by")
-  approvedBy      String?          @map("approved_by")
-  approvedAt      DateTime?        @map("approved_at")
-  notes           String?
+  id                 String           @id @default(uuid())
+  restaurantId       String           @map("restaurant_id")
+  outletId           String?          @map("outlet_id")
+  title              String
+  currency           String           @default("USD")
+  overtimeMultiplier Float            @default(1.5) @map("overtime_multiplier")
+  periodStart        DateTime         @map("period_start")
+  periodEnd          DateTime         @map("period_end")
+  paymentDate        DateTime         @map("payment_date")
+  status             PayrollRunStatus @default(DRAFT)
+  totalGross         Decimal          @default(0) @map("total_gross")
+  totalAllowances    Decimal          @default(0) @map("total_allowances")
+  totalDeductions    Decimal          @default(0) @map("total_deductions")
+  totalNet           Decimal          @default(0) @map("total_net")
+  previewHash        String?          @map("preview_hash")
+  previewedAt        DateTime?        @map("previewed_at")
+  previewedBy        String?          @map("previewed_by")
+  processedBy        String?          @map("processed_by")
+  approvedBy         String?          @map("approved_by")
+  approvedAt         DateTime?        @map("approved_at")
+  finalizedBy        String?          @map("finalized_by")
+  finalizedAt        DateTime?        @map("finalized_at")
+  correctionOfRunId  String?          @map("correction_of_run_id")
+  version            Int              @default(1)
+  notes              String?
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
@@ -2302,6 +2343,12 @@ model AttendanceRecord {
   approvedBy        String?          @map("approved_by")
   approvedAt        DateTime?        @map("approved_at")
   managerNotes      String?          @map("manager_notes")
+  needsReview       Boolean          @default(false) @map("needs_review")
+  exceptionFlags    Json?            @map("exception_flags")
+  scheduledSnapshot Json?            @map("scheduled_snapshot")
+  correctedBy       String?          @map("corrected_by")
+  correctedAt       DateTime?        @map("corrected_at")
+  correctionReason  String?          @map("correction_reason")
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @updatedAt @map("updated_at")
 
@@ -2335,6 +2382,10 @@ model TimePunch {
   deviceInfo         String?          @map("device_info") // e.g. "Kitchen iPad 01" / "Web Kiosk"
   photoUrl           String?          @map("photo_url")
   notes              String?
+  idempotencyKey     String?          @unique @map("idempotency_key")
+  isManualAdjustment Boolean          @default(false) @map("is_manual_adjustment")
+  adjustedBy         String?          @map("adjusted_by")
+  adjustmentReason   String?          @map("adjustment_reason")
   createdAt          DateTime         @default(now()) @map("created_at")
 
   // Relations
@@ -2352,20 +2403,27 @@ model TimePunch {
 }
 
 model LeaveRequest {
-  id           String      @id @default(uuid())
-  restaurantId String      @map("restaurant_id")
-  employeeId   String      @map("employee_id")
-  leaveType    LeaveType   @map("leave_type")
-  startDate    DateTime    @map("start_date")
-  endDate      DateTime    @map("end_date")
-  totalDays    Float       @map("total_days")
-  status       LeaveStatus @default(PENDING)
-  reason       String
-  managerNotes String?     @map("manager_notes")
-  reviewedBy   String?     @map("reviewed_by")
-  reviewedAt   DateTime?   @map("reviewed_at")
-  createdAt    DateTime    @default(now()) @map("created_at")
-  updatedAt    DateTime    @updatedAt @map("updated_at")
+  id             String      @id @default(uuid())
+  restaurantId   String      @map("restaurant_id")
+  employeeId     String      @map("employee_id")
+  outletId       String?     @map("outlet_id")
+  leaveType      LeaveType   @map("leave_type")
+  startDate      DateTime    @map("start_date")
+  endDate        DateTime    @map("end_date")
+  totalDays      Float       @map("total_days")
+  isPartialDay   Boolean     @default(false) @map("is_partial_day")
+  startTime      String?     @map("start_time")
+  endTime        String?     @map("end_time")
+  hoursRequested Float?      @map("hours_requested")
+  attachmentUrl  String?     @map("attachment_url")
+  attachmentName String?     @map("attachment_name")
+  status         LeaveStatus @default(PENDING)
+  reason         String
+  managerNotes   String?     @map("manager_notes")
+  reviewedBy     String?     @map("reviewed_by")
+  reviewedAt     DateTime?   @map("reviewed_at")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
 
   // Relations
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
@@ -2389,37 +2447,57 @@ enum TipDistributionMethod {
 }
 
 model TipPoolRule {
-  id                 String                @id @default(uuid())
-  restaurantId       String                @map("restaurant_id")
-  name               String                @default("Standard Restaurant Pool")
-  fohPercentage      Float                 @default(70) @map("foh_percentage") // 70% FOH
-  bohPercentage      Float                 @default(30) @map("boh_percentage") // 30% BOH
-  distributionMethod TipDistributionMethod @default(HOURS_WORKED) @map("distribution_method")
-  rolePointsJson     Json?                 @map("role_points_json")
-  isActive           Boolean               @default(true) @map("is_active")
-  createdAt          DateTime              @default(now()) @map("created_at")
-  updatedAt          DateTime              @updatedAt @map("updated_at")
+  id                    String                @id @default(uuid())
+  restaurantId          String                @map("restaurant_id")
+  outletId              String?               @map("outlet_id")
+  name                  String                @default("Standard Restaurant Pool")
+  fohPercentage         Float                 @default(70) @map("foh_percentage") // 70% FOH
+  bohPercentage         Float                 @default(30) @map("boh_percentage") // 30% BOH
+  distributionMethod    TipDistributionMethod @default(HOURS_WORKED) @map("distribution_method")
+  includeCashTips       Boolean               @default(true) @map("include_cash_tips")
+  includeCardTips       Boolean               @default(true) @map("include_card_tips")
+  includeServiceCharges Boolean               @default(false) @map("include_service_charges")
+  deductRefunds         Boolean               @default(true) @map("deduct_refunds")
+  rolePointsJson        Json?                 @map("role_points_json")
+  isActive              Boolean               @default(true) @map("is_active")
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
 
   // Relations
   restaurant Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   tipRuns    TipPoolRun[]
 
   @@index([restaurantId])
+  @@index([outletId])
   @@map("tip_pool_rules")
 }
 
 model TipPoolRun {
-  id                 String       @id @default(uuid())
-  restaurantId       String       @map("restaurant_id")
-  payrollRunId       String?      @map("payroll_run_id")
-  ruleId             String?      @map("rule_id")
-  periodStart        DateTime     @map("period_start")
-  periodEnd          DateTime     @map("period_end")
-  totalCollectedTips Float        @map("total_collected_tips")
-  fohPoolAmount      Float        @map("foh_pool_amount")
-  bohPoolAmount      Float        @map("boh_pool_amount")
-  distributionsJson  Json         @map("distributions_json")
-  createdAt          DateTime     @default(now()) @map("created_at")
+  id                   String       @id @default(uuid())
+  restaurantId         String       @map("restaurant_id")
+  outletId             String?      @map("outlet_id")
+  payrollRunId         String?      @map("payroll_run_id")
+  ruleId               String?      @map("rule_id")
+  status               String       @default("DRAFT")
+  currency             String       @default("USD")
+  periodStart          DateTime     @map("period_start")
+  periodEnd            DateTime     @map("period_end")
+  totalCollectedTips   Float        @map("total_collected_tips")
+  cashTipsAmount       Float        @default(0) @map("cash_tips_amount")
+  cardTipsAmount       Float        @default(0) @map("card_tips_amount")
+  serviceChargesAmount Float        @default(0) @map("service_charges_amount")
+  refundsAmount        Float        @default(0) @map("refunds_amount")
+  adjustmentsAmount    Float        @default(0) @map("adjustments_amount")
+  eligiblePoolAmount   Float        @default(0) @map("eligible_pool_amount")
+  fohPoolAmount        Float        @map("foh_pool_amount")
+  bohPoolAmount        Float        @map("boh_pool_amount")
+  totalDistributedTips Float        @default(0) @map("total_distributed_tips")
+  undistributedAmount  Float        @default(0) @map("undistributed_amount")
+  undistributedReason  String?      @map("undistributed_reason")
+  distributionsJson    Json         @map("distributions_json")
+  finalizedBy          String?      @map("finalized_by")
+  finalizedAt          DateTime?    @map("finalized_at")
+  createdAt            DateTime     @default(now()) @map("created_at")
 
   // Relations
   restaurant Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
@@ -2662,10 +2740,15 @@ model ShiftChecklistItem {
   templateId         String                 @map("template_id")
   title              String
   description        String?
+  sectionName        String?                @map("section_name")
   roleRequired       String?                @map("role_required")
   priority           ItemPriority           @default(MEDIUM)
+  isRequired         Boolean                @default(true) @map("is_required")
   requiresValueInput Boolean                @default(false) @map("requires_value_input")
   valueInputLabel    String?                @map("value_input_label")
+  minValue           Float?                 @map("min_value")
+  maxValue           Float?                 @map("max_value")
+  unit               String?
   requiresPhoto      Boolean                @default(false) @map("requires_photo")
   sortOrder          Int                    @default(0) @map("sort_order")
   createdAt          DateTime               @default(now()) @map("created_at")
@@ -2679,21 +2762,28 @@ model ShiftChecklistItem {
 }
 
 model ShiftChecklistExecution {
-  id                   String                        @id @default(uuid())
-  restaurantId         String                        @map("restaurant_id")
-  outletId             String                        @map("outlet_id")
-  templateId           String                        @map("template_id")
-  shiftAssignmentId    String?                       @map("shift_assignment_id")
-  title                String
-  type                 ChecklistType                 @default(OPENING)
-  executionDate        DateTime                      @map("execution_date")
-  status               ChecklistStatus               @default(PENDING)
-  assignedEmployeeId   String?                       @map("assigned_employee_id")
-  verifiedByEmployeeId String?                       @map("verified_by_employee_id")
-  verifiedAt           DateTime?                     @map("verified_at")
-  notes                String?
-  createdAt            DateTime                      @default(now()) @map("created_at")
-  updatedAt            DateTime                      @updatedAt @map("updated_at")
+  id                          String                        @id @default(uuid())
+  restaurantId                String                        @map("restaurant_id")
+  outletId                    String                        @map("outlet_id")
+  templateId                  String                        @map("template_id")
+  shiftAssignmentId           String?                       @map("shift_assignment_id")
+  stationName                 String?                       @map("station_name")
+  title                       String
+  type                        ChecklistType                 @default(OPENING)
+  executionDate               DateTime                      @map("execution_date")
+  dueAt                       DateTime?                     @map("due_at")
+  status                      ChecklistStatus               @default(PENDING)
+  version                     Int                           @default(1)
+  allowCarryForwardExceptions Boolean                       @default(false) @map("allow_carry_forward_exceptions")
+  assignedEmployeeId          String?                       @map("assigned_employee_id")
+  submittedAt                 DateTime?                     @map("submitted_at")
+  submittedByEmployeeId       String?                       @map("submitted_by_employee_id")
+  verifiedByEmployeeId        String?                       @map("verified_by_employee_id")
+  verifiedAt                  DateTime?                     @map("verified_at")
+  notes                       String?
+  handoverNotes               String?                       @map("handover_notes")
+  createdAt                   DateTime                      @default(now()) @map("created_at")
+  updatedAt                   DateTime                      @updatedAt @map("updated_at")
 
   // Relations
   restaurant         Restaurant                    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
@@ -2716,9 +2806,24 @@ model ShiftChecklistItemExecution {
   templateItemId        String?                 @map("template_item_id")
   title                 String
   description           String?
+  sectionName           String?                 @map("section_name")
   roleRequired          String?                 @map("role_required")
   priority              ItemPriority            @default(MEDIUM)
+  isRequired            Boolean                 @default(true) @map("is_required")
+  requiresValueInput    Boolean                 @default(false) @map("requires_value_input")
+  valueInputLabel       String?                 @map("value_input_label")
+  minValue              Float?                  @map("min_value")
+  maxValue              Float?                  @map("max_value")
+  unit                  String?
+  requiresPhoto         Boolean                 @default(false) @map("requires_photo")
   isCompleted           Boolean                 @default(false) @map("is_completed")
+  isOutOfRange          Boolean                 @default(false) @map("is_out_of_range")
+  reviewStatus          String                  @default("NONE") @map("review_status")
+  returnReason          String?                 @map("return_reason")
+  carryForwardOwner     String?                 @map("carry_forward_owner")
+  carryForwardNote      String?                 @map("carry_forward_note")
+  responseHistory       Json?                   @map("response_history")
+  version               Int                     @default(1)
   completedAt           DateTime?               @map("completed_at")
   completedByEmployeeId String?                 @map("completed_by_employee_id")
   inputValue            String?                 @map("input_value")

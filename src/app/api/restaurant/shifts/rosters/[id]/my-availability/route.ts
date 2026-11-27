@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
+import { getShiftActorContext } from "@/modules/shifts/authHelper";
 import { ShiftService } from "@/modules/shifts/service";
 import { prisma } from "@/core/database/client";
 
@@ -10,62 +9,36 @@ export async function GET(
 ) {
   try {
     const { id: rosterId } = await params;
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await getShiftActorContext("shifts:view_roster");
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-    // Find Employee associated with logged-in user
-    const employee = await prisma.employee.findFirst({
-      where: { restaurantId: session.activeRestaurantId, archivedAt: null },
-    });
+    const { searchParams } = new URL(req.url);
+    const requestedEmpId = searchParams.get("employeeId");
+    const targetEmployeeId =
+      requestedEmpId && auth.ctx.canManageRoster ? requestedEmpId : auth.ctx.employeeId;
 
-    if (!employee) {
+    if (!targetEmployeeId) {
       return NextResponse.json({ error: "No employee record linked to current user" }, { status: 404 });
     }
 
-    const data = await ShiftService.getRosterAvailability(session.activeRestaurantId, rosterId, {
-      employeeId: employee.id,
+    const data = await ShiftService.getRosterAvailability(auth.ctx.restaurantId, rosterId, {
+      employeeId: targetEmployeeId,
     });
 
-    if (data.roster?.status === "DRAFT") {
-      const membership = await prisma.restaurantMembership.findUnique({
-        where: {
-          restaurantId_userId: {
-            restaurantId: session.activeRestaurantId,
-            userId: session.userId,
-          },
-        },
-        include: {
-          accessGrants: {
-            where: { status: "ACTIVE" },
-            include: { role: true },
-          },
-        },
-      });
-
-      const isUserAdmin =
-        session.role === "PLATFORM_ADMIN" ||
-        (membership?.accessGrants?.some((g: any) =>
-          ["Restaurant Owner", "Admin", "Owner", "Super Admin", "General Manager"].includes(g.role?.name || "")
-        ) ?? false) ||
-        (!membership?.employeeId && (membership?.accessGrants?.length || 0) === 0);
-
-      if (!isUserAdmin) {
-        return NextResponse.json(
-          { error: "This roster period is currently in draft mode and is not yet open for employee availability." },
-          { status: 403 }
-        );
-      }
+    if (data.roster?.status === "DRAFT" && !auth.ctx.canManageRoster) {
+      return NextResponse.json(
+        { error: "This roster period is currently in draft mode and is not yet open for employee availability." },
+        { status: 403 }
+      );
     }
 
     const recurring = await prisma.shiftAvailability.findMany({
-      where: { restaurantId: session.activeRestaurantId, employeeId: employee.id },
+      where: { restaurantId: auth.ctx.restaurantId, employeeId: targetEmployeeId },
       orderBy: { dayOfWeek: "asc" },
     });
 
     return NextResponse.json({
-      employee,
+      employee: auth.ctx.employee,
       roster: data.roster,
       dates: data.dates,
       myAvailability: data.availabilities[0] || null,
@@ -83,29 +56,25 @@ export async function POST(
 ) {
   try {
     const { id: rosterId } = await params;
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await getShiftActorContext("shifts:view_roster");
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const body = await req.json();
     const { action, employeeId: requestedEmpId, dateAvailabilities, notes } = body;
 
-    let targetEmployeeId = requestedEmpId;
+    // Only managers may submit on behalf of another employee
+    if (requestedEmpId && requestedEmpId !== auth.ctx.employeeId && !auth.ctx.canManageRoster) {
+      return NextResponse.json({ error: "Forbidden: cannot modify another employee's availability" }, { status: 403 });
+    }
 
+    const targetEmployeeId = requestedEmpId || auth.ctx.employeeId;
     if (!targetEmployeeId) {
-      const employee = await prisma.employee.findFirst({
-        where: { restaurantId: session.activeRestaurantId, archivedAt: null },
-      });
-      if (!employee) {
-        return NextResponse.json({ error: "No employee record linked to user" }, { status: 404 });
-      }
-      targetEmployeeId = employee.id;
+      return NextResponse.json({ error: "No employee record linked to user" }, { status: 404 });
     }
 
     if (action === "apply_recurring") {
       const updated = await ShiftService.applyRecurringAvailabilityToRoster(
-        session.activeRestaurantId,
+        auth.ctx.restaurantId,
         rosterId,
         targetEmployeeId
       );
@@ -114,7 +83,7 @@ export async function POST(
 
     if (action === "submit") {
       const submission = await ShiftService.submitEmployeeAvailability(
-        session.activeRestaurantId,
+        auth.ctx.restaurantId,
         rosterId,
         targetEmployeeId,
         notes
@@ -128,7 +97,7 @@ export async function POST(
       }
 
       const updated = await ShiftService.saveRosterDateAvailabilities(
-        session.activeRestaurantId,
+        auth.ctx.restaurantId,
         rosterId,
         targetEmployeeId,
         dateAvailabilities

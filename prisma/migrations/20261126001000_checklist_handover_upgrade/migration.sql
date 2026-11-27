@@ -1,0 +1,33 @@
+-- Module 6: Shift Checklists & Handover upgrade
+ALTER TABLE "shift_checklist_items"
+  ADD COLUMN IF NOT EXISTS "section_name" TEXT,
+  ADD COLUMN IF NOT EXISTS "is_required" BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS "min_value" DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS "max_value" DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS "unit" TEXT;
+
+ALTER TABLE "shift_checklist_executions"
+  ADD COLUMN IF NOT EXISTS "station_name" TEXT,
+  ADD COLUMN IF NOT EXISTS "due_at" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "version" INTEGER NOT NULL DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS "allow_carry_forward_exceptions" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "submitted_at" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "submitted_by_employee_id" TEXT,
+  ADD COLUMN IF NOT EXISTS "handover_notes" TEXT;
+
+ALTER TABLE "shift_checklist_item_executions"
+  ADD COLUMN IF NOT EXISTS "section_name" TEXT,
+  ADD COLUMN IF NOT EXISTS "is_required" BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS "requires_value_input" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "value_input_label" TEXT,
+  ADD COLUMN IF NOT EXISTS "min_value" DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS "max_value" DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS "unit" TEXT,
+  ADD COLUMN IF NOT EXISTS "requires_photo" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "is_out_of_range" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "review_status" TEXT NOT NULL DEFAULT 'NONE',
+  ADD COLUMN IF NOT EXISTS "return_reason" TEXT,
+  ADD COLUMN IF NOT EXISTS "carry_forward_owner" TEXT,
+  ADD COLUMN IF NOT EXISTS "carry_forward_note" TEXT,
+  ADD COLUMN IF NOT EXISTS "response_history" JSONB,
+  ADD COLUMN IF NOT EXISTS "version" INTEGER NOT NULL DEFAULT 1;

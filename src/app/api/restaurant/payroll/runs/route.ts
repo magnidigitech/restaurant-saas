@@ -1,67 +1,76 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
-import { PayrollService } from "@/modules/payroll/service";
+import { getPayrollActorContext } from "@/modules/payroll/authHelper";
+import { PayrollService, PayrollError } from "@/modules/payroll/service";
 import { z } from "zod";
 
 const createPayrollRunSchema = z.object({
-  outletId: z.string().uuid().nullable().optional().or(z.literal("")),
-  title: z.string().min(1).optional(),
-  name: z.string().min(1).optional(),
-  periodStart: z.string().optional(),
-  startDate: z.string().optional(),
-  periodEnd: z.string().optional(),
-  endDate: z.string().optional(),
-  paymentDate: z.string().min(1),
-  notes: z.string().nullable().optional(),
+  outletId: z.string().uuid().optional().nullable(),
+  title: z.string().min(2),
+  periodStart: z.string(),
+  periodEnd: z.string(),
+  paymentDate: z.string(),
+  overtimeMultiplier: z.number().min(1).max(3).optional(),
+  notes: z.string().optional(),
 });
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const access = await verifyAccess(session.userId, session.activeRestaurantId, { moduleKey: "payroll", permissionKey: "payroll:view_payroll" }, session.tokenVersion);
-    if (!access.authorized) return NextResponse.json({ error: access.error }, { status: access.status });
+    const outletId = req.nextUrl.searchParams.get("outletId") || undefined;
+    const auth = await getPayrollActorContext({ requireView: true, outletId });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
-    const { searchParams } = new URL(req.url);
-    const outletId = searchParams.get("outletId") || undefined;
-
-    const runs = await PayrollService.getPayrollRuns(session.activeRestaurantId, outletId);
-    return NextResponse.json({ runs });
+    const runs = await PayrollService.getPayrollRuns(auth.ctx.restaurantId, {
+      outletId,
+      accessibleOutletIds: auth.ctx.accessibleOutletIds,
+    });
+    return NextResponse.json({
+      runs,
+      actor: {
+        canViewPayroll: auth.ctx.canViewPayroll,
+        canRunPayroll: auth.ctx.canRunPayroll,
+        canApprovePayroll: auth.ctx.canApprovePayroll,
+        accessibleOutletIds: auth.ctx.accessibleOutletIds,
+      },
+    });
   } catch (error: any) {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    const status = error instanceof PayrollError ? error.status : 500;
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const access = await verifyAccess(session.userId, session.activeRestaurantId, { moduleKey: "payroll", permissionKey: "payroll:run_payroll" }, session.tokenVersion);
-    if (!access.authorized) return NextResponse.json({ error: access.error }, { status: access.status });
-
     const body = await req.json();
     const result = createPayrollRunSchema.safeParse(body);
-    if (!result.success) return NextResponse.json({ error: "Invalid payload", details: result.error.flatten() }, { status: 400 });
-
-    const title = result.data.title || result.data.name;
-    const periodStart = result.data.periodStart || result.data.startDate;
-    const periodEnd = result.data.periodEnd || result.data.endDate;
-
-    if (!title || !periodStart || !periodEnd) {
-      return NextResponse.json({ error: "Missing required fields: title, periodStart, periodEnd" }, { status: 400 });
+    if (!result.success) {
+      return NextResponse.json(
+        { error: "Invalid payload", details: result.error.flatten() },
+        { status: 400 }
+      );
     }
 
-    const run = await PayrollService.createPayrollRun(session.activeRestaurantId, {
-      outletId: result.data.outletId && result.data.outletId !== "" ? result.data.outletId : undefined,
-      title,
-      periodStart,
-      periodEnd,
+    const auth = await getPayrollActorContext({
+      requireRun: true,
+      outletId: result.data.outletId ?? null,
+    });
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    const run = await PayrollService.createPayrollRun(auth.ctx.restaurantId, {
+      outletId: result.data.outletId || undefined,
+      title: result.data.title,
+      periodStart: result.data.periodStart,
+      periodEnd: result.data.periodEnd,
       paymentDate: result.data.paymentDate,
-      notes: result.data.notes || undefined,
+      overtimeMultiplier: result.data.overtimeMultiplier,
+      notes: result.data.notes,
     });
     return NextResponse.json({ success: true, run });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 400 });
+    const status = error instanceof PayrollError ? error.status : 400;
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status });
   }
 }

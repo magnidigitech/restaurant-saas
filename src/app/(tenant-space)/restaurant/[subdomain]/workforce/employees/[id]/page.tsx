@@ -21,10 +21,49 @@ export default function AppleEmployeeDetailPage({
   const [activeTab, setActiveTab] = useState<"profile" | "payroll" | "history" | "outlets" | "emergency" | "documents">("profile");
   const [selectedPayslip, setSelectedPayslip] = useState<any>(null);
 
+  // Reference options for employment & outlet modals
+  const [outlets, setOutlets] = useState<Array<{ id: string; name: string; code?: string }>>([]);
+  const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
+  const [designations, setDesignations] = useState<Array<{ id: string; name: string }>>([]);
+
   // Sub-modal states
   const [showModal, setShowModal] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Employment lifecycle modal state
+  const [empModalOpen, setEmpModalOpen] = useState(false);
+  const [empForm, setEmpForm] = useState({
+    status: "ACTIVE",
+    workerType: "FULL_TIME",
+    departmentId: "",
+    designationId: "",
+    primaryOutletId: "",
+    effectiveFrom: new Date().toISOString().split("T")[0],
+    weeklyHoursLimit: "",
+    reason: "",
+  });
+  const [empImpact, setEmpImpact] = useState<any>(null);
+  const [empModalError, setEmpModalError] = useState("");
+
+  // Outlet assignment modal state
+  const [outletModalOpen, setOutletModalOpen] = useState(false);
+  const [outletForm, setOutletForm] = useState({
+    outletId: "",
+    isPrimary: false,
+    assignmentType: "TEMPORARY",
+    effectiveFrom: new Date().toISOString().split("T")[0],
+    effectiveTo: "",
+    reason: "",
+  });
+  const [outletModalError, setOutletModalError] = useState("");
+
+  // End outlet assignment modal state
+  const [endOutletTarget, setEndOutletTarget] = useState<any>(null);
+  const [endEffectiveTo, setEndEffectiveTo] = useState(new Date().toISOString().split("T")[0]);
+  const [endReason, setEndReason] = useState("");
+  const [endImpact, setEndImpact] = useState<any>(null);
+  const [endModalError, setEndModalError] = useState("");
 
   // Edit Capacity & Info form state
   const [editWorkerType, setEditWorkerType] = useState("FULL_TIME");
@@ -35,6 +74,40 @@ export default function AppleEmployeeDetailPage({
   // Form inputs for modals
   const [contactForm, setContactForm] = useState({ name: "", relationship: "Spouse", phone: "", address: "" });
   const [docForm, setDocForm] = useState({ type: "AADHAAR", documentNumber: "", fileUrl: "", issueDate: "", expiryDate: "" });
+
+  const STATUS_LABELS: Record<string, string> = {
+    PROBATION: "On probation",
+    ACTIVE: "Active",
+    ON_LEAVE: "On leave",
+    NOTICE: "Serving notice",
+    SUSPENDED: "Suspended",
+    RESIGNED: "Resigned",
+    TERMINATED: "Terminated",
+  };
+
+  const fetchRefOptions = async () => {
+    try {
+      const [rOut, rDept, rDesig] = await Promise.all([
+        fetch("/api/restaurant/outlets"),
+        fetch("/api/restaurant/departments"),
+        fetch("/api/restaurant/designations"),
+      ]);
+      if (rOut.ok) {
+        const d = await rOut.json();
+        setOutlets(d.outlets || []);
+      }
+      if (rDept.ok) {
+        const d = await rDept.json();
+        setDepartments(d.departments || []);
+      }
+      if (rDesig.ok) {
+        const d = await rDesig.json();
+        setDesignations(d.designations || []);
+      }
+    } catch {
+      // ignore
+    }
+  };
 
   const fetchEmployee = async () => {
     setLoading(true);
@@ -61,6 +134,10 @@ export default function AppleEmployeeDetailPage({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchRefOptions();
+  }, []);
 
   useEffect(() => {
     if (id) {
@@ -113,6 +190,194 @@ export default function AppleEmployeeDetailPage({
       } catch {}
     }
     return responseVal;
+  };
+
+  const openEditEmploymentModal = () => {
+    if (!employee) return;
+    const rec = employee.employmentRecords?.[0];
+    setEmpForm({
+      status: employee.currentStatus || rec?.status || "ACTIVE",
+      workerType: rec?.employmentType || employee.workerType || "FULL_TIME",
+      departmentId: rec?.departmentId || "",
+      designationId: rec?.designationId || "",
+      primaryOutletId: rec?.primaryOutletId || "",
+      effectiveFrom: new Date().toISOString().split("T")[0],
+      weeklyHoursLimit: employee.weeklyHoursLimit ? String(employee.weeklyHoursLimit) : "",
+      reason: "",
+    });
+    setEmpImpact(null);
+    setEmpModalError("");
+    setEmpModalOpen(true);
+  };
+
+  const handleSaveEmploymentLifecycle = async (confirmedCancelShifts = false) => {
+    setSaving(true);
+    setEmpModalError("");
+    try {
+      const payload = {
+        status: empForm.status,
+        workerType: empForm.workerType,
+        departmentId: empForm.departmentId || null,
+        designationId: empForm.designationId || null,
+        primaryOutletId: empForm.primaryOutletId || null,
+        effectiveFrom: empForm.effectiveFrom,
+        weeklyHoursLimit: empForm.weeklyHoursLimit ? Number(empForm.weeklyHoursLimit) : null,
+        reason: empForm.reason || null,
+        ...(confirmedCancelShifts ? { resolution: "CANCEL_SHIFTS" } : { preview: true }),
+      };
+
+      if (!confirmedCancelShifts) {
+        const previewRes = await fetch(`/api/restaurant/employees/${id}/employment-records`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const previewData = await previewRes.json();
+        if (!previewRes.ok) throw new Error(previewData.error || "Failed to check scheduling impact");
+        if (previewData.requiresResolution && previewData.affectedShifts?.length > 0) {
+          setEmpImpact(previewData);
+          setSaving(false);
+          return;
+        }
+      }
+
+      const saveRes = await fetch(`/api/restaurant/employees/${id}/employment-records`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...payload,
+          preview: false,
+          ...(confirmedCancelShifts ? { resolution: "CANCEL_SHIFTS" } : {}),
+        }),
+      });
+      const saveData = await saveRes.json();
+      if (!saveRes.ok) {
+        if (saveData.details?.affectedShifts?.length > 0) {
+          setEmpImpact(saveData.details);
+          setSaving(false);
+          return;
+        }
+        throw new Error(saveData.error || "Failed to update employment record");
+      }
+
+      setEmpModalOpen(false);
+      setEmpImpact(null);
+      setSaveSuccess(true);
+      await fetchEmployee();
+      setTimeout(() => setSaveSuccess(false), 4000);
+    } catch (err: any) {
+      setEmpModalError(err.message || "Error updating employment");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveOutletAssignment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setOutletModalError("");
+    try {
+      const res = await fetch(`/api/restaurant/employees/${id}/outlet-assignments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outletId: outletForm.outletId,
+          isPrimary: outletForm.isPrimary,
+          assignmentType: outletForm.isPrimary ? "PRIMARY" : outletForm.assignmentType,
+          effectiveFrom: outletForm.effectiveFrom,
+          effectiveTo: outletForm.isPrimary ? null : outletForm.effectiveTo || null,
+          reason: outletForm.reason || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save outlet assignment");
+      setOutletModalOpen(false);
+      await fetchEmployee();
+    } catch (err: any) {
+      setOutletModalError(err.message || "Error saving outlet assignment");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openEndOutletModal = async (oa: any) => {
+    setEndOutletTarget(oa);
+    const today = new Date().toISOString().split("T")[0];
+    setEndEffectiveTo(today);
+    setEndReason("");
+    setEndImpact(null);
+    setEndModalError("");
+    try {
+      const res = await fetch(`/api/restaurant/employees/${id}/outlet-assignments`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outletId: oa.outletId,
+          effectiveTo: today,
+          preview: true,
+        }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.requiresResolution) setEndImpact(d);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleConfirmEndOutlet = async () => {
+    if (!endOutletTarget) return;
+    setSaving(true);
+    setEndModalError("");
+    try {
+      // Re-preview if date changed and not yet previewed
+      const previewRes = await fetch(`/api/restaurant/employees/${id}/outlet-assignments`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outletId: endOutletTarget.outletId,
+          effectiveTo: endEffectiveTo,
+          preview: true,
+        }),
+      });
+      const previewData = await previewRes.json();
+      if (previewRes.ok && previewData.requiresResolution && !endImpact) {
+        setEndImpact(previewData);
+        setSaving(false);
+        return;
+      }
+
+      const res = await fetch(`/api/restaurant/employees/${id}/outlet-assignments`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          outletId: endOutletTarget.outletId,
+          effectiveTo: endEffectiveTo,
+          reason: endReason || null,
+          ...(previewData?.requiresResolution || endImpact?.requiresResolution
+            ? { resolution: "CANCEL_SHIFTS" }
+            : {}),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.details?.affectedShifts?.length > 0) {
+          setEndImpact(data.details);
+          setSaving(false);
+          return;
+        }
+        throw new Error(data.error || "Failed to end outlet assignment");
+      }
+
+      setEndOutletTarget(null);
+      setEndImpact(null);
+      await fetchEmployee();
+    } catch (err: any) {
+      setEndModalError(err.message || "Error ending outlet assignment");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleUpdateCapacity = async (e: React.FormEvent) => {
@@ -334,10 +599,33 @@ export default function AppleEmployeeDetailPage({
                     Archived
                   </span>
                 ) : (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-                    Active
+                  <span
+                    className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full border ${
+                      employee.currentStatus === "ACTIVE"
+                        ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/25"
+                        : employee.currentStatus === "PROBATION"
+                        ? "bg-blue-500/15 text-blue-400 border-blue-500/25"
+                        : employee.currentStatus === "NOTICE" || employee.currentStatus === "ON_LEAVE"
+                        ? "bg-amber-500/15 text-amber-400 border-amber-500/25"
+                        : "bg-rose-500/15 text-rose-400 border-rose-500/25"
+                    }`}
+                  >
+                    {employee.currentStatusLabel || STATUS_LABELS[employee.currentStatus] || "Active"}
                   </span>
                 )}
+                <span
+                  className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+                    employee.membership?.status === "ACTIVE"
+                      ? isDark
+                        ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+                        : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : isDark
+                      ? "bg-white/[0.04] text-[#8F95A3] border-white/[0.08]"
+                      : "bg-slate-100 text-slate-600 border-slate-200"
+                  }`}
+                >
+                  App Access: {employee.membership?.status === "ACTIVE" ? "Active" : employee.membership?.status || "None"}
+                </span>
               </div>
 
               <h1 className={`text-xl sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
@@ -368,18 +656,26 @@ export default function AppleEmployeeDetailPage({
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 w-full sm:w-auto">
-            <button
-              onClick={handleArchiveToggle}
-              className={`w-full sm:w-auto px-4 py-2 text-xs font-medium rounded-xl border transition cursor-pointer text-center ${
-                isArchived
-                  ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25"
-                  : "bg-rose-500/10 border-rose-500/25 text-rose-500 hover:bg-rose-500/20"
-              }`}
-            >
-              {isArchived ? "Reactivate Staff" : "Archive Profile"}
-            </button>
-          </div>
+          {employee.permissions?.canManageWorkforce !== false && (
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <button
+                onClick={openEditEmploymentModal}
+                className="flex-1 sm:flex-none px-4 py-2 text-xs font-semibold rounded-xl bg-[#0071E3] hover:bg-[#0077ED] text-white transition cursor-pointer text-center"
+              >
+                Edit Employment / Status
+              </button>
+              <button
+                onClick={handleArchiveToggle}
+                className={`flex-1 sm:flex-none px-4 py-2 text-xs font-medium rounded-xl border transition cursor-pointer text-center ${
+                  isArchived
+                    ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25"
+                    : "bg-rose-500/10 border-rose-500/25 text-rose-500 hover:bg-rose-500/20"
+                }`}
+              >
+                {isArchived ? "Reactivate Staff" : "Archive Profile"}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Tab Navigation */}
@@ -389,12 +685,18 @@ export default function AppleEmployeeDetailPage({
           }`}
         >
           {[
-            { id: "profile", label: "Profile & Hours Capacity" },
-            { id: "payroll", label: "Payrolls & Compensation", count: employee?.payslips?.length || 0 },
-            { id: "history", label: "Employment History" },
-            { id: "outlets", label: "Outlet Assignments" },
-            { id: "emergency", label: "Emergency Contacts" },
-            { id: "documents", label: "Documents" },
+            { id: "profile", label: "Employment" },
+            { id: "outlets", label: "Outlet Assignments", count: employee?.outletAssignments?.length || 0 },
+            { id: "history", label: "History", count: employee?.employmentRecords?.length || 0 },
+            ...(employee?.permissions?.canViewPayroll !== false
+              ? [{ id: "payroll", label: "Payrolls & Compensation", count: employee?.payslips?.length || 0 }]
+              : []),
+            ...(employee?.permissions?.canViewSensitive !== false
+              ? [
+                  { id: "emergency", label: "Emergency Contacts" },
+                  { id: "documents", label: "Documents" },
+                ]
+              : []),
           ].map((tab) => (
             <button
               key={tab.id}
@@ -882,51 +1184,119 @@ export default function AppleEmployeeDetailPage({
           );
         })()}
 
-        {/* TAB CONTENT: Employment History */}
+        {/* TAB CONTENT: Employment History & Audit Trail */}
         {activeTab === "history" && (
-          <div
-            className={`p-6 rounded-3xl border transition space-y-4 ${
-              isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
-            }`}
-          >
-            <h3 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
-              Employment History & Role Records
-            </h3>
-
-            {employee.employmentRecords?.length === 0 ? (
-              <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-                No employment records logged.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {employee.employmentRecords.map((rec: any) => (
-                  <div
-                    key={rec.id}
-                    className={`p-4 rounded-2xl border transition flex items-center justify-between ${
-                      isDark ? "bg-[#0A0C12]/50 border-white/[0.06]" : "bg-slate-50 border-slate-200/80"
-                    }`}
+          <div className="space-y-6">
+            <div
+              className={`p-6 rounded-3xl border transition space-y-4 ${
+                isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <h3 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                  Employment Lifecycle Records
+                </h3>
+                {employee.permissions?.canManageWorkforce !== false && (
+                  <button
+                    onClick={openEditEmploymentModal}
+                    className="px-3 py-1.5 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer"
                   >
-                    <div>
-                      <p className={`text-xs font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
-                        {rec.designation?.name || "Staff Member"} — {rec.department?.name || "General"}
-                      </p>
-                      <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                        Effective from {new Date(rec.effectiveFrom).toLocaleDateString()}
-                        {rec.primaryOutlet && ` • ${rec.primaryOutlet.name}`}
-                      </p>
-                    </div>
-
-                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
-                      rec.status === "ACTIVE"
-                        ? isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-100 text-emerald-800 border-emerald-300"
-                        : isDark ? "bg-white/[0.04] text-[#8F95A3] border-white/[0.08]" : "bg-slate-100 text-slate-600 border-slate-200"
-                    }`}>
-                      {rec.status}
-                    </span>
-                  </div>
-                ))}
+                    + Update Status / Role
+                  </button>
+                )}
               </div>
-            )}
+
+              {employee.employmentRecords?.length === 0 ? (
+                <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                  No employment records logged.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {employee.employmentRecords.map((rec: any) => (
+                    <div
+                      key={rec.id}
+                      className={`p-4 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                        isDark ? "bg-[#0A0C12]/50 border-white/[0.06]" : "bg-slate-50 border-slate-200/80"
+                      }`}
+                    >
+                      <div className="space-y-0.5">
+                        <p className={`text-xs font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                          {rec.designation?.name || "Staff Member"} — {rec.department?.name || "General"}
+                        </p>
+                        <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                          Effective {new Date(rec.effectiveFrom).toLocaleDateString()}
+                          {rec.effectiveTo ? ` → ${new Date(rec.effectiveTo).toLocaleDateString()}` : " → Present"}
+                          {rec.primaryOutlet && ` • ${rec.primaryOutlet.name}`}
+                        </p>
+                        {rec.notes && (
+                          <p className={`text-[11px] italic ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
+                            Reason: {rec.notes}
+                          </p>
+                        )}
+                      </div>
+
+                      <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border self-start sm:self-center ${
+                        rec.status === "ACTIVE"
+                          ? isDark ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/25" : "bg-emerald-100 text-emerald-800 border-emerald-300"
+                          : isDark ? "bg-white/[0.04] text-[#8F95A3] border-white/[0.08]" : "bg-slate-100 text-slate-600 border-slate-200"
+                      }`}>
+                        {STATUS_LABELS[rec.status] || rec.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Sanitized Audit History */}
+            <div
+              className={`p-6 rounded-3xl border transition space-y-4 ${
+                isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
+              }`}
+            >
+              <h3 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                Change Audit Log
+              </h3>
+              {!employee.auditHistory?.length ? (
+                <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+                  No lifecycle audit entries recorded yet.
+                </p>
+              ) : (
+                <div className="space-y-2.5">
+                  {employee.auditHistory.map((log: any) => {
+                    let parsedNew: Record<string, any> = {};
+                    try {
+                      parsedNew = log.newValues ? JSON.parse(log.newValues) : {};
+                    } catch {
+                      // ignore
+                    }
+                    return (
+                      <div
+                        key={log.id}
+                        className={`p-3.5 rounded-2xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                          isDark ? "bg-[#0A0C12]/40 border-white/[0.06]" : "bg-slate-50/70 border-slate-200/70"
+                        }`}
+                      >
+                        <div className="space-y-0.5">
+                          <p className={`font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                            {log.action.replace(/_/g, " ")}
+                          </p>
+                          <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                            By {log.userEmail} • {new Date(log.createdAt).toLocaleString()}
+                            {parsedNew.reason ? ` • "${parsedNew.reason}"` : ""}
+                          </p>
+                        </div>
+                        {parsedNew.cancelledShiftsCount > 0 && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/25 self-start sm:self-center">
+                            {parsedNew.cancelledShiftsCount} future shift(s) unassigned
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -937,31 +1307,89 @@ export default function AppleEmployeeDetailPage({
               isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
             }`}
           >
-            <h3 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
-              Assigned Branch Outlets
-            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                  Outlet Eligibility & Assignments
+                </h3>
+                <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                  Manage primary and secondary outlet eligibility for shift scheduling.
+                </p>
+              </div>
+              {employee.permissions?.canManageWorkforce !== false && (
+                <button
+                  onClick={() => {
+                    setOutletForm({
+                      outletId: outlets[0]?.id || "",
+                      isPrimary: false,
+                      assignmentType: "TEMPORARY",
+                      effectiveFrom: new Date().toISOString().split("T")[0],
+                      effectiveTo: "",
+                      reason: "",
+                    });
+                    setOutletModalError("");
+                    setOutletModalOpen(true);
+                  }}
+                  className="px-3.5 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl transition cursor-pointer self-start sm:self-auto"
+                >
+                  + Assign Outlet / Change Primary
+                </button>
+              )}
+            </div>
 
             {employee.outletAssignments?.length === 0 ? (
               <p className={`text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-                No specific branch assignments. (Eligible for all outlets).
+                No branch outlet assignments configured.
               </p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {employee.outletAssignments.map((oa: any) => (
-                  <div
-                    key={oa.id || oa.outlet.id}
-                    className={`p-4 rounded-2xl border transition ${
-                      isDark ? "bg-[#0A0C12]/50 border-white/[0.06]" : "bg-slate-50 border-slate-200/80"
-                    }`}
-                  >
-                    <p className={`text-xs font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
-                      {oa.outlet.name}
-                    </p>
-                    <p className={`text-[10px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                      Active Outlet Access
-                    </p>
-                  </div>
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {employee.outletAssignments.map((oa: any) => {
+                  const isEnded = oa.effectiveTo && new Date(oa.effectiveTo) < new Date();
+                  return (
+                    <div
+                      key={oa.id || oa.outlet.id}
+                      className={`p-4 rounded-2xl border transition space-y-2.5 ${
+                        isDark ? "bg-[#0A0C12]/50 border-white/[0.06]" : "bg-slate-50 border-slate-200/80"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className={`text-xs font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                            {oa.outlet.name}
+                          </p>
+                          <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                            {oa.isPrimary ? "Primary Outlet" : oa.assignmentType || "Secondary"}
+                          </p>
+                        </div>
+                        <span
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                            oa.isPrimary
+                              ? "bg-[#0071E3]/15 text-[#0071E3] border-[#0071E3]/25"
+                              : isEnded
+                              ? "bg-slate-500/15 text-slate-400 border-slate-500/25"
+                              : "bg-emerald-500/15 text-emerald-500 border-emerald-500/25"
+                          }`}
+                        >
+                          {oa.isPrimary ? "Primary" : isEnded ? "Ended" : "Active"}
+                        </span>
+                      </div>
+
+                      <p className={`text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                        From {new Date(oa.effectiveFrom).toLocaleDateString()}
+                        {oa.effectiveTo ? ` • Ends ${new Date(oa.effectiveTo).toLocaleDateString()}` : " • Ongoing"}
+                      </p>
+
+                      {!oa.isPrimary && !isEnded && employee.permissions?.canManageWorkforce !== false && (
+                        <button
+                          onClick={() => openEndOutletModal(oa)}
+                          className="w-full py-1.5 rounded-xl text-xs font-medium text-rose-500 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition cursor-pointer"
+                        >
+                          End Assignment
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1585,6 +2013,367 @@ export default function AppleEmployeeDetailPage({
                 ) : (
                   "Yes, Archive Staff"
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Edit Employment & Lifecycle Status */}
+      {empModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div
+            className={`w-full max-w-lg rounded-3xl border p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto ${
+              isDark ? "bg-[#121622] border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold">Edit Employment & Lifecycle</h3>
+              <button onClick={() => setEmpModalOpen(false)} className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer">✕</button>
+            </div>
+
+            {empModalError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs">
+                {empModalError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div>
+                <label className="block font-medium mb-1 opacity-70">Employment Status</label>
+                <select
+                  value={empForm.status}
+                  onChange={(e) => {
+                    setEmpForm({ ...empForm, status: e.target.value });
+                    setEmpImpact(null);
+                  }}
+                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"}`}
+                >
+                  {(employee.allowedNextStatuses || ["ACTIVE", "PROBATION", "ON_LEAVE", "NOTICE", "SUSPENDED", "RESIGNED", "TERMINATED"]).map((st: string) => (
+                    <option key={st} value={st}>{STATUS_LABELS[st] || st}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 opacity-70">Worker Type</label>
+                <select
+                  value={empForm.workerType}
+                  onChange={(e) => setEmpForm({ ...empForm, workerType: e.target.value })}
+                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"}`}
+                >
+                  <option value="FULL_TIME">Full-Time</option>
+                  <option value="PART_TIME">Part-Time</option>
+                  <option value="CONTRACT">Contractor</option>
+                  <option value="TEMPORARY">Temporary</option>
+                  <option value="INTERN">Intern</option>
+                  <option value="CONSULTANT">Consultant</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 opacity-70">Primary Outlet</label>
+                <select
+                  value={empForm.primaryOutletId}
+                  onChange={(e) => {
+                    setEmpForm({ ...empForm, primaryOutletId: e.target.value });
+                    setEmpImpact(null);
+                  }}
+                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"}`}
+                >
+                  <option value="">Unassigned</option>
+                  {outlets.map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 opacity-70">Effective Date</label>
+                <input
+                  type="date"
+                  value={empForm.effectiveFrom}
+                  onChange={(e) => {
+                    setEmpForm({ ...empForm, effectiveFrom: e.target.value });
+                    setEmpImpact(null);
+                  }}
+                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"}`}
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 opacity-70">Department</label>
+                <select
+                  value={empForm.departmentId}
+                  onChange={(e) => setEmpForm({ ...empForm, departmentId: e.target.value })}
+                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"}`}
+                >
+                  <option value="">Unassigned</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 opacity-70">Role / Designation</label>
+                <select
+                  value={empForm.designationId}
+                  onChange={(e) => setEmpForm({ ...empForm, designationId: e.target.value })}
+                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"}`}
+                >
+                  <option value="">Unassigned</option>
+                  {designations.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block font-medium mb-1 opacity-70">Reason / Audit Note</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Probation completed, outlet transfer, resignation..."
+                  value={empForm.reason}
+                  onChange={(e) => setEmpForm({ ...empForm, reason: e.target.value })}
+                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"}`}
+                />
+              </div>
+            </div>
+
+            {empImpact?.affectedShifts?.length > 0 && (
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+                <p className="text-xs font-bold text-amber-500">
+                  Future Published Shifts Impacted ({empImpact.count})
+                </p>
+                <p className="text-[11px] opacity-80">
+                  Confirming this change will unassign these future published shifts while preserving historical shifts, attendance, and payroll.
+                </p>
+                <ul className="space-y-1 text-[11px] max-h-32 overflow-y-auto">
+                  {empImpact.affectedShifts.map((s: any) => (
+                    <li key={s.id} className="flex items-center justify-between">
+                      <span>{new Date(s.shiftDate).toLocaleDateString()} • {s.startTime}–{s.endTime}</span>
+                      <span className="font-medium">{s.outletName}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-black/5 dark:border-white/5">
+              <button
+                type="button"
+                onClick={() => setEmpModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-white/10 cursor-pointer"
+              >
+                Cancel
+              </button>
+              {empImpact?.affectedShifts?.length > 0 ? (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => handleSaveEmploymentLifecycle(true)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white cursor-pointer"
+                >
+                  {saving ? "Saving..." : `Confirm & Unassign ${empImpact.count} Shift(s)`}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => handleSaveEmploymentLifecycle(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#0071E3] hover:bg-[#0077ED] text-white cursor-pointer"
+                >
+                  {saving ? "Checking..." : "Save Employment"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Grant / Change Outlet Assignment */}
+      {outletModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <form
+            onSubmit={handleSaveOutletAssignment}
+            className={`w-full max-w-md rounded-3xl border p-6 space-y-4 shadow-2xl ${
+              isDark ? "bg-[#121622] border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold">Assign Outlet Eligibility</h3>
+              <button type="button" onClick={() => setOutletModalOpen(false)} className="text-xs text-slate-400 cursor-pointer">✕</button>
+            </div>
+
+            {outletModalError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs">
+                {outletModalError}
+              </div>
+            )}
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-medium mb-1 opacity-70">Outlet</label>
+                <select
+                  required
+                  value={outletForm.outletId}
+                  onChange={(e) => setOutletForm({ ...outletForm, outletId: e.target.value })}
+                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"}`}
+                >
+                  {outlets.map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={outletForm.isPrimary}
+                  onChange={(e) => setOutletForm({ ...outletForm, isPrimary: e.target.checked })}
+                />
+                <span className="font-medium">Set as Primary Outlet</span>
+              </label>
+
+              {!outletForm.isPrimary && (
+                <div>
+                  <label className="block font-medium mb-1 opacity-70">Assignment Type</label>
+                  <select
+                    value={outletForm.assignmentType}
+                    onChange={(e) => setOutletForm({ ...outletForm, assignmentType: e.target.value })}
+                    className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"}`}
+                  >
+                    <option value="TEMPORARY">Secondary / Float</option>
+                    <option value="TRAINING">Training</option>
+                  </select>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-medium mb-1 opacity-70">Effective From</label>
+                  <input
+                    type="date"
+                    required
+                    value={outletForm.effectiveFrom}
+                    onChange={(e) => setOutletForm({ ...outletForm, effectiveFrom: e.target.value })}
+                    className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"}`}
+                  />
+                </div>
+                {!outletForm.isPrimary && (
+                  <div>
+                    <label className="block font-medium mb-1 opacity-70">End Date (Optional)</label>
+                    <input
+                      type="date"
+                      value={outletForm.effectiveTo}
+                      onChange={(e) => setOutletForm({ ...outletForm, effectiveTo: e.target.value })}
+                      className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"}`}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 opacity-70">Reason</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Weekend cross-outlet coverage"
+                  value={outletForm.reason}
+                  onChange={(e) => setOutletForm({ ...outletForm, reason: e.target.value })}
+                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"}`}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-black/5 dark:border-white/5">
+              <button type="button" onClick={() => setOutletModalOpen(false)} className="px-4 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-white/10 cursor-pointer">Cancel</button>
+              <button type="submit" disabled={saving} className="px-4 py-2 rounded-xl text-xs font-bold bg-[#0071E3] hover:bg-[#0077ED] text-white cursor-pointer">
+                {saving ? "Saving..." : "Save Assignment"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL: End Secondary Outlet Assignment */}
+      {endOutletTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div
+            className={`w-full max-w-md rounded-3xl border p-6 space-y-4 shadow-2xl ${
+              isDark ? "bg-[#121622] border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold">End Outlet Assignment</h3>
+              <button onClick={() => setEndOutletTarget(null)} className="text-xs text-slate-400 cursor-pointer">✕</button>
+            </div>
+            <p className="text-xs opacity-80">
+              Ending secondary eligibility at <strong>{endOutletTarget.outlet?.name}</strong>.
+            </p>
+
+            {endModalError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs">
+                {endModalError}
+              </div>
+            )}
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-medium mb-1 opacity-70">Effective End Date</label>
+                <input
+                  type="date"
+                  value={endEffectiveTo}
+                  onChange={(e) => {
+                    setEndEffectiveTo(e.target.value);
+                    setEndImpact(null);
+                  }}
+                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"}`}
+                />
+              </div>
+              <div>
+                <label className="block font-medium mb-1 opacity-70">Reason</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Coverage window completed"
+                  value={endReason}
+                  onChange={(e) => setEndReason(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-xl border ${isDark ? "bg-[#0A0C12] border-white/10" : "bg-slate-50 border-slate-200"}`}
+                />
+              </div>
+            </div>
+
+            {endImpact?.affectedShifts?.length > 0 && (
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+                <p className="text-xs font-bold text-amber-500">
+                  Future Published Shifts Impacted ({endImpact.count})
+                </p>
+                <p className="text-[11px] opacity-80">
+                  Confirming will unassign these future published shifts at {endOutletTarget.outlet?.name}. Historical shifts and attendance remain intact.
+                </p>
+                <ul className="space-y-1 text-[11px] max-h-32 overflow-y-auto">
+                  {endImpact.affectedShifts.map((s: any) => (
+                    <li key={s.id} className="flex items-center justify-between">
+                      <span>{new Date(s.shiftDate).toLocaleDateString()} • {s.startTime}–{s.endTime}</span>
+                      <span className="font-medium">{s.roleTitle}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-black/5 dark:border-white/5">
+              <button onClick={() => setEndOutletTarget(null)} className="px-4 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-white/10 cursor-pointer">Cancel</button>
+              <button
+                disabled={saving}
+                onClick={handleConfirmEndOutlet}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white cursor-pointer"
+              >
+                {saving
+                  ? "Processing..."
+                  : endImpact?.affectedShifts?.length > 0
+                  ? `Confirm & Unassign ${endImpact.count} Shift(s)`
+                  : "End Assignment"}
               </button>
             </div>
           </div>
