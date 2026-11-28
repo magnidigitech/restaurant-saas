@@ -148,7 +148,8 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
   };
 
   const [activeModules, setActiveModules] = useState<string[] | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean>(true);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [canManageRoster, setCanManageRoster] = useState<boolean>(false);
 
   // Automatic Branding Fetch & Cache across all pages
   const [internalBranding, setInternalBranding] = useState<RestaurantNavbarProps["branding"] | null>(
@@ -210,6 +211,11 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
           if (data.isAdmin !== undefined) {
             setIsAdmin(!!data.isAdmin);
           }
+          if (data.canManageRoster !== undefined) {
+            setCanManageRoster(!!data.canManageRoster);
+          } else if (data.isAdmin !== undefined) {
+            setCanManageRoster(!!data.isAdmin);
+          }
         }
       })
       .catch(() => {});
@@ -269,14 +275,20 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
       {
         id: "shifts",
         label: "Shifts & Rosters",
-        href: p("/shifts/rosters"),
+        href: canManageRoster ? p("/shifts/rosters") : p("/shifts/my-shifts"),
         icon: CalendarDays,
         moduleKey: "shift_management",
-        children: [
-          { label: "Staff Rosters", desc: "Weekly & daily employee shift schedules", href: p("/shifts/rosters"), quickAction: true },
-          { label: "Schedule Templates", desc: "Reusable shift patterns for lunch & dinner", href: p("/shifts/templates") },
-          { label: "Shift Swaps", desc: "Peer-to-peer shift trade approvals", href: p("/shifts/swaps") },
-        ],
+        children: canManageRoster
+          ? [
+              { label: "Staff Rosters", desc: "Weekly & daily employee shift schedules", href: p("/shifts/rosters"), quickAction: true },
+              { label: "Schedule Templates", desc: "Reusable shift patterns for lunch & dinner", href: p("/shifts/templates") },
+              { label: "My Shifts", desc: "Personal schedule & availability submission", href: p("/shifts/my-shifts") },
+              { label: "Shift Swaps", desc: "Peer-to-peer shift trade approvals", href: p("/shifts/swaps") },
+            ]
+          : [
+              { label: "My Shifts", desc: "View published shifts & submit availability", href: p("/shifts/my-shifts"), quickAction: true },
+              { label: "Shift Swaps", desc: "Request & respond to shift swaps", href: p("/shifts/swaps") },
+            ],
       },
       {
         id: "workforce",
@@ -353,7 +365,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
         ],
       },
     ],
-    [subdomain]
+    [subdomain, canManageRoster]
   );
 
   // Filter modules based on tenant permissions

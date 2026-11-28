@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getShiftActorContext } from "@/modules/shifts/authHelper";
+import { getShiftActorContext, checkRosterOutletAccess } from "@/modules/shifts/authHelper";
 import { ShiftService } from "@/modules/shifts/service";
 
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
@@ -7,6 +7,11 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     const params = await props.params;
     const auth = await getShiftActorContext("shifts:manage_roster");
     if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+    const outletCheck = await checkRosterOutletAccess(auth.ctx, params.id);
+    if (!outletCheck.ok) {
+      return NextResponse.json({ error: outletCheck.error }, { status: outletCheck.status });
+    }
 
     let expectedVersion: number | undefined;
     try {

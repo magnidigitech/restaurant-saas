@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getShiftActorContext } from "@/modules/shifts/authHelper";
+import { getShiftActorContext, checkRosterOutletAccess } from "@/modules/shifts/authHelper";
 import { ShiftService } from "@/modules/shifts/service";
 
 export async function GET(
@@ -10,6 +10,11 @@ export async function GET(
     const { id: rosterId } = await params;
     const auth = await getShiftActorContext("shifts:manage_roster");
     if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+    const outletCheck = await checkRosterOutletAccess(auth.ctx, rosterId);
+    if (!outletCheck.ok) {
+      return NextResponse.json({ error: outletCheck.error }, { status: outletCheck.status });
+    }
 
     const { searchParams } = new URL(req.url);
     const shiftDate = searchParams.get("shiftDate");

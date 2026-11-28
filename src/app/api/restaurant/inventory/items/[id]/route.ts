@@ -25,8 +25,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const access = await verifyAccess(session.userId, session.activeRestaurantId, { moduleKey: "inventory", permissionKey: "inventory:view_items" }, session.tokenVersion);
     if (!access.authorized) return NextResponse.json({ error: access.error }, { status: access.status });
 
-    const item = await InventoryService.getItemById(session.activeRestaurantId, id);
-    return NextResponse.json({ item });
+    const { searchParams } = new URL(req.url);
+    const outletId = searchParams.get("outletId") || undefined;
+
+    const [item, ledgerSummary] = await Promise.all([
+      InventoryService.getItemById(session.activeRestaurantId, id),
+      InventoryService.getItemLedgerBreakdown(session.activeRestaurantId, id, outletId),
+    ]);
+    return NextResponse.json({ item, ledgerSummary });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || "Not found" }, { status: 404 });
   }

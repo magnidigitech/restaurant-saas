@@ -212,7 +212,7 @@ export default function MyShiftsPage() {
   return (
     <ModuleAccessGuard moduleKey="shifts" moduleName="My Shifts">
       <div
-        className={`min-h-screen font-sans antialiased flex flex-col ${
+        className={`min-h-screen font-sans antialiased flex flex-col overflow-x-hidden ${
           isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
         }`}
       >
@@ -294,7 +294,7 @@ export default function MyShiftsPage() {
                   <button
                     type="button"
                     onClick={() => setSwapTargetShift(nextShift)}
-                    className="ml-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#0071E3]/10 text-[#0071E3] font-semibold cursor-pointer"
+                    className="w-full sm:w-auto sm:ml-auto inline-flex items-center justify-center gap-1 px-3 py-2 sm:py-1.5 rounded-xl bg-[#0071E3]/10 text-[#0071E3] font-semibold cursor-pointer"
                   >
                     <ArrowLeftRight className="w-3.5 h-3.5" />
                     <span>Request Swap</span>
@@ -358,10 +358,10 @@ export default function MyShiftsPage() {
                       key={dateKey}
                       className="p-3 rounded-2xl border border-black/[0.06] dark:border-white/[0.06] flex flex-col gap-2"
                     >
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <span className="text-xs font-bold font-mono">{dateKey}</span>
                         {isLeave ? (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-500 border border-purple-500/20">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-500 border border-purple-500/20 self-start sm:self-auto">
                             Approved leave
                           </span>
                         ) : (
@@ -373,7 +373,7 @@ export default function MyShiftsPage() {
                                 [dateKey]: { ...val, type: e.target.value },
                               }))
                             }
-                            className={`px-2.5 py-1 text-xs rounded-xl border ${
+                            className={`w-full sm:w-auto min-w-0 max-w-full px-2.5 py-1.5 text-xs rounded-xl border ${
                               isDark ? "bg-[#090B10] border-white/[0.1]" : "bg-slate-50 border-slate-200"
                             }`}
                           >
@@ -386,7 +386,7 @@ export default function MyShiftsPage() {
                       </div>
 
                       {val.type === "SPECIFIC_TIME" && !isLeave && (
-                        <div className="flex items-center gap-2 text-xs">
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
                           <input
                             type="time"
                             value={val.from}
@@ -396,9 +396,9 @@ export default function MyShiftsPage() {
                                 [dateKey]: { ...val, from: e.target.value },
                               }))
                             }
-                            className="px-2 py-1 rounded-lg border bg-transparent"
+                            className="min-w-0 flex-1 sm:flex-initial px-2 py-1.5 rounded-lg border bg-transparent"
                           />
-                          <span>to</span>
+                          <span className="text-slate-400">to</span>
                           <input
                             type="time"
                             value={val.until}
@@ -408,7 +408,7 @@ export default function MyShiftsPage() {
                                 [dateKey]: { ...val, until: e.target.value },
                               }))
                             }
-                            className="px-2 py-1 rounded-lg border bg-transparent"
+                            className="min-w-0 flex-1 sm:flex-initial px-2 py-1.5 rounded-lg border bg-transparent"
                           />
                         </div>
                       )}
@@ -417,12 +417,12 @@ export default function MyShiftsPage() {
                 })}
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
                   disabled={savingAvail}
                   onClick={() => handleSaveAndSubmitAvailability(false)}
-                  className="px-3.5 py-2 text-xs font-semibold rounded-xl border border-black/10 dark:border-white/10 cursor-pointer"
+                  className="w-full sm:w-auto px-3.5 py-2 text-xs font-semibold rounded-xl border border-black/10 dark:border-white/10 cursor-pointer"
                 >
                   Save Draft
                 </button>
@@ -430,7 +430,7 @@ export default function MyShiftsPage() {
                   type="button"
                   disabled={savingAvail}
                   onClick={() => handleSaveAndSubmitAvailability(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl cursor-pointer"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl cursor-pointer"
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>{savingAvail ? "Submitting..." : "Submit Availability"}</span>
@@ -453,16 +453,16 @@ export default function MyShiftsPage() {
                 {laterShifts.map((s) => (
                   <div
                     key={s.id}
-                    className="p-3.5 rounded-2xl border border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between gap-3"
+                    className="p-3.5 rounded-2xl border border-black/[0.06] dark:border-white/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
                   >
                     <div className="min-w-0 space-y-0.5">
-                      <div className="text-xs font-bold flex items-center gap-2">
+                      <div className="text-xs font-bold flex flex-wrap items-center gap-2">
                         <span>{s.shiftDate.slice(0, 10)}</span>
                         <span className="font-mono text-[#0071E3]">
                           {s.startTime} – {s.endTime}
                         </span>
                       </div>
-                      <div className="text-[11px] text-slate-500 truncate">
+                      <div className="text-[11px] text-slate-500 break-words">
                         {s.outlet.name} ({s.outlet.timezone}) ·{" "}
                         {s.roleName || s.employee?.employmentRecords?.[0]?.designation?.name || "Staff"}
                       </div>
@@ -470,7 +470,7 @@ export default function MyShiftsPage() {
                     <button
                       type="button"
                       onClick={() => setSwapTargetShift(s)}
-                      className="px-2.5 py-1.5 text-[11px] font-semibold rounded-xl bg-black/5 dark:bg-white/5 hover:text-[#0071E3] shrink-0 cursor-pointer"
+                      className="w-full sm:w-auto px-3 py-1.5 text-[11px] font-semibold rounded-xl bg-black/5 dark:bg-white/5 hover:text-[#0071E3] shrink-0 cursor-pointer"
                     >
                       Swap
                     </button>
@@ -483,26 +483,28 @@ export default function MyShiftsPage() {
 
         {/* Swap Request Modal */}
         {swapTargetShift && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
             <form
               onSubmit={handleRequestSwap}
-              className={`w-full max-w-md rounded-3xl border p-5 space-y-4 ${
+              className={`w-full max-w-md max-h-[calc(100dvh-1rem)] sm:max-h-[90dvh] rounded-3xl border flex flex-col overflow-hidden my-auto ${
                 isDark ? "bg-[#121622] border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
               }`}
             >
-              <h3 className="text-sm font-bold">Request Shift Swap</h3>
-              <p className="text-xs text-slate-500">
-                {swapTargetShift.shiftDate.slice(0, 10)} · {swapTargetShift.startTime}–{swapTargetShift.endTime} at{" "}
-                {swapTargetShift.outlet.name}
-              </p>
-              <textarea
-                rows={3}
-                placeholder="Reason for swap request..."
-                value={swapReason}
-                onChange={(e) => setSwapReason(e.target.value)}
-                className="w-full p-2.5 text-xs rounded-xl border bg-transparent"
-              />
-              <div className="flex justify-end gap-2">
+              <div className="p-5 space-y-3 overflow-y-auto flex-1 min-h-0">
+                <h3 className="text-sm font-bold">Request Shift Swap</h3>
+                <p className="text-xs text-slate-500">
+                  {swapTargetShift.shiftDate.slice(0, 10)} · {swapTargetShift.startTime}–{swapTargetShift.endTime} at{" "}
+                  {swapTargetShift.outlet.name}
+                </p>
+                <textarea
+                  rows={3}
+                  placeholder="Reason for swap request..."
+                  value={swapReason}
+                  onChange={(e) => setSwapReason(e.target.value)}
+                  className="w-full p-2.5 text-xs rounded-xl border bg-transparent"
+                />
+              </div>
+              <div className="px-5 py-3.5 border-t border-black/[0.06] dark:border-white/[0.06] flex justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setSwapTargetShift(null)}

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTenantSession } from "@/core/auth/session";
-import { verifyAccess } from "@/core/permissions/check";
+import { getShiftActorContext, checkRosterOutletAccess } from "@/modules/shifts/authHelper";
 import { ShiftService } from "@/modules/shifts/service";
 import { z } from "zod";
 
@@ -15,12 +14,28 @@ const updateRosterSchema = z.object({
 export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   try {
     const params = await props.params;
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const access = await verifyAccess(session.userId, session.activeRestaurantId, { moduleKey: "shifts", permissionKey: "shifts:view_roster" }, session.tokenVersion);
-    if (!access.authorized) return NextResponse.json({ error: access.error }, { status: access.status });
+    const auth = await getShiftActorContext("shifts:view_roster");
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-    const roster = await ShiftService.getRosterById(session.activeRestaurantId, params.id);
+    const outletCheck = await checkRosterOutletAccess(auth.ctx, params.id);
+    if (!outletCheck.ok) {
+      return NextResponse.json({ error: outletCheck.error }, { status: outletCheck.status });
+    }
+
+    const roster: any = await ShiftService.getRosterById(auth.ctx.restaurantId, params.id);
+    if (!auth.ctx.canManageRoster) {
+      if (roster.status === "DRAFT" || roster.status === "ARCHIVED") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      const { draftRevisionJson: _draft, ...safeRoster } = roster;
+      if (Array.isArray(safeRoster.assignments)) {
+        safeRoster.assignments = auth.ctx.employeeId
+          ? safeRoster.assignments.filter((a: any) => a.employeeId === auth.ctx.employeeId)
+          : [];
+      }
+      return NextResponse.json({ roster: safeRoster });
+    }
+
     return NextResponse.json({ roster });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || "Internal server error" }, { status: 404 });
@@ -30,16 +45,19 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
 export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   try {
     const params = await props.params;
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const access = await verifyAccess(session.userId, session.activeRestaurantId, { moduleKey: "shifts", permissionKey: "shifts:manage_roster" }, session.tokenVersion);
-    if (!access.authorized) return NextResponse.json({ error: access.error }, { status: access.status });
+    const auth = await getShiftActorContext("shifts:manage_roster");
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+    const outletCheck = await checkRosterOutletAccess(auth.ctx, params.id);
+    if (!outletCheck.ok) {
+      return NextResponse.json({ error: outletCheck.error }, { status: outletCheck.status });
+    }
 
     const body = await req.json();
     const result = updateRosterSchema.safeParse(body);
     if (!result.success) return NextResponse.json({ error: "Invalid payload", details: result.error.flatten() }, { status: 400 });
 
-    const roster = await ShiftService.updateRoster(session.activeRestaurantId, params.id, result.data as any);
+    const roster = await ShiftService.updateRoster(auth.ctx.restaurantId, params.id, result.data as any);
     return NextResponse.json({ success: true, roster });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || "Internal server error" }, { status: 400 });
@@ -49,12 +67,15 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   try {
     const params = await props.params;
-    const session = await getTenantSession();
-    if (!session || !session.activeRestaurantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const access = await verifyAccess(session.userId, session.activeRestaurantId, { moduleKey: "shifts", permissionKey: "shifts:manage_roster" }, session.tokenVersion);
-    if (!access.authorized) return NextResponse.json({ error: access.error }, { status: access.status });
+    const auth = await getShiftActorContext("shifts:manage_roster");
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-    await ShiftService.deleteRoster(session.activeRestaurantId, params.id);
+    const outletCheck = await checkRosterOutletAccess(auth.ctx, params.id);
+    if (!outletCheck.ok) {
+      return NextResponse.json({ error: outletCheck.error }, { status: outletCheck.status });
+    }
+
+    await ShiftService.deleteRoster(auth.ctx.restaurantId, params.id);
     return NextResponse.json({ success: true, message: "Roster deleted" });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || "Internal server error" }, { status: 400 });

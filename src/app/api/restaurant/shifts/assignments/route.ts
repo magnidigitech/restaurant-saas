@@ -110,6 +110,14 @@ export async function POST(req: NextRequest) {
       if (!bulkResult.success) {
         return NextResponse.json({ error: "Invalid payload", details: bulkResult.error.flatten() }, { status: 400 });
       }
+      if (auth.ctx.accessibleOutletIds) {
+        const outOfScope = bulkResult.data.assignments.some(
+          (a) => !auth.ctx.accessibleOutletIds!.includes(a.outletId)
+        );
+        if (outOfScope) {
+          return NextResponse.json({ error: "Forbidden for this outlet" }, { status: 403 });
+        }
+      }
       const created = await ShiftService.bulkCreateAssignments(
         auth.ctx.restaurantId,
         bulkResult.data.assignments as any,
@@ -179,6 +187,18 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "Missing assignment id" }, { status: 400 });
+
+    const existing = await prisma.shiftAssignment.findFirst({
+      where: { id, restaurantId: auth.ctx.restaurantId },
+      select: { outletId: true },
+    });
+    if (
+      existing &&
+      auth.ctx.accessibleOutletIds &&
+      !auth.ctx.accessibleOutletIds.includes(existing.outletId)
+    ) {
+      return NextResponse.json({ error: "Forbidden for this outlet" }, { status: 403 });
+    }
 
     await ShiftService.deleteAssignment(auth.ctx.restaurantId, id);
     return NextResponse.json({ success: true, message: "Assignment removed" });

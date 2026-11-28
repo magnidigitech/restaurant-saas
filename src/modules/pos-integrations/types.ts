@@ -54,7 +54,7 @@ export interface NormalizedOrder {
   providerOrderId: string;
   providerLocationId?: string;
   orderNumber: string;
-  orderType: "DINE_IN" | "TAKEAWAY" | "DELIVERY";
+  orderType: "DINE_IN" | "TAKEAWAY" | "DELIVERY" | "UNKNOWN";
   status: "COMPLETED" | "CANCELLED" | "PENDING";
   currency: string;
   environment: "SANDBOX" | "PRODUCTION";

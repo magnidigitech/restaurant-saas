@@ -1,4 +1,9 @@
 import { prisma } from "@/core/database/client";
+import { convertQuantity } from "@/core/inventory/units";
+
+function roundQty4(val: number): number {
+  return Math.round(val * 10000) / 10000;
+}
 
 export const InventoryService = {
   // ── Categories ──────────────────────────────────────────────────────────
@@ -821,13 +826,46 @@ export const InventoryService = {
       itemId: string;
       movementType: string;
       quantity: number;
+      packId?: string;
+      packCount?: number;
       referenceId?: string;
       notes?: string;
       recordedBy: string;
     }
   ) {
-    await prisma.inventoryItem.findFirstOrThrow({ where: { id: data.itemId, restaurantId } });
-    await prisma.restaurantOutlet.findFirstOrThrow({ where: { id: data.outletId, restaurantId } });
+    const item = await prisma.inventoryItem.findFirstOrThrow({
+      where: { id: data.itemId, restaurantId },
+    });
+    await prisma.restaurantOutlet.findFirstOrThrow({
+      where: { id: data.outletId, restaurantId },
+    });
+
+    let baseQty = Number(data.quantity);
+    let derivedNotes = data.notes || "";
+
+    if (data.packId && data.packCount && data.packCount > 0) {
+      const pack = await prisma.itemPurchasePack.findFirstOrThrow({
+        where: { id: data.packId, itemId: item.id, restaurantId },
+      });
+      const rawPackTotal = Number(data.packCount) * Number(pack.netQuantityPerPack);
+      baseQty =
+        pack.packUnit === item.unitOfMeasure
+          ? rawPackTotal
+          : convertQuantity(rawPackTotal, pack.packUnit, item.unitOfMeasure);
+      baseQty = roundQty4(baseQty);
+      const packDesc = `${data.packCount} × ${pack.name} (${pack.netQuantityPerPack} ${pack.packUnit}) = ${baseQty} ${item.unitOfMeasure}`;
+      derivedNotes = derivedNotes ? `${packDesc} — ${derivedNotes}` : packDesc;
+    }
+
+    // Enforce deterministic sign per movementType
+    const positiveTypes = new Set(["PURCHASE", "TRANSFER_IN", "RETURN"]);
+    const negativeTypes = new Set(["TRANSFER_OUT", "CONSUMPTION", "WASTAGE"]);
+    let signedQty = roundQty4(baseQty);
+    if (positiveTypes.has(data.movementType)) {
+      signedQty = Math.abs(signedQty);
+    } else if (negativeTypes.has(data.movementType)) {
+      signedQty = -Math.abs(signedQty);
+    }
 
     return prisma.stockLedger.create({
       data: {
@@ -835,12 +873,167 @@ export const InventoryService = {
         outletId: data.outletId,
         itemId: data.itemId,
         movementType: data.movementType as any,
-        quantity: data.quantity,
+        quantity: signedQty,
         referenceId: data.referenceId,
-        notes: data.notes,
+        notes: derivedNotes || undefined,
         recordedBy: data.recordedBy,
       },
     });
+  },
+
+  async transferStockBetweenOutlets(
+    restaurantId: string,
+    data: {
+      fromOutletId: string;
+      toOutletId: string;
+      itemId: string;
+      quantity: number;
+      referenceId?: string;
+      notes?: string;
+      recordedBy: string;
+    }
+  ) {
+    if (data.fromOutletId === data.toOutletId) {
+      throw new Error("Source and destination outlets must be different");
+    }
+    const qty = roundQty4(Math.abs(Number(data.quantity)));
+    if (qty <= 0) {
+      throw new Error("Transfer quantity must be greater than zero");
+    }
+
+    await prisma.inventoryItem.findFirstOrThrow({
+      where: { id: data.itemId, restaurantId },
+    });
+    const [fromOutlet, toOutlet] = await Promise.all([
+      prisma.restaurantOutlet.findFirstOrThrow({
+        where: { id: data.fromOutletId, restaurantId },
+        select: { id: true, name: true },
+      }),
+      prisma.restaurantOutlet.findFirstOrThrow({
+        where: { id: data.toOutletId, restaurantId },
+        select: { id: true, name: true },
+      }),
+    ]);
+
+    const ref = data.referenceId || `TRF-${Date.now()}`;
+    const noteOut = `Transfer to ${toOutlet.name}${data.notes ? ` — ${data.notes}` : ""}`;
+    const noteIn = `Transfer from ${fromOutlet.name}${data.notes ? ` — ${data.notes}` : ""}`;
+
+    return prisma.$transaction(async (tx) => {
+      const outEntry = await tx.stockLedger.create({
+        data: {
+          restaurantId,
+          outletId: fromOutlet.id,
+          itemId: data.itemId,
+          movementType: "TRANSFER_OUT",
+          quantity: -qty,
+          referenceId: ref,
+          notes: noteOut,
+          recordedBy: data.recordedBy,
+        },
+      });
+      const inEntry = await tx.stockLedger.create({
+        data: {
+          restaurantId,
+          outletId: toOutlet.id,
+          itemId: data.itemId,
+          movementType: "TRANSFER_IN",
+          quantity: qty,
+          referenceId: ref,
+          notes: noteIn,
+          recordedBy: data.recordedBy,
+        },
+      });
+      return { referenceId: ref, outEntry, inEntry };
+    });
+  },
+
+  async getItemLedgerBreakdown(restaurantId: string, itemId: string, outletId?: string) {
+    const entries = await prisma.stockLedger.findMany({
+      where: {
+        restaurantId,
+        itemId,
+        ...(outletId && outletId !== "ALL" ? { outletId } : {}),
+      },
+      include: {
+        outlet: { select: { id: true, name: true } },
+      },
+      orderBy: [{ occurredAt: "asc" }, { createdAt: "asc" }],
+    });
+
+    const attribution = {
+      purchase: 0,
+      transferIn: 0,
+      transferOut: 0,
+      wastage: 0,
+      consumption: 0,
+      adjustment: 0,
+      return: 0,
+    };
+
+    const byOutletMap = new Map<string, { outletId: string; outletName: string; expectedBalance: number }>();
+    let runningBalance = 0;
+
+    const chronological = entries.map((e) => {
+      const qty = Number(e.quantity);
+      runningBalance = roundQty4(runningBalance + qty);
+
+      switch (e.movementType) {
+        case "PURCHASE":
+          attribution.purchase = roundQty4(attribution.purchase + qty);
+          break;
+        case "TRANSFER_IN":
+          attribution.transferIn = roundQty4(attribution.transferIn + qty);
+          break;
+        case "TRANSFER_OUT":
+          attribution.transferOut = roundQty4(attribution.transferOut + qty);
+          break;
+        case "WASTAGE":
+          attribution.wastage = roundQty4(attribution.wastage + qty);
+          break;
+        case "CONSUMPTION":
+          attribution.consumption = roundQty4(attribution.consumption + qty);
+          break;
+        case "ADJUSTMENT":
+          attribution.adjustment = roundQty4(attribution.adjustment + qty);
+          break;
+        case "RETURN":
+          attribution.return = roundQty4(attribution.return + qty);
+          break;
+      }
+
+      const existingOutlet = byOutletMap.get(e.outletId);
+      if (existingOutlet) {
+        existingOutlet.expectedBalance = roundQty4(existingOutlet.expectedBalance + qty);
+      } else {
+        byOutletMap.set(e.outletId, {
+          outletId: e.outletId,
+          outletName: e.outlet?.name || "Outlet",
+          expectedBalance: roundQty4(qty),
+        });
+      }
+
+      return {
+        id: e.id,
+        outletId: e.outletId,
+        outletName: e.outlet?.name || "Outlet",
+        movementType: e.movementType,
+        quantity: roundQty4(qty),
+        runningBalance,
+        referenceId: e.referenceId,
+        notes: e.notes,
+        recordedBy: e.recordedBy,
+        occurredAt: e.occurredAt,
+        createdAt: e.createdAt,
+      };
+    });
+
+    return {
+      expectedBalance: runningBalance,
+      attribution,
+      byOutlet: Array.from(byOutletMap.values()),
+      movements: chronological.reverse(),
+    };
   },
 
   async getStockByOutlet(restaurantId: string, outletId?: string) {

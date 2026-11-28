@@ -138,6 +138,30 @@ export async function getShiftActorContext(
         }
       : null;
 
+  if (requiredPermission === "shifts:manage_roster" && !canManageRoster) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Forbidden: missing 'shifts:manage_roster' permission",
+    };
+  }
+
+  if (requiredPermission === "shifts:approve_swap" && !canApproveSwap) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Forbidden: missing 'shifts:approve_swap' permission",
+    };
+  }
+
+  if (outletId && accessibleOutletIds !== null && !accessibleOutletIds.includes(outletId)) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Forbidden for this outlet",
+    };
+  }
+
   return {
     ok: true,
     ctx: {
@@ -153,4 +177,24 @@ export async function getShiftActorContext(
       accessibleOutletIds,
     },
   };
+}
+
+/**
+ * Verifies that a roster belongs to the actor's restaurant and an accessible outlet.
+ */
+export async function checkRosterOutletAccess(
+  ctx: ShiftActorContext,
+  rosterId: string
+): Promise<{ ok: true; outletId: string } | { ok: false; status: number; error: string }> {
+  const roster = await prisma.shiftRoster.findFirst({
+    where: { id: rosterId, restaurantId: ctx.restaurantId },
+    select: { outletId: true },
+  });
+  if (!roster) {
+    return { ok: false, status: 404, error: "Roster not found" };
+  }
+  if (ctx.accessibleOutletIds !== null && !ctx.accessibleOutletIds.includes(roster.outletId)) {
+    return { ok: false, status: 403, error: "Forbidden for this outlet" };
+  }
+  return { ok: true, outletId: roster.outletId };
 }

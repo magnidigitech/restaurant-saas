@@ -405,11 +405,20 @@ export class ToastAdapter implements PosProviderAdapter {
     const diningOptStr = String(
       o.diningOption?.displayName || o.diningOption?.name || o.diningOption || ""
     ).toUpperCase();
-    let derivedOrderType: "DINE_IN" | "TAKEAWAY" | "DELIVERY" = "TAKEAWAY";
+    let derivedOrderType: "DINE_IN" | "TAKEAWAY" | "DELIVERY" | "UNKNOWN" = "UNKNOWN";
     if (diningOptStr.includes("DINE") || diningOptStr.includes("TABLE")) {
       derivedOrderType = "DINE_IN";
     } else if (diningOptStr.includes("DELIVER")) {
       derivedOrderType = "DELIVERY";
+    } else if (
+      diningOptStr.includes("TAKE") ||
+      diningOptStr.includes("PICK") ||
+      diningOptStr.includes("CARRY") ||
+      diningOptStr.includes("TOGO") ||
+      diningOptStr.includes("TO GO") ||
+      diningOptStr.includes("COUNTER")
+    ) {
+      derivedOrderType = "TAKEAWAY";
     }
 
     const orderGuid =

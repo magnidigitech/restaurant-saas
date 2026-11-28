@@ -77,7 +77,7 @@ export default function ShiftsDashboard() {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [templatesCount, setTemplatesCount] = useState(0);
   const [swaps, setSwaps] = useState<any[]>([]);
-  const [canManageRoster, setCanManageRoster] = useState(true);
+  const [canManageRoster, setCanManageRoster] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

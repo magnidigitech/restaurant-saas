@@ -166,6 +166,7 @@ model Restaurant {
   posIntegrations      PosIntegration[]
   posSyncRuns          PosSyncRun[]
   posMenuItemMappings  PosMenuItemMapping[]
+  stockCounts          StockCount[]
   vaultFolders         VaultFolder[]
   vaultItems           VaultItem[]
   vaultAuditLogs       VaultAuditLog[]
@@ -260,6 +261,7 @@ model RestaurantOutlet {
   outletAssignments EmployeeOutletAssignment[]
   stockLedger       StockLedger[]
   wastageLogs       WastageLog[]
+  stockCounts       StockCount[]
   purchaseOrders    PurchaseOrder[]
   shiftRosters      ShiftRoster[]
   shiftAssignments  ShiftAssignment[]
@@ -1175,6 +1177,7 @@ model InventoryItem {
   recipeItems  RecipeItem[]
   purchasePacks ItemPurchasePack[]
   poReceipts   PurchaseOrderReceipt[]
+  stockCountItems StockCountItem[]
 
   @@unique([restaurantId, name])
   @@index([restaurantId])
@@ -1238,6 +1241,72 @@ enum StockMovementType {
   CONSUMPTION
   WASTAGE
   RETURN
+}
+
+enum StockCountStatus {
+  DRAFT
+  SUBMITTED
+  NEEDS_RECOUNT
+  APPROVED
+  CANCELLED
+}
+
+model StockCount {
+  id                String           @id @default(uuid())
+  restaurantId      String           @map("restaurant_id")
+  outletId          String           @map("outlet_id")
+  countNumber       String           @map("count_number")
+  status            StockCountStatus @default(DRAFT)
+  countDate         DateTime         @default(now()) @map("count_date")
+  cutoffAt          DateTime         @map("cutoff_at")
+  startedByUserId   String           @map("started_by_user_id")
+  submittedAt       DateTime?        @map("submitted_at")
+  submittedByUserId String?          @map("submitted_by_user_id")
+  reviewedAt        DateTime?        @map("reviewed_at")
+  reviewedByUserId  String?          @map("reviewed_by_user_id")
+  approvedAt        DateTime?        @map("approved_at")
+  approvedByUserId  String?          @map("approved_by_user_id")
+  notes             String?
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  restaurant Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  outlet     RestaurantOutlet @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  items      StockCountItem[]
+
+  @@unique([restaurantId, countNumber])
+  @@index([restaurantId, outletId, status])
+  @@map("stock_counts")
+}
+
+model StockCountItem {
+  id                       String        @id @default(uuid())
+  stockCountId             String        @map("stock_count_id")
+  itemId                   String        @map("item_id")
+  unitOfMeasure            UnitOfMeasure @map("unit_of_measure")
+  isCounted                Boolean       @default(false) @map("is_counted")
+  countedBaseInput         Decimal?      @map("counted_base_input")
+  countedPacksJson         Json?         @map("counted_packs_json")
+  countedBaseQty           Decimal?      @map("counted_base_qty")
+  expectedAtCutoff         Decimal       @default(0) @map("expected_at_cutoff")
+  varianceQty              Decimal       @default(0) @map("variance_qty")
+  laterMovementsQty        Decimal       @default(0) @map("later_movements_qty")
+  reviewedExpectedAtCutoff Decimal?      @map("reviewed_expected_at_cutoff")
+  recountRequested         Boolean       @default(false) @map("recount_requested")
+  recountReason            String?       @map("recount_reason")
+  adjustmentLedgerId       String?       @map("adjustment_ledger_id")
+  countedByUserId          String?       @map("counted_by_user_id")
+  countedAt                DateTime?     @map("counted_at")
+  createdAt                DateTime      @default(now()) @map("created_at")
+  updatedAt                DateTime      @updatedAt @map("updated_at")
+
+  stockCount StockCount    @relation(fields: [stockCountId], references: [id], onDelete: Cascade)
+  item       InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([stockCountId, itemId])
+  @@index([stockCountId])
+  @@index([itemId])
+  @@map("stock_count_items")
 }
 
 enum WastageReason {
@@ -1991,8 +2060,10 @@ model RecipeItem {
   notes             String?
   originalText      String?             @map("original_text")
   statedQuantityRaw String?             @map("stated_quantity_raw")
-  isUnresolved      Boolean             @default(false) @map("is_unresolved")
-  unresolvedReason  String?             @map("unresolved_reason")
+  isUnresolved         Boolean             @default(false) @map("is_unresolved")
+  unresolvedReason     String?             @map("unresolved_reason")
+  isPackaging          Boolean             @default(false) @map("is_packaging")
+  applicableOrderTypes String[]            @default([]) @map("applicable_order_types")
   createdAt         DateTime            @default(now()) @map("created_at")
   updatedAt         DateTime            @updatedAt @map("updated_at")
 
@@ -2013,6 +2084,7 @@ enum PosOrderType {
   DINE_IN
   TAKEAWAY
   DELIVERY
+  UNKNOWN
 }
 
 enum PosOrderStatus {
@@ -2115,8 +2187,10 @@ model PosOrder {
   providerVersion     String?          @map("provider_version")
   businessDate        String?          @map("business_date")
   syncHash            String?          @map("sync_hash")
-  isPartialSnapshot   Boolean          @default(false) @map("is_partial_snapshot")
-  lastSyncedAt        DateTime?        @map("last_synced_at")
+  isPartialSnapshot       Boolean          @default(false) @map("is_partial_snapshot")
+  lastSyncedAt            DateTime?        @map("last_synced_at")
+  packagingReviewRequired Boolean          @default(false) @map("packaging_review_required")
+  packagingReviewReason   String?          @map("packaging_review_reason")
   customerName        String?          @map("customer_name")
   customerPhone       String?          @map("customer_phone")
   rawPayload          Json?            @map("raw_payload")
@@ -2215,6 +2289,7 @@ model PosMenuItemMapping {
   recipeId                String?          @map("recipe_id")
   modifierAdjustmentsJson Json?            @map("modifier_adjustments_json")
   isIgnored               Boolean          @default(false) @map("is_ignored")
+  effectiveFrom           DateTime?        @map("effective_from")
   mappedByUserId          String?          @map("mapped_by_user_id")
   mappedAt                DateTime?        @map("mapped_at")
   createdAt               DateTime         @default(now()) @map("created_at")

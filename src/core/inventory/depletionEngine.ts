@@ -24,11 +24,17 @@ export interface OrderDepletionResult {
  * Uses exact culinary shrinkage math: Gross Quantity = Usable Quantity ÷ (1 - Loss%).
  * Resolves item-specific purchase packs and blocks draft recipes from depletion.
  */
+export interface ExplodeOptions {
+  orderType?: string;
+  onPackagingSkippedForUnknown?: (itemName: string) => void;
+}
+
 export async function explodeRecipeToRawIngredients(
   recipeId: string,
   multiplier = 1,
   visited = new Set<string>(),
-  visitedPath: string[] = []
+  visitedPath: string[] = [],
+  options?: ExplodeOptions
 ): Promise<Map<string, { itemId: string; name: string; quantity: number; unit: UnitOfMeasure; wastageIncluded: boolean }>> {
   if (visited.has(recipeId)) {
     const cycleStr = [...visitedPath, recipeId].join(" ➔ ");
@@ -84,6 +90,19 @@ export async function explodeRecipeToRawIngredients(
       );
     }
 
+    // Conditional order-type packaging: only apply when orderType matches applicableOrderTypes
+    const applicableTypes = item.applicableOrderTypes || [];
+    if (item.isPackaging || applicableTypes.length > 0) {
+      const ordType = options?.orderType;
+      if (!ordType || ordType === "UNKNOWN") {
+        options?.onPackagingSkippedForUnknown?.(item.inventoryItem?.name || "Packaging");
+        continue;
+      }
+      if (applicableTypes.length > 0 && !applicableTypes.includes(ordType)) {
+        continue;
+      }
+    }
+
     let usableQty = Number(item.quantity);
     let recipeUnit = item.unitOfMeasure;
 
@@ -124,7 +143,8 @@ export async function explodeRecipeToRawIngredients(
         item.subRecipe.id,
         subUnitQty,
         new Set(visited),
-        [...visitedPath, recipe.name]
+        [...visitedPath, recipe.name],
+        options
       );
 
       for (const [invId, subComp] of subExplosion.entries()) {
@@ -178,7 +198,13 @@ export async function depleteOrderInventory(
   for (const orderItem of order.items) {
     if (!orderItem.recipeId) continue;
 
-    const exploded = await explodeRecipeToRawIngredients(orderItem.recipeId, orderItem.quantity);
+    const exploded = await explodeRecipeToRawIngredients(
+      orderItem.recipeId,
+      orderItem.quantity,
+      new Set(),
+      [],
+      { orderType: order.orderType }
+    );
     for (const [invId, comp] of exploded.entries()) {
       const existing = aggregatedIngredients.get(invId);
       if (existing) {

@@ -50,6 +50,7 @@ export function getProviderAdapter(provider: string): PosProviderAdapter {
 
 export function computeOrderSyncHash(order: NormalizedOrder): string {
   const canonical = {
+    orderType: order.orderType,
     status: order.status,
     paymentStatus: order.paymentStatus || "PAID",
     paymentMethod: order.paymentMethod || "",
@@ -712,6 +713,7 @@ export async function upsertNormalizedPosOrder(params: {
 
     const dbMatchesOrder =
       existing.syncHash === syncHash &&
+      existing.orderType === order.orderType &&
       existing.status === order.status &&
       (existing.businessDate || null) === (order.businessDate || null) &&
       Math.round(Number(existing.totalAmount) * 100) === Math.round(order.totalAmount * 100) &&

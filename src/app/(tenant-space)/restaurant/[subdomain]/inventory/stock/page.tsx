@@ -277,7 +277,19 @@ export default function InventoryStockPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => router.push(`/restaurant/${subdomain}/inventory/counts`)}
+                className={`px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-semibold border transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                  isDark
+                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 shadow-2xs"
+                }`}
+              >
+                <PackageCheck className="w-3.5 h-3.5" />
+                <span>Physical Counts</span>
+              </button>
               <button
                 onClick={openGeneralAdjust}
                 className="px-3.5 py-1.5 sm:py-2 bg-[#0071E3] hover:bg-[#0077ED] active:scale-[0.98] text-white text-xs font-semibold rounded-xl transition shadow-sm cursor-pointer whitespace-nowrap"

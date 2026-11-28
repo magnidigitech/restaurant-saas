@@ -128,14 +128,14 @@ export default function ShiftSwapsPage() {
   return (
     <ModuleAccessGuard moduleKey="shifts" moduleName="Shift Swaps">
       <div
-        className={`min-h-screen font-sans antialiased flex flex-col ${
+        className={`min-h-screen font-sans antialiased flex flex-col overflow-x-hidden ${
           isDark ? "bg-[#090B10] text-[#E4E7EB]" : "bg-[#F5F5F7] text-[#1D1D1F]"
         }`}
       >
         <RestaurantNavbar activeSection="Shifts & Scheduling" />
 
-        <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <main className="flex-1 w-full max-w-5xl mx-auto px-3 sm:px-6 py-5 sm:py-6 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pl-12 lg:pl-0">
             <div>
               <button
                 type="button"
@@ -148,7 +148,7 @@ export default function ShiftSwapsPage() {
               <h1 className="text-xl font-bold tracking-tight">Shift Swaps & Approvals</h1>
             </div>
 
-            <div className="flex items-center gap-1 p-1 rounded-2xl bg-black/[0.04] dark:bg-white/[0.04]">
+            <div className="flex items-center gap-1 p-1 rounded-2xl bg-black/[0.04] dark:bg-white/[0.04] overflow-x-auto max-w-full">
               {["ALL", "PENDING", "APPROVED", "REJECTED"].map((tab) => (
                 <button
                   key={tab}

@@ -5,6 +5,34 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 
+interface LedgerMovement {
+  id: string;
+  outletId: string;
+  outletName: string;
+  movementType: string;
+  quantity: number;
+  runningBalance: number;
+  referenceId?: string | null;
+  notes?: string | null;
+  occurredAt: string;
+  createdAt: string;
+}
+
+interface LedgerSummary {
+  expectedBalance: number;
+  attribution: {
+    purchase: number;
+    transferIn: number;
+    transferOut: number;
+    wastage: number;
+    consumption: number;
+    adjustment: number;
+    return: number;
+  };
+  byOutlet: Array<{ outletId: string; outletName: string; expectedBalance: number }>;
+  movements: LedgerMovement[];
+}
+
 interface ItemDetail {
   id: string;
   name: string;
@@ -17,13 +45,6 @@ interface ItemDetail {
   currentStock: number;
   isLowStock: boolean;
   category?: { id: string; name: string } | null;
-  stockLedgers?: {
-    id: string;
-    changeType: string;
-    quantityDelta: number;
-    notes?: string;
-    createdAt: string;
-  }[];
 }
 
 interface Category {
@@ -81,6 +102,8 @@ export default function InventoryItemDetailPage({
   const { isDark } = useTheme();
 
   const [item, setItem] = useState<ItemDetail | null>(null);
+  const [ledgerSummary, setLedgerSummary] = useState<LedgerSummary | null>(null);
+  const [ledgerOutletId, setLedgerOutletId] = useState<string>("ALL");
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -111,6 +134,7 @@ export default function InventoryItemDetailPage({
       const dataItem = await resItem.json();
       if (resItem.ok && dataItem.item) {
         setItem(dataItem.item);
+        if (dataItem.ledgerSummary) setLedgerSummary(dataItem.ledgerSummary);
         setForm({
           name: dataItem.item.name || "",
           sku: dataItem.item.sku || "",
@@ -525,17 +549,87 @@ export default function InventoryItemDetailPage({
           )}
         </div>
 
-        {/* Stock Movement Ledgers History */}
+        {/* Stock Movement Ledgers History & Balance Attribution */}
         <div
           className={`p-6 rounded-3xl border transition space-y-4 ${
             isDark ? "bg-[#121622]/60 border-white/[0.06]" : "bg-white border-slate-200/80 shadow-xs"
           }`}
         >
-          <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
-            Stock Movement History
-          </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-white" : "text-slate-900"}`}>
+                Stock Movement Ledger &amp; Balance Attribution
+              </h2>
+              <p className={`text-xs mt-0.5 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                Explains expected stock balance from receipts, transfers, wastage, recipe usage, and adjustments.
+              </p>
+            </div>
+            {ledgerSummary && ledgerSummary.byOutlet.length > 0 && (
+              <select
+                aria-label="Filter ledger by outlet"
+                value={ledgerOutletId}
+                onChange={async (e) => {
+                  const val = e.target.value;
+                  setLedgerOutletId(val);
+                  const res = await fetch(
+                    `/api/restaurant/inventory/items/${itemId}${val !== "ALL" ? `?outletId=${encodeURIComponent(val)}` : ""}`
+                  );
+                  if (res.ok) {
+                    const d = await res.json();
+                    if (d.ledgerSummary) setLedgerSummary(d.ledgerSummary);
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-medium ${
+                  isDark ? "bg-[#0B0D14] border-white/[0.1] text-white" : "bg-slate-50 border-slate-200 text-slate-800"
+                }`}
+              >
+                <option value="ALL">All Outlets</option>
+                {ledgerSummary.byOutlet.map((o) => (
+                  <option key={o.outletId} value={o.outletId}>
+                    {o.outletName} ({o.expectedBalance} {formatUnit(item.unitOfMeasure as any)})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
 
-          {!item.stockLedgers || item.stockLedgers.length === 0 ? (
+          {ledgerSummary && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+              {[
+                { label: "Purchased (+)", val: ledgerSummary.attribution.purchase, cls: "text-emerald-600" },
+                {
+                  label: "Transfers Net",
+                  val: ledgerSummary.attribution.transferIn + ledgerSummary.attribution.transferOut,
+                  cls: "text-blue-600",
+                },
+                { label: "Wastage (-)", val: ledgerSummary.attribution.wastage, cls: "text-rose-600" },
+                { label: "Recipe Usage (-)", val: ledgerSummary.attribution.consumption, cls: "text-amber-600" },
+                { label: "Adjustments", val: ledgerSummary.attribution.adjustment, cls: "text-indigo-600" },
+                {
+                  label: "Expected Balance",
+                  val: ledgerSummary.expectedBalance,
+                  cls: isDark ? "text-white font-bold" : "text-slate-900 font-bold",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className={`p-3 rounded-2xl border ${
+                    isDark ? "bg-white/[0.02] border-white/[0.06]" : "bg-slate-50/70 border-slate-200/70"
+                  }`}
+                >
+                  <div className={`text-[11px] font-medium ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                    {stat.label}
+                  </div>
+                  <div className={`text-sm font-semibold mt-0.5 tabular-nums ${stat.cls}`}>
+                    {stat.val > 0 && stat.label !== "Expected Balance" ? `+${stat.val}` : stat.val}{" "}
+                    {formatUnit(item.unitOfMeasure as any)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!ledgerSummary || ledgerSummary.movements.length === 0 ? (
             <div className={`p-8 text-center text-xs ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
               No stock movements recorded for this item yet.
             </div>
@@ -547,26 +641,38 @@ export default function InventoryItemDetailPage({
                     isDark ? "border-white/[0.06] text-[#8F95A3]" : "border-slate-200 text-slate-500"
                   }`}>
                     <th className="pb-3 px-3">Date</th>
+                    <th className="pb-3 px-3">Outlet</th>
                     <th className="pb-3 px-3">Movement Type</th>
                     <th className="pb-3 px-3">Quantity Delta</th>
+                    <th className="pb-3 px-3">Running Balance</th>
+                    <th className="pb-3 px-3">Reference</th>
                     <th className="pb-3 px-3">Notes</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/[0.04] dark:divide-white/[0.04]">
-                  {item.stockLedgers.map((l) => (
+                  {ledgerSummary.movements.map((l) => (
                     <tr key={l.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition">
-                      <td className={`py-3 px-3 ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
-                        {new Date(l.createdAt).toLocaleString()}
+                      <td className={`py-3 px-3 whitespace-nowrap ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                        {new Date(l.occurredAt || l.createdAt).toLocaleString()}
+                      </td>
+                      <td className={`py-3 px-3 ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
+                        {l.outletName}
                       </td>
                       <td className="py-3 px-3">
-                        <span className="font-mono text-[10px] uppercase font-bold px-2 py-0.5 rounded border bg-white/[0.04] border-white/[0.08]">
-                          {l.changeType}
+                        <span className="font-mono text-[10px] uppercase font-bold px-2 py-0.5 rounded border bg-slate-100 dark:bg-white/[0.04] border-slate-200 dark:border-white/[0.08]">
+                          {l.movementType}
                         </span>
                       </td>
-                      <td className="py-3 px-3 font-semibold">
-                        <span className={l.quantityDelta >= 0 ? "text-emerald-500" : "text-rose-500"}>
-                          {l.quantityDelta >= 0 ? `+${l.quantityDelta}` : l.quantityDelta}
+                      <td className="py-3 px-3 font-semibold tabular-nums">
+                        <span className={l.quantity >= 0 ? "text-emerald-600" : "text-rose-600"}>
+                          {l.quantity >= 0 ? `+${l.quantity}` : l.quantity}
                         </span>
+                      </td>
+                      <td className={`py-3 px-3 font-semibold tabular-nums ${isDark ? "text-white" : "text-slate-900"}`}>
+                        {l.runningBalance} {formatUnit(item.unitOfMeasure as any)}
+                      </td>
+                      <td className={`py-3 px-3 font-mono text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-500"}`}>
+                        {l.referenceId || "—"}
                       </td>
                       <td className={`py-3 px-3 ${isDark ? "text-[#BAC0CD]" : "text-slate-700"}`}>
                         {l.notes || "—"}

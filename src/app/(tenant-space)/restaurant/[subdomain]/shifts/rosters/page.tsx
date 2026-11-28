@@ -164,7 +164,8 @@ export default function ShiftRostersWorkspacePage() {
   const [templates, setTemplates] = useState<ShiftTemplate[]>([]);
   const [assignments, setAssignments] = useState<ShiftAssignment[]>([]);
   const [availabilityData, setAvailabilityData] = useState<any>(null);
-  const [canManageRoster, setCanManageRoster] = useState(true);
+  const [canManageRoster, setCanManageRoster] = useState(false);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [bannerError, setBannerError] = useState<string | null>(null);
   const [bannerSuccess, setBannerSuccess] = useState<string | null>(null);
@@ -253,7 +254,11 @@ export default function ShiftRostersWorkspacePage() {
         const d = await resRosters.json();
         const rosterList: ShiftRoster[] = d.rosters || [];
         setRosters(rosterList);
-        if (d.permissions) setCanManageRoster(Boolean(d.permissions.canManageRoster));
+        if (d.permissions) {
+          setCanManageRoster(Boolean(d.permissions.canManageRoster));
+        } else {
+          setCanManageRoster(false);
+        }
 
         const urlRosterId = preferredRosterId || searchParams.get("rosterId");
         if (urlRosterId && rosterList.some((r) => r.id === urlRosterId)) {
@@ -276,6 +281,7 @@ export default function ShiftRostersWorkspacePage() {
         setTemplates(d.templates || []);
       }
     } finally {
+      setPermissionsLoaded(true);
       setLoading(false);
     }
   };
@@ -858,6 +864,34 @@ export default function ShiftRostersWorkspacePage() {
 
   const outletRosters = rosters.filter((r) => !selectedOutletId || r.outletId === selectedOutletId);
 
+  useEffect(() => {
+    if (permissionsLoaded && !canManageRoster && subdomain) {
+      router.replace(`/restaurant/${subdomain}/shifts/my-shifts`);
+    }
+  }, [permissionsLoaded, canManageRoster, router, subdomain]);
+
+  if (permissionsLoaded && !canManageRoster) {
+    return (
+      <ModuleAccessGuard moduleKey="shifts" moduleName="Shifts & Rosters">
+        <div className="min-h-screen flex items-center justify-center p-4 bg-[#F5F5F7] dark:bg-[#090B10] text-slate-900 dark:text-white">
+          <div className="max-w-sm w-full rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#121622] p-6 text-center space-y-3">
+            <h1 className="text-base font-bold">Manager Access Required</h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Roster management is restricted to authorized managers. Redirecting you to My Shifts...
+            </p>
+            <button
+              type="button"
+              onClick={() => router.replace(`/restaurant/${subdomain}/shifts/my-shifts`)}
+              className="w-full px-4 py-2 rounded-xl bg-[#0071E3] text-white text-xs font-semibold cursor-pointer"
+            >
+              Go to My Shifts
+            </button>
+          </div>
+        </div>
+      </ModuleAccessGuard>
+    );
+  }
+
   return (
     <ModuleAccessGuard moduleKey="shifts" moduleName="Roster Scheduler">
       <div
@@ -1326,57 +1360,71 @@ export default function ShiftRostersWorkspacePage() {
 
         {/* CREATE ROSTER MODAL */}
         {createRosterOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
             <form
               onSubmit={handleCreateRoster}
-              className={`w-full max-w-md rounded-3xl border p-6 space-y-4 ${
+              className={`w-full max-w-md max-h-[calc(100dvh-1rem)] sm:max-h-[90dvh] rounded-3xl border flex flex-col overflow-hidden my-auto ${
                 isDark ? "bg-[#121622] border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
               }`}
             >
-              <h3 className="text-sm font-bold">Create Shift Roster</h3>
-              <div>
-                <label className="block text-[11px] font-semibold mb-1">Roster Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Bi-Weekly Dec 1–14"
-                  value={newRosterName}
-                  onChange={(e) => setNewRosterName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border bg-transparent"
-                />
+              <div className="px-5 py-4 border-b border-black/[0.06] dark:border-white/[0.06] flex items-center justify-between shrink-0">
+                <h3 className="text-sm font-bold">Create Shift Roster</h3>
+                <button
+                  type="button"
+                  onClick={() => setCreateRosterOpen(false)}
+                  aria-label="Close"
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+
+              <div className="p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
                 <div>
-                  <label className="block text-[11px] font-semibold mb-1">Start Date *</label>
+                  <label className="block text-[11px] font-semibold mb-1">Roster Name *</label>
                   <input
-                    type="date"
+                    type="text"
                     required
-                    value={newRosterStart}
-                    onChange={(e) => setNewRosterStart(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border bg-transparent"
+                    placeholder="e.g. Bi-Weekly Dec 1–14"
+                    value={newRosterName}
+                    onChange={(e) => setNewRosterName(e.target.value)}
+                    className="w-full min-w-0 max-w-full box-border px-3 py-2 text-xs rounded-xl border bg-transparent"
                   />
                 </div>
-                <div>
-                  <label className="block text-[11px] font-semibold mb-1">End Date *</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="min-w-0">
+                    <label className="block text-[11px] font-semibold mb-1">Start Date *</label>
+                    <input
+                      type="date"
+                      required
+                      value={newRosterStart}
+                      onChange={(e) => setNewRosterStart(e.target.value)}
+                      className="w-full min-w-0 max-w-full box-border appearance-none px-3 py-2 text-xs rounded-xl border bg-transparent [&::-webkit-date-and-time-value]:text-left"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <label className="block text-[11px] font-semibold mb-1">End Date *</label>
+                    <input
+                      type="date"
+                      required
+                      value={newRosterEnd}
+                      onChange={(e) => setNewRosterEnd(e.target.value)}
+                      className="w-full min-w-0 max-w-full box-border appearance-none px-3 py-2 text-xs rounded-xl border bg-transparent [&::-webkit-date-and-time-value]:text-left"
+                    />
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <label className="block text-[11px] font-semibold mb-1">Availability Deadline (Optional)</label>
                   <input
-                    type="date"
-                    required
-                    value={newRosterEnd}
-                    onChange={(e) => setNewRosterEnd(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border bg-transparent"
+                    type="datetime-local"
+                    value={newRosterDeadline}
+                    onChange={(e) => setNewRosterDeadline(e.target.value)}
+                    className="w-full min-w-0 max-w-full box-border appearance-none px-3 py-2 text-xs rounded-xl border bg-transparent [&::-webkit-date-and-time-value]:text-left"
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-[11px] font-semibold mb-1">Availability Deadline (Optional)</label>
-                <input
-                  type="datetime-local"
-                  value={newRosterDeadline}
-                  onChange={(e) => setNewRosterDeadline(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border bg-transparent"
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
+
+              <div className="px-5 py-3.5 border-t border-black/[0.06] dark:border-white/[0.06] flex justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setCreateRosterOpen(false)}

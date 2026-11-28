@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getShiftActorContext } from "@/modules/shifts/authHelper";
+import { getShiftActorContext, checkRosterOutletAccess } from "@/modules/shifts/authHelper";
 import { ShiftService, DraftRevisionPayload } from "@/modules/shifts/service";
 import { z } from "zod";
 
@@ -58,6 +58,11 @@ export async function PUT(
     const { id: rosterId } = await params;
     const auth = await getShiftActorContext("shifts:manage_roster");
     if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+    const outletCheck = await checkRosterOutletAccess(auth.ctx, rosterId);
+    if (!outletCheck.ok) {
+      return NextResponse.json({ error: outletCheck.error }, { status: outletCheck.status });
+    }
 
     const body = await req.json();
     const parsed = saveRevisionSchema.safeParse(body);

@@ -32,7 +32,14 @@ export async function GET(req: NextRequest) {
       include: {
         accessGrants: {
           where: { status: "ACTIVE" },
-          include: { role: true, module: true },
+          include: {
+            role: {
+              include: {
+                permissions: true,
+              },
+            },
+            module: true,
+          },
         },
       },
     });
@@ -99,8 +106,19 @@ export async function GET(req: NextRequest) {
 
     const isAdmin = hasAdminRole || (totalGrants === 0 && !membership?.employeeId);
 
+    const canManageRoster =
+      Boolean(isAdmin) ||
+      Boolean(
+        membership?.accessGrants.some(
+          (g) =>
+            (g.moduleId === "shifts" || g.moduleId === "shift_management") &&
+            g.role?.permissions?.some((p) => p.permissionId === "shifts:manage_roster")
+        )
+      );
+
     return NextResponse.json({
       isAdmin,
+      canManageRoster,
       role: membership?.accessGrants?.[0]?.role?.name || (isAdmin ? "Admin" : "Staff"),
       employeeId: membership?.employeeId || null,
       modules: allowedModules.map((tm) => ({
