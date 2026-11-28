@@ -135,7 +135,7 @@ export default function ShiftSwapsPage() {
         <RestaurantNavbar activeSection="Shifts & Scheduling" />
 
         <main className="flex-1 w-full max-w-5xl mx-auto px-3 sm:px-6 py-5 sm:py-6 space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pl-12 lg:pl-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <button
                 type="button"

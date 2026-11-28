@@ -5,6 +5,7 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
 import ModuleAccessGuard from "@/components/ModuleAccessGuard";
+import SearchableCombobox from "@/components/SearchableCombobox";
 import {
   ArrowLeft,
   Plus,
@@ -166,6 +167,7 @@ export default function ShiftRostersWorkspacePage() {
   const [availabilityData, setAvailabilityData] = useState<any>(null);
   const [canManageRoster, setCanManageRoster] = useState(false);
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+  const [rosterPickerOpen, setRosterPickerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [bannerError, setBannerError] = useState<string | null>(null);
   const [bannerSuccess, setBannerSuccess] = useState<string | null>(null);
@@ -902,147 +904,175 @@ export default function ShiftRostersWorkspacePage() {
         <RestaurantNavbar activeSection="Shifts & Scheduling" />
 
         <main className="flex-1 w-full max-w-[1600px] mx-auto px-3 sm:px-6 py-4 space-y-4">
-          {/* Compact Toolbar */}
-          <div
-            className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col xl:flex-row xl:items-center justify-between gap-3 ${
-              isDark ? "bg-[#121622] border-white/[0.08]" : "bg-white border-slate-200 shadow-xs"
-            }`}
-          >
-            <div className="flex items-center gap-2.5 flex-wrap pl-12 lg:pl-0">
+          {/* Page Title & Back Navigation */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5 min-w-0">
               <button
                 type="button"
                 onClick={() => router.push(`/restaurant/${subdomain}/shifts`)}
-                className="p-2 rounded-xl border border-black/10 dark:border-white/10 text-slate-500 hover:text-[#0071E3] cursor-pointer"
+                className="p-2 rounded-xl border border-black/10 dark:border-white/10 text-slate-500 hover:text-[#0071E3] cursor-pointer shrink-0"
                 title="Back to Shift Operations"
+                aria-label="Back to Shift Operations"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate">Staff Rosters</h1>
+            </div>
 
-              <select
-                value={selectedOutletId}
-                onChange={(e) => {
-                  setSelectedOutletId(e.target.value);
-                  const first = rosters.find((r) => r.outletId === e.target.value);
-                  setSelectedRosterId(first?.id || "");
-                }}
-                aria-label="Select outlet"
-                className={`px-3 py-2 text-xs font-semibold rounded-xl border ${
-                  isDark ? "bg-[#090B10] border-white/10 text-white" : "bg-slate-50 border-slate-200"
+            {selectedRoster && (
+              <span
+                className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border shrink-0 ${
+                  STATUS_BADGE_MAP[selectedRoster.status]?.cls || ""
                 }`}
               >
-                {outlets.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.name} ({o.timezone})
-                  </option>
-                ))}
-              </select>
+                {STATUS_BADGE_MAP[selectedRoster.status]?.label || selectedRoster.status} (v{selectedRoster.version})
+              </span>
+            )}
+          </div>
 
-              <select
-                value={selectedRosterId}
-                onChange={(e) => setSelectedRosterId(e.target.value)}
-                aria-label="Select roster"
-                className={`px-3 py-2 text-xs font-semibold rounded-xl border max-w-[230px] ${
-                  isDark ? "bg-[#090B10] border-white/10 text-white" : "bg-slate-50 border-slate-200"
-                }`}
-              >
-                {outletRosters.length === 0 ? (
-                  <option value="">No rosters yet</option>
-                ) : (
-                  outletRosters.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name} ({r.startDate.slice(0, 10)} → {r.endDate.slice(0, 10)})
-                    </option>
-                  ))
-                )}
-              </select>
-
-              {selectedRoster && (
-                <span
-                  className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${
-                    STATUS_BADGE_MAP[selectedRoster.status]?.cls || ""
+          {/* Outlet & Roster Controls */}
+          <div
+            className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col xl:flex-row xl:items-end justify-between gap-3 ${
+              isDark ? "bg-[#121622] border-white/[0.08]" : "bg-white border-slate-200 shadow-xs"
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-start gap-3 w-full xl:w-auto">
+              <div className="w-full sm:w-[220px] min-w-0">
+                <label
+                  htmlFor="roster-outlet-select"
+                  className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1"
+                >
+                  Outlet
+                </label>
+                <select
+                  id="roster-outlet-select"
+                  value={selectedOutletId}
+                  onChange={(e) => {
+                    setSelectedOutletId(e.target.value);
+                    const first = rosters.find((r) => r.outletId === e.target.value);
+                    setSelectedRosterId(first?.id || "");
+                    setRosterPickerOpen(false);
+                  }}
+                  aria-label="Outlet"
+                  className={`w-full px-3 py-2 text-xs font-semibold rounded-xl border ${
+                    isDark ? "bg-[#090B10] border-white/10 text-white" : "bg-slate-50 border-slate-200"
                   }`}
                 >
-                  {STATUS_BADGE_MAP[selectedRoster.status]?.label || selectedRoster.status} (v{selectedRoster.version})
-                </span>
-              )}
-            </div>
+                  {outlets.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedOutlet?.timezone && (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                    {selectedOutlet.timezone}
+                  </p>
+                )}
+              </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
-              {totalWeeks > 1 && (
-                <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-black/[0.04] dark:bg-white/[0.04] text-xs">
-                  <button
-                    type="button"
-                    disabled={weekIndex === 0}
-                    onClick={() => setWeekIndex((w) => Math.max(0, w - 1))}
-                    className="p-1 rounded-lg disabled:opacity-30 cursor-pointer"
-                    aria-label="Previous week"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <span className="px-2 font-semibold">
-                    Week {weekIndex + 1} of {totalWeeks}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={weekIndex >= totalWeeks - 1}
-                    onClick={() => setWeekIndex((w) => Math.min(totalWeeks - 1, w + 1))}
-                    className="p-1 rounded-lg disabled:opacity-30 cursor-pointer"
-                    aria-label="Next week"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+              {outletRosters.length > 0 && (
+                <div className="w-full sm:w-[300px] min-w-0">
+                  <SearchableCombobox
+                    id="roster-picker"
+                    label="Roster"
+                    value={selectedRosterId}
+                    onChange={(val) => {
+                      setSelectedRosterId(val);
+                      setWeekIndex(0);
+                    }}
+                    options={outletRosters.map((r) => ({
+                      value: r.id,
+                      label: `${r.name} (${r.startDate.slice(0, 10)} → ${r.endDate.slice(0, 10)})`,
+                      searchText: `${r.name} ${r.startDate.slice(0, 10)} ${r.endDate.slice(0, 10)} ${r.status}`,
+                    }))}
+                    placeholder="Search rosters..."
+                    isOpen={rosterPickerOpen}
+                    onOpenChange={setRosterPickerOpen}
+                    isDark={isDark}
+                  />
                 </div>
               )}
-
-              {canManageRoster && (
-                <button
-                  type="button"
-                  onClick={() => setCreateRosterOpen(true)}
-                  className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold rounded-xl border border-black/10 dark:border-white/10 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>New Roster</span>
-                </button>
-              )}
-
-              {nextLifecycleAction?.secondary && (
-                <button
-                  type="button"
-                  onClick={() => handleStatusTransition(nextLifecycleAction.secondary!.nextStatus)}
-                  className="px-3 py-2 text-xs font-semibold rounded-xl border border-black/10 dark:border-white/10 cursor-pointer"
-                >
-                  {nextLifecycleAction.secondary.label}
-                </button>
-              )}
-
-              {nextLifecycleAction && (
-                <button
-                  type="button"
-                  onClick={() => handleStatusTransition(nextLifecycleAction.nextStatus)}
-                  className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 cursor-pointer"
-                >
-                  {nextLifecycleAction.label}
-                </button>
-              )}
-
-              {canManageRoster && selectedRoster && (
-                <button
-                  type="button"
-                  onClick={openReviewModal}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-[#0071E3] hover:bg-[#0077ED] text-white shadow-xs cursor-pointer"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>
-                    {selectedRoster.status === "PUBLISHED" ? "Review & Publish Revision" : "Review & Publish"}
-                  </span>
-                  {pendingRevisionCount > 0 && (
-                    <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-white text-[#0071E3] font-bold">
-                      {pendingRevisionCount}
-                    </span>
-                  )}
-                </button>
-              )}
             </div>
+
+            {outletRosters.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {totalWeeks > 1 && (
+                  <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-black/[0.04] dark:bg-white/[0.04] text-xs">
+                    <button
+                      type="button"
+                      disabled={weekIndex === 0}
+                      onClick={() => setWeekIndex((w) => Math.max(0, w - 1))}
+                      className="p-1 rounded-lg disabled:opacity-30 cursor-pointer"
+                      aria-label="Previous week"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className="px-2 font-semibold">
+                      Week {weekIndex + 1} of {totalWeeks}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={weekIndex >= totalWeeks - 1}
+                      onClick={() => setWeekIndex((w) => Math.min(totalWeeks - 1, w + 1))}
+                      className="p-1 rounded-lg disabled:opacity-30 cursor-pointer"
+                      aria-label="Next week"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                {canManageRoster && (
+                  <button
+                    type="button"
+                    onClick={() => setCreateRosterOpen(true)}
+                    className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold rounded-xl border border-black/10 dark:border-white/10 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>New Roster</span>
+                  </button>
+                )}
+
+                {nextLifecycleAction?.secondary && (
+                  <button
+                    type="button"
+                    onClick={() => handleStatusTransition(nextLifecycleAction.secondary!.nextStatus)}
+                    className="px-3 py-2 text-xs font-semibold rounded-xl border border-black/10 dark:border-white/10 cursor-pointer"
+                  >
+                    {nextLifecycleAction.secondary.label}
+                  </button>
+                )}
+
+                {nextLifecycleAction && (
+                  <button
+                    type="button"
+                    onClick={() => handleStatusTransition(nextLifecycleAction.nextStatus)}
+                    className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 cursor-pointer"
+                  >
+                    {nextLifecycleAction.label}
+                  </button>
+                )}
+
+                {canManageRoster && selectedRoster && (
+                  <button
+                    type="button"
+                    onClick={openReviewModal}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-[#0071E3] hover:bg-[#0077ED] text-white shadow-xs cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>
+                      {selectedRoster.status === "PUBLISHED" ? "Review & Publish Revision" : "Review & Publish"}
+                    </span>
+                    {pendingRevisionCount > 0 && (
+                      <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-white text-[#0071E3] font-bold">
+                        {pendingRevisionCount}
+                      </span>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Alerts & Revision Banner */}
@@ -1097,9 +1127,29 @@ export default function ShiftRostersWorkspacePage() {
           )}
 
           {!selectedRoster ? (
-            <div className="p-12 text-center rounded-3xl border border-dashed border-black/10 dark:border-white/10 text-xs text-slate-400">
-              {loading ? "Loading roster workspace..." : "Select or create a roster for this outlet to begin scheduling."}
-            </div>
+            loading ? (
+              <div className="p-8 text-center rounded-3xl border border-dashed border-black/10 dark:border-white/10 text-xs text-slate-400">
+                Loading roster workspace...
+              </div>
+            ) : (
+              <div
+                className={`p-6 rounded-3xl border text-center space-y-3 ${
+                  isDark ? "bg-[#121622] border-white/[0.08]" : "bg-white border-slate-200 shadow-xs"
+                }`}
+              >
+                <p className="text-sm font-semibold">No rosters for this outlet yet</p>
+                {canManageRoster && (
+                  <button
+                    type="button"
+                    onClick={() => setCreateRosterOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0071E3] hover:bg-[#0077ED] text-white text-xs font-semibold rounded-xl cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>New Roster</span>
+                  </button>
+                )}
+              </div>
+            )
           ) : (
             <>
               {/* DESKTOP WEEKLY GRID */}

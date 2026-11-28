@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useTheme } from "@/core/theme/ThemeContext";
 import RestaurantNavbar from "@/components/RestaurantNavbar";
@@ -34,6 +35,9 @@ interface SearchableComboboxProps {
   emptyOptionLabel?: string;
   isDark: boolean;
   dropDirection?: "up" | "down";
+  dialogContainerRef?: React.RefObject<HTMLDivElement | null>;
+  overlayContainerRef?: React.RefObject<HTMLDivElement | null>;
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 function SearchableCombobox({
@@ -45,17 +49,35 @@ function SearchableCombobox({
   emptyOptionLabel = "None",
   isDark,
   dropDirection = "down",
+  dialogContainerRef,
+  overlayContainerRef,
+  scrollContainerRef,
 }: SearchableComboboxProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [overlayStyle, setOverlayStyle] = useState<React.CSSProperties>({});
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputBoxRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const selectedItem = options.find((o) => o.id === value);
 
   useEffect(() => {
+    const checkDesktop = () => setIsDesktop(window.innerWidth >= 640);
+    checkDesktop();
+    window.addEventListener("resize", checkDesktop);
+    return () => window.removeEventListener("resize", checkDesktop);
+  }, []);
+
+  useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const inWrapper = wrapperRef.current?.contains(target);
+      const inMenu = menuRef.current?.contains(target);
+      if (!inWrapper && !inMenu) {
         setIsOpen(false);
       }
     };
@@ -63,13 +85,86 @@ function SearchableCombobox({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredOptions = query
+  const filteredOptions = (query
     ? options.filter((o) => o.name.toLowerCase().includes(query.toLowerCase()))
-    : options;
+    : options
+  ).slice(0, 5);
 
   const exactMatch = options.some(
     (o) => o.name.toLowerCase() === query.trim().toLowerCase()
   );
+
+  // Build flat keyboard-selectable items list
+  const selectableItems: Array<
+    | { kind: "empty" }
+    | { kind: "option"; id: string; name: string }
+    | { kind: "create" }
+  > = [];
+  if (emptyOptionLabel) selectableItems.push({ kind: "empty" });
+  for (const opt of filteredOptions) {
+    selectableItems.push({ kind: "option", id: opt.id, name: opt.name });
+  }
+  if (query.trim() && !exactMatch && onAddNew) {
+    selectableItems.push({ kind: "create" });
+  }
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [query, isOpen]);
+
+  // Compute desktop overlay position relative to dialogContainerRef
+  useEffect(() => {
+    if (!isOpen || !isDesktop || !overlayContainerRef?.current || !dialogContainerRef?.current) {
+      return;
+    }
+
+    const updateOverlayPosition = () => {
+      const inputEl = inputBoxRef.current;
+      const dialogEl = dialogContainerRef.current;
+      if (!inputEl || !dialogEl) return;
+
+      const inputRect = inputEl.getBoundingClientRect();
+      const dialogRect = dialogEl.getBoundingClientRect();
+
+      const spaceBelow = Math.max(0, window.innerHeight - inputRect.bottom - 12);
+      const spaceAbove = Math.max(0, inputRect.top - 12);
+
+      const openUp =
+        dropDirection === "up"
+          ? spaceAbove >= 140 || spaceAbove > spaceBelow
+          : spaceBelow < 180 && spaceAbove > spaceBelow;
+
+      const left = inputRect.left - dialogRect.left;
+      const width = inputRect.width;
+
+      if (openUp) {
+        setOverlayStyle({
+          position: "absolute",
+          left,
+          width,
+          bottom: dialogRect.bottom - inputRect.top + 6,
+          maxHeight: Math.max(100, Math.min(224, spaceAbove)),
+        });
+      } else {
+        setOverlayStyle({
+          position: "absolute",
+          left,
+          width,
+          top: inputRect.bottom - dialogRect.top + 6,
+          maxHeight: Math.max(100, Math.min(224, spaceBelow)),
+        });
+      }
+    };
+
+    updateOverlayPosition();
+    const scrollEl = scrollContainerRef?.current;
+    scrollEl?.addEventListener("scroll", updateOverlayPosition, { passive: true });
+    window.addEventListener("resize", updateOverlayPosition);
+    return () => {
+      scrollEl?.removeEventListener("scroll", updateOverlayPosition);
+      window.removeEventListener("resize", updateOverlayPosition);
+    };
+  }, [isOpen, isDesktop, dropDirection, dialogContainerRef, overlayContainerRef, scrollContainerRef]);
 
   const handleSelect = (id: string) => {
     onChange(id);
@@ -94,21 +189,161 @@ function SearchableCombobox({
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      e.preventDefault();
+      setIsOpen(true);
+      return;
+    }
+    if (!isOpen) return;
+
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsOpen(false);
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (selectableItems.length > 0) {
+        setActiveIndex((prev) => (prev + 1) % selectableItems.length);
+      }
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (selectableItems.length > 0) {
+        setActiveIndex((prev) => (prev - 1 + selectableItems.length) % selectableItems.length);
+      }
+      return;
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const item = selectableItems[activeIndex];
+      if (!item) return;
+      if (item.kind === "empty") handleSelect("");
+      else if (item.kind === "option") handleSelect(item.id);
+      else if (item.kind === "create") void handleCreateNew();
+    }
+  };
+
+  const menuContent = (
+    <div
+      ref={menuRef}
+      role="listbox"
+      style={isDesktop && overlayContainerRef?.current ? overlayStyle : undefined}
+      className={`${
+        isDesktop && overlayContainerRef?.current
+          ? "pointer-events-auto"
+          : `absolute left-0 right-0 ${dropDirection === "up" ? "bottom-full mb-1.5" : "top-full mt-1.5"}`
+      } z-50 max-h-56 overflow-y-auto rounded-2xl border shadow-xl p-1 text-xs space-y-0.5 ${
+        isDark
+          ? "bg-[#121622] border-white/[0.1] text-white shadow-2xl shadow-black/80"
+          : "bg-white border-slate-200 text-slate-900 shadow-xl shadow-slate-900/10"
+      }`}
+    >
+      {emptyOptionLabel && (
+        <button
+          type="button"
+          role="option"
+          aria-selected={!value}
+          onClick={() => handleSelect("")}
+          className={`w-full text-left px-3 py-2 rounded-xl transition flex items-center justify-between cursor-pointer ${
+            !value
+              ? isDark
+                ? "bg-[#0071E3]/20 text-[#0071E3] font-semibold"
+                : "bg-blue-50 text-[#0071E3] font-semibold"
+              : selectableItems[activeIndex]?.kind === "empty"
+              ? isDark
+                ? "bg-white/[0.08] text-white"
+                : "bg-slate-100 text-slate-900"
+              : isDark
+              ? "hover:bg-white/[0.06] text-[#8F95A3]"
+              : "hover:bg-slate-100 text-slate-600"
+          }`}
+        >
+          <span>{emptyOptionLabel}</span>
+          {!value && <span>✓</span>}
+        </button>
+      )}
+
+      {filteredOptions.map((opt) => {
+        const isSelected = opt.id === value;
+        const activeItem = selectableItems[activeIndex];
+        const isHighlighted = activeItem?.kind === "option" && activeItem.id === opt.id;
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            role="option"
+            aria-selected={isSelected}
+            onClick={() => handleSelect(opt.id)}
+            className={`w-full text-left px-3 py-2 rounded-xl transition flex items-center justify-between cursor-pointer ${
+              isSelected
+                ? "bg-[#0071E3] text-white font-semibold"
+                : isHighlighted
+                ? isDark
+                  ? "bg-white/[0.08] text-white"
+                  : "bg-slate-100 text-slate-900"
+                : isDark
+                ? "hover:bg-white/[0.06] text-white"
+                : "hover:bg-slate-100 text-slate-800"
+            }`}
+          >
+            <span className="truncate">{opt.name}</span>
+            {isSelected && <span>✓</span>}
+          </button>
+        );
+      })}
+
+      {filteredOptions.length === 0 && !query && (
+        <div className={`p-3 text-center text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
+          No options available
+        </div>
+      )}
+
+      {query.trim() && !exactMatch && onAddNew && (
+        <button
+          type="button"
+          disabled={isCreating}
+          onClick={handleCreateNew}
+          className={`w-full text-left px-3 py-2 rounded-xl transition flex items-center gap-2 cursor-pointer font-medium ${
+            isDark
+              ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 border border-blue-500/30"
+              : "bg-blue-50 text-[#0071E3] hover:bg-blue-100 border border-blue-200"
+          }`}
+        >
+          <span>+</span>
+          <span>{isCreating ? "Creating..." : `Create "${query.trim()}"`}</span>
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div ref={wrapperRef} className="relative">
       <label className={`block text-xs font-medium mb-1.5 ${isDark ? "text-[#8F95A3]" : "text-slate-600"}`}>
         {label}
       </label>
 
-      <div className="relative">
+      <div ref={inputBoxRef} className="relative">
         <input
           type="text"
+          role="combobox"
+          aria-expanded={isOpen}
           value={isOpen ? query : selectedItem ? selectedItem.name : ""}
           placeholder={selectedItem ? selectedItem.name : emptyOptionLabel}
           onFocus={() => {
             setIsOpen(true);
             setQuery("");
           }}
+          onClick={() => {
+            if (!isOpen) {
+              setIsOpen(true);
+              setQuery("");
+            }
+          }}
+          onKeyDown={handleKeyDown}
           onChange={(e) => {
             setQuery(e.target.value);
             if (!isOpen) setIsOpen(true);
@@ -147,83 +382,10 @@ function SearchableCombobox({
         </div>
       </div>
 
-      {/* Floating Menu (Upward or Downward) */}
-      {isOpen && (
-        <div
-          className={`absolute left-0 right-0 ${
-            dropDirection === "up" ? "bottom-full mb-1.5" : "top-full mt-1.5"
-          } z-50 max-h-56 overflow-y-auto rounded-2xl border shadow-xl p-1 text-xs space-y-0.5 ${
-            isDark
-              ? "bg-[#121622] border-white/[0.1] text-white shadow-2xl shadow-black/80"
-              : "bg-white border-slate-200 text-slate-900 shadow-xl shadow-slate-900/10"
-          }`}
-        >
-          {emptyOptionLabel && (
-            <button
-              type="button"
-              onClick={() => handleSelect("")}
-              className={`w-full text-left px-3 py-2 rounded-xl transition flex items-center justify-between cursor-pointer ${
-                !value
-                  ? isDark
-                    ? "bg-[#0071E3]/20 text-[#0071E3] font-semibold"
-                    : "bg-blue-50 text-[#0071E3] font-semibold"
-                  : isDark
-                  ? "hover:bg-white/[0.06] text-[#8F95A3]"
-                  : "hover:bg-slate-100 text-slate-600"
-              }`}
-            >
-              <span>{emptyOptionLabel}</span>
-              {!value && <span>✓</span>}
-            </button>
-          )}
-
-          {filteredOptions.map((opt) => {
-            const isSelected = opt.id === value;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => handleSelect(opt.id)}
-                className={`w-full text-left px-3 py-2 rounded-xl transition flex items-center justify-between cursor-pointer ${
-                  isSelected
-                    ? isDark
-                      ? "bg-[#0071E3] text-white font-semibold"
-                      : "bg-[#0071E3] text-white font-semibold"
-                    : isDark
-                    ? "hover:bg-white/[0.06] text-white"
-                    : "hover:bg-slate-100 text-slate-800"
-                }`}
-              >
-                <span className="truncate">{opt.name}</span>
-                {isSelected && <span>✓</span>}
-              </button>
-            );
-          })}
-
-          {filteredOptions.length === 0 && !query && (
-            <div className={`p-3 text-center text-[11px] ${isDark ? "text-[#8F95A3]" : "text-slate-400"}`}>
-              No options available
-            </div>
-          )}
-
-          {/* Quick Create on Typing */}
-          {query.trim() && !exactMatch && onAddNew && (
-            <button
-              type="button"
-              disabled={isCreating}
-              onClick={handleCreateNew}
-              className={`w-full text-left px-3 py-2 rounded-xl transition flex items-center gap-2 cursor-pointer font-medium ${
-                isDark
-                  ? "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 border border-blue-500/30"
-                  : "bg-blue-50 text-[#0071E3] hover:bg-blue-100 border border-blue-200"
-              }`}
-            >
-              <span>+</span>
-              <span>{isCreating ? "Creating..." : `Create "${query.trim()}"`}</span>
-            </button>
-          )}
-        </div>
-      )}
+      {isOpen &&
+        (isDesktop && overlayContainerRef?.current
+          ? createPortal(menuContent, overlayContainerRef.current)
+          : menuContent)}
     </div>
   );
 }
@@ -315,6 +477,9 @@ export default function AppleEmployeeDirectoryPage() {
     (statusFilter !== "active" ? 1 : 0);
 
   const [showModal, setShowModal] = useState(false);
+  const addDialogRef = useRef<HTMLDivElement>(null);
+  const addOverlayRef = useRef<HTMLDivElement>(null);
+  const addScrollRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
 
   // Excel Bulk Import Modal State
@@ -1530,10 +1695,13 @@ export default function AppleEmployeeDirectoryPage() {
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 animate-in fade-in duration-200">
           <div
-            className={`w-full sm:max-w-xl max-h-[92vh] sm:max-h-[88vh] rounded-t-3xl sm:rounded-3xl border-t sm:border shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-200 sm:zoom-in-95 ${
+            ref={addDialogRef}
+            className={`relative w-full sm:max-w-xl max-h-[92vh] sm:max-h-[88vh] rounded-t-3xl sm:rounded-3xl border-t sm:border shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-200 sm:zoom-in-95 ${
               isDark ? "bg-[#121622] border-white/[0.08] text-white" : "bg-white border-slate-200 text-slate-900"
             }`}
           >
+            {/* Desktop Combobox Overlay Layer (outside clipped form body) */}
+            <div ref={addOverlayRef} className="pointer-events-none absolute inset-0 z-40 hidden sm:block" />
             {/* Mobile Sheet Drag Indicator */}
             <div className="pt-3 pb-1 block sm:hidden shrink-0">
               <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-white/20 mx-auto" />
@@ -1557,7 +1725,7 @@ export default function AppleEmployeeDirectoryPage() {
 
             {/* Modal Form */}
             <form onSubmit={handleCreate} className="flex flex-col flex-1 overflow-hidden">
-              <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-4 space-y-4">
+              <div ref={addScrollRef} className="flex-1 overflow-y-auto px-5 sm:px-6 py-4 space-y-4">
                 {error && (
                   <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-xl">
                     {error}
@@ -1644,6 +1812,9 @@ export default function AppleEmployeeDirectoryPage() {
                         }}
                         emptyOptionLabel="Select Type..."
                         isDark={isDark}
+                        dialogContainerRef={addDialogRef}
+                        overlayContainerRef={addOverlayRef}
+                        scrollContainerRef={addScrollRef}
                       />
                     </div>
 
@@ -1697,6 +1868,9 @@ export default function AppleEmployeeDirectoryPage() {
                         }}
                         emptyOptionLabel="Select Type..."
                         isDark={isDark}
+                        dialogContainerRef={addDialogRef}
+                        overlayContainerRef={addOverlayRef}
+                        scrollContainerRef={addScrollRef}
                       />
                     </div>
 
@@ -1728,6 +1902,9 @@ export default function AppleEmployeeDirectoryPage() {
                       emptyOptionLabel="None / General"
                       dropDirection="up"
                       isDark={isDark}
+                      dialogContainerRef={addDialogRef}
+                      overlayContainerRef={addOverlayRef}
+                      scrollContainerRef={addScrollRef}
                     />
                   </div>
 
@@ -1741,6 +1918,9 @@ export default function AppleEmployeeDirectoryPage() {
                       emptyOptionLabel="None / Staff"
                       dropDirection="up"
                       isDark={isDark}
+                      dialogContainerRef={addDialogRef}
+                      overlayContainerRef={addOverlayRef}
+                      scrollContainerRef={addScrollRef}
                     />
                   </div>
 
@@ -1753,6 +1933,9 @@ export default function AppleEmployeeDirectoryPage() {
                       emptyOptionLabel="All Outlets"
                       dropDirection="up"
                       isDark={isDark}
+                      dialogContainerRef={addDialogRef}
+                      overlayContainerRef={addOverlayRef}
+                      scrollContainerRef={addScrollRef}
                     />
                   </div>
                 </div>

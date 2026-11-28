@@ -220,11 +220,11 @@ export default function MyShiftsPage() {
 
         <main className="flex-1 w-full max-w-3xl mx-auto px-3 sm:px-6 py-5 space-y-5">
           {/* Header */}
-          <div className="flex items-center justify-between gap-2 pl-12 lg:pl-0">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <button
               type="button"
               onClick={() => router.push(`/restaurant/${subdomain}/shifts`)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-[#0071E3] cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-[#0071E3] py-1 cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Shift Operations</span>
@@ -232,7 +232,7 @@ export default function MyShiftsPage() {
             <button
               type="button"
               onClick={() => router.push(`/restaurant/${subdomain}/shifts/swaps`)}
-              className="text-xs font-semibold text-[#0071E3] hover:underline cursor-pointer"
+              className="text-xs font-semibold text-[#0071E3] hover:underline py-1 shrink-0 cursor-pointer"
             >
               View Swaps
             </button>
@@ -252,24 +252,29 @@ export default function MyShiftsPage() {
               isDark ? "bg-[#121622] border-white/[0.08]" : "bg-white border-slate-200 shadow-xs"
             }`}
           >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#0071E3]">
-                Next shift
-              </span>
-              {nextShift && nextShift.endTime <= nextShift.startTime && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
-                  <Moon className="w-3 h-3" />
-                  Overnight
-                </span>
-              )}
-            </div>
-
             {loading ? (
               <p className="text-xs text-slate-400">Loading your schedule...</p>
             ) : !nextShift ? (
-              <p className="text-xs text-slate-400">No upcoming published shifts scheduled.</p>
+              <div className="space-y-1">
+                <h2 className="text-sm font-bold">No upcoming shifts</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Your shifts will appear here once your manager publishes the schedule.
+                </p>
+              </div>
             ) : (
-              <div className="space-y-3">
+              <>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#0071E3]">
+                    Next shift
+                  </span>
+                  {nextShift.endTime <= nextShift.startTime && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+                      <Moon className="w-3 h-3" />
+                      Overnight
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-3">
                 <div>
                   <div className="text-lg font-bold">{nextShift.shiftDate.slice(0, 10)}</div>
                   <div className="text-2xl font-bold font-mono text-[#0071E3] mt-0.5">
@@ -301,6 +306,7 @@ export default function MyShiftsPage() {
                   </button>
                 </div>
               </div>
+              </>
             )}
           </section>
 
@@ -439,16 +445,14 @@ export default function MyShiftsPage() {
             </section>
           )}
 
-          {/* Upcoming Shifts List */}
-          <section
-            className={`p-5 rounded-3xl border space-y-3 ${
-              isDark ? "bg-[#121622] border-white/[0.08]" : "bg-white border-slate-200 shadow-xs"
-            }`}
-          >
-            <h2 className="text-sm font-bold">Upcoming published shifts</h2>
-            {laterShifts.length === 0 ? (
-              <p className="text-xs text-slate-400">No additional upcoming shifts.</p>
-            ) : (
+          {/* Upcoming Shifts List (only when more than 1 upcoming shift) */}
+          {laterShifts.length > 0 && (
+            <section
+              className={`p-5 rounded-3xl border space-y-3 ${
+                isDark ? "bg-[#121622] border-white/[0.08]" : "bg-white border-slate-200 shadow-xs"
+              }`}
+            >
+              <h2 className="text-sm font-bold">Upcoming published shifts</h2>
               <div className="space-y-2">
                 {laterShifts.map((s) => (
                   <div
@@ -477,8 +481,8 @@ export default function MyShiftsPage() {
                   </div>
                 ))}
               </div>
-            )}
-          </section>
+            </section>
+          )}
         </main>
 
         {/* Swap Request Modal */}
