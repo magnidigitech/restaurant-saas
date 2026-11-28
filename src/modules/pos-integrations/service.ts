@@ -713,6 +713,7 @@ export async function upsertNormalizedPosOrder(params: {
 
     const dbMatchesOrder =
       existing.syncHash === syncHash &&
+      existing.currency === resolvedCurrency &&
       existing.orderType === order.orderType &&
       existing.status === order.status &&
       (existing.businessDate || null) === (order.businessDate || null) &&
