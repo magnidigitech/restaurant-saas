@@ -14,7 +14,15 @@ export default function OnboardingRedirectPage({
   const { isDark } = useTheme();
 
   useEffect(() => {
-    router.replace(`/restaurant/${subdomain}/workforce/employees?tab=onboarding`);
+    const isSubdomain =
+      typeof window !== "undefined" &&
+      (window.location.host.startsWith(`${subdomain}.`) ||
+        (window.location.host.includes(".localhost") && !window.location.host.startsWith("admin.")));
+    router.replace(
+      isSubdomain
+        ? "/workforce/employees?tab=onboarding"
+        : `/restaurant/${subdomain}/workforce/employees?tab=onboarding`
+    );
   }, [router, subdomain]);
 
   return (

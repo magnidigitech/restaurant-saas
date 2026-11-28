@@ -63,7 +63,7 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    await assertEmployeeInScope(auth.ctx, id);
+    await assertEmployeeInScope(auth.ctx, id, { includeArchived: true });
 
     const body = await req.json();
     const result = updateEmployeeSchema.safeParse(body);

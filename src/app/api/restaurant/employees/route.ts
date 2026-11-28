@@ -43,6 +43,9 @@ export async function GET(req: NextRequest) {
     const search = sp.get("search") || undefined;
     const workerTypeRaw = sp.get("workerType") || undefined;
     const statusRaw = sp.get("employmentStatus") || undefined;
+    const archiveRaw = sp.get("status") || undefined;
+    const archiveStatus: "active" | "archived" | "all" =
+      archiveRaw === "archived" || archiveRaw === "all" ? archiveRaw : "active";
 
     const workerType =
       workerTypeRaw && workerTypeRaw in WorkerType
@@ -59,6 +62,7 @@ export async function GET(req: NextRequest) {
       departmentId,
       workerType,
       employmentStatus,
+      archiveStatus,
     });
 
     return NextResponse.json({

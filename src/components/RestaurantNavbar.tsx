@@ -298,7 +298,7 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
         moduleKey: "hr_onboarding",
         children: [
           { label: "Employee Directory", desc: "Staff profiles, job grades & outlet allocation", href: p("/workforce/employees"), quickAction: true },
-          { label: "Staff Onboarding", desc: "New hire document & compliance verification", href: p("/workforce/onboarding") },
+          { label: "Staff Onboarding", desc: "New hire document & compliance verification", href: p("/workforce/employees?tab=onboarding") },
           { label: "Roles & Permissions", desc: "User access levels & operational privileges", href: p("/workforce/users") },
           { label: "Live Attendance", desc: "Clocked-in presence, timesheets & punch logs", href: p("/attendance") },
           { label: "Leave Requests", desc: "Paid leaves, sick quotas & manager approvals", href: p("/leaves") },
@@ -832,7 +832,18 @@ export default function RestaurantNavbar({ branding, activeSection }: Restaurant
                   {hasSubs && isExpanded && (
                     <div className="pl-3.5 pr-1 py-1 space-y-0.5 border-l-2 ml-4 my-1 border-slate-200 dark:border-white/10 transition-all">
                       {item.children!.map((sub) => {
-                        const isChildActive = !!pathname && pathname.startsWith(sub.href);
+                        const currentTab =
+                          typeof window !== "undefined"
+                            ? new URLSearchParams(window.location.search).get("tab")
+                            : null;
+                        const isChildActive = !!pathname && (
+                          sub.href.includes("?tab=onboarding")
+                            ? (pathname.includes("/workforce/employees") && currentTab === "onboarding") ||
+                              pathname.includes("/workforce/onboarding")
+                            : sub.href.endsWith("/workforce/employees")
+                            ? pathname.includes("/workforce/employees") && currentTab !== "onboarding"
+                            : pathname.startsWith(sub.href.split("?")[0])
+                        );
                         return (
                           <button
                             key={sub.label}

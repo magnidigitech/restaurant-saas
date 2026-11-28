@@ -132,6 +132,7 @@ export interface DirectoryFilters {
   departmentId?: string;
   workerType?: WorkerType;
   employmentStatus?: EmploymentStatus;
+  archiveStatus?: "active" | "archived" | "all";
 }
 
 /**
@@ -149,6 +150,14 @@ export async function listDirectoryEmployees(
   );
 
   const where: Record<string, unknown> = { ...baseWhere };
+
+  if (filters.archiveStatus === "archived") {
+    where.archivedAt = { not: null };
+  } else if (filters.archiveStatus === "all") {
+    delete where.archivedAt;
+  } else {
+    where.archivedAt = null;
+  }
 
   if (filters.search?.trim()) {
     const q = filters.search.trim();
@@ -175,6 +184,7 @@ export async function listDirectoryEmployees(
       workerType: true,
       weeklyHoursLimit: true,
       joiningDate: true,
+      archivedAt: true,
       createdAt: true,
       memberships: {
         take: 1,
@@ -242,6 +252,7 @@ export async function listDirectoryEmployees(
         profilePhotoUrl: emp.profilePhotoUrl,
         weeklyHoursLimit: emp.weeklyHoursLimit,
         joiningDate: emp.joiningDate,
+        archivedAt: emp.archivedAt,
         employmentStatus: status,
         employmentStatusLabel: EMPLOYMENT_STATUS_LABELS[status] || status,
         workerType,
@@ -367,10 +378,15 @@ export async function getRosterEligibleEmployees(
 
 export async function assertEmployeeInScope(
   ctx: WorkforceActorContext,
-  employeeId: string
+  employeeId: string,
+  options?: { includeArchived?: boolean }
 ) {
   const emp = await prisma.employee.findFirst({
-    where: { id: employeeId, restaurantId: ctx.restaurantId, archivedAt: null },
+    where: {
+      id: employeeId,
+      restaurantId: ctx.restaurantId,
+      ...(options?.includeArchived ? {} : { archivedAt: null }),
+    },
     select: {
       id: true,
       outletAssignments: { select: { outletId: true } },
@@ -411,10 +427,10 @@ export async function getEmployeeProfile(
   ctx: WorkforceActorContext,
   employeeId: string
 ) {
-  await assertEmployeeInScope(ctx, employeeId);
+  await assertEmployeeInScope(ctx, employeeId, { includeArchived: true });
 
   const employee = await prisma.employee.findFirst({
-    where: { id: employeeId, restaurantId: ctx.restaurantId, archivedAt: null },
+    where: { id: employeeId, restaurantId: ctx.restaurantId },
     select: {
       id: true,
       restaurantId: true,
